@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record model="res.groups.privilege" id="res_groups_privilege_shahtaj">
+        <field name="name">Shahtaj Order Booker</field>
+        <field name="sequence">5</field>
+        <field name="category_id" ref="base.module_category_sales"/>
+        <field name="placeholder">No</field>
+    </record>
+
+    <record id="group_shahtaj_distributor" model="res.groups">
+        <field name="name">Distributor</field>
+        <field name="sequence">10</field>
+        <field name="privilege_id" ref="res_groups_privilege_shahtaj"/>
+        <field name="implied_ids" eval="[
+            (4, ref('base.group_user')),
+            (4, ref('product.group_product_manager')),
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('sales_team.group_sale_manager')),
+            (4, ref('account.group_account_invoice')),
+            (4, ref('account.group_account_readonly')),
+        ]"/>
+        <field name="comment">Distributor: field ops, products, stock, sales, invoicing, and shop accounting.</field>
+    </record>
+
+    <record id="group_shahtaj_order_booker" model="res.groups">
+        <field name="name">Order Booker</field>
+        <field name="sequence">20</field>
+        <field name="privilege_id" ref="res_groups_privilege_shahtaj"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Field booker: visits, GPS check-in, tasks, shop registration.</field>
+    </record>
+</odoo>

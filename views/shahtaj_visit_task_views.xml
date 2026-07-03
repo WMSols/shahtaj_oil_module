@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_visit_task_list" model="ir.ui.view">
+        <field name="name">shahtaj.visit.task.list</field>
+        <field name="model">shahtaj.visit.task</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state in ('cancelled', 'skipped')"
+                  decoration-success="state == 'completed'"
+                  decoration-warning="state == 'pending'"
+                  decoration-info="state == 'in_progress'">
+                <field name="scheduled_date"/>
+                <field name="order_booker_id"/>
+                <field name="route_id"/>
+                <field name="zone_id" optional="show"/>
+                <field name="shop_id"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'completed'"
+                       decoration-warning="state == 'pending'"
+                       decoration-info="state == 'in_progress'"
+                       decoration-danger="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_task_form" model="ir.ui.view">
+        <field name="name">shahtaj.visit.task.form</field>
+        <field name="model">shahtaj.visit.task</field>
+        <field name="arch" type="xml">
+            <form string="Visit Task">
+                <header>
+                    <button name="action_start" type="object" string="Start"
+                            invisible="state != 'pending'" class="oe_highlight"/>
+                    <button name="action_complete" type="object" string="Complete"
+                            invisible="state not in ('pending', 'in_progress')" class="oe_highlight"/>
+                    <button name="action_skip" type="object" string="Skip"
+                            invisible="state in ('completed', 'cancelled', 'skipped')"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state in ('completed', 'cancelled')"/>
+                    <button name="action_reset_pending" type="object" string="Reset to Pending"
+                            invisible="state == 'pending'"/>
+                    <button string="Save" special="save" class="oe_highlight" data-hotkey="s"/>
+                    <button string="Discard" special="cancel" data-hotkey="j"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,in_progress,completed,skipped,cancelled"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="scheduled_date" required="1"/>
+                            <field name="order_booker_id" required="1"/>
+                            <field name="route_id" required="1"/>
+                        </group>
+                        <group>
+                            <field name="zone_id"/>
+                            <field name="shop_id" required="1"
+                                   domain="[('is_shahtaj_shop', '=', True), ('shop_approval_state', '=', 'approved'), ('route_id', '=', route_id)]"/>
+                            <field name="weekly_schedule_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1" placeholder="Distributor or booker notes..."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" special="save" class="btn-primary" data-hotkey="s"/>
+                    <button string="Discard" special="cancel" class="btn-secondary" data-hotkey="j"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_task_list_booker" model="ir.ui.view">
+        <field name="name">shahtaj.visit.task.list.booker</field>
+        <field name="model">shahtaj.visit.task</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state in ('cancelled', 'skipped')"
+                  decoration-success="state == 'completed'"
+                  decoration-warning="state == 'pending'"
+                  decoration-info="state == 'in_progress'"
+                  create="false" delete="false">
+                <field name="scheduled_date"/>
+                <field name="route_id"/>
+                <field name="zone_id" optional="show"/>
+                <field name="shop_id"/>
+                <field name="visit_duration_minutes" string="Visit (min)" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'completed'"
+                       decoration-warning="state == 'pending'"
+                       decoration-info="state == 'in_progress'"
+                       decoration-danger="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_task_form_booker" model="ir.ui.view">
+        <field name="name">shahtaj.visit.task.form.booker</field>
+        <field name="model">shahtaj.visit.task</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <form string="Visit Task" create="false" delete="false">
+                <header>
+                    <button name="action_check_in_at_shop" type="object" string="I'm at Shop"
+                            class="oe_highlight"
+                            invisible="state in ('completed', 'cancelled', 'skipped') or visit_id"/>
+                    <button name="action_open_visit" type="object" string="Continue Visit"
+                            class="oe_highlight"
+                            invisible="not visit_id or state in ('completed', 'cancelled', 'skipped')"/>
+                    <button name="action_open_active_visit_from_task" type="object"
+                            string="Go to Active Visit"
+                            class="oe_highlight"
+                            invisible="not shahtaj_has_active_visit_elsewhere"/>
+                    <button name="action_skip" type="object" string="Skip"
+                            invisible="state in ('completed', 'cancelled', 'skipped') or visit_id"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,in_progress,completed,skipped"/>
+                </header>
+                <sheet>
+                    <field name="visit_id" invisible="1"/>
+                    <field name="shahtaj_has_active_visit_elsewhere" invisible="1"/>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not shahtaj_has_active_visit_elsewhere">
+                        You have an active visit at another shop.
+                        Finish it or use <b>Go to Active Visit</b> before starting here.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="scheduled_date" readonly="1"/>
+                            <field name="route_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="zone_id" readonly="1"/>
+                            <field name="shop_id" readonly="1"/>
+                            <field name="visit_duration_minutes" readonly="1"
+                                   invisible="not visit_id"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1" placeholder="Add notes about this visit..."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save Notes" special="save" class="btn-primary" data-hotkey="s"/>
+                    <button string="Close" special="cancel" class="btn-secondary" data-hotkey="j"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_task_search" model="ir.ui.view">
+        <field name="name">shahtaj.visit.task.search</field>
+        <field name="model">shahtaj.visit.task</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="shop_id"/>
+                <field name="route_id"/>
+                <field name="order_booker_id"/>
+                <filter string="Today" name="today"
+                        domain="[('scheduled_date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Pending" name="pending" domain="[('state', '=', 'pending')]"/>
+                <filter string="In Progress" name="in_progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter string="Completed" name="completed" domain="[('state', '=', 'completed')]"/>
+                <separator/>
+                <filter string="Scheduled Date" name="group_date" context="{'group_by': 'scheduled_date'}"/>
+                <filter string="Route" name="group_route" context="{'group_by': 'route_id'}"/>
+                <filter string="Order Booker" name="group_booker" context="{'group_by': 'order_booker_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_visit_task" model="ir.actions.act_window">
+        <field name="name">Visit Tasks</field>
+        <field name="res_model">shahtaj.visit.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shahtaj_visit_task_search"/>
+        <field name="context">{'search_default_today': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No visit tasks yet
+            </p>
+            <p>
+                Open an order booker from <b>Weekly Schedules</b> to assign routes.
+                Visit tasks are created automatically from the schedule.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_visit_task_today" model="ir.actions.act_window">
+        <field name="name">My Tasks Today</field>
+        <field name="res_model">shahtaj.visit.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shahtaj_visit_task_search"/>
+        <field name="domain">[
+            ('order_booker_id', '=', uid),
+            ('state', 'not in', ['cancelled']),
+        ]</field>
+        <field name="context">{'search_default_today': 1, 'search_default_group_route': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No visits scheduled for today
+            </p>
+            <p>Your distributor assigns weekly routes. Tasks appear here automatically.</p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_visit_task_today_list_booker" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_visit_task_list_booker"/>
+        <field name="act_window_id" ref="action_shahtaj_visit_task_today"/>
+    </record>
+
+    <record id="action_shahtaj_visit_task_today_form_booker" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shahtaj_visit_task_form_booker"/>
+        <field name="act_window_id" ref="action_shahtaj_visit_task_today"/>
+    </record>
+
+</odoo>
