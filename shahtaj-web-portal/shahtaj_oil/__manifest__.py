@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.0.34',
+    'version': '19.0.1.0.35',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',

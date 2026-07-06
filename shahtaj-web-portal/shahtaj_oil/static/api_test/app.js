@@ -461,8 +461,8 @@
     el.innerHTML = state.tasks.map((t) => {
       const shop = t.shop || {};
       return `<article class="card task-card" data-task-id="${t.id}">
-        <h4>${escapeHtml(shop.name || '?')}</h4>
-        <p class="meta">${escapeHtml(t.route?.name || '')} · ${t.state}</p>
+        <h4>${escapeHtml(shop.name || '?')} <span class="meta">#${shop.shop_id || shop.id || ''}</span></h4>
+        <p class="meta">${escapeHtml(t.route?.name || '')} · ${t.state} · Booker ID: ${t.order_booker_id || '?'}</p>
         <p class="hint">${escapeHtml(shop.owner_phone || '')}</p>
       </article>`;
     }).join('');
@@ -481,7 +481,7 @@
     panel.classList.remove('hidden');
     const shop = state.selectedTask.shop || {};
     $('selected-task-label').textContent =
-      `${shop.name} — ${state.selectedTask.state}`;
+      `${shop.name} (Shop ID: ${shop.shop_id || shop.id}) — ${state.selectedTask.state}`;
     $('inp-task-notes').value = state.selectedTask.notes || '';
     const gpsBox = $('shop-gps-box');
     gpsBox.innerHTML = shop.latitude && shop.longitude
@@ -587,8 +587,8 @@
       completed.classList.add('hidden');
       const v = state.visit;
       $('visit-summary').innerHTML = `
-        <p><strong>${escapeHtml(v.shop?.name || '')}</strong> · ${v.state} · ${v.duration_minutes?.toFixed?.(1) || 0} min</p>
-        <p class="meta">Check-in distance: ${v.check_in_distance_m?.toFixed?.(0) || '?'} m</p>`;
+        <p><strong>${escapeHtml(v.shop?.name || '')}</strong> <span class="meta">(Shop ID: ${v.shop_id || v.shop?.id || '?'})</span> · ${v.state} · ${v.duration_minutes?.toFixed?.(1) || 0} min</p>
+        <p class="meta">Booker ID: ${v.order_booker_id || '?'} · Check-in distance: ${v.check_in_distance_m?.toFixed?.(0) || '?'} m</p>`;
       $('inp-visit-notes').value = v.notes || '';
       const tbody = $('visit-lines-table').querySelector('tbody');
       tbody.innerHTML = (v.lines || []).map((line) => `
@@ -664,8 +664,8 @@
     el.innerHTML = `<p class="meta">Showing ${visits.length} of ${data.total || visits.length}</p>` +
       visits.map((v) => `
         <article class="card history-card" data-visit-id="${v.id}">
-          <h4>${escapeHtml(v.shop?.name || '?')}</h4>
-          <p>${v.outcome} · ${v.started_at || ''}</p>
+          <h4>${escapeHtml(v.shop?.name || '?')} <span class="meta">#${v.shop_id || v.shop?.id || ''}</span></h4>
+          <p>${v.outcome} · ${v.started_at || ''} · Booker ID: ${v.order_booker_id || '?'}</p>
           <p class="hint">Order: ${escapeHtml(v.sale_order_name || '—')}</p>
         </article>`).join('');
     el.querySelectorAll('.history-card').forEach((card) => {
@@ -722,7 +722,7 @@
     }
     el.innerHTML = shops.map((s) => `
       <article class="card shop-card" data-shop-id="${s.id}">
-        <h4>${escapeHtml(s.name)}</h4>
+        <h4>${escapeHtml(s.name)} <span class="meta">#${s.shop_id || s.id}</span></h4>
         <p>${s.approval_state} · ${escapeHtml(s.owner_phone || '')}</p>
       </article>`).join('');
     el.querySelectorAll('.shop-card').forEach((card) => {
@@ -733,7 +733,7 @@
             include_photos: true,
           });
           $('shop-detail-panel').classList.remove('hidden');
-          $('shop-detail-title').textContent = detail.shop.name;
+          $('shop-detail-title').textContent = `${detail.shop.name} (Shop ID: ${detail.shop.shop_id || detail.shop.id})`;
           $('shop-detail-photos').innerHTML = '<pre class="log-json">' +
             escapeHtml(JSON.stringify(detail.shop.photo_data || {}, null, 2)) + '</pre>';
         } catch (e) {

@@ -89,8 +89,9 @@
                             <tr>
                                 <td class="ps-4">
                                     <div class="fw-bold text-dark"><t t-esc="staff.name"/></div>
+                                    <small class="text-muted">Booker ID: <t t-esc="staff.id"/></small>
                                     <t t-if="staff.employee_code">
-                                        <small class="text-muted"><t t-esc="staff.employee_code"/></small>
+                                        <small class="text-muted d-block"><t t-esc="staff.employee_code"/></small>
                                     </t>
                                 </td>
                                 <td>
@@ -136,9 +137,12 @@
                 <div class="d-flex justify-content-between align-items-end">
                     <div>
                         <h2 class="fw-bold text-dark mb-1"><t t-esc="this.state.selectedStaff.name"/></h2>
-                        <div class="d-flex align-items-center mt-2">
-                            <span class="badge bg-primary text-white shadow-sm px-2 py-1 fs-6"><t t-esc="this.state.selectedStaff.role"/></span>
-                            <span class="text-muted fw-bold small ms-3 d-flex align-items-center">
+                        <div class="d-flex align-items-center mt-2 flex-wrap gap-2">
+                            <span class="badge bg-dark text-white shadow-sm px-2 py-1">
+                                Booker ID: <t t-esc="this.state.selectedStaff.id"/>
+                            </span>
+                            <span class="badge bg-primary text-white shadow-sm px-2 py-1"><t t-esc="this.state.selectedStaff.role"/></span>
+                            <span class="text-muted fw-bold small d-flex align-items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-badge-check me-1"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg>
                                 <t t-esc="this.state.selectedStaff.employee_code || 'No Code'"/>
                             </span>

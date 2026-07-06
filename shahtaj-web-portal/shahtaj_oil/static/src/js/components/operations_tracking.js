@@ -93,7 +93,9 @@ export class OperationsTracking extends Component {
             return {
                 id: v.id,
                 shop: v.shop_id ? v.shop_id[1] : 'Unknown Shop',
+                shopId: v.shop_id ? v.shop_id[0] : false,
                 booker: v.order_booker_id ? v.order_booker_id[1] : 'Unknown Booker',
+                bookerId: v.order_booker_id ? v.order_booker_id[0] : false,
                 time: v.started_at || 'Pending',
                 endTime: v.ended_at || 'In Progress',
                 status: displayStatus,
@@ -122,8 +124,10 @@ export class OperationsTracking extends Component {
                 odoo_id: o.id,
                 id: o.name,
                 shop: o.partner_id ? o.partner_id[1] : 'Unknown Shop',
-                partner_id: o.partner_id, // Store tuple to fetch partner info later
+                shopId: o.partner_id ? o.partner_id[0] : false,
+                partner_id: o.partner_id,
                 booker: o.user_id ? o.user_id[1] : 'Unknown Booker',
+                bookerId: o.user_id ? o.user_id[0] : false,
                 address: "Loading...", 
                 phone: "Loading...",
                 email: "Loading...",
@@ -161,7 +165,9 @@ export class OperationsTracking extends Component {
     get filteredCheckins() {
         return this.state.checkins.filter(c => {
             const matchSearch = c.shop.toLowerCase().includes(this.state.checkinFilters.search.toLowerCase()) || 
-                                c.booker.toLowerCase().includes(this.state.checkinFilters.search.toLowerCase());
+                                c.booker.toLowerCase().includes(this.state.checkinFilters.search.toLowerCase()) ||
+                                String(c.shopId || '').includes(this.state.checkinFilters.search) ||
+                                String(c.bookerId || '').includes(this.state.checkinFilters.search);
             const matchStatus = this.state.checkinFilters.status ? c.status === this.state.checkinFilters.status : true;
             return matchSearch && matchStatus;
         });
@@ -176,7 +182,9 @@ export class OperationsTracking extends Component {
         return this.state.orders.filter(o => {
             const matchSearch = o.shop.toLowerCase().includes(this.state.orderFilters.search.toLowerCase()) || 
                                 o.id.toLowerCase().includes(this.state.orderFilters.search.toLowerCase()) ||
-                                o.booker.toLowerCase().includes(this.state.orderFilters.search.toLowerCase());
+                                o.booker.toLowerCase().includes(this.state.orderFilters.search.toLowerCase()) ||
+                                String(o.shopId || '').includes(this.state.orderFilters.search) ||
+                                String(o.bookerId || '').includes(this.state.orderFilters.search);
             const matchStatus = this.state.orderFilters.status ? o.status === this.state.orderFilters.status : true;
             return matchSearch && matchStatus;
         });

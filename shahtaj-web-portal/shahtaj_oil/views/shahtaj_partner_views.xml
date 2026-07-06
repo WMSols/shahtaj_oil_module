@@ -8,6 +8,7 @@
         <field name="priority">1</field>
         <field name="arch" type="xml">
             <list>
+                <field name="id" string="Shop ID" optional="show"/>
                 <field name="name" string="Shop Name"/>
                 <field name="owner_name"/>
                 <field name="owner_phone"/>
