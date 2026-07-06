@@ -1,0 +1,65 @@
+# =============================================================================
+# NEVER commit Odoo core or local machine files (listed first on purpose).
+# =============================================================================
+odoo-19.0/
+.venv/
+venv/
+db_backup/
+backups/
+odoo.conf
+odoo.conf.*
+*.sql
+*.dump
+odoo_addons/
+
+# =============================================================================
+# Whitelist: only README + addon modules under shahtaj-web-portal/
+# =============================================================================
+/*
+!/.gitignore
+!/README.md
+!/.vscode/
+!/.vscode/**
+!/shahtaj-web-portal/
+
+shahtaj-web-portal/*
+!/shahtaj-web-portal/shahtaj_oil/
+!/shahtaj-web-portal/fastapi/
+!/shahtaj-web-portal/endpoint_route_handler/
+!/shahtaj-web-portal/README.md
+!/shahtaj-web-portal/.gitignore
+
+# --- Python bytecode (inside tracked modules) ---
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/*.egg-info/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# --- Secrets ---
+.env
+.env.*
+*.pem
+
+# --- IDE / OS ---
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Legacy ---
+shahtaj_order_booker/
+shahtaj_distributor/
+AGENT_CONTEXT.md
+
+# --- Logs / temp ---
+*.log
+filestore/
+sessions/
+tmp/
+temp/
+debug_*.py
+check_*.py

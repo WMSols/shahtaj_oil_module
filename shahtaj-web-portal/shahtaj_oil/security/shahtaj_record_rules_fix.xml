@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="rule_shahtaj_distributor_read_bookers" model="ir.rule">
+            <field name="domain_force">[
+                '|',
+                ('shahtaj_is_order_booker', '=', True),
+                ('id', '=', user.id),
+            ]</field>
+        </record>
+        <record id="rule_shahtaj_shop_booker_own" model="ir.rule">
+            <field name="domain_force">[
+                '|',
+                ('is_shahtaj_shop', '=', False),
+                '|',
+                ('registered_by_id', '=', user.id),
+                ('route_id.weekly_schedule_ids.order_booker_id', '=', user.id),
+            ]</field>
+        </record>
+        <!-- Order bookers may pick any zone/route when registering shops -->
+        <delete model="ir.rule" id="rule_shahtaj_route_booker_read"/>
+        <delete model="ir.rule" id="rule_shahtaj_zone_booker_read"/>
+    </data>
+</odoo>

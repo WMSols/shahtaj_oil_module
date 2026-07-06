@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_create_order_booker_wizard_form" model="ir.ui.view">
+        <field name="name">shahtaj.create.order.booker.wizard.form</field>
+        <field name="model">shahtaj.create.order.booker.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Create Order Booker">
+                <group>
+                    <field name="name" placeholder="e.g. Ahmed Ali"/>
+                    <field name="login" placeholder="e.g. 03001234567 or ahmed"/>
+                    <field name="password" password="True"/>
+                    <field name="shahtaj_employee_code" placeholder="e.g. OB-001"/>
+                </group>
+                <div class="alert alert-info" role="alert">
+                    Default access is applied automatically:
+                    Internal User + Shahtaj / Order Booker only.
+                </div>
+                <footer>
+                    <button name="action_create_booker" type="object"
+                            string="Create Order Booker" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_create_order_booker_wizard" model="ir.actions.act_window">
+        <field name="name">Create Order Booker</field>
+        <field name="res_model">shahtaj.create.order.booker.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Distributor shop payments: no sample rows (they reference inaccessible partners). -->
+    <record id="view_account_payment_tree_shahtaj" model="ir.ui.view">
+        <field name="name">account.payment.list.shahtaj</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_tree"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <list position="attributes">
+                <attribute name="sample">0</attribute>
+            </list>
+            <field name="partner_id" position="attributes">
+                <attribute name="domain">[
+                    '|', '|',
+                    ('is_shahtaj_shop', '=', True),
+                    ('parent_id.is_shahtaj_shop', '=', True),
+                    ('commercial_partner_id.is_shahtaj_shop', '=', True),
+                ]</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_account_payment_kanban_shahtaj" model="ir.ui.view">
+        <field name="name">account.payment.kanban.shahtaj</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_kanban"/>
+        <field name="arch" type="xml">
+            <kanban position="attributes">
+                <attribute name="sample">0</attribute>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_account_payment_form_shahtaj" model="ir.ui.view">
+        <field name="name">account.payment.form.shahtaj</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_form"/>
+        <field name="arch" type="xml">
+            <!-- Odoo 19: view selectors cannot use @string; use @invisible instead. -->
+            <xpath expr="//field[@name='partner_id'][@invisible=&quot;partner_type != 'customer'&quot;]" position="attributes">
+                <attribute name="domain">[
+                    ('is_shahtaj_shop', '=', True),
+                    ('shop_approval_state', '=', 'approved'),
+                ]</attribute>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

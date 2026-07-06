@@ -1,0 +1,18 @@
+{
+  "files.exclude": {
+    "odoo-19.0": true,
+    ".venv": true,
+    "db_backup": true
+  },
+  "search.exclude": {
+    "odoo-19.0": true,
+    ".venv": true,
+    "db_backup": true
+  },
+  "files.watcherExclude": {
+    "**/odoo-19.0/**": true,
+    "**/.venv/**": true,
+    "**/db_backup/**": true
+  },
+  "git.ignoreLimitWarning": true
+}

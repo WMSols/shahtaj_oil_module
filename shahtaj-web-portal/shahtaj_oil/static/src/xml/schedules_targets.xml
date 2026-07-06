@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.SchedulesTargets" owl="1">
+        <div class="card border-0 shadow-sm bg-white rounded-3">
+
+            <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center rounded-top">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-0">Schedules &amp; Targets Hub</h2>
+                    <small class="text-muted">Manage weekly routes and performance KPIs for field staff.</small>
+                </div>
+            </div>
+
+            <t t-if="this.state.viewMode === 'list'">
+                <div class="p-3 border-bottom">
+                    <ul class="nav nav-pills nav-fill">
+                        <li class="nav-item">
+                            <button t-on-click="() => this.switchMainTab('schedules')" t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeMainTab === 'schedules' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-days me-2">
+                                    <path d="M8 2v4"/>
+                                    <path d="M16 2v4"/>
+                                    <rect width="18" height="18" x="3" y="4" rx="2"/>
+                                    <path d="M3 10h18"/>
+                                    <path d="M8 14h.01"/>
+                                    <path d="M12 14h.01"/>
+                                    <path d="M16 14h.01"/>
+                                    <path d="M8 18h.01"/>
+                                    <path d="M12 18h.01"/>
+                                    <path d="M16 18h.01"/>
+                                </svg>
+                                Weekly Schedules
+                            </button>
+                        </li>
+                        <li class="nav-item mx-2">
+                            <button t-on-click="() => this.switchMainTab('targets')" t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeMainTab === 'targets' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target me-2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <circle cx="12" cy="12" r="6"/>
+                                    <circle cx="12" cy="12" r="2"/>
+                                </svg>
+                                Performance Targets
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="bg-light text-uppercase small fw-bold text-muted">
+                            <tr>
+                                <th class="border-top-0 ps-4">Order Booker</th>
+                                <th class="border-top-0 text-end pe-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="this.state.bookers" t-as="booker" t-key="booker.id">
+                                <tr>
+                                    <td class="ps-4 align-middle fw-bold text-dark">
+                                        <t t-esc="booker.name"/>
+                                        <small class="d-block text-muted fw-normal">
+                                            <t t-esc="booker.id"/>
+                                        </small>
+                                    </td>
+                                    
+                                    <td class="align-middle text-end pe-4">
+                                        <button class="btn btn-sm btn-outline-dark fw-bold d-inline-flex align-items-center" t-on-click="() => this.openBookerDetails(booker)">
+                                            <t t-if="this.state.activeMainTab === 'schedules'">View Schedules</t>
+                                            <t t-else="">View Targets</t>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right ms-2">
+                                                <path d="M5 12h14"/>
+                                                <path d="m12 5 7 7-7 7"/>
+                                            </svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+
+
+            <t t-if="this.state.viewMode === 'detail'">
+
+                <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <button class="btn btn-sm btn-link text-muted fw-bold px-0 text-decoration-none d-flex align-items-center" t-on-click="goBackToList">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+                                <path d="m12 19-7-7 7-7"/>
+                                <path d="M19 12H5"/>
+                            </svg>
+                            Back to List
+                        </button>
+                        <h5 class="fw-bold text-dark mb-0 mt-1">
+                            <t t-if="this.state.activeMainTab === 'schedules'">Weekly Schedules: </t>
+                            <t t-else="">Performance Targets: </t>
+                            <span class="text-primary">
+                                <t t-esc="this.state.selectedBooker.name"/>
+                            </span>
+                        </h5>
+                    </div>
+                    <t t-if="!this.state.showForm">
+                        <button class="btn btn-dark shadow-sm fw-bold d-flex align-items-center text-white" t-on-click="openForm">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
+                                <path d="M5 12h14"/>
+                                <path d="M12 5v14"/>
+                            </svg>
+                            <t t-if="this.state.activeMainTab === 'schedules'">Add Schedule</t>
+                            <t t-else="">Add Target</t>
+                        </button>
+                    </t>
+                </div>
+
+                <t t-if="this.state.errorMessage">
+                    <div class="alert alert-danger m-3 py-2 small fw-bold d-flex align-items-center rounded-3" role="alert">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-triangle me-2">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                            <line x1="12" x2="12" y1="9" y2="13"/>
+                            <line x1="12" x2="12.01" y1="17" y2="17"/>
+                        </svg>
+                        <t t-esc="this.state.errorMessage"/>
+                    </div>
+                </t>
+
+
+                <t t-if="this.state.showForm and this.state.activeMainTab === 'schedules'">
+                    <div class="p-4 bg-white border-bottom">
+                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">New Schedule Configuration</h6>
+
+                        <div class="row align-items-end mb-4">
+                            <div class="col-md-3">
+                                <label class="small fw-bold">Day of the Week</label>
+                                <select class="form-select form-control" t-model="this.state.scheduleForm.day">
+                                    <option value="">-- Select Day --</option>
+                                    <option value="0">Monday</option>
+                                    <option value="1">Tuesday</option>
+                                    <option value="2">Wednesday</option>
+                                    <option value="3">Thursday</option>
+                                    <option value="4">Friday</option>
+                                    <option value="5">Saturday</option>
+                                    <option value="6">Sunday</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold">Zone</label>
+                                <select class="form-select form-control" t-model="this.state.scheduleForm.zone_name">
+                                    <option value="">-- Select Zone --</option>
+                                    <t t-foreach="this.uniqueZones" t-as="z" t-key="z">
+                                        <option t-att-value="z">
+                                            <t t-esc="z"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold">Route</label>
+                                <select class="form-select form-control" t-model="this.state.scheduleForm.route_id">
+                                    <option value="">-- Select Route --</option>
+                                    <t t-foreach="this.filteredRoutes" t-as="r" t-key="r.id">
+                                        <option t-att-value="r.id">
+                                            <t t-esc="r.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-2 pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="schedActiveSwitch" t-model="this.state.scheduleForm.is_active"/>
+                                    <label class="form-check-label small fw-bold cursor-pointer" for="schedActiveSwitch">Active</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-light rounded-3 border mb-4">
+                            <h6 class="fw-bold text-muted mb-3 small text-uppercase">Tracking Parameters (Auto-Calculated)</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label class="small fw-bold text-muted">Shops on Route</label>
+                                    <input type="text" class="form-control bg-white text-center fw-bold" value="0" disabled="1"/>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold text-muted">Planned Visits</label>
+                                    <input type="text" class="form-control bg-white text-center fw-bold" value="0" disabled="1"/>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold text-muted">Done Visits</label>
+                                    <input type="text" class="form-control bg-white text-center fw-bold" value="0" disabled="1"/>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold text-muted">Day Progress</label>
+                                    <input type="text" class="form-control bg-white text-center fw-bold text-success" value="0%" disabled="1"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end mt-3">
+                            <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
+                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveSchedule">Save Schedule</button>
+                        </div>
+                    </div>
+                </t>
+
+
+                <t t-if="this.state.showForm and this.state.activeMainTab === 'targets'">
+                    <div class="p-4 bg-white border-bottom">
+                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">New Target Configuration</h6>
+
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="small fw-bold">Start Period</label>
+                                <input type="date" class="form-control" t-model="this.state.targetForm.startDate"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold">End Period</label>
+                                <input type="date" class="form-control" t-model="this.state.targetForm.endDate"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold">Target Type</label>
+                                <select class="form-select form-control" t-model="this.state.targetForm.type">
+                                    <option value="">-- Select Type --</option>
+                                    <option value="visit_count">Visit Count</option>
+                                    <option value="order_count">Order Count</option>
+                                    <option value="sales_amount">Sales Amount</option>
+                                    <option value="product_qty">Product Quantity</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 pt-4 mt-1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="targetActiveSwitch" t-model="this.state.targetForm.is_active"/>
+                                    <label class="form-check-label small fw-bold cursor-pointer" for="targetActiveSwitch">Active</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <label class="small fw-bold">Target Amount / Value</label>
+                                <input type="number" class="form-control" t-model="this.state.targetForm.target_value" placeholder="e.g. 500"/>
+                            </div>
+
+                            <t t-if="this.state.targetForm.type === 'sales_amount'">
+                                <div class="col-md-4">
+                                    <label class="small fw-bold text-success">Currency</label>
+                                    <select class="form-select form-control border-success" t-model="this.state.targetForm.currency_id">
+                                        <t t-foreach="this.state.currencies" t-as="c" t-key="c.id">
+                                            <option t-att-value="c.id">
+                                                <t t-esc="c.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                </div>
+                            </t>
+
+                            <t t-if="this.state.targetForm.type === 'product_qty'">
+                                <div class="col-md-4">
+                                    <label class="small fw-bold text-primary">Target Product</label>
+                                    <select class="form-select form-control border-primary" t-model="this.state.targetForm.product_id">
+                                        <option value="">-- Select Product --</option>
+                                        <t t-foreach="this.state.products" t-as="p" t-key="p.id">
+                                            <option t-att-value="p.id">
+                                                <t t-esc="p.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                </div>
+                            </t>
+                        </div>
+
+                        <hr class="mb-4"/>
+
+                        <div class="p-3 bg-light rounded-3 border mb-4">
+                            <h6 class="fw-bold text-muted mb-3 small text-uppercase">Live Progress Details (Auto-Calculated)</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="small fw-bold text-muted">Achieved So Far</label>
+                                    <input type="text" class="form-control bg-white fw-bold" value="0 / Pending" disabled="1"/>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold text-muted">Overall Progress</label>
+                                    <div class="progress mt-2" style="height: 25px;">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end mt-3">
+                            <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
+                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveTarget">Save Target</button>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="!this.state.showForm and this.state.activeMainTab === 'schedules'">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                <tr>
+                                    <th class="ps-4 border-top-0">Day</th>
+                                    <th class="border-top-0">Route Info</th>
+                                    <th class="text-center border-top-0">Shops</th>
+                                    <th class="text-center border-top-0">Progress</th>
+                                    <th class="text-end pe-4 border-top-0">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="currentBookerSchedules.length === 0">
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">No schedules configured for this booker.</td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="currentBookerSchedules" t-as="sched" t-key="sched.id">
+                                    <tr>
+                                        <td class="ps-4 align-middle fw-bold">
+                                            <t t-esc="sched.day"/>
+                                        </td>
+                                        <td class="align-middle">
+                                            <div class="text-dark">
+                                                <t t-esc="sched.route"/>
+                                            </div>
+                                            <small class="text-muted">
+                                                <t t-esc="sched.zone"/>
+                                            </small>
+                                        </td>
+                                        <td class="align-middle text-center">
+                                            <t t-esc="sched.shops"/>
+                                        </td>
+                                        <td class="align-middle text-center fw-bold text-success">
+                                            <t t-esc="sched.progress"/>
+                                        </td>
+                                        <td class="align-middle text-end pe-4">
+                                            <span t-attf-class="badge #{sched.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
+                                                <t t-esc="sched.status"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+
+                <t t-if="!this.state.showForm and this.state.activeMainTab === 'targets'">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                <tr>
+                                    <th class="ps-4 border-top-0">Period</th>
+                                    <th class="border-top-0">Target Goal</th>
+                                    <th class="border-top-0">Achieved</th>
+                                    <th class="border-top-0">Progress</th>
+                                    <th class="text-end pe-4 border-top-0">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="currentBookerTargets.length === 0">
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">No targets configured for this booker.</td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="currentBookerTargets" t-as="tgt" t-key="tgt.id">
+                                    <tr>
+                                        <td class="ps-4 align-middle">
+                                            <div class="fw-bold small">
+                                                <t t-esc="tgt.startDate"/>
+                                            </div>
+                                            <div class="text-muted small">to <t t-esc="tgt.endDate"/>
+                                            </div>
+                                        </td>
+                                        <td class="align-middle">
+                                            <div class="text-dark fw-bold text-capitalize">
+                                                <t t-esc="tgt.type.replace('_', ' ')"/>
+                                            </div>
+                                            <small class="text-muted">
+                                                <t t-esc="tgt.amount"/>
+                                                <t t-if="tgt.currency">
+                                                    <t t-esc="tgt.currency"/>
+                                                </t>
+                                                <t t-if="tgt.product"> (<t t-esc="tgt.product"/>) </t>
+                                            </small>
+                                        </td>
+                                        <td class="align-middle fw-bold">
+                                            <t t-esc="tgt.achievedAmount"/>
+                                        </td>
+                                        <td class="align-middle">
+                                            <div class="progress" style="height: 6px; width: 100px;">
+                                                <div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{tgt.progressPercentage};"></div>
+                                            </div>
+                                            <small class="fw-bold text-success mt-1 d-block">
+                                                <t t-esc="tgt.progressPercentage"/>
+                                            </small>
+                                        </td>
+                                        <td class="align-middle text-end pe-4">
+                                            <span t-attf-class="badge #{tgt.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
+                                                <t t-esc="tgt.status"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </div>
+    </t>
+</templates>

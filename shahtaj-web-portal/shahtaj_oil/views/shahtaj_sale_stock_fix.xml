@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        sale_stock adds qty_at_date_widget on sale order lines for all users.
+        Order bookers open linked sale orders but do not have stock JS assets;
+        hide the widget unless the user has inventory access.
+    -->
+    <record id="view_order_form_inherit_sale_stock_shahtaj" model="ir.ui.view">
+        <field name="name">sale.order.form.sale.stock.shahtaj</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale_stock.view_order_form_inherit_sale_stock"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']//form//widget[@name='qty_at_date_widget']" position="attributes">
+                <attribute name="groups">stock.group_stock_user</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']//list//widget[@name='qty_at_date_widget']" position="attributes">
+                <attribute name="groups">stock.group_stock_user</attribute>
+            </xpath>
+            <xpath expr="//field[@name='json_popover'][@widget='stock_rescheduling_popover']" position="attributes">
+                <attribute name="groups">stock.group_stock_user</attribute>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

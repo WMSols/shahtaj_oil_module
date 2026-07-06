@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Sale order: show visit / booker links for distributor -->
+    <record id="view_sale_order_form_shahtaj" model="ir.ui.view">
+        <field name="name">sale.order.form.shahtaj</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <div name="button_box" position="inside">
+                <button type="object"
+                        name="action_shahtaj_view_visit"
+                        class="oe_stat_button"
+                        icon="fa-map-marker"
+                        invisible="not shahtaj_visit_id"
+                        groups="shahtaj_oil.group_shahtaj_distributor">
+                    <span class="o_stat_text">Shop Visit</span>
+                </button>
+            </div>
+            <field name="partner_id" position="after">
+                <field name="shahtaj_visit_id" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       invisible="not shahtaj_visit_id"/>
+                <field name="shahtaj_visit_task_id" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       invisible="not shahtaj_visit_task_id"/>
+                <field name="shahtaj_order_booker_id" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       invisible="not shahtaj_order_booker_id"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_sale_order_list_shahtaj" model="ir.ui.view">
+        <field name="name">sale.order.list.shahtaj</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.sale_order_tree"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="shahtaj_order_booker_id" optional="show"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_visit_id" optional="hide"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Distributor visit form: links to order and shop -->
+    <record id="view_shahtaj_visit_form_accounting" model="ir.ui.view">
+        <field name="name">shahtaj.visit.form.accounting</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="inherit_id" ref="view_shahtaj_visit_form"/>
+        <field name="arch" type="xml">
+            <header position="inside">
+                <button name="action_open_sale_order" type="object"
+                        string="Open Sales Order"
+                        class="oe_highlight"
+                        invisible="not sale_order_id"
+                        groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <button name="action_open_shop" type="object"
+                        string="Shop Account"
+                        invisible="not shop_id"
+                        groups="shahtaj_oil.group_shahtaj_distributor"/>
+            </header>
+            <field name="sale_order_id" position="attributes">
+                <attribute name="groups">shahtaj_oil.group_shahtaj_distributor</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_list_accounting" model="ir.ui.view">
+        <field name="name">shahtaj.visit.list.accounting</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="inherit_id" ref="view_shahtaj_visit_list"/>
+        <field name="arch" type="xml">
+            <field name="order_amount" position="after">
+                <field name="sale_order_id" optional="hide"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

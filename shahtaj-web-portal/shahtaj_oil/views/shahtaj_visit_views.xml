@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_visit_list" model="ir.ui.view">
+        <field name="name">shahtaj.visit.list</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="outcome == 'no_order'"
+                  decoration-success="outcome == 'order'">
+                <field name="started_at"/>
+                <field name="order_booker_id"/>
+                <field name="shop_id"/>
+                <field name="route_id" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="outcome" widget="badge"
+                       decoration-success="outcome == 'order'"
+                       decoration-warning="outcome == 'no_order'"/>
+                <field name="duration_minutes" string="Duration (min)"/>
+                <field name="order_amount" optional="show"/>
+                <field name="check_in_distance_m" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_form" model="ir.ui.view">
+        <field name="name">shahtaj.visit.form</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="arch" type="xml">
+            <form string="Shop Visit">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="order_booker_id" readonly="1"/>
+                            <field name="shop_id" readonly="1"/>
+                            <field name="route_id" readonly="1"/>
+                            <field name="visit_task_id" readonly="1"/>
+                        </group>
+                        <group string="Timing">
+                            <field name="started_at" readonly="1"/>
+                            <field name="ended_at" readonly="1"/>
+                            <field name="duration_minutes" readonly="1"/>
+                            <field name="outcome" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="GPS Check-in">
+                        <group>
+                            <field name="check_in_latitude" readonly="1"/>
+                            <field name="check_in_longitude" readonly="1"/>
+                            <field name="check_in_distance_m" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Order" invisible="not sale_order_id">
+                        <field name="sale_order_id" readonly="1"/>
+                        <field name="order_amount" readonly="1"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                    <notebook invisible="state != 'in_progress'">
+                        <page string="Products" name="lines">
+                            <field name="line_ids" readonly="state != 'in_progress'">
+                                <list editable="bottom">
+                                    <field name="product_id"/>
+                                    <field name="shahtaj_qty_unlimited" column_invisible="1"/>
+                                    <field name="shahtaj_qty_bookable" string="Available"
+                                           invisible="shahtaj_qty_unlimited"/>
+                                    <field name="product_uom_qty"/>
+                                    <field name="price_unit"/>
+                                    <field name="subtotal"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                    <notebook invisible="state == 'in_progress'">
+                        <page string="Products Ordered" name="lines_done">
+                            <field name="line_ids" readonly="1">
+                                <list>
+                                    <field name="product_id"/>
+                                    <field name="product_uom_qty"/>
+                                    <field name="price_unit"/>
+                                    <field name="subtotal"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_list_booker" model="ir.ui.view">
+        <field name="name">shahtaj.visit.list.booker</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <list string="My Shop Visits" create="false" edit="false" delete="false"
+                  decoration-muted="outcome == 'no_order'"
+                  decoration-success="outcome == 'order'"
+                  decoration-info="state == 'in_progress'">
+                <field name="started_at" string="Check-in"/>
+                <field name="shop_name" string="Shop"/>
+                <field name="route_name" string="Route" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="outcome" widget="badge"
+                       decoration-success="outcome == 'order'"
+                       decoration-warning="outcome == 'no_order'"/>
+                <field name="duration_minutes" string="Duration (min)"/>
+                <field name="order_amount" string="Order Total" optional="show"/>
+                <field name="shop_id" column_invisible="1"/>
+                <field name="route_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Order booker: read-only visit history (no product entry here) -->
+    <record id="view_shahtaj_visit_form_booker_history" model="ir.ui.view">
+        <field name="name">shahtaj.visit.form.booker.history</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="priority">25</field>
+        <field name="arch" type="xml">
+            <form string="Visit History" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_open_booker_form" type="object"
+                            string="Continue Active Visit"
+                            class="oe_highlight"
+                            invisible="state != 'in_progress'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="state != 'in_progress'">
+                        This visit is still active. Use <b>Continue Active Visit</b> above
+                        (or the <b>Active Visit</b> menu) to add products and place an order.
+                    </div>
+                    <group>
+                        <group string="Visit">
+                            <field name="shop_name" string="Shop"/>
+                            <field name="route_name" string="Route"/>
+                            <field name="started_at" string="Check-in Time"/>
+                            <field name="ended_at" string="End Time" invisible="state != 'completed'"/>
+                        </group>
+                        <group string="Summary">
+                            <field name="outcome" string="Result"/>
+                            <field name="duration_minutes" string="Duration (min)"/>
+                            <field name="check_in_distance_m" string="Check-in Distance (m)"/>
+                            <field name="order_amount" string="Order Total"
+                                   invisible="outcome != 'order'"/>
+                            <field name="sale_order_name" string="Order Reference"
+                                   invisible="outcome != 'order'"/>
+                        </group>
+                    </group>
+                    <group string="Products" invisible="not line_ids">
+                        <field name="line_ids" nolabel="1" readonly="1">
+                            <list>
+                                <field name="product_name" string="Product"/>
+                                <field name="product_uom_qty" string="Qty"/>
+                                <field name="price_unit" string="Price"/>
+                                <field name="subtotal" string="Subtotal"/>
+                            </list>
+                        </field>
+                    </group>
+                    <group string="Notes" invisible="not notes">
+                        <field name="notes" nolabel="1" readonly="1"/>
+                    </group>
+                    <field name="shop_id" invisible="1"/>
+                    <field name="route_id" invisible="1"/>
+                    <field name="sale_order_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_form_booker" model="ir.ui.view">
+        <field name="name">shahtaj.visit.form.booker</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <form string="Active Shop Visit" create="false" delete="false">
+                <header>
+                    <button name="action_place_order" type="object" string="Place Order"
+                            class="oe_highlight"
+                            invisible="state != 'in_progress'"/>
+                    <button name="action_end_without_order" type="object"
+                            string="End Visit (No Order)"
+                            invisible="state != 'in_progress'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="state != 'in_progress'">
+                        <strong>Active visit</strong> at
+                        <field name="shop_name" readonly="1" nolabel="1" class="oe_inline"/>
+                        (<field name="route_name" readonly="1" nolabel="1" class="oe_inline"/>).
+                        Add products below, then place the order or end without order.
+                        Started <field name="started_at" readonly="1" nolabel="1" class="oe_inline"/>.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="shop_name" string="Shop" readonly="1"/>
+                            <field name="route_name" string="Route" readonly="1"/>
+                            <field name="shop_id" invisible="1"/>
+                            <field name="route_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="started_at" readonly="1"/>
+                            <field name="duration_minutes" readonly="1" string="Elapsed (min)"/>
+                            <field name="check_in_distance_m" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="visit_task_id" invisible="1"/>
+                    <field name="order_booker_id" invisible="1"/>
+                    <field name="outcome" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <group string="Order Lines" invisible="state != 'in_progress'">
+                        <field name="line_ids" nolabel="1">
+                            <list editable="bottom">
+                                <field name="product_id" placeholder="Select product"/>
+                                <field name="shahtaj_qty_unlimited" column_invisible="1"/>
+                                <field name="shahtaj_qty_bookable" string="Available"
+                                       invisible="shahtaj_qty_unlimited"/>
+                                <field name="product_uom_qty"/>
+                                <field name="price_unit"/>
+                                <field name="subtotal"/>
+                            </list>
+                        </field>
+                    </group>
+                    <group string="Notes" invisible="state != 'in_progress'">
+                        <field name="notes" nolabel="1"
+                               placeholder="Add visit notes (optional)..."/>
+                    </group>
+                    <group string="Result" invisible="state != 'completed'">
+                        <field name="outcome" readonly="1"/>
+                        <field name="ended_at" readonly="1"/>
+                        <field name="duration_minutes" readonly="1" string="Total Visit (min)"/>
+                        <field name="sale_order_name" readonly="1" invisible="outcome != 'order'"/>
+                        <field name="sale_order_id" invisible="1"/>
+                        <field name="order_amount" readonly="1" invisible="outcome != 'order'"/>
+                    </group>
+                    <group string="Notes" invisible="state != 'completed' or not notes">
+                        <field name="notes" nolabel="1" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_search_booker" model="ir.ui.view">
+        <field name="name">shahtaj.visit.search.booker</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <search string="My Shop Visits">
+                <field name="shop_name" string="Shop"/>
+                <field name="route_name" string="Route"/>
+                <filter string="In Progress" name="in_progress"
+                        domain="[('state', '=', 'in_progress')]"/>
+                <filter string="Completed" name="completed"
+                        domain="[('state', '=', 'completed')]"/>
+                <filter string="Today" name="today"
+                        domain="[('started_at', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter string="Order Placed" name="with_order"
+                        domain="[('outcome', '=', 'order')]"/>
+                <filter string="No Order" name="no_order"
+                        domain="[('outcome', '=', 'no_order')]"/>
+                <separator/>
+                <filter string="Day" name="group_day"
+                        context="{'group_by': 'started_at:day'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_search" model="ir.ui.view">
+        <field name="name">shahtaj.visit.search</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="shop_id"/>
+                <field name="order_booker_id"/>
+                <field name="route_id"/>
+                <filter string="Today" name="today"
+                        domain="[('started_at', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter string="In Progress" name="in_progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter string="Order Placed" name="with_order" domain="[('outcome', '=', 'order')]"/>
+                <filter string="No Order" name="no_order" domain="[('outcome', '=', 'no_order')]"/>
+                <separator/>
+                <filter string="Order Booker" name="group_booker" context="{'group_by': 'order_booker_id'}"/>
+                <filter string="Shop" name="group_shop" context="{'group_by': 'shop_id'}"/>
+                <filter string="Route" name="group_route" context="{'group_by': 'route_id'}"/>
+                <filter string="Day" name="group_day" context="{'group_by': 'started_at:day'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_graph" model="ir.ui.view">
+        <field name="name">shahtaj.visit.graph</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="arch" type="xml">
+            <graph string="Visit Duration" type="bar">
+                <field name="order_booker_id"/>
+                <field name="duration_minutes" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_visit_pivot" model="ir.ui.view">
+        <field name="name">shahtaj.visit.pivot</field>
+        <field name="model">shahtaj.visit</field>
+        <field name="arch" type="xml">
+            <pivot string="Shop Visits">
+                <field name="order_booker_id" type="row"/>
+                <field name="outcome" type="col"/>
+                <field name="duration_minutes" type="measure"/>
+                <field name="order_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_visit" model="ir.actions.act_window">
+        <field name="name">Shop Visits</field>
+        <field name="res_model">shahtaj.visit</field>
+        <field name="view_mode">list,form,graph,pivot</field>
+        <field name="search_view_id" ref="view_shahtaj_visit_search"/>
+        <field name="context">{'search_default_today': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No shop visits recorded yet
+            </p>
+            <p>
+                Visits are created when order bookers check in at a shop with GPS.
+                Duration and orders are tracked here for distributor reporting.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_my_visits" model="ir.actions.server">
+        <field name="name">My Shop Visits</field>
+        <field name="model_id" ref="model_shahtaj_visit"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_my_visits()</field>
+    </record>
+
+    <record id="action_shahtaj_active_visit" model="ir.actions.server">
+        <field name="name">Active Visit</field>
+        <field name="model_id" ref="model_shahtaj_visit"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_my_active_visit()</field>
+    </record>
+
+</odoo>

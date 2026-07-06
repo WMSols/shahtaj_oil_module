@@ -1,0 +1,29 @@
+# Python / bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Secrets (never commit)
+.env
+.env.*
+*.pem
+
+# Legacy modules (if restored from backup)
+shahtaj_order_booker/
+shahtaj_distributor/
+
+# Logs
+*.log
+tmp/
+temp/

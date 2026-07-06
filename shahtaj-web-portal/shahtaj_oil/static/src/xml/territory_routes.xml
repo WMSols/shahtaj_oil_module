@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.TerritoryRoutes" owl="1">
+        <div class="card border-0 shadow-sm bg-white rounded-3">
+        
+        <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center rounded-top">
+            <div>
+                <h2 class="h4 fw-bold text-dark mb-0">Territory &amp; Route Management</h2>
+                <small class="text-muted">Create areas, define routes, map shops, and assign field staff.</small>
+            </div>
+            <div>
+                <span class="badge bg-info px-3 py-2 text-white d-flex align-items-center shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin me-2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Mapping Engine Active
+                </span>
+            </div>
+        </div>
+
+        <div class="p-3 border-bottom">
+            <ul class="nav nav-pills nav-fill">
+                <li class="nav-item">
+                    <button t-on-click="() => this.setSubTab('areas')" 
+                            t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeSubTab === 'areas' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map me-2"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>
+                        Areas
+                    </button>
+                </li>
+                <li class="nav-item mx-2">
+                    <button t-on-click="() => this.setSubTab('routes')" 
+                            t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeSubTab === 'routes' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route me-2"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>
+                        Routes &amp; Assignments
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button t-on-click="() => this.setSubTab('shops')" 
+                            t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeSubTab === 'shops' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store me-2"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h2V14h8v8h2a2 2 0 0 0 2-2v-8"/><path d="M2 7h20v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z"/></svg>
+                        Shops Directory
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <t t-if="this.state.activeSubTab === 'areas'">
+            <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0">Geographical Areas</h6>
+                <button class="btn btn-sm btn-dark d-flex align-items-center text-white" t-on-click="() => this.state.showAreaForm = true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    Add New Area
+                </button>
+            </div>
+
+            <t t-if="this.state.showAreaForm">
+                <div class="p-4 bg-light border-bottom">
+                    <div class="row align-items-end">
+                        <div class="col-md-6">
+                            <label class="small fw-bold">Area Name</label>
+                            <input type="text" class="form-control" t-model="this.state.areaForm.name" placeholder="e.g. West Zone"/>
+                        </div>
+                        <div class="col-md-3 pb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="areaActiveSwitch" t-model="this.state.areaForm.is_active"/>
+                                <label class="form-check-label small fw-bold cursor-pointer" for="areaActiveSwitch">Active Status</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3 d-flex">
+                            <button class="btn btn-outline-secondary me-2 w-50 fw-bold" t-on-click="() => this.state.showAreaForm = false">Cancel</button>
+                            <button class="btn btn-success text-white w-50 fw-bold" t-on-click="saveArea">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light text-uppercase small fw-bold text-muted">
+                        <tr>
+                            <th class="border-top-0 ps-4">Area ID</th>
+                            <th class="border-top-0">Area Name</th>
+                            <th class="border-top-0 text-center">Active Routes</th>
+                            <th class="border-top-0">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="this.state.areas" t-as="area" t-key="area.id">
+                            <tr>
+                                <td class="ps-4 fw-bold align-middle"><t t-esc="area.id"/></td>
+                                <td class="align-middle">
+                                    <div class="text-dark fw-bold"><t t-esc="area.name"/></div>
+                                </td>
+                                <td class="align-middle text-center"><span class="badge bg-light text-dark border px-2 py-1"><t t-esc="area.route_count"/></span></td>
+                                <td class="align-middle">
+                                    <span t-attf-class="small fw-bold #{area.active ? 'text-success' : 'text-warning'}">
+                                        <t t-esc="area.active ? 'Active' : 'Inactive'"/>
+                                    </span>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </t>
+
+        <t t-if="this.state.activeSubTab === 'routes'">
+            <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0">Route Configurations</h6>
+                <button class="btn btn-sm btn-dark d-flex align-items-center text-white" t-on-click="() => this.state.showRouteForm = true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    Create Route
+                </button>
+            </div>
+
+            <t t-if="this.state.showRouteForm">
+                <div class="p-4 bg-light border-bottom">
+                    <div class="row align-items-end">
+                        <div class="col-md-4">
+                            <label class="small fw-bold">Route Name</label>
+                            <input type="text" class="form-control" t-model="this.state.routeForm.name" placeholder="e.g. Main Market"/>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small fw-bold">Parent Zone</label>
+                            <select class="form-control" t-model="this.state.routeForm.zone_id">
+                                <option value="">Select Zone...</option>
+                                <t t-foreach="this.state.areas" t-as="a" t-key="a.id">
+                                    <option t-att-value="a.id"><t t-esc="a.name"/></option>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="col-md-2 pb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input cursor-pointer" type="checkbox" id="routeActiveSwitch" t-model="this.state.routeForm.is_active"/>
+                                <label class="form-check-label small fw-bold cursor-pointer" for="routeActiveSwitch">Active Status</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-flex">
+                            <button class="btn btn-outline-secondary me-2 w-100" t-on-click="() => this.state.showRouteForm = false">Cancel</button>
+                            <button class="btn btn-success w-100" t-on-click="saveRoute">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light text-uppercase small fw-bold text-muted">
+                        <tr>
+                            <th class="border-top-0 ps-4">Route Info</th>
+                            <th class="border-top-0 text-center">Mapped Shops</th>
+                            <th class="border-top-0 text-end pe-4">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="this.state.routes" t-as="route" t-key="route.id">
+                            <tr>
+                                <td class="ps-4 align-middle">
+                                    <div class="text-dark fw-bold"><t t-esc="route.name"/></div>
+                                    <small class="text-muted d-flex align-items-center mt-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin me-1"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                        <t t-esc="route.zone_id ? route.zone_id[1] : 'Unassigned'"/>
+                                    </small>
+                                </td>
+                                <td class="align-middle text-center"><span class="badge bg-light text-dark border px-2 py-1"><t t-esc="route.shop_count"/></span></td>
+                                <td class="align-middle text-end pe-4">
+                                    <span t-attf-class="small fw-bold #{route.active ? 'text-success' : 'text-secondary'}">
+                                        <t t-esc="route.active ? 'Active' : 'Inactive'"/>
+                                    </span>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </t>
+
+        <t t-if="this.state.activeSubTab === 'shops'">
+            
+            <t t-if="this.state.selectedShopDetails">
+                <div class="p-4 bg-light border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="fw-bold text-dark mb-0"><t t-esc="this.state.selectedShopDetails.name"/></h4>
+                        <small class="text-muted">Owner: <t t-esc="this.state.selectedShopDetails.owner_name"/> | <t t-esc="this.state.selectedShopDetails.phone"/></small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold d-flex align-items-center" t-on-click="closeShopDetails">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                        Back to Directory
+                    </button>
+                </div>
+                
+                <div class="p-4">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-primary">Location Details</h6>
+                            <p class="mb-1"><strong>Zone:</strong> <t t-esc="this.state.selectedShopDetails.zone_id ? this.state.selectedShopDetails.zone_id[1] : 'N/A'"/></p>
+                            <p class="mb-1"><strong>Route:</strong> <t t-esc="this.state.selectedShopDetails.route_id ? this.state.selectedShopDetails.route_id[1] : 'N/A'"/></p>
+                            <p class="mb-0"><strong>Coordinates:</strong> <t t-esc="this.state.selectedShopDetails.partner_latitude"/>, <t t-esc="this.state.selectedShopDetails.partner_longitude"/></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-success">Financial Details</h6>
+                            <p class="mb-2">
+                                <strong>Category:</strong>
+                                <select class="form-select form-select-sm d-inline-block w-auto ms-2"
+                                        t-model="this.state.shopCategoryEdit">
+                                    <option value="credit">Credit</option>
+                                    <option value="cash">Cash</option>
+                                </select>
+                                <button class="btn btn-sm btn-primary ms-2"
+                                        t-on-click="saveShopCategory">
+                                    Save Category
+                                </button>
+                            </p>
+                            <p class="mb-1" t-if="this.state.selectedShopDetails.shahtaj_shop_category === 'credit'">
+                                <strong>Credit Limit:</strong> Rs. <t t-esc="this.state.selectedShopDetails.credit_limit"/>
+                            </p>
+                            <p class="mb-1"><strong>Legacy Balance:</strong> Rs. <t t-esc="this.state.selectedShopDetails.legacy_balance"/></p>
+                            <p class="mb-0"><strong>Outstanding Balance:</strong> Rs. <t t-esc="this.state.selectedShopDetails.outstanding_balance"/></p>
+                        </div>
+                    </div>
+                    
+                    <h6 class="fw-bold text-dark mb-3">Verification Images</h6>
+                    <div class="row">
+                        <div class="col-md-3 text-center mb-3">
+                            <small class="fw-bold d-block mb-2">CNIC Front</small>
+                            <t t-if="this.state.selectedShopDetails.owner_cnic_front">
+                                <img t-att-src="'data:image/jpeg;base64,' + this.state.selectedShopDetails.owner_cnic_front" class="img-fluid rounded border shadow-sm"/>
+                            </t>
+                            <t t-else=""><div class="p-4 bg-light border rounded text-muted small">No Image</div></t>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <small class="fw-bold d-block mb-2">CNIC Back</small>
+                            <t t-if="this.state.selectedShopDetails.owner_cnic_back">
+                                <img t-att-src="'data:image/jpeg;base64,' + this.state.selectedShopDetails.owner_cnic_back" class="img-fluid rounded border shadow-sm"/>
+                            </t>
+                            <t t-else=""><div class="p-4 bg-light border rounded text-muted small">No Image</div></t>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <small class="fw-bold d-block mb-2">Owner Photo</small>
+                            <t t-if="this.state.selectedShopDetails.owner_photo">
+                                <img t-att-src="'data:image/jpeg;base64,' + this.state.selectedShopDetails.owner_photo" class="img-fluid rounded border shadow-sm"/>
+                            </t>
+                            <t t-else=""><div class="p-4 bg-light border rounded text-muted small">No Image</div></t>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <small class="fw-bold d-block mb-2">Shop Exterior</small>
+                            <t t-if="this.state.selectedShopDetails.shop_exterior_photo">
+                                <img t-att-src="'data:image/jpeg;base64,' + this.state.selectedShopDetails.shop_exterior_photo" class="img-fluid rounded border shadow-sm"/>
+                            </t>
+                            <t t-else=""><div class="p-4 bg-light border rounded text-muted small">No Image</div></t>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <t t-elif="!this.state.showShopForm">
+                <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold mb-0">Registered Shops</h6>
+                    <button class="btn btn-sm btn-dark d-flex align-items-center text-white" t-on-click="() => this.state.showShopForm = true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                        Register New Shop
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="bg-light text-uppercase small fw-bold text-muted">
+                            <tr>
+                                <th class="border-top-0 ps-4">Shop Details</th>
+                                <th class="border-top-0">Contact</th>
+                                <th class="border-top-0">Route Mapping</th>
+                                <th class="border-top-0 text-center">Category</th>
+                                <th class="border-top-0 text-center">Status</th>
+                                <th class="border-top-0 text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="this.state.shops" t-as="shop" t-key="shop.id">
+                                <tr>
+                                    <td class="ps-4 align-middle">
+                                        <div class="text-dark fw-bold"><t t-esc="shop.name"/></div>
+                                        <small class="text-muted">ID: <t t-esc="shop.id"/></small>
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="text-dark"><t t-esc="shop.owner_name"/></div>
+                                        <small class="text-muted"><t t-esc="shop.phone"/></small>
+                                    </td>
+                                    <td class="align-middle text-primary fw-bold"><t t-esc="shop.route_id ? shop.route_id[1] : 'Unassigned'"/></td>
+                                    <td class="align-middle text-center">
+                                        <span t-attf-class="badge #{shop.shahtaj_shop_category === 'cash' ? 'bg-info' : 'bg-primary'}">
+                                            <t t-esc="shop.shahtaj_shop_category === 'cash' ? 'Cash' : 'Credit'"/>
+                                        </span>
+                                    </td>
+                                    <td class="align-middle text-center">
+                                        <span t-attf-class="badge text-white #{shop.shop_approval_state === 'approved' ? 'bg-success' : (shop.shop_approval_state === 'rejected' ? 'bg-danger' : 'bg-warning text-dark')}">
+                                            <t t-esc="shop.shop_approval_state.toUpperCase()"/>
+                                        </span>
+                                    </td>
+                                    <td class="align-middle text-end pe-4">
+                                        <t t-if="shop.shop_approval_state === 'pending'">
+                                            <button class="btn btn-sm btn-success me-2 fw-bold" t-on-click="() => this.approveShop(shop.id)">
+                                                Approve
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.rejectShop(shop.id)">
+                                                Reject
+                                            </button>
+                                        </t>
+                                        <t t-else="">
+                                            <button class="btn btn-sm btn-outline-primary" t-on-click="() => this.viewShopDetails(shop.id)">
+                                                View Details
+                                            </button>
+                                        </t>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+
+            <t t-else="">
+                <div class="p-4 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="fw-bold text-dark mb-0">New Shop Registration</h4>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold d-flex align-items-center" t-on-click="() => this.state.showShopForm = false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                            Back to Directory
+                        </button>
+                    </div>
+
+                    <div class="card border-0 shadow-sm mb-4 rounded-3">
+                        <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                            <h6 class="fw-bold text-primary mb-0">1. Basic Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="small fw-bold">Shop Name</label>
+                                    <input type="text" class="form-control" t-model="this.state.shopForm.name" placeholder="e.g. Al-Hafeez Supermart"/>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="small fw-bold">Owner Name</label>
+                                    <input type="text" class="form-control" t-model="this.state.shopForm.owner_name" placeholder="e.g. Rizwan Ahmed"/>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="small fw-bold">Contact Phone</label>
+                                    <input type="text" class="form-control" t-model="this.state.shopForm.owner_phone" placeholder="03XX-XXXXXXX"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm mb-4 rounded-3">
+                        <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                            <h6 class="fw-bold text-success mb-0">2. Geographical Mapping</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="small fw-bold">Select Zone</label>
+                                    <select class="form-select form-control" t-model="this.state.shopForm.zone_id" t-on-change="onZoneChange">
+                                        <option value="">-- Select Zone --</option>
+                                        <t t-foreach="this.state.areas" t-as="a" t-key="a.id">
+                                            <option t-att-value="a.id"><t t-esc="a.name"/></option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="small fw-bold">Assign to Route</label>
+                                    <select class="form-select form-control" t-model="this.state.shopForm.route_id">
+                                        <option value="">-- Select Route --</option>
+                                        <t t-foreach="this.filteredRoutes" t-as="r" t-key="r.id">
+                                            <option t-att-value="r.id"><t t-esc="r.name"/></option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="small fw-bold text-muted">GPS Latitude</label>
+                                    <input type="number" step="any" class="form-control" t-model="this.state.shopForm.lat" placeholder="31.5204"/>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="small fw-bold text-muted">GPS Longitude</label>
+                                    <input type="number" step="any" class="form-control" t-model="this.state.shopForm.lng" placeholder="74.3587"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm mb-4 rounded-3">
+                        <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                            <h6 class="fw-bold text-warning text-dark mb-0">3. Financial Ledger Setup</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="small fw-bold">Shop Category</label>
+                                    <select class="form-select form-control" t-model="this.state.shopForm.shopCategory">
+                                        <option value="credit">Credit</option>
+                                        <option value="cash">Cash</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3" t-if="this.state.shopForm.shopCategory === 'credit'">
+                                    <label class="small fw-bold">Approved Credit Limit (Rs.)</label>
+                                    <input type="number" class="form-control" t-model="this.state.shopForm.creditLimit" placeholder="e.g. 150000"/>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="small fw-bold">Legacy Balance Brought Forward</label>
+                                    <input type="number" class="form-control" t-model="this.state.shopForm.legacyBalance" placeholder="0.00"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm mb-4 rounded-3">
+                        <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                            <h6 class="fw-bold text-info mb-0">4. KYC &amp; Visual Verification</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label class="small fw-bold">Owner CNIC (Front)</label>
+                                    <input type="file" class="form-control form-control-sm" accept="image/*" t-on-change="(ev) => this.onFileChange(ev, 'owner_cnic_front')"/>
+                                    <t t-if="this.state.shopForm.preview_owner_cnic_front">
+                                        <img t-att-src="this.state.shopForm.preview_owner_cnic_front" class="img-thumbnail mt-2" style="max-height: 120px;"/>
+                                    </t>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="small fw-bold">Owner CNIC (Back)</label>
+                                    <input type="file" class="form-control form-control-sm" accept="image/*" t-on-change="(ev) => this.onFileChange(ev, 'owner_cnic_back')"/>
+                                    <t t-if="this.state.shopForm.preview_owner_cnic_back">
+                                        <img t-att-src="this.state.shopForm.preview_owner_cnic_back" class="img-thumbnail mt-2" style="max-height: 120px;"/>
+                                    </t>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="small fw-bold">Owner Portrait Photo</label>
+                                    <input type="file" class="form-control form-control-sm" accept="image/*" t-on-change="(ev) => this.onFileChange(ev, 'owner_photo')"/>
+                                    <t t-if="this.state.shopForm.preview_owner_photo">
+                                        <img t-att-src="this.state.shopForm.preview_owner_photo" class="img-thumbnail mt-2" style="max-height: 120px;"/>
+                                    </t>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="small fw-bold">Shop Exterior Photo</label>
+                                    <input type="file" class="form-control form-control-sm" accept="image/*" t-on-change="(ev) => this.onFileChange(ev, 'shop_exterior_photo')"/>
+                                    <t t-if="this.state.shopForm.preview_shop_exterior_photo">
+                                        <img t-att-src="this.state.shopForm.preview_shop_exterior_photo" class="img-thumbnail mt-2" style="max-height: 120px;"/>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end pb-4 mt-3">
+                        <button class="btn btn-outline-secondary px-4 me-2 fw-bold" t-on-click="() => this.state.showShopForm = false">Discard</button>
+                        <button class="btn btn-dark px-5 text-white fw-bold" t-on-click="saveShop">Register Shop &amp; Submit for Review</button>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </div>
+    </t>
+</templates>
