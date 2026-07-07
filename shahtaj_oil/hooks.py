@@ -46,7 +46,12 @@ def _sync_distributor_partner_rules(env):
 
 
 def post_init_hook(env):
+    env['ir.config_parameter'].sudo().set_param(
+        'base.enable_programmatic_api_keys', '1'
+    )
     _sync_distributor_partner_rules(env)
+    env['res.users']._sync_all_shahtaj_ui_groups()
+    env.registry.clear_cache('templates')
 
 
 def migrate_distributor_partner_rules(cr):

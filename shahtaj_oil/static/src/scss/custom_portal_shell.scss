@@ -1,0 +1,20 @@
+/* Custom-portal distributors: avatar + Log out only. */
+
+body.o_shahtaj_custom_portal .o_navbar_apps_menu,
+body.o_shahtaj_custom_portal .o_menu_toggle,
+body.o_shahtaj_custom_portal .o_app_menu_sidebar,
+body.o_shahtaj_custom_portal .o_menu_sections,
+body.o_shahtaj_custom_portal .o_menu_brand,
+body.o_shahtaj_custom_portal .o_navbar_breadcrumbs {
+    display: none !important;
+}
+
+/* User menu is d-none on small screens by default; keep logout available. */
+body.o_shahtaj_custom_portal .o_user_menu {
+    display: block !important;
+}
+
+/* Hide debug DB name under avatar in the top bar button. */
+body.o_shahtaj_custom_portal .o_user_menu .oe_topbar_name {
+    display: none !important;
+}

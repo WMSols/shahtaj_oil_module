@@ -8,18 +8,22 @@
         <field name="priority">2</field>
         <field name="arch" type="xml">
             <list string="Shop Balances"
-                  decoration-danger="use_partner_credit_limit and credit_limit and outstanding_balance > credit_limit">
+                  decoration-danger="shahtaj_shop_category == 'credit' and credit_limit and outstanding_balance > credit_limit">
                 <field name="name" string="Shop"/>
                 <field name="owner_name" optional="show"/>
                 <field name="owner_phone" optional="hide"/>
                 <field name="route_id" optional="show"/>
-                <field name="credit_limit" string="Credit Limit"/>
+                <field name="shahtaj_shop_category" string="Category" widget="badge"
+                       decoration-info="shahtaj_shop_category == 'cash'"
+                       decoration-primary="shahtaj_shop_category == 'credit'"/>
+                <field name="credit_limit" string="Credit Limit" optional="hide"/>
                 <field name="outstanding_balance" string="Outstanding"/>
                 <field name="credit" string="Receivable"
                        groups="account.group_account_invoice,account.group_account_readonly"/>
                 <field name="total_invoiced" string="Total Invoiced" optional="show"
                        groups="account.group_account_invoice,account.group_account_readonly"/>
                 <field name="use_partner_credit_limit" column_invisible="1"/>
+                <field name="shahtaj_shop_category" column_invisible="1"/>
                 <field name="currency_id" column_invisible="1"/>
             </list>
         </field>

@@ -375,6 +375,8 @@ class ShahtajVisit(models.Model):
     def _check_credit_limit(self, order_total):
         self.ensure_one()
         shop = self.shop_id
+        if shop.shahtaj_shop_category == 'cash':
+            return
         if not shop.use_partner_credit_limit or not shop.credit_limit:
             return
         outstanding = shop.sudo().credit

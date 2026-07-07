@@ -14,3 +14,4 @@ from . import product_template
 from . import res_users
 from . import shahtaj_accounting_hub
 from . import ir_http
+from . import ir_ui_menu

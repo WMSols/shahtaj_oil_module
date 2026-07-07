@@ -7,6 +7,7 @@
         <field name="priority">50</field>
         <field name="arch" type="xml">
             <list decoration-muted="not active">
+                <field name="id" string="Booker ID" optional="show"/>
                 <field name="name"/>
                 <field name="login"/>
                 <field name="shahtaj_employee_code" optional="show"/>

@@ -79,8 +79,14 @@
                             <t t-foreach="this.state.orders" t-as="ord" t-key="ord.id">
                                 <tr>
                                     <td class="ps-4 fw-bold text-primary"><t t-esc="ord.display_name"/></td>
-                                    <td class="fw-bold"><t t-esc="ord.shop"/></td>
-                                    <td><span class="badge bg-secondary"><i class="fa fa-user me-1"></i> <t t-esc="ord.booker"/></span></td>
+                                    <td class="fw-bold">
+                                        <t t-esc="ord.shop"/>
+                                        <small class="d-block text-muted fw-normal">Shop ID: <t t-esc="ord.shopId"/></small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary"><i class="fa fa-user me-1"></i> <t t-esc="ord.booker"/></span>
+                                        <small class="d-block text-muted mt-1">Booker ID: <t t-esc="ord.bookerId"/></small>
+                                    </td>
                                     <td class="text-muted"><t t-esc="ord.date"/></td>
                                     <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/></td>
                                     <td class="text-end pe-4">
@@ -110,10 +116,12 @@
                                 <div class="col-md-4">
                                     <div class="small text-muted fw-bold text-uppercase mb-1">Customer / Shop</div>
                                     <div class="fw-bold text-dark fs-6"><t t-esc="this.state.selectedOrder.shop"/></div>
+                                    <small class="text-muted">Shop ID: <t t-esc="this.state.selectedOrder.shopId"/></small>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="small text-muted fw-bold text-uppercase mb-1">Order Booker</div>
                                     <div class="fw-bold text-dark fs-6"><t t-esc="this.state.selectedOrder.booker"/></div>
+                                    <small class="text-muted">Booker ID: <t t-esc="this.state.selectedOrder.bookerId"/></small>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="small text-muted fw-bold text-uppercase mb-1">Order Date</div>
@@ -370,7 +378,10 @@
                                 </t>
                                 <t t-foreach="this.state.balances" t-as="bal" t-key="bal.id">
                                     <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewShop(bal)">
-                                        <td class="ps-4 fw-bold text-dark"><t t-esc="bal.shop"/></td>
+                                        <td class="ps-4 fw-bold text-dark">
+                                            <t t-esc="bal.shop"/>
+                                            <small class="d-block text-muted fw-normal">Shop ID: <t t-esc="bal.shopId"/></small>
+                                        </td>
                                         <td><t t-esc="bal.owner"/></td>
                                         <td><span class="badge bg-secondary"><t t-esc="bal.route"/></span></td>
                                         <td class="text-end fw-bold">Rs. <t t-esc="bal.limit"/></td>
@@ -387,7 +398,10 @@
                             <i class="fa fa-arrow-left me-1"></i> Back to Ledger
                         </button>
                         <div class="card p-4 shadow-sm border-0 border-start border-4 border-warning">
-                            <h4 class="mb-4 text-dark fw-bold">Ledger Configuration: <t t-esc="this.state.selectedShop.shop"/></h4>
+                            <h4 class="mb-1 text-dark fw-bold">
+                                <t t-esc="this.state.selectedShop.shop"/>
+                            </h4>
+                            <p class="text-muted small mb-4">Shop ID: <t t-esc="this.state.selectedShop.shopId"/></p>
                             <div class="row align-items-center border-bottom pb-4 mb-4">
                                 <div class="col-md-6 border-end">
                                     <label class="small fw-bold text-muted">Shop Owner</label>
@@ -445,7 +459,7 @@
                             <tr>
                                 <td class="ps-4">
                                     <div class="text-dark fw-bold"><t t-esc="credit.shop"/></div>
-                                    <small class="text-muted">ID: <t t-esc="credit.id"/></small>
+                                    <small class="text-muted">Shop ID: <t t-esc="credit.shopId || credit.id"/></small>
                                 </td>
                                 <td>
                                     <div class="d-flex justify-content-between mb-1">

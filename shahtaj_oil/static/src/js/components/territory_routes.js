@@ -14,6 +14,7 @@ export class TerritoryRoutes extends Component {
             showRouteForm: false,
             showShopForm: false,
             selectedShopDetails: null,
+            shopCategoryEdit: 'credit',
 
             // Form Data States
             areaForm: { name: '', is_active: true },
@@ -21,6 +22,7 @@ export class TerritoryRoutes extends Component {
             shopForm: { 
                 name: '', owner_name: '', owner_phone: '', address: '',
                 zone_id: '', route_id: '', lat: '', lng: '', 
+                shopCategory: 'credit',
                 creditLimit: '', legacyBalance: '', outstandingBalance: '',
                 owner_cnic_front: null, owner_cnic_back: null, 
                 owner_photo: null, shop_exterior_photo: null,
@@ -56,7 +58,7 @@ export class TerritoryRoutes extends Component {
         this.state.shops = await this.orm.searchRead(
             "res.partner",
             [["is_shahtaj_shop", "=", true]], 
-            ["id", "name", "owner_name", "phone", "route_id", "shop_approval_state"]
+            ["id", "name", "owner_name", "phone", "route_id", "shop_approval_state", "shahtaj_shop_category"]
         );
     }
 
@@ -100,18 +102,42 @@ export class TerritoryRoutes extends Component {
             [shopId],
             [
                 "id", "name", "owner_name", "phone", "partner_latitude", "partner_longitude",
-                "credit_limit", "legacy_balance", "outstanding_balance", "route_id", "zone_id",
+                "shahtaj_shop_category", "credit_limit", "legacy_balance", "outstanding_balance",
+                "route_id", "zone_id",
                 "owner_cnic_front", "owner_cnic_back", "owner_photo", "shop_exterior_photo", 
                 "shop_approval_state"
             ]
         );
         if (details.length > 0) {
             this.state.selectedShopDetails = details[0];
+            this.state.shopCategoryEdit = details[0].shahtaj_shop_category || 'credit';
         }
     }
 
     closeShopDetails() {
         this.state.selectedShopDetails = null;
+        this.state.shopCategoryEdit = 'credit';
+    }
+
+    async saveShopCategory() {
+        if (!this.state.selectedShopDetails) {
+            return;
+        }
+        const shopId = this.state.selectedShopDetails.id;
+        const category = this.state.shopCategoryEdit;
+        try {
+            await this.orm.write("res.partner", [shopId], {
+                shahtaj_shop_category: category,
+            });
+            await this.viewShopDetails(shopId);
+            await this.fetchDashboardData();
+        } catch (error) {
+            alert("Failed to update shop category: " + (error.data?.message || error.message));
+        }
+    }
+
+    getShopCategoryLabel(category) {
+        return category === 'cash' ? 'Cash' : 'Credit';
     }
 
     // --- Approval Actions ---
@@ -176,7 +202,8 @@ export class TerritoryRoutes extends Component {
         await this.orm.create("res.partner", [{
             is_shahtaj_shop: true,
             company_type: 'company',
-            shop_approval_state: 'pending', // Keeps shop pending for new entries
+            shop_approval_state: 'pending',
+            shahtaj_shop_category: this.state.shopForm.shopCategory || 'credit',
             name: this.state.shopForm.name,
             owner_name: this.state.shopForm.owner_name,
             owner_phone: this.state.shopForm.owner_phone,
@@ -185,7 +212,9 @@ export class TerritoryRoutes extends Component {
             route_id: this.state.shopForm.route_id ? parseInt(this.state.shopForm.route_id) : false,
             partner_latitude: lat,
             partner_longitude: lng,
-            credit_limit: parseFloat(this.state.shopForm.creditLimit) || 0.0,
+            credit_limit: this.state.shopForm.shopCategory === 'credit'
+                ? (parseFloat(this.state.shopForm.creditLimit) || 0.0)
+                : 0.0,
             legacy_balance: parseFloat(this.state.shopForm.legacyBalance) || 0.0,
             owner_cnic_front: this.state.shopForm.owner_cnic_front,
             owner_cnic_back: this.state.shopForm.owner_cnic_back,
@@ -197,6 +226,7 @@ export class TerritoryRoutes extends Component {
         this.state.shopForm = { 
             name: '', owner_name: '', owner_phone: '', address: '',
             zone_id: '', route_id: '', lat: '', lng: '', 
+            shopCategory: 'credit',
             creditLimit: '', legacyBalance: '', outstandingBalance: '',
             owner_cnic_front: null, owner_cnic_back: null, 
             owner_photo: null, shop_exterior_photo: null,

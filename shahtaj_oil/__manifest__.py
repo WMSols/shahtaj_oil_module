@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.0.27',
+    'version': '19.0.1.0.35',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -55,6 +55,7 @@
         'views/shahtaj_schedule_hub_views.xml',
         'views/shahtaj_visit_hub_views.xml',
         'views/shahtaj_order_booker_users_views.xml',
+        'views/res_users_views.xml',
 
         # ── 7. WIZARDS (actions used by menus) ──
         'wizard/shahtaj_generate_tasks_views.xml',
@@ -62,24 +63,24 @@
         'wizard/shahtaj_quick_add_product_views.xml',
         'wizard/shahtaj_add_stock_views.xml',
         
-        # ── 8. FRONTEND CLIENT ACTIONS (must load before menus) ──
-        'views/client_actions.xml',
-
-        # ── 9. SECURITY FIXES (must update rules created in step 1) ──
+        # ── 8. SECURITY FIXES (must update rules created in step 1) ──
         'security/shahtaj_record_rules_fix.xml',
         'security/shahtaj_booker_ui_fix.xml',
         'security/shahtaj_partner_access_upgrade.xml',
 
-        # ── 10. DATA FIXES / CLEANUP (must run after actions they touch) ──
+        # ── 9. DATA FIXES / CLEANUP (must run after actions they touch) ──
         'data/shahtaj_accounting_action_fix.xml',
         'data/shahtaj_accounting_menu_cleanup.xml',
+        'data/shahtaj_ui_mode_sync.xml',
 
-        # ── 11. MENUS (ALWAYS LAST) ──
+        # ── 10. MENUS (ALWAYS LAST; includes distributor portal client action) ──
         'views/menus.xml', # All combined Menus
         'views/shahtaj_api_test_menu.xml',
     ],
     'assets': {
         'web.assets_backend': [
+            'shahtaj_oil/static/src/scss/custom_portal_shell.scss',
+            'shahtaj_oil/static/src/js/custom_portal_shell.js',
             # Linked OWL layout template and component logic (Paths updated to shahtaj_oil)
             'shahtaj_oil/static/src/xml/dashboard.xml',
             'shahtaj_oil/static/src/js/components/staff_management.js',

@@ -12,6 +12,7 @@ def _m2o(record):
 def user_brief(user):
     return {
         'id': user.id,
+        'order_booker_id': user.id,
         'name': user.name,
         'login': user.login,
         'employee_code': user.shahtaj_employee_code or False,
@@ -21,11 +22,13 @@ def user_brief(user):
 def task_dict(task):
     return {
         'id': task.id,
+        'order_booker_id': task.order_booker_id.id,
         'scheduled_date': str(task.scheduled_date) if task.scheduled_date else False,
         'state': task.state,
         'route': _m2o(task.route_id),
         'zone': _m2o(task.zone_id),
         'shop': shop_brief(task.shop_id),
+        'shop_id': task.shop_id.id,
         'visit_id': task.visit_id.id or False,
         'visit_duration_minutes': task.visit_duration_minutes,
         'notes': task.notes or '',
@@ -37,12 +40,14 @@ def shop_brief(partner):
         return None
     return {
         'id': partner.id,
+        'shop_id': partner.id,
         'name': partner.name,
         'owner_name': partner.owner_name or '',
         'owner_phone': partner.owner_phone or '',
         'latitude': partner.partner_latitude,
         'longitude': partner.partner_longitude,
         'approval_state': partner.shop_approval_state,
+        'shop_category': partner.shahtaj_shop_category,
         'photos': shop_photo_flags(partner),
     }
 
@@ -98,6 +103,8 @@ def visit_dict(visit, include_lines=True):
         'notes': visit.notes or '',
         'task_id': visit.visit_task_id.id,
         'shop': shop_brief(visit.shop_id),
+        'shop_id': visit.shop_id.id,
+        'order_booker_id': visit.order_booker_id.id,
         'route': _m2o(visit.route_id),
         'sale_order_name': visit.sale_order_name or False,
         'order_amount': visit.order_amount,

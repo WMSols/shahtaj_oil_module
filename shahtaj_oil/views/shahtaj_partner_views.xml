@@ -8,6 +8,7 @@
         <field name="priority">1</field>
         <field name="arch" type="xml">
             <list>
+                <field name="id" string="Shop ID" optional="show"/>
                 <field name="name" string="Shop Name"/>
                 <field name="owner_name"/>
                 <field name="owner_phone"/>
@@ -17,6 +18,9 @@
                        decoration-danger="shop_approval_state == 'rejected'"/>
                 <field name="zone_id" optional="show"/>
                 <field name="route_id" optional="show"/>
+                <field name="shahtaj_shop_category" widget="badge"
+                       decoration-info="shahtaj_shop_category == 'cash'"
+                       decoration-primary="shahtaj_shop_category == 'credit'"/>
                 <field name="partner_latitude" string="Latitude"/>
                 <field name="partner_longitude" string="Longitude"/>
                 <field name="credit_limit" optional="hide"/>
@@ -135,9 +139,11 @@
                     </group>
                     <group string="Credit and Balance">
                         <group>
-                            <field name="use_partner_credit_limit"/>
+                            <field name="shahtaj_shop_category" widget="radio"
+                                   options="{'horizontal': true}"/>
+                            <field name="use_partner_credit_limit" invisible="1"/>
                             <field name="credit_limit" string="Credit Limit (Rs)"
-                                   invisible="not use_partner_credit_limit"/>
+                                   invisible="shahtaj_shop_category != 'credit'"/>
                             <field name="legacy_balance" string="Legacy Balance (Rs)"
                                    readonly="legacy_balance_move_id"/>
                             <field name="property_payment_term_id"

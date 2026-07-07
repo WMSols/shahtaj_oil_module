@@ -56,9 +56,7 @@
                                 <tr>
                                     <td class="ps-4 align-middle fw-bold text-dark">
                                         <t t-esc="booker.name"/>
-                                        <small class="d-block text-muted fw-normal">
-                                            <t t-esc="booker.id"/>
-                                        </small>
+                                        <small class="d-block text-muted fw-normal">Booker ID: <t t-esc="booker.id"/></small>
                                     </td>
                                     
                                     <td class="align-middle text-end pe-4">
@@ -96,6 +94,7 @@
                             <span class="text-primary">
                                 <t t-esc="this.state.selectedBooker.name"/>
                             </span>
+                            <small class="text-muted ms-2">(Booker ID: <t t-esc="this.state.selectedBooker.id"/>)</small>
                         </h5>
                     </div>
                     <t t-if="!this.state.showForm">
