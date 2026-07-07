@@ -20,7 +20,7 @@ export class TerritoryRoutes extends Component {
             areaForm: { name: '', is_active: true },
             routeForm: { name: '', zone_id: '', is_active: true }, 
             shopForm: { 
-                name: '', owner_name: '', owner_phone: '', address: '',
+                name: '', owner_name: '', owner_phone: '', owner_cnic_number: '', address: '',
                 zone_id: '', route_id: '', lat: '', lng: '', 
                 shopCategory: 'credit',
                 creditLimit: '', legacyBalance: '', outstandingBalance: '',
@@ -58,7 +58,7 @@ export class TerritoryRoutes extends Component {
         this.state.shops = await this.orm.searchRead(
             "res.partner",
             [["is_shahtaj_shop", "=", true]], 
-            ["id", "name", "owner_name", "phone", "route_id", "shop_approval_state", "shahtaj_shop_category"]
+            ["id", "name", "owner_name", "phone", "route_id", "shop_approval_state", "shahtaj_shop_category", "registered_by_id"]
         );
     }
 
@@ -101,9 +101,9 @@ export class TerritoryRoutes extends Component {
             "res.partner",
             [shopId],
             [
-                "id", "name", "owner_name", "phone", "partner_latitude", "partner_longitude",
+                "id", "name", "owner_name", "phone", "owner_cnic_number", "partner_latitude", "partner_longitude",
                 "shahtaj_shop_category", "credit_limit", "legacy_balance", "outstanding_balance",
-                "route_id", "zone_id",
+                "route_id", "zone_id", "registered_by_id",
                 "owner_cnic_front", "owner_cnic_back", "owner_photo", "shop_exterior_photo", 
                 "shop_approval_state"
             ]
@@ -207,6 +207,7 @@ export class TerritoryRoutes extends Component {
             name: this.state.shopForm.name,
             owner_name: this.state.shopForm.owner_name,
             owner_phone: this.state.shopForm.owner_phone,
+            owner_cnic_number: this.state.shopForm.owner_cnic_number || false,
             phone: this.state.shopForm.owner_phone, 
             zone_id: this.state.shopForm.zone_id ? parseInt(this.state.shopForm.zone_id) : false,
             route_id: this.state.shopForm.route_id ? parseInt(this.state.shopForm.route_id) : false,
@@ -224,7 +225,7 @@ export class TerritoryRoutes extends Component {
 
         this.state.showShopForm = false;
         this.state.shopForm = { 
-            name: '', owner_name: '', owner_phone: '', address: '',
+            name: '', owner_name: '', owner_phone: '', owner_cnic_number: '', address: '',
             zone_id: '', route_id: '', lat: '', lng: '', 
             shopCategory: 'credit',
             creditLimit: '', legacyBalance: '', outstandingBalance: '',

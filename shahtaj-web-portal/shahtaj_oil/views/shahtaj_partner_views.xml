@@ -12,6 +12,7 @@
                 <field name="name" string="Shop Name"/>
                 <field name="owner_name"/>
                 <field name="owner_phone"/>
+                <field name="owner_cnic_number" optional="hide"/>
                 <field name="shop_approval_state" widget="badge"
                        decoration-success="shop_approval_state == 'approved'"
                        decoration-warning="shop_approval_state == 'pending'"
@@ -26,6 +27,8 @@
                 <field name="credit_limit" optional="hide"/>
                 <field name="legacy_balance" optional="hide"/>
                 <field name="outstanding_balance" optional="show"/>
+                <field name="registered_by_name" string="Registered By" optional="show"/>
+                <field name="registered_by_booker_id" string="Booker ID" optional="show"/>
                 <field name="registered_by_id" optional="hide"/>
             </list>
         </field>
@@ -116,6 +119,12 @@
                         <group string="Owner">
                             <field name="owner_name" required="1"/>
                             <field name="owner_phone" required="1" widget="phone"/>
+                            <field name="owner_cnic_number" placeholder="Optional"/>
+                        </group>
+                        <group string="Registration">
+                            <field name="registered_by_name" readonly="1"/>
+                            <field name="registered_by_booker_id" readonly="1"/>
+                            <field name="create_date" string="Registered On" readonly="1"/>
                         </group>
                         <group string="Assignment">
                             <field name="zone_id" options="{'no_create': True}"/>
@@ -123,7 +132,7 @@
                                    domain="[('id', 'in', allowed_route_ids)]"
                                    invisible="not zone_id"
                                    options="{'no_create': True}"/>
-                            <field name="registered_by_id" readonly="1"/>
+                            <field name="registered_by_id" readonly="1" groups="base.group_no_one"/>
                         </group>
                     </group>
                     <group string="GPS Location">
@@ -188,6 +197,7 @@
                 <field name="name" string="Shop Name"/>
                 <field name="owner_name"/>
                 <field name="owner_phone"/>
+                <field name="owner_cnic_number" optional="hide"/>
                 <field name="shop_approval_state" widget="badge"
                        decoration-success="shop_approval_state == 'approved'"
                        decoration-warning="shop_approval_state == 'pending'"
@@ -252,6 +262,9 @@
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                             <field name="owner_phone" required="1" widget="phone"
                                    placeholder="03xx xxxxxxx"
+                                   readonly="shop_approval_state in ('approved', 'rejected')"/>
+                            <field name="owner_cnic_number"
+                                   placeholder="Optional"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                         </group>
                         <group>

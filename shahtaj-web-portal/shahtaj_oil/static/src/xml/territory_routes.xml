@@ -183,6 +183,19 @@
                             Shop ID: <strong><t t-esc="this.state.selectedShopDetails.id"/></strong>
                             · Owner: <t t-esc="this.state.selectedShopDetails.owner_name"/> | <t t-esc="this.state.selectedShopDetails.phone"/>
                         </small>
+                        <small class="text-muted d-block" t-if="this.state.selectedShopDetails.owner_cnic_number">
+                            ID Card No: <strong><t t-esc="this.state.selectedShopDetails.owner_cnic_number"/></strong>
+                        </small>
+                        <small class="text-muted d-block">
+                            Registered by:
+                            <strong>
+                                <t t-if="this.state.selectedShopDetails.registered_by_id">
+                                    <t t-esc="this.state.selectedShopDetails.registered_by_id[1]"/>
+                                    (Booker ID: <t t-esc="this.state.selectedShopDetails.registered_by_id[0]"/>)
+                                </t>
+                                <t t-else="">Distributor / not recorded</t>
+                            </strong>
+                        </small>
                     </div>
                     <button class="btn btn-sm btn-outline-secondary fw-bold d-flex align-items-center" t-on-click="closeShopDetails">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
@@ -285,6 +298,9 @@
                                     <td class="align-middle">
                                         <div class="text-dark"><t t-esc="shop.owner_name"/></div>
                                         <small class="text-muted"><t t-esc="shop.phone"/></small>
+                                        <small class="d-block text-muted" t-if="shop.registered_by_id">
+                                            Registered by: <t t-esc="shop.registered_by_id[1]"/> (#<t t-esc="shop.registered_by_id[0]"/>)
+                                        </small>
                                     </td>
                                     <td class="align-middle text-primary fw-bold"><t t-esc="shop.route_id ? shop.route_id[1] : 'Unassigned'"/></td>
                                     <td class="align-middle text-center">
@@ -299,6 +315,9 @@
                                     </td>
                                     <td class="align-middle text-end pe-4">
                                         <t t-if="shop.shop_approval_state === 'pending'">
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.viewShopDetails(shop.id)">
+                                                Review
+                                            </button>
                                             <button class="btn btn-sm btn-success me-2 fw-bold" t-on-click="() => this.approveShop(shop.id)">
                                                 Approve
                                             </button>
@@ -346,6 +365,10 @@
                                 <div class="col-md-3 mb-3">
                                     <label class="small fw-bold">Contact Phone</label>
                                     <input type="text" class="form-control" t-model="this.state.shopForm.owner_phone" placeholder="03XX-XXXXXXX"/>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="small fw-bold">Owner ID Card No. <span class="text-muted">(Optional)</span></label>
+                                    <input type="text" class="form-control" t-model="this.state.shopForm.owner_cnic_number" placeholder="e.g. 35202-1234567-1"/>
                                 </div>
                             </div>
                         </div>

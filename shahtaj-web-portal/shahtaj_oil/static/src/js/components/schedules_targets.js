@@ -18,7 +18,8 @@ export class SchedulesTargets extends Component {
             scheduleForm: { day: '', route_id: null, zone_name: '', is_active: true },
             targetForm: {
                 startDate: '', endDate: '', is_active: true,
-                type: '', target_value: '', product_id: null, currency_id: null
+                type: '', target_value: '', product_id: null, currency_id: null,
+                target_weight_uom: 'kg',
             },
 
             // Real data
@@ -124,8 +125,8 @@ export class SchedulesTargets extends Component {
             [['order_booker_id', '=', bookerId]],
             [
                 'id', 'name', 'date_start', 'date_end', 'target_type',
-                'target_value', 'achieved_value', 'progress_percent',
-                'product_id', 'currency_id', 'active'
+                'target_value', 'achieved_value', 'remaining_value', 'progress_percent',
+                'product_id', 'currency_id', 'target_weight_uom', 'active'
             ]
         );
         this.state.targets = records.map(r => ({
@@ -135,9 +136,11 @@ export class SchedulesTargets extends Component {
             startDate: r.date_start,
             endDate: r.date_end,
             type: r.target_type,
-            amount: r.target_value,                  // Fixed mapping for XML
-            achievedAmount: r.achieved_value,        // Fixed mapping for XML
-            progressPercentage: r.progress_percent ? `${r.progress_percent.toFixed(1)}%` : '0%', // Fixed mapping for XML
+            amount: r.target_value,
+            achievedAmount: r.achieved_value,
+            remainingAmount: r.remaining_value,
+            weightUom: r.target_weight_uom || null,
+            progressPercentage: r.progress_percent ? `${r.progress_percent.toFixed(1)}%` : '0%',
             product: r.product_id ? r.product_id[1] : null,
             currency: r.currency_id ? r.currency_id[1] : null,
             status: r.active ? 'Active' : 'Inactive',
@@ -187,6 +190,7 @@ export class SchedulesTargets extends Component {
         this.state.targetForm = {
             startDate: '', endDate: '', is_active: true,
             type: '', target_value: '', product_id: null, currency_id: null,
+            target_weight_uom: 'kg',
         };
     }
 
@@ -269,6 +273,16 @@ export class SchedulesTargets extends Component {
             return;
         }
 
+        if (form.type === 'product_weight' && !form.product_id) {
+            this.state.errorMessage = 'A product is required for Product Weight targets.';
+            return;
+        }
+
+        if (form.type === 'product_weight' && !form.target_weight_uom) {
+            this.state.errorMessage = 'Select kg or ton for the weight target.';
+            return;
+        }
+
         this.state.isLoading = true;
         this.state.errorMessage = '';
 
@@ -284,6 +298,10 @@ export class SchedulesTargets extends Component {
 
             if (form.type === 'product_qty' && form.product_id) {
                 payload.product_id = form.product_id;
+            }
+            if (form.type === 'product_weight') {
+                payload.product_id = form.product_id;
+                payload.target_weight_uom = form.target_weight_uom || 'kg';
             }
             if (form.type === 'sales_amount' && form.currency_id) {
                 payload.currency_id = form.currency_id;

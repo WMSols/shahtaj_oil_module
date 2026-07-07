@@ -220,6 +220,7 @@
                                     <option value="order_count">Order Count</option>
                                     <option value="sales_amount">Sales Amount</option>
                                     <option value="product_qty">Product Quantity</option>
+                                    <option value="product_weight">Product Weight (kg/ton)</option>
                                 </select>
                             </div>
                             <div class="col-md-2 pt-4 mt-1">
@@ -249,7 +250,7 @@
                                 </div>
                             </t>
 
-                            <t t-if="this.state.targetForm.type === 'product_qty'">
+                            <t t-if="this.state.targetForm.type === 'product_qty' or this.state.targetForm.type === 'product_weight'">
                                 <div class="col-md-4">
                                     <label class="small fw-bold text-primary">Target Product</label>
                                     <select class="form-select form-control border-primary" t-model="this.state.targetForm.product_id">
@@ -259,6 +260,16 @@
                                                 <t t-esc="p.name"/>
                                             </option>
                                         </t>
+                                    </select>
+                                </div>
+                            </t>
+
+                            <t t-if="this.state.targetForm.type === 'product_weight'">
+                                <div class="col-md-4">
+                                    <label class="small fw-bold text-info">Weight Unit</label>
+                                    <select class="form-select form-control border-info" t-model="this.state.targetForm.target_weight_uom">
+                                        <option value="kg">Kilogram (kg)</option>
+                                        <option value="ton">Ton</option>
                                     </select>
                                 </div>
                             </t>
@@ -371,6 +382,7 @@
                                             </div>
                                             <small class="text-muted">
                                                 <t t-esc="tgt.amount"/>
+                                                <t t-if="tgt.weightUom"> <t t-esc="tgt.weightUom"/></t>
                                                 <t t-if="tgt.currency">
                                                     <t t-esc="tgt.currency"/>
                                                 </t>
@@ -379,6 +391,11 @@
                                         </td>
                                         <td class="align-middle fw-bold">
                                             <t t-esc="tgt.achievedAmount"/>
+                                            <t t-if="tgt.type === 'product_weight' and tgt.weightUom">
+                                                <small class="d-block text-muted fw-normal">
+                                                    <t t-esc="tgt.remainingAmount"/> <t t-esc="tgt.weightUom"/> left
+                                                </small>
+                                            </t>
                                         </td>
                                         <td class="align-middle">
                                             <div class="progress" style="height: 6px; width: 100px;">

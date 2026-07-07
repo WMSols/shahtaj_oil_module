@@ -9,7 +9,9 @@
         <field name="arch" type="xml">
             <list string="Products">
                 <field name="name"/>
+                <field name="shahtaj_sale_uom" string="Unit"/>
                 <field name="list_price" string="Sales Price"/>
+                <field name="taxes_id" widget="many2many_tags" string="Taxes" optional="show"/>
                 <field name="qty_available" string="On Hand"/>
                 <field name="shahtaj_qty_bookable" string="Available to Book"/>
                 <field name="is_storable" string="Tracked" widget="boolean"/>
@@ -33,6 +35,14 @@
                     <group>
                         <group string="Sales">
                             <field name="list_price" string="Sales Price"/>
+                            <field name="shahtaj_sale_uom" string="Selling Unit"/>
+                            <field name="shahtaj_kg_per_unit"
+                                   invisible="shahtaj_sale_uom in ('kg', 'ton')"
+                                   required="shahtaj_sale_uom in ('litre', 'piece')"/>
+                            <field name="taxes_id" widget="many2many_tags"
+                                   string="Customer Taxes"
+                                   domain="[('type_tax_use', '=', 'sale'), ('active', '=', True)]"
+                                   options="{'no_create': True}"/>
                         </group>
                         <group string="Inventory">
                             <field name="is_storable" string="Track Inventory"/>

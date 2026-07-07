@@ -11,7 +11,9 @@
                 <field name="date_end"/>
                 <field name="target_type"/>
                 <field name="target_value"/>
+                <field name="target_weight_uom" optional="hide"/>
                 <field name="achieved_value"/>
+                <field name="remaining_value" optional="hide"/>
                 <field name="progress_percent" widget="progressbar"/>
                 <field name="active"/>
             </list>
@@ -39,14 +41,19 @@
                             <field name="target_type" required="1"/>
                             <field name="target_value" required="1"/>
                             <field name="product_id"
-                                   invisible="target_type != 'product_qty'"
-                                   required="target_type == 'product_qty'"/>
+                                   invisible="target_type not in ('product_qty', 'product_weight')"
+                                   required="target_type in ('product_qty', 'product_weight')"/>
+                            <field name="target_weight_uom"
+                                   invisible="target_type != 'product_weight'"
+                                   required="target_type == 'product_weight'"/>
                             <field name="currency_id" invisible="target_type != 'sales_amount'"/>
                         </group>
                     </group>
                     <group string="Progress">
                         <group>
                             <field name="achieved_value" readonly="1"/>
+                            <field name="remaining_value" readonly="1"
+                                   invisible="target_type != 'product_weight'"/>
                             <field name="progress_percent" widget="progressbar" readonly="1"/>
                         </group>
                     </group>

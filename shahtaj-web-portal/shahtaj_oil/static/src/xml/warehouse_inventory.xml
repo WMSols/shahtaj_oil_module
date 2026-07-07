@@ -91,8 +91,41 @@
                             <input type="number" class="form-control" t-model="this.state.productForm.list_price"/>
                         </div>
                         <div class="col-md-3">
+                            <label class="small fw-bold">Selling Unit</label>
+                            <select class="form-select" t-model="this.state.productForm.shahtaj_sale_uom"
+                                    t-on-change="() => this.onSaleUomChange('new')">
+                                <option value="kg">Kilogram (kg)</option>
+                                <option value="ton">Ton</option>
+                                <option value="litre">Litre</option>
+                                <option value="piece">Piece</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3" t-if="this.state.productForm.shahtaj_sale_uom === 'litre' or this.state.productForm.shahtaj_sale_uom === 'piece'">
+                            <label class="small fw-bold">Kg per Unit</label>
+                            <input type="number" class="form-control" t-model="this.state.productForm.shahtaj_kg_per_unit" min="0.0001" step="0.0001"/>
+                        </div>
+                        <div class="col-md-3">
                             <label class="small fw-bold">Cost</label>
                             <input type="number" class="form-control" t-model="this.state.productForm.standard_price"/>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold">Customer Taxes</label>
+                            <div class="border rounded p-2 bg-white">
+                                <t t-if="this.state.saleTaxes.length === 0">
+                                    <small class="text-muted">No sale taxes configured.</small>
+                                </t>
+                                <t t-foreach="this.state.saleTaxes" t-as="tax" t-key="tax.id">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               t-att-id="'new_tax_' + tax.id"
+                                               t-att-checked="this.isTaxSelected('new', tax.id)"
+                                               t-on-change="(ev) => this.toggleProductTax('new', tax.id, ev.target.checked)"/>
+                                        <label class="form-check-label small" t-att-for="'new_tax_' + tax.id">
+                                            <t t-esc="tax.label"/>
+                                        </label>
+                                    </div>
+                                </t>
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <label class="small fw-bold">Barcode</label>
@@ -172,8 +205,41 @@
                             <input type="number" class="form-control" t-model="this.state.currentProduct.list_price"/>
                         </div>
                         <div class="col-md-3">
+                            <label class="small fw-bold">Selling Unit</label>
+                            <select class="form-select" t-model="this.state.currentProduct.shahtaj_sale_uom"
+                                    t-on-change="() => this.onSaleUomChange('edit')">
+                                <option value="kg">Kilogram (kg)</option>
+                                <option value="ton">Ton</option>
+                                <option value="litre">Litre</option>
+                                <option value="piece">Piece</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3" t-if="this.state.currentProduct.shahtaj_sale_uom === 'litre' or this.state.currentProduct.shahtaj_sale_uom === 'piece'">
+                            <label class="small fw-bold">Kg per Unit</label>
+                            <input type="number" class="form-control" t-model="this.state.currentProduct.shahtaj_kg_per_unit" min="0.0001" step="0.0001"/>
+                        </div>
+                        <div class="col-md-3">
                             <label class="small fw-bold">Cost</label>
                             <input type="number" class="form-control" t-model="this.state.currentProduct.standard_price"/>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold">Customer Taxes</label>
+                            <div class="border rounded p-2 bg-white">
+                                <t t-if="this.state.saleTaxes.length === 0">
+                                    <small class="text-muted">No sale taxes configured.</small>
+                                </t>
+                                <t t-foreach="this.state.saleTaxes" t-as="tax" t-key="tax.id">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               t-att-id="'edit_tax_' + tax.id"
+                                               t-att-checked="this.isTaxSelected('edit', tax.id)"
+                                               t-on-change="(ev) => this.toggleProductTax('edit', tax.id, ev.target.checked)"/>
+                                        <label class="form-check-label small" t-att-for="'edit_tax_' + tax.id">
+                                            <t t-esc="tax.label"/>
+                                        </label>
+                                    </div>
+                                </t>
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <label class="small fw-bold">Barcode</label>
@@ -221,7 +287,7 @@
                                         </t>
                                         <div>
                                             <div class="text-dark fw-bold"><t t-esc="item.name"/></div>
-                                            <small class="text-muted">Type: <t t-esc="item.type === 'consu' or item.type === 'product' ? 'Goods' : item.type"/></small>
+                                            <small class="text-muted">Unit: <t t-esc="item.shahtaj_sale_uom || item.uom_name"/> · Tax: <t t-esc="item.tax_label"/> · Type: <t t-esc="item.type === 'consu' or item.type === 'product' ? 'Goods' : item.type"/></small>
                                         </div>
                                     </td>
                                     <td>

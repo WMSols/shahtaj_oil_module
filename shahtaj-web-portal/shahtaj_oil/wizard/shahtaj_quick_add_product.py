@@ -27,6 +27,49 @@ class ShahtajQuickAddProductWizard(models.TransientModel):
         default=True,
         help='Required for order bookers to see available quantity.',
     )
+    shahtaj_sale_uom = fields.Selection(
+        selection=[
+            ('kg', 'Kilogram (kg)'),
+            ('ton', 'Ton'),
+            ('litre', 'Litre'),
+            ('piece', 'Piece'),
+        ],
+        string='Selling Unit',
+        default='piece',
+        required=True,
+    )
+    shahtaj_kg_per_unit = fields.Float(
+        string='Kg per Unit',
+        default=1.0,
+        digits=(16, 4),
+        help='Kilograms per one selling unit (for litre/piece products).',
+    )
+    tax_ids = fields.Many2many(
+        'account.tax',
+        string='Customer Taxes',
+        domain="[('type_tax_use', '=', 'sale'), ('active', '=', True)]",
+        help='Taxes applied when this product is sold.',
+    )
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        if 'tax_ids' in fields_list and not res.get('tax_ids'):
+            default_tax = self.env['product.template']._get_shahtaj_default_sale_taxes()
+            if default_tax:
+                res['tax_ids'] = [(6, 0, default_tax.ids)]
+        return res
+
+    @api.onchange('shahtaj_sale_uom')
+    def _onchange_shahtaj_sale_uom(self):
+        defaults = {
+            'kg': 1.0,
+            'ton': 1000.0,
+            'litre': 1.0,
+            'piece': 1.0,
+        }
+        if self.shahtaj_sale_uom:
+            self.shahtaj_kg_per_unit = defaults.get(self.shahtaj_sale_uom, 1.0)
 
     @api.constrains('list_price', 'opening_qty')
     def _check_values(self):
@@ -43,6 +86,9 @@ class ShahtajQuickAddProductWizard(models.TransientModel):
             'name': self.name.strip(),
             'list_price': self.list_price,
             'is_storable': self.track_inventory,
+            'shahtaj_sale_uom': self.shahtaj_sale_uom,
+            'shahtaj_kg_per_unit': self.shahtaj_kg_per_unit,
+            'taxes_id': [(6, 0, self.tax_ids.ids)],
         })
         if self.track_inventory and self.opening_qty > 0:
             product._shahtaj_set_on_hand_qty(self.opening_qty)

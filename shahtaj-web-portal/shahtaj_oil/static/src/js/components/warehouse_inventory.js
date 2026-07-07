@@ -19,6 +19,8 @@ export class WarehouseInventory extends Component {
             adjustmentForm: { product_id: '', qty: 0 },
             productForm: this.getEmptyProductForm(),
             currentProduct: null,
+            saleTaxes: [],
+            defaultTaxIds: [],
 
             warehouses: [
                 { id: "WH-MAIN", name: "Central Hub - Lahore", type: "Main Warehouse", location: "Sundar Industrial Estate", manager: "Zafar Iqbal", status: "Active" },
@@ -30,6 +32,7 @@ export class WarehouseInventory extends Component {
         });
 
         onWillStart(async () => {
+            await this.loadSaleTaxes();
             await this.loadInventory();
         });
     }
@@ -42,25 +45,93 @@ export class WarehouseInventory extends Component {
         return {
             name: '', track_inventory: true, on_hand: 0,
             list_price: 0.0, standard_price: 0.0,
-            invoice_policy: 'order', type: 'consu', 
+            invoice_policy: 'order', type: 'consu',
+            shahtaj_sale_uom: 'piece', shahtaj_kg_per_unit: 1.0,
+            tax_ids: [...this.state.defaultTaxIds],
             barcode: '', weight: 0.0, volume: 0.0,
             income_account: 'static_inc', expense_account: 'static_exp',
             image_1920: false
         };
     }
 
+    formatTaxLabel(tax) {
+        if (tax.amount_type === 'percent') {
+            return `${tax.name} (${tax.amount}%)`;
+        }
+        return tax.name;
+    }
+
+    async loadSaleTaxes() {
+        const taxes = await this.orm.call(
+            'product.template',
+            'get_shahtaj_sale_tax_options',
+            [],
+        );
+        this.state.saleTaxes = (taxes || []).map((tax) => ({
+            ...tax,
+            label: this.formatTaxLabel(tax),
+        }));
+        this.state.defaultTaxIds = this.state.saleTaxes
+            .filter((tax) => tax.is_default)
+            .map((tax) => tax.id);
+        if (!this.state.productForm.tax_ids.length && this.state.defaultTaxIds.length) {
+            this.state.productForm.tax_ids = [...this.state.defaultTaxIds];
+        }
+    }
+
+    toggleProductTax(formTarget, taxId, checked) {
+        const form = formTarget === 'edit' ? this.state.currentProduct : this.state.productForm;
+        if (!form) {
+            return;
+        }
+        const ids = new Set(form.tax_ids || []);
+        if (checked) {
+            ids.add(taxId);
+        } else {
+            ids.delete(taxId);
+        }
+        form.tax_ids = Array.from(ids);
+    }
+
+    isTaxSelected(formTarget, taxId) {
+        const form = formTarget === 'edit' ? this.state.currentProduct : this.state.productForm;
+        return (form?.tax_ids || []).includes(taxId);
+    }
+
+    getTaxLabel(taxIds) {
+        if (!taxIds || !taxIds.length) {
+            return 'No tax';
+        }
+        return taxIds
+            .map((id) => this.state.saleTaxes.find((tax) => tax.id === id)?.label)
+            .filter(Boolean)
+            .join(', ');
+    }
+
+    onSaleUomChange(formTarget) {
+        const defaults = { kg: 1.0, ton: 1000.0, litre: 1.0, piece: 1.0 };
+        const form = formTarget === 'edit' ? this.state.currentProduct : this.state.productForm;
+        if (form) {
+            form.shahtaj_kg_per_unit = defaults[form.shahtaj_sale_uom] || 1.0;
+        }
+    }
+
     async loadInventory() {
-        // Added shahtaj_qty_bookable and virtual_available (forecast) to the fetched fields
         const products = await this.orm.searchRead(
             "product.template",
             [['sale_ok', '=', true]], 
             [
-                "id", "name", "categ_id", "qty_available", "uom_name", "type", 
-                "list_price", "standard_price", "barcode", "weight", "volume", 
-                "invoice_policy", "image_1920", "shahtaj_qty_bookable", "virtual_available"
+                "id", "name", "categ_id", "qty_available", "uom_name", "type",
+                "list_price", "standard_price", "barcode", "weight", "volume",
+                "invoice_policy", "image_1920", "shahtaj_qty_bookable", "virtual_available",
+                "shahtaj_sale_uom", "shahtaj_kg_per_unit", "taxes_id",
             ]
         );
-        this.state.inventory = products;
+        this.state.inventory = products.map((product) => ({
+            ...product,
+            tax_ids: product.taxes_id || [],
+            tax_label: this.getTaxLabel(product.taxes_id || []),
+        }));
     }
 
     setSubTab(tabName) {
@@ -76,7 +147,6 @@ export class WarehouseInventory extends Component {
         this.state.currentProduct = null;
     }
 
-    // --- Image Upload Handler ---
     onImageChange(ev, target) {
         const file = ev.target.files[0];
         if (!file) return;
@@ -93,7 +163,6 @@ export class WarehouseInventory extends Component {
         reader.readAsDataURL(file);
     }
 
-    // --- Product Add Logic ---
     async saveProduct() {
         const vals = {
             name: this.state.productForm.name,
@@ -105,6 +174,9 @@ export class WarehouseInventory extends Component {
             weight: parseFloat(this.state.productForm.weight || 0),
             volume: parseFloat(this.state.productForm.volume || 0),
             is_storable: this.state.productForm.track_inventory,
+            shahtaj_sale_uom: this.state.productForm.shahtaj_sale_uom,
+            shahtaj_kg_per_unit: parseFloat(this.state.productForm.shahtaj_kg_per_unit || 1),
+            taxes_id: [[6, 0, (this.state.productForm.tax_ids || []).map((id) => parseInt(id, 10))]],
         };
 
         if (this.state.productForm.image_1920) {
@@ -123,7 +195,6 @@ export class WarehouseInventory extends Component {
         this.state.productForm = this.getEmptyProductForm();
     }
 
-    // --- Stock Adjustment Logic ---
     get selectedProductStock() {
         if (!this.state.adjustmentForm.product_id) return 0;
         const prod = this.state.inventory.find(p => p.id == this.state.adjustmentForm.product_id);
@@ -139,14 +210,15 @@ export class WarehouseInventory extends Component {
             await this.loadInventory();
         }
         
-        // Hide form and clear inputs after successful adjustment
         this.state.showAdjustmentForm = false;
         this.state.adjustmentForm = { product_id: '', qty: 0 };
     }
 
-    // --- View / Edit Details Logic ---
     viewProductDetails(product) {
-        this.state.currentProduct = { ...product }; 
+        this.state.currentProduct = {
+            ...product,
+            tax_ids: [...(product.tax_ids || product.taxes_id || [])],
+        };
         this.state.showProductDetails = true;
         this.state.showProductAddForm = false;
     }
@@ -160,7 +232,10 @@ export class WarehouseInventory extends Component {
             weight: parseFloat(this.state.currentProduct.weight || 0),
             volume: parseFloat(this.state.currentProduct.volume || 0),
             invoice_policy: this.state.currentProduct.invoice_policy,
-            type: this.state.currentProduct.type
+            type: this.state.currentProduct.type,
+            shahtaj_sale_uom: this.state.currentProduct.shahtaj_sale_uom,
+            shahtaj_kg_per_unit: parseFloat(this.state.currentProduct.shahtaj_kg_per_unit || 1),
+            taxes_id: [[6, 0, (this.state.currentProduct.tax_ids || []).map((id) => parseInt(id, 10))]],
         };
 
         if (this.state.currentProduct.image_1920) {
