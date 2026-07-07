@@ -181,8 +181,7 @@
                                         <t t-esc="log.shop"/>
                                     </h6>
                                     <small class="text-muted">
-                                        <t t-esc="log.booker"/>
- •                                        <t t-esc="log.time"/>
+                                        Shop ID: <t t-esc="log.shopId"/> · Booker ID: <t t-esc="log.bookerId"/> · <t t-esc="log.booker"/> · <t t-esc="log.time"/>
                                     </small>
                                 </div>
                             </div>
@@ -246,8 +245,12 @@
                                 <t t-esc="this.state.selectedCheckin.shop"/>
                             </h5>
                             <p class="text-muted mb-1 small">
+                                <strong>Shop ID:</strong> <t t-esc="this.state.selectedCheckin.shopId"/>
+                            </p>
+                            <p class="text-muted mb-1 small">
                                 <strong>Booker:</strong>
                                 <t t-esc="this.state.selectedCheckin.booker"/>
+                                <span class="ms-1">(ID: <t t-esc="this.state.selectedCheckin.bookerId"/>)</span>
                             </p>
                             <p class="text-muted mb-0 small">
                                 <strong>Task Reference:</strong>
@@ -342,7 +345,8 @@
                                     <div class="text-dark fw-bold">
                                         <t t-esc="ord.shop"/>
                                     </div>
-                                    <small class="text-muted">Booked by: <t t-esc="ord.booker"/>
+                                    <small class="text-muted">
+                                        Shop ID: <t t-esc="ord.shopId"/> · Booker ID: <t t-esc="ord.bookerId"/> · <t t-esc="ord.booker"/>
                                     </small>
                                 </td>
                                 <td class="align-middle">
@@ -443,6 +447,9 @@
                         <h5 class="fw-bold text-dark mb-1">
                             <t t-esc="this.state.selectedOrder.shop"/>
                         </h5>
+                        <p class="text-muted mb-1 small">
+                            <strong>Shop ID:</strong> <t t-esc="this.state.selectedOrder.shopId"/>
+                        </p>
                         <p class="text-muted mb-1 small d-flex align-items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin me-1">
                                 <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
@@ -485,6 +492,7 @@
                             <span class="text-muted small">Field Booker:</span>
                             <span class="fw-bold text-dark">
                                 <t t-esc="this.state.selectedOrder.booker"/>
+                                <small class="text-muted ms-1">(ID: <t t-esc="this.state.selectedOrder.bookerId"/>)</small>
                             </span>
                         </div>
                     </div>

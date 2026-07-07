@@ -1,38 +1,51 @@
 # -*- coding: utf-8 -*-
-from odoo import http
-from odoo.http import request
-from odoo.addons.web.controllers.home import Home
+"""Post-login routing and custom-portal navigation guard (Odoo 19).
 
-class CustomHome(Home):
+Only override _login_redirect and web_client with @http.route() (no path) so
+/odoo routes stay registered. Never use @http.route('/web') alone.
+"""
+from odoo.http import request
+from odoo import http
+
+try:
+    from odoo.addons.portal.controllers.web import Home as PortalHome
+except ImportError:
+    from odoo.addons.web.controllers.home import Home as PortalHome
+
+
+class CustomHome(PortalHome):
+
+    def _shahtaj_dashboard_action(self):
+        return request.env.ref(
+            'shahtaj_oil.action_shahtaj_dashboard',
+            raise_if_not_found=False,
+        )
+
+    def _shahtaj_user_uses_custom_portal(self, uid):
+        user = request.env(user=uid)['res.users'].browse(uid)
+        return bool(user.shahtaj_custom_frontend)
 
     def _login_redirect(self, uid, redirect=None):
         clean_redirect = redirect.rstrip('?') if redirect else None
-        
-        if not clean_redirect or clean_redirect in ['/web', '/odoo']:
-            # Check the user doing the logging in
-            user = request.env['res.users'].browse(uid)
-            
-            # Use the correct module prefix: shahtaj_order_booker
-            if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
-                action = request.env.ref('shahtaj_oil.action_shahtaj_dashboard', raise_if_not_found=False)
+        if self._shahtaj_user_uses_custom_portal(uid):
+            if not clean_redirect or clean_redirect in ('/web', '/odoo'):
+                action = self._shahtaj_dashboard_action()
                 if action:
-                    redirect = '/web?action=%s' % action.id
-                
-        return super(CustomHome, self)._login_redirect(uid, redirect=redirect)
+                    redirect = '/odoo/action-%s' % action.id
+        return super()._login_redirect(uid, redirect=redirect)
 
-    # Changed auth="user" back to auth="none" to prevent 404s on logout
-    @http.route('/web', type='http', auth="none")
+    @http.route()
     def web_client(self, s_action=None, **kw):
-        
-        # Only attempt to redirect if there is an active session (user is logged in)
-        if request.session.uid:
-            if not kw.get('action') and not kw.get('menu_id') and not s_action:
-                user = request.env['res.users'].browse(request.session.uid)
-                
-                # Use the correct module prefix: shahtaj_order_booker
-                if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
-                    action = request.env.ref('shahtaj_oil.action_shahtaj_dashboard', raise_if_not_found=False)
-                    if action:
-                        return request.redirect('/web?action=%s' % action.id)
-                        
-        return super(CustomHome, self).web_client(s_action=s_action, **kw)
+        if request.session.uid and self._shahtaj_user_uses_custom_portal(
+            request.session.uid
+        ):
+            action = self._shahtaj_dashboard_action()
+            if action:
+                path = request.httprequest.path or ''
+                allowed = '/odoo/action-%s' % action.id
+                if path in ('/web', '/odoo', '/web/') or (
+                    path.startswith('/odoo/')
+                    and not path.startswith(allowed)
+                ):
+                    return request.redirect(allowed, code=303)
+        return super().web_client(s_action=s_action, **kw)

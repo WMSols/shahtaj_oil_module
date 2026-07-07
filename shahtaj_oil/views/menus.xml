@@ -16,90 +16,90 @@
               parent="menu_shahtaj_root"
               action="action_shahtaj_dashboard"
               sequence="1"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_custom_portal_user"/>
 
     <menuitem id="menu_shahtaj_order_bookers"
               name="Order Bookers"
               parent="menu_shahtaj_root"
               action="action_shahtaj_order_booker_management"
               sequence="5"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_create_order_booker"
               name="Create Order Booker"
               parent="menu_shahtaj_root"
               action="action_shahtaj_create_order_booker_wizard"
               sequence="6"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_zone"
               name="1. Zones"
               parent="menu_shahtaj_root"
               action="action_shahtaj_zone"
               sequence="10"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_route"
               name="2. Routes"
               parent="menu_shahtaj_root"
               action="action_shahtaj_route"
               sequence="20"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_shops"
               name="3. Shops"
               parent="menu_shahtaj_root"
               action="action_shahtaj_shop"
               sequence="30"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_weekly_schedule"
               name="4. Weekly Schedules"
               parent="menu_shahtaj_root"
               action="action_shahtaj_schedule_hub"
               sequence="35"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_visit_task"
               name="5. Visit Tasks"
               parent="menu_shahtaj_root"
               action="action_shahtaj_visit_hub"
               sequence="37"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
               
     <menuitem id="menu_shahtaj_visit_target"
               name="6. Targets"
               parent="menu_shahtaj_root"
               action="action_shahtaj_visit_target"
               sequence="38"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_visit"
               name="Shop Visits"
               parent="menu_shahtaj_root"
               action="action_shahtaj_visit"
               sequence="39"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
               
     <menuitem id="menu_shahtaj_shop_approvals"
               name="Pending Approvals"
               parent="menu_shahtaj_root"
               action="action_shahtaj_shop_pending"
               sequence="40"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_accounting"
               name="7. Shop Accounting"
               parent="menu_shahtaj_root"
               action="action_shahtaj_accounting_hub"
               sequence="42"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_products"
               name="Products"
               parent="menu_shahtaj_root"
               sequence="45"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_quick_add_product"
               name="Quick Add Product"
@@ -123,7 +123,7 @@
               name="Inventory"
               parent="menu_shahtaj_root"
               sequence="46"
-              groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_add_stock"
               name="Add Stock"

@@ -6,6 +6,7 @@ Distributor hubs read these computed fields for tasks, schedules, and targets.
 from datetime import timedelta
 
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 from .shahtaj_visit_task import shahtaj_week_bounds
 
@@ -88,6 +89,176 @@ class ResUsers(models.Model):
         string='Active Target',
         compute='_compute_shahtaj_stats',
     )
+    shahtaj_custom_frontend = fields.Boolean(
+        string='Use Custom Distributor Portal',
+        default=False,
+        help=(
+            'When enabled, this distributor logs into the Shahtaj OWL portal only '
+            '(no standard Odoo apps or native Shahtaj menus). When disabled, only '
+            'the standard Odoo / Shahtaj backend is available.'
+        ),
+    )
+    shahtaj_is_distributor = fields.Boolean(
+        string='Is Distributor',
+        compute='_compute_shahtaj_is_distributor',
+        store=True,
+        index=True,
+    )
+
+    # Same pattern as sale_stock.property_warehouse_id: res.users form fields must be
+    # listed here or the web client can receive arch without field metadata.
+    @property
+    def SELF_READABLE_FIELDS(self):
+        return super().SELF_READABLE_FIELDS + [
+            'shahtaj_custom_frontend',
+            'shahtaj_is_distributor',
+        ]
+
+    @property
+    def SELF_WRITEABLE_FIELDS(self):
+        return super().SELF_WRITEABLE_FIELDS + [
+            'shahtaj_custom_frontend',
+        ]
+
+    @api.depends('group_ids')
+    def _compute_shahtaj_is_distributor(self):
+        for user in self:
+            user.shahtaj_is_distributor = user.has_group(
+                'shahtaj_oil.group_shahtaj_distributor'
+            )
+
+    _SHAHTAJ_USER_FORM_FIELDS = ('shahtaj_custom_frontend', 'shahtaj_is_distributor')
+
+    @api.model
+    def get_views(self, views, options=None):
+        """Ensure Shahtaj user-form fields are always in models.fields metadata."""
+        result = super().get_views(views, options)
+        if not any(view_type == 'form' for _view_id, view_type in views):
+            return result
+        field_defs = (
+            result.setdefault('models', {})
+            .setdefault('res.users', {})
+            .setdefault('fields', {})
+        )
+        for fname in self._SHAHTAJ_USER_FORM_FIELDS:
+            if fname in field_defs or fname not in self._fields:
+                continue
+            meta = self.fields_get([fname]).get(fname)
+            if not meta:
+                field = self._fields[fname]
+                meta = {
+                    'name': fname,
+                    'type': field.type,
+                    'string': field.string,
+                    'help': field.help or '',
+                    'readonly': bool(field.readonly),
+                    'required': bool(field.required),
+                    'searchable': True,
+                    'sortable': bool(field.store),
+                    'store': bool(field.store),
+                    'groupable': bool(field.store),
+                    'change_default': False,
+                }
+            field_defs[fname] = meta
+        return result
+
+
+    @api.constrains('shahtaj_custom_frontend', 'group_ids')
+    def _check_shahtaj_custom_frontend_role(self):
+        dist_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_distributor',
+            raise_if_not_found=False,
+        )
+        if not dist_group:
+            return
+        for user in self:
+            if user.shahtaj_custom_frontend and dist_group not in user.group_ids:
+                raise ValidationError(_(
+                    'Custom Distributor Portal can only be enabled for users '
+                    'with the Distributor role.'
+                ))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        users = super().create(vals_list)
+        users._sync_shahtaj_ui_groups()
+        return users
+
+    def write(self, vals):
+        if self.env.context.get('shahtaj_skip_ui_sync'):
+            return super().write(vals)
+        res = super().write(vals)
+        if {'shahtaj_custom_frontend', 'group_ids'} & set(vals):
+            self._sync_shahtaj_ui_groups()
+        return res
+
+    def _sync_shahtaj_ui_groups(self):
+        """Assign technical UI groups from shahtaj_custom_frontend + distributor role."""
+        custom_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_custom_portal_user',
+            raise_if_not_found=False,
+        )
+        native_ui_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_native_distributor_ui',
+            raise_if_not_found=False,
+        )
+        native_apps_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_distributor_native_apps',
+            raise_if_not_found=False,
+        )
+        dist_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_distributor',
+            raise_if_not_found=False,
+        )
+        if not all([custom_group, native_ui_group, native_apps_group, dist_group]):
+            return
+
+        for user in self.sudo():
+            is_distributor = dist_group in user.group_ids
+            commands = []
+            if is_distributor and user.shahtaj_custom_frontend:
+                commands = [
+                    (4, custom_group.id),
+                    (3, native_ui_group.id),
+                    (3, native_apps_group.id),
+                ]
+            elif is_distributor:
+                commands = [
+                    (3, custom_group.id),
+                    (4, native_ui_group.id),
+                    (4, native_apps_group.id),
+                ]
+            else:
+                if user.shahtaj_custom_frontend:
+                    user.with_context(shahtaj_skip_ui_sync=True).write({
+                        'shahtaj_custom_frontend': False,
+                    })
+                commands = [
+                    (3, custom_group.id),
+                    (3, native_ui_group.id),
+                    (3, native_apps_group.id),
+                ]
+
+            group_ids = set(user.group_ids.ids)
+            desired = set(group_ids)
+            for cmd in commands:
+                if cmd[0] == 4:
+                    desired.add(cmd[1])
+                elif cmd[0] == 3:
+                    desired.discard(cmd[1])
+            if desired != group_ids:
+                user.with_context(shahtaj_skip_ui_sync=True).write({
+                    'group_ids': [(6, 0, list(desired))],
+                })
+
+    @api.model
+    def _sync_all_shahtaj_ui_groups(self):
+        users = self.search([
+            '|',
+            ('shahtaj_is_distributor', '=', True),
+            ('shahtaj_custom_frontend', '=', True),
+        ])
+        users._sync_shahtaj_ui_groups()
 
     @api.depends('group_ids')
     def _compute_shahtaj_is_order_booker(self):

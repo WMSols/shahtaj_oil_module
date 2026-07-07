@@ -33,13 +33,14 @@ export class StaffManagement extends Component {
     }
 
     async fetchStaffData() {
+        // Fetch both active and deactivated bookers by explicitly defining the active domain
         const bookers = await this.orm.searchRead(
             "res.users",
-            [["shahtaj_is_order_booker", "=", true]],
+            [["shahtaj_is_order_booker", "=", true], ["active", "in", [true, false]]],
             [
                 "id", "name", "shahtaj_employee_code", "shahtaj_online_status",
                 "shahtaj_task_today_total", "shahtaj_task_today_pending", "shahtaj_task_today_done",
-                "shahtaj_active_target_progress", "shahtaj_active_target_summary"
+                "shahtaj_active_target_progress", "shahtaj_active_target_summary", "active"
             ]
         );
         
@@ -49,6 +50,7 @@ export class StaffManagement extends Component {
             employee_code: u.shahtaj_employee_code,
             role: "Order Booker",
             status: u.shahtaj_online_status,
+            active: u.active,
             metrics: {
                 today: { 
                     total: u.shahtaj_task_today_total, 
@@ -109,7 +111,6 @@ export class StaffManagement extends Component {
         this.state.showForm = true;
     }
 
-   // --- UPDATED CREATION LOGIC USING WIZARD ---
     async saveStaff() {
         if (!this.state.formData.name || !this.state.formData.email || !this.state.formData.password) {
             alert("Name, Email, and Password are required.");
@@ -117,7 +118,6 @@ export class StaffManagement extends Component {
         }
 
         try {
-            // 1. Create a record in the existing wizard model
             const wizardIds = await this.orm.create("shahtaj.create.order.booker.wizard", [{
                 name: this.state.formData.name,
                 login: this.state.formData.email,
@@ -125,20 +125,39 @@ export class StaffManagement extends Component {
                 shahtaj_employee_code: this.state.formData.employee_code,
             }]);
 
-            // 2. Execute the wizard's creation action using the generated record ID
             await this.orm.call("shahtaj.create.order.booker.wizard", "action_create_booker", [wizardIds]);
 
-            // 3. Reset form and UI state on success
             this.state.showForm = false;
             this.state.formData = { name: '', employee_code: '', email: '', password: '', role: 'order_booker' };
             
-            // 4. Refresh the list to show the new booker
             await this.fetchStaffData();
 
         } catch (error) {
             console.error("Creation failed:", error);
             const errorMessage = error.data?.message || error.message || "Unknown error occurred";
             alert(`Failed to create order booker:\n\n${errorMessage}`);
+        }
+    }
+
+    // Toggle user activation state via backend methods
+    async toggleActiveStatus(staffId, currentStatus) {
+        const newStatus = !currentStatus;
+        const actionWord = newStatus ? "activate" : "deactivate";
+        
+        if (!confirm(`Are you sure you want to ${actionWord} this order booker?`)) return;
+
+        try {
+            const methodName = newStatus ? "action_shahtaj_activate_booker" : "action_shahtaj_deactivate_booker";
+            await this.orm.call("res.users", methodName, [[staffId]]);
+            
+            // Refresh main list and update local state to trigger UI re-render
+            await this.fetchStaffData();
+            if (this.state.selectedStaff && this.state.selectedStaff.id === staffId) {
+                this.state.selectedStaff.active = newStatus;
+            }
+        } catch (error) {
+            console.error("Failed to toggle status:", error);
+            alert("An error occurred while updating the status.");
         }
     }
 }

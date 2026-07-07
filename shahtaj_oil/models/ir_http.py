@@ -18,4 +18,7 @@ class IrHttp(models.AbstractModel):
                 request.env['shahtaj.visit.task'].sudo()._auto_generate_window(
                     order_booker=user,
                 )
-        return super().session_info()
+        result = super().session_info()
+        if request.session.uid and request.env.user.shahtaj_custom_frontend:
+            result['shahtaj_custom_frontend'] = True
+        return result

@@ -48,6 +48,17 @@ class ResPartner(models.Model):
     # --- Shop identity and territory (one shop → one route) ---
     credit_limit = fields.Float(groups=_SHAHTAJ_CREDIT_GROUPS)
     use_partner_credit_limit = fields.Boolean(groups=_SHAHTAJ_CREDIT_GROUPS)
+    shahtaj_shop_category = fields.Selection(
+        [
+            ('credit', 'Credit'),
+            ('cash', 'Cash'),
+        ],
+        string='Shop Category',
+        default='credit',
+        required=True,
+        help='Credit shops enforce the credit limit on field orders. '
+             'Cash shops skip credit limit checks when placing orders.',
+    )
 
     is_shahtaj_shop = fields.Boolean(string='Is Shop')
     shop_approval_state = fields.Selection(
@@ -159,6 +170,33 @@ class ResPartner(models.Model):
         if self.owner_phone:
             self.phone = self.owner_phone
 
+    @api.onchange('shahtaj_shop_category')
+    def _onchange_shahtaj_shop_category(self):
+        if self.shahtaj_shop_category == 'cash':
+            self.use_partner_credit_limit = False
+        elif self.shahtaj_shop_category == 'credit' and self.credit_limit > 0:
+            self.use_partner_credit_limit = True
+
+    @api.onchange('credit_limit', 'shahtaj_shop_category')
+    def _onchange_credit_limit_shop_category(self):
+        if self.shahtaj_shop_category == 'credit' and self.credit_limit > 0:
+            self.use_partner_credit_limit = True
+
+    @api.model
+    def _sync_shop_category_credit_flags(self, vals):
+        """Keep Odoo credit-limit flag aligned with shop category."""
+        vals = dict(vals)
+        category = vals.get('shahtaj_shop_category')
+        if category == 'cash':
+            vals['use_partner_credit_limit'] = False
+        elif category == 'credit' and vals.get('credit_limit', 0) > 0:
+            vals['use_partner_credit_limit'] = True
+        elif category == 'credit' and 'credit_limit' not in vals:
+            pass
+        elif vals.get('credit_limit', 0) > 0 and category != 'cash':
+            vals['use_partner_credit_limit'] = True
+        return vals
+
     @api.constrains('route_id', 'zone_id', 'is_shahtaj_shop')
     def _check_shop_route_zone(self):
         for partner in self.filtered(lambda p: p.is_shahtaj_shop and p.route_id):
@@ -205,6 +243,7 @@ class ResPartner(models.Model):
         vals = dict(vals)
         if vals.get('is_shahtaj_shop') or self.env.context.get('shahtaj_shop_form'):
             vals.setdefault('is_shahtaj_shop', True)
+            vals.setdefault('shahtaj_shop_category', 'credit')
             vals.setdefault('company_type', 'company')
             vals.setdefault('customer_rank', 1)
             if vals.get('owner_phone'):
@@ -225,9 +264,7 @@ class ResPartner(models.Model):
                     'shop_approval_state',
                     self.env.context['default_shop_approval_state'],
                 )
-            credit = vals.get('credit_limit', 0) or 0
-            if credit > 0:
-                vals['use_partner_credit_limit'] = True
+            vals = self._sync_shop_category_credit_flags(vals)
         return vals
 
     def _get_shop_receivable_account(self, company):
@@ -325,16 +362,26 @@ class ResPartner(models.Model):
         return partners
 
     def write(self, vals):
+        vals = self._sync_shop_category_credit_flags(vals)
         if vals.get('owner_phone'):
             vals.setdefault('phone', vals['owner_phone'])
-        if vals.get('credit_limit', 0) > 0:
-            vals['use_partner_credit_limit'] = True
         if vals.get('legacy_balance_move_id') and not self.env.context.get(
             'shahtaj_posting_legacy_move'
         ):
             # Block manual edits; only _post_legacy_balance_entry may set this link.
             raise UserError(_('Legacy balance journal entry cannot be changed manually.'))
         res = super().write(vals)
+        if 'shahtaj_shop_category' in vals:
+            credit_shops = self.filtered(
+                lambda p: p.is_shahtaj_shop
+                and p.shahtaj_shop_category == 'credit'
+                and p.credit_limit > 0
+                and not p.use_partner_credit_limit
+            )
+            if credit_shops:
+                super(ResPartner, credit_shops).write({
+                    'use_partner_credit_limit': True,
+                })
         if any(k in vals for k in ('is_shahtaj_shop', 'name', 'owner_name', 'owner_phone',
                                     'partner_latitude', 'partner_longitude')):
             self.filtered('is_shahtaj_shop')._validate_shop_required_fields()

@@ -55,7 +55,9 @@ export class FinancialsInvoicing extends Component {
                 id: o.id,
                 display_name: o.name,
                 shop: o.partner_id ? o.partner_id[1] : 'Unknown',
-                booker: o.user_id ? o.user_id[1] : 'Unassigned', // Added Order Booker
+                shopId: o.partner_id ? o.partner_id[0] : false,
+                booker: o.user_id ? o.user_id[1] : 'Unassigned',
+                bookerId: o.user_id ? o.user_id[0] : false,
                 date: o.date_order ? o.date_order.split(' ')[0] : 'N/A', 
                 amount: (o.amount_total || 0).toLocaleString(),
                 rawAmount: o.amount_total || 0,
@@ -113,15 +115,19 @@ export class FinancialsInvoicing extends Component {
             const shopsData = await this.orm.searchRead(
                 "res.partner",
                 [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]],
-                ["name", "owner_name", "route_id", "credit_limit", "credit"] 
+                ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "credit"] 
             );
             
             this.state.balances = shopsData.map(shop => ({
                 id: shop.id,
+                shopId: shop.id,
                 shop: shop.name,
                 owner: shop.owner_name || 'N/A',
                 route: shop.route_id ? shop.route_id[1] : 'Unassigned',
-                limit: (shop.credit_limit || 0).toLocaleString(),
+                category: shop.shahtaj_shop_category === 'cash' ? 'Cash' : 'Credit',
+                limit: shop.shahtaj_shop_category === 'cash'
+                    ? 'N/A'
+                    : (shop.credit_limit || 0).toLocaleString(),
                 rawLimit: shop.credit_limit || 0,
                 outstanding: (shop.credit || 0).toLocaleString(), 
             }));
@@ -131,13 +137,16 @@ export class FinancialsInvoicing extends Component {
                 const utilized = shop.credit || 0;
                 let status = "Healthy";
                 
-                if (limit > 0) {
+                if (shop.shahtaj_shop_category === 'cash') {
+                    status = "Cash";
+                } else if (limit > 0) {
                     if (utilized > limit) status = "Exceeded";
                     else if (utilized >= limit * 0.85) status = "Critical";
                 }
                 
                 return {
                     id: shop.id,
+                    shopId: shop.id,
                     shop: shop.name,
                     limit: limit.toLocaleString(),
                     rawLimit: limit,
