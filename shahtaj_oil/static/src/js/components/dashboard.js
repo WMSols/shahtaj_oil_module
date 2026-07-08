@@ -11,23 +11,17 @@ import { PortalSettings } from "./settings"
 import { SchedulesTargets } from "./schedules_targets";
 
 export class ShahtajDashboard extends Component {
+    // 2. Register it
     static components = { StaffManagement, OperationsTracking, TerritoryRoutes, WarehouseInventory, FinancialsInvoicing, PortalSettings, SchedulesTargets }; 
 
     setup() {
         this.state = useState({
-            activeTab: 'territory', // Default active tab
-            isSidebarOpen: false, // NEW: State to control mobile sidebar
+            activeTab: 'territory', 
         });
     }
 
     switchTab(tabName) {
         this.state.activeTab = tabName;
-        this.state.isSidebarOpen = false; // NEW: Auto-close sidebar on mobile after clicking a link
-    }
-
-    // NEW: Function to toggle sidebar visibility
-    toggleSidebar() {
-        this.state.isSidebarOpen = !this.state.isSidebarOpen;
     }
 }
 

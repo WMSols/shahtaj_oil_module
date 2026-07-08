@@ -17,8 +17,14 @@
         <t t-if="this.state.showForm">
             <div class="p-3 p-md-4 bg-light rounded-3 mb-4 border">
                 <h5 class="fw-bold mb-3 d-flex align-items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-plus me-2 text-primary"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
-                    Configure New Employee
+                    <t t-if="this.state.editingStaffId">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-cog me-2 text-primary"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><circle cx="19" cy="11" r="2"/><path d="M19 8v1"/><path d="M19 13v1"/><path d="m21.6 9.5-.87.5"/><path d="m17.27 12-.87.5"/><path d="m21.6 12.5-.87-.5"/><path d="m17.27 10-.87-.5"/></svg>
+                        Edit Employee Details
+                    </t>
+                    <t t-else="">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-plus me-2 text-primary"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+                        Configure New Employee
+                    </t>
                 </h5>
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-4">
@@ -47,14 +53,19 @@
                         <input type="email" class="form-control" t-model="this.state.formData.email" placeholder="employee@shahtaj.com" autocomplete="off"/>
                     </div>
                     <div class="col-12 col-md-6">
-                        <label class="small fw-bold text-muted">App Password</label>
+                        <label class="small fw-bold text-muted">
+                            App Password 
+                            <span t-if="this.state.editingStaffId" class="text-primary fw-normal ms-1">(Leave blank to keep unchanged)</span>
+                        </label>
                         <input type="password" class="form-control" t-model="this.state.formData.password" placeholder="••••••••" autocomplete="new-password"/>
                     </div>
                 </div>
 
                 <div class="d-flex flex-column flex-sm-row justify-content-end gap-2 mt-4">
-                    <button class="btn btn-outline-secondary fw-bold w-100 w-sm-auto" t-on-click="() => this.state.showForm = false">Cancel</button>
-                    <button class="btn btn-dark fw-bold text-white w-100 w-sm-auto" t-on-click="saveStaff">Save Employee</button>
+                    <button class="btn btn-outline-secondary fw-bold w-100 w-sm-auto" t-on-click="cancelForm">Cancel</button>
+                    <button class="btn btn-dark fw-bold text-white w-100 w-sm-auto" t-on-click="saveStaff">
+                        <t t-esc="this.state.editingStaffId ? 'Update Employee' : 'Save Employee'"/>
+                    </button>
                 </div>
             </div>
         </t>
@@ -88,7 +99,7 @@
                                 <td class="ps-4 text-nowrap">
                                     <div class="fw-bold text-dark d-flex align-items-center">
                                         <t t-esc="staff.name"/>
-                                        <span t-if="!staff.active" class="badge bg-danger ms-2" style="font-size: 0.65rem;">Deactivated</span>
+                                        <span t-if="!staff.active" class="badge bg-danger text-white ms-2" style="font-size: 0.65rem;">Deactivated</span>
                                     </div>
                                     <t t-if="staff.employee_code">
                                         <small class="text-muted d-block mt-1"><t t-esc="staff.employee_code"/></small>
@@ -123,6 +134,10 @@
                                     </t>
                                 </td>
                                 <td class="text-end pe-4 text-nowrap">
+                                    <button class="btn btn-sm btn-outline-secondary fw-bold d-inline-flex align-items-center me-2" t-on-click="() => this.editStaff(staff)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil me-1"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                                        Edit
+                                    </button>
                                     <button class="btn btn-sm btn-outline-dark fw-bold d-inline-flex align-items-center" t-on-click="() => this.openDetails(staff)">
                                         View Details
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right ms-2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>

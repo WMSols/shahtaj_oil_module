@@ -11,7 +11,7 @@
                 <field name="name"/>
                 <field name="login"/>
                 <field name="shahtaj_employee_code" optional="show"/>
-                <field name="active" widget="boolean_toggle"/>
+                <field name="active" widget="boolean" readonly="1"/>
                 <field name="shahtaj_online_status" widget="badge"
                        decoration-success="shahtaj_online_status == 'online'"
                        decoration-warning="shahtaj_online_status == 'away'"
@@ -23,6 +23,12 @@
                 <field name="shahtaj_schedule_count" string="Schedules"/>
                 <field name="shahtaj_active_target_progress" string="Target %" widget="progressbar"/>
                 <field name="shahtaj_active_target_summary" optional="hide"/>
+                <button name="action_shahtaj_deactivate_booker" type="object"
+                        string="Deactivate" icon="fa-ban" title="Deactivate"
+                        invisible="not active" readonly="0"/>
+                <button name="action_shahtaj_activate_booker" type="object"
+                        string="Activate" icon="fa-check" title="Activate"
+                        invisible="active" readonly="0"/>
             </list>
         </field>
     </record>
@@ -36,10 +42,10 @@
                 <header>
                     <button name="action_shahtaj_activate_booker" type="object"
                             string="Activate" class="oe_highlight"
-                            invisible="active"/>
+                            invisible="active" readonly="0"/>
                     <button name="action_shahtaj_deactivate_booker" type="object"
                             string="Deactivate"
-                            invisible="not active"
+                            invisible="not active" readonly="0"
                             confirm="Deactivate this order booker? They will not be able to log in."/>
                 </header>
                 <sheet>
@@ -70,7 +76,7 @@
                             <field name="name" readonly="1"/>
                             <field name="login" readonly="1"/>
                             <field name="shahtaj_employee_code"/>
-                            <field name="active" widget="boolean_toggle"/>
+                            <field name="active" widget="boolean" readonly="1"/>
                         </group>
                         <group string="Field Status">
                             <field name="shahtaj_online_status" widget="badge"

@@ -60,6 +60,7 @@
                                     <field name="name"/>
                                     <field name="owner_name"/>
                                     <field name="owner_phone"/>
+                                    <field name="registered_by_name" string="Registered By" optional="show"/>
                                     <field name="route_id" column_invisible="1"/>
                                     <field name="zone_id" column_invisible="1"/>
                                     <field name="shop_approval_state" widget="badge"

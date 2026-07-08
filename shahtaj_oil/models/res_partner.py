@@ -72,6 +72,7 @@ class ResPartner(models.Model):
     )
     owner_name = fields.Char(string='Owner Name')
     owner_phone = fields.Char(string='Owner Phone')
+    owner_cnic_number = fields.Char(string='Owner ID Card Number')
     zone_id = fields.Many2one(
         'shahtaj.zone',
         string='Zone',
@@ -87,9 +88,21 @@ class ResPartner(models.Model):
     )
     registered_by_id = fields.Many2one(
         'res.users',
-        string='Registered By',
+        string='Registered By User',
         readonly=True,
         copy=False,
+    )
+    registered_by_name = fields.Char(
+        related='registered_by_id.name',
+        string='Registered By',
+        store=True,
+        readonly=True,
+    )
+    registered_by_booker_id = fields.Integer(
+        related='registered_by_id.id',
+        string='Registered By Booker ID',
+        store=True,
+        readonly=True,
     )
     legacy_balance = fields.Monetary(
         string='Legacy Balance',

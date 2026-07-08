@@ -153,6 +153,7 @@
         { name: 'name', required: true, type: 'string' },
         { name: 'owner_name', required: true, type: 'string' },
         { name: 'owner_phone', required: true, type: 'string' },
+        { name: 'owner_cnic_number', required: false, type: 'string' },
         { name: 'latitude', required: true, type: 'float' },
         { name: 'longitude', required: true, type: 'float' },
         { name: 'zone_id', required: false, type: 'int' },
@@ -704,12 +705,18 @@
       el.innerHTML = '<p class="empty-state">No active targets.</p>';
       return;
     }
-    el.innerHTML = rows.map((t) => `
+    el.innerHTML = rows.map((t) => {
+      const unit = t.target_weight_uom ? ` ${t.target_weight_uom}` : '';
+      const remaining = t.target_type === 'product_weight' && t.remaining_value != null
+        ? ` · ${t.remaining_value}${unit} left`
+        : '';
+      return `
       <article class="card">
         <h4>${escapeHtml(t.name)}</h4>
         <p>${t.date_start} → ${t.date_end}</p>
-        <p>${t.achieved_value} / ${t.target_value} (${t.progress_percent?.toFixed?.(0) || 0}%)</p>
-      </article>`).join('');
+        <p>${t.achieved_value}${unit} / ${t.target_value}${unit} (${t.progress_percent?.toFixed?.(0) || 0}%)${remaining}</p>
+      </article>`;
+    }).join('');
   }
 
   async function loadMyShops() {
@@ -892,6 +899,8 @@
       latitude: parseFloat($('reg-lat').value),
       longitude: parseFloat($('reg-lng').value),
     };
+    const ownerCnicNumber = $('reg-owner-cnic-number').value.trim();
+    if (ownerCnicNumber) body.owner_cnic_number = ownerCnicNumber;
     const credit = $('reg-credit').value;
     const legacy = $('reg-legacy').value;
     const zone = $('reg-zone').value;
