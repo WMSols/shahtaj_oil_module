@@ -36,6 +36,7 @@ class ShahtajApiShops(http.Controller):
             'name': name,
             'owner_name': owner_name,
             'owner_phone': owner_phone,
+            'owner_cnic_number': kwargs.get('owner_cnic_number') or False,
             'partner_latitude': float(latitude),
             'partner_longitude': float(longitude),
         }

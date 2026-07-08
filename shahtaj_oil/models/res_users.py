@@ -6,7 +6,7 @@ Distributor hubs read these computed fields for tasks, schedules, and targets.
 from datetime import timedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 from .shahtaj_visit_task import shahtaj_week_bounds
 
@@ -184,9 +184,45 @@ class ResUsers(models.Model):
         users._sync_shahtaj_ui_groups()
         return users
 
+    def _shahtaj_split_managed_bookers(self):
+        """Return (booker_users, other_users) for the current distributor context."""
+        booker_group = self.env.ref('shahtaj_oil.group_shahtaj_order_booker')
+        targets = self.with_context(active_test=False)
+        bookers = targets.filtered(
+            lambda user: booker_group in user.sudo().group_ids
+        )
+        return bookers, targets - bookers
+
+    def check_access(self, operation):
+        """Let distributors run booker actions on read-only res.users forms."""
+        if (
+            operation == 'write'
+            and not self.env.su
+            and self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+        ):
+            bookers, others = self._shahtaj_split_managed_bookers()
+            if bookers and not others:
+                return super(ResUsers, bookers).check_access('read')
+        return super().check_access(operation)
+
     def write(self, vals):
         if self.env.context.get('shahtaj_skip_ui_sync'):
             return super().write(vals)
+
+        # Distributors manage order bookers with sudo to avoid res.users/partner rules.
+        if (
+            not self.env.su
+            and self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+        ):
+            bookers, others = self._shahtaj_split_managed_bookers()
+            if bookers:
+                res = super(ResUsers, bookers.sudo()).write(vals)
+                if others:
+                    res = super(ResUsers, others).write(vals) and res
+                if {'shahtaj_custom_frontend', 'group_ids'} & set(vals):
+                    self._sync_shahtaj_ui_groups()
+                return res
+
         res = super().write(vals)
         if {'shahtaj_custom_frontend', 'group_ids'} & set(vals):
             self._sync_shahtaj_ui_groups()
@@ -335,9 +371,18 @@ class ResUsers(models.Model):
             if active_targets:
                 best = active_targets.sorted('progress_percent', reverse=True)[0]
                 user.shahtaj_active_target_progress = best.progress_percent
-                user.shahtaj_active_target_summary = (
-                    f'{best.target_type}: {best.achieved_value:.0f} / {best.target_value:.0f}'
-                )
+                if best.target_type == 'product_weight':
+                    uom = dict(
+                        best._fields['target_weight_uom'].selection,
+                    ).get(best.target_weight_uom, '')
+                    user.shahtaj_active_target_summary = (
+                        f'Weight: {best.achieved_value:.2f} / {best.target_value:.2f} {uom} '
+                        f'({best.remaining_value:.2f} {uom} left)'
+                    )
+                else:
+                    user.shahtaj_active_target_summary = (
+                        f'{best.target_type}: {best.achieved_value:.0f} / {best.target_value:.0f}'
+                    )
             else:
                 user.shahtaj_active_target_progress = 0.0
                 user.shahtaj_active_target_summary = 'No active target'
@@ -381,13 +426,55 @@ class ResUsers(models.Model):
             user.shahtaj_active_target_progress = 0.0
             user.shahtaj_active_target_summary = ''
 
+    @api.model
+    def _sync_shahtaj_distributor_booker_access(self):
+        """Called from data on upgrade to refresh user access rules and flags."""
+        from odoo.addons.shahtaj_oil.hooks import (
+            _recompute_shahtaj_order_booker_flags,
+            _sync_distributor_booker_user_rule,
+        )
+        _sync_distributor_booker_user_rule(self.env)
+        _recompute_shahtaj_order_booker_flags(self.env)
+
+    def _shahtaj_ensure_distributor_manage_booker(self):
+        """Only distributors may activate/deactivate Shahtaj order booker logins."""
+        if not self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            raise AccessError(_('Only distributors can manage order booker accounts.'))
+        booker_group = self.env.ref('shahtaj_oil.group_shahtaj_order_booker')
+        for user in self.sudo().with_context(active_test=False):
+            if booker_group not in user.group_ids:
+                raise UserError(_(
+                    'User "%(user)s" is not an order booker account.',
+                    user=user.display_name,
+                ))
+
     def action_shahtaj_deactivate_booker(self):
         self.ensure_one()
+        self._shahtaj_ensure_distributor_manage_booker()
         self.sudo().write({'active': False})
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Order Bookers'),
+            'res_model': 'res.users',
+            'view_mode': 'list,form',
+            'domain': [('shahtaj_is_order_booker', '=', True)],
+            'context': {'search_default_active': 1},
+            'target': 'current',
+        }
 
     def action_shahtaj_activate_booker(self):
         self.ensure_one()
+        self._shahtaj_ensure_distributor_manage_booker()
         self.sudo().write({'active': True})
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Order Bookers'),
+            'res_model': 'res.users',
+            'view_mode': 'list,form',
+            'domain': [('shahtaj_is_order_booker', '=', True)],
+            'context': {'search_default_active': 1},
+            'target': 'current',
+        }
 
     def action_shahtaj_view_tasks_today(self):
         self.ensure_one()

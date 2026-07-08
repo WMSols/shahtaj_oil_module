@@ -44,6 +44,7 @@ def shop_brief(partner):
         'name': partner.name,
         'owner_name': partner.owner_name or '',
         'owner_phone': partner.owner_phone or '',
+        'owner_cnic_number': partner.owner_cnic_number or '',
         'latitude': partner.partner_latitude,
         'longitude': partner.partner_longitude,
         'approval_state': partner.shop_approval_state,
@@ -80,14 +81,23 @@ def product_brief(product, bookable_qty=None, visit_line_ids=None):
             exclude_visit_line_ids=visit_line_ids or [],
         )
     unlimited = bookable_qty is None
+    tmpl = product.product_tmpl_id
     return {
         'id': product.id,
         'name': product.display_name,
         'list_price': product.lst_price,
         'uom': product.uom_id.name,
+        'sale_uom': tmpl.shahtaj_sale_uom,
+        'kg_per_unit': tmpl._shahtaj_get_kg_per_unit(),
         'is_storable': product.is_storable,
         'qty_bookable': bookable_qty if not unlimited else False,
         'qty_unlimited': unlimited,
+        'taxes': [{
+            'id': tax.id,
+            'name': tax.name,
+            'amount': tax.amount,
+            'amount_type': tax.amount_type,
+        } for tax in tmpl.taxes_id],
     }
 
 
@@ -133,7 +143,7 @@ def schedule_dict(schedule):
 
 
 def target_dict(target):
-    return {
+    data = {
         'id': target.id,
         'name': target.name,
         'target_type': target.target_type,
@@ -141,6 +151,13 @@ def target_dict(target):
         'date_end': str(target.date_end),
         'target_value': target.target_value,
         'achieved_value': target.achieved_value,
+        'remaining_value': target.remaining_value,
         'progress_percent': target.progress_percent,
         'product': _m2o(target.product_id) if target.product_id else None,
     }
+    if target.target_type == 'product_weight':
+        data['target_weight_uom'] = target.target_weight_uom
+        data['weight_unit_label'] = dict(
+            target._fields['target_weight_uom'].selection,
+        ).get(target.target_weight_uom, '')
+    return data

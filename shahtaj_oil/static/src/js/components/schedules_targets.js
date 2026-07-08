@@ -14,11 +14,16 @@ export class SchedulesTargets extends Component {
             errorMessage: '',
             isLoading: false,
 
+            // Edit Tracking
+            editingScheduleId: null,
+            editingTargetId: null,
+
             // Form Data
-            scheduleForm: { day: '', route_id: null, zone_name: '', is_active: true },
+            scheduleForm: { day: '', route_id: '', zone_name: '', is_active: true },
             targetForm: {
                 startDate: '', endDate: '', is_active: true,
-                type: '', target_value: '', product_id: null, currency_id: null
+                type: '', target_value: '', product_id: '', currency_id: '',
+                target_weight_uom: 'kg',
             },
 
             // Real data
@@ -104,10 +109,11 @@ export class SchedulesTargets extends Component {
             id: r.id,
             bookerId: bookerId,
             name: r.name,
+            day_raw: r.day_of_week, 
             day: dayMap[r.day_of_week] || r.day_of_week,
-            route_id: r.route_id ? r.route_id[0] : null,
-            route: r.route_id ? r.route_id[1] : '', // Fixed mapping for XML
-            zone: r.zone_id ? r.zone_id[1] : '',    // Fixed mapping for XML
+            route_id: r.route_id ? r.route_id[0] : '',
+            route: r.route_id ? r.route_id[1] : '',
+            zone: r.zone_id ? r.zone_id[1] : '',    
             status: r.active ? 'Active' : 'Inactive',
             shops: r.shop_count,
             isLocked: r.is_day_locked,
@@ -124,8 +130,8 @@ export class SchedulesTargets extends Component {
             [['order_booker_id', '=', bookerId]],
             [
                 'id', 'name', 'date_start', 'date_end', 'target_type',
-                'target_value', 'achieved_value', 'progress_percent',
-                'product_id', 'currency_id', 'active'
+                'target_value', 'achieved_value', 'remaining_value', 'progress_percent',
+                'product_id', 'currency_id', 'target_weight_uom', 'active'
             ]
         );
         this.state.targets = records.map(r => ({
@@ -135,10 +141,14 @@ export class SchedulesTargets extends Component {
             startDate: r.date_start,
             endDate: r.date_end,
             type: r.target_type,
-            amount: r.target_value,                  // Fixed mapping for XML
-            achievedAmount: r.achieved_value,        // Fixed mapping for XML
-            progressPercentage: r.progress_percent ? `${r.progress_percent.toFixed(1)}%` : '0%', // Fixed mapping for XML
+            amount: r.target_value,
+            achievedAmount: r.achieved_value,
+            remainingAmount: r.remaining_value,
+            weightUom: r.target_weight_uom || null,
+            progressPercentage: r.progress_percent ? `${r.progress_percent.toFixed(1)}%` : '0%',
+            product_id_raw: r.product_id ? r.product_id[0] : '',
             product: r.product_id ? r.product_id[1] : null,
+            currency_id_raw: r.currency_id ? r.currency_id[0] : '',
             currency: r.currency_id ? r.currency_id[1] : null,
             status: r.active ? 'Active' : 'Inactive',
         }));
@@ -152,6 +162,8 @@ export class SchedulesTargets extends Component {
         this.state.selectedBooker = null;
         this.state.showForm = false;
         this.state.errorMessage = '';
+        this.state.editingScheduleId = null;
+        this.state.editingTargetId = null;
         this.state.schedules = [];
         this.state.targets = [];
     }
@@ -161,6 +173,8 @@ export class SchedulesTargets extends Component {
         this.state.viewMode = 'detail';
         this.state.showForm = false;
         this.state.errorMessage = '';
+        this.state.editingScheduleId = null;
+        this.state.editingTargetId = null;
         this.state.isLoading = true;
 
         await Promise.all([
@@ -176,6 +190,8 @@ export class SchedulesTargets extends Component {
         this.state.selectedBooker = null;
         this.state.showForm = false;
         this.state.errorMessage = '';
+        this.state.editingScheduleId = null;
+        this.state.editingTargetId = null;
         this.state.schedules = [];
         this.state.targets = [];
     }
@@ -183,11 +199,44 @@ export class SchedulesTargets extends Component {
     openForm() {
         this.state.showForm = true;
         this.state.errorMessage = '';
-        this.state.scheduleForm = { day: '', route_id: null, zone_name: '', is_active: true };
+        this.state.editingScheduleId = null;
+        this.state.editingTargetId = null;
+        this.state.scheduleForm = { day: '', route_id: '', zone_name: '', is_active: true };
         this.state.targetForm = {
             startDate: '', endDate: '', is_active: true,
-            type: '', target_value: '', product_id: null, currency_id: null,
+            type: '', target_value: '', product_id: '', currency_id: '',
+            target_weight_uom: 'kg',
         };
+    }
+
+    // ─── Editing ─────────────────────────────────────────────────────────────────
+
+    editSchedule(sched) {
+        this.state.errorMessage = '';
+        this.state.scheduleForm = {
+            day: sched.day_raw.toString(),
+            route_id: sched.route_id,
+            zone_name: sched.zone,
+            is_active: sched.status === 'Active'
+        };
+        this.state.editingScheduleId = sched.id;
+        this.state.showForm = true;
+    }
+
+    editTarget(tgt) {
+        this.state.errorMessage = '';
+        this.state.targetForm = {
+            startDate: tgt.startDate,
+            endDate: tgt.endDate,
+            type: tgt.type,
+            target_value: tgt.amount,
+            product_id: tgt.product_id_raw,
+            currency_id: tgt.currency_id_raw,
+            target_weight_uom: tgt.weightUom || 'kg',
+            is_active: tgt.status === 'Active'
+        };
+        this.state.editingTargetId = tgt.id;
+        this.state.showForm = true;
     }
 
     // ─── Getters ─────────────────────────────────────────────────────────────────
@@ -223,7 +272,8 @@ export class SchedulesTargets extends Component {
             return;
         }
 
-        const dayExists = this.currentBookerSchedules.some(s => s.day === form.day);
+        // Only check for duplicate days if creating new, OR if updating and day changed
+        const dayExists = this.currentBookerSchedules.some(s => s.day_raw.toString() === form.day && s.id !== this.state.editingScheduleId);
         if (dayExists) {
             this.state.errorMessage = `A schedule for this day already exists for this Order Booker.`;
             return;
@@ -233,12 +283,18 @@ export class SchedulesTargets extends Component {
         this.state.errorMessage = '';
 
         try {
-            await this.orm.create('shahtaj.weekly.schedule', [{
+            const payload = {
                 order_booker_id: this.state.selectedBooker.id,
                 day_of_week: form.day,
-                route_id: form.route_id,
+                route_id: parseInt(form.route_id),
                 active: form.is_active,
-            }]);
+            };
+
+            if (this.state.editingScheduleId) {
+                await this.orm.write('shahtaj.weekly.schedule', [this.state.editingScheduleId], payload);
+            } else {
+                await this.orm.create('shahtaj.weekly.schedule', [payload]);
+            }
 
             this.state.showForm = false;
             await this._loadBookerSchedules(this.state.selectedBooker.id);
@@ -269,6 +325,16 @@ export class SchedulesTargets extends Component {
             return;
         }
 
+        if (form.type === 'product_weight' && !form.product_id) {
+            this.state.errorMessage = 'A product is required for Product Weight targets.';
+            return;
+        }
+
+        if (form.type === 'product_weight' && !form.target_weight_uom) {
+            this.state.errorMessage = 'Select kg or ton for the weight target.';
+            return;
+        }
+
         this.state.isLoading = true;
         this.state.errorMessage = '';
 
@@ -282,14 +348,22 @@ export class SchedulesTargets extends Component {
                 active: form.is_active,
             };
 
-            if (form.type === 'product_qty' && form.product_id) {
-                payload.product_id = form.product_id;
+            // Fix: Parse Int for IDs to prevent Odoo validation crashes
+            if (['product_qty', 'product_weight'].includes(form.type) && form.product_id) {
+                payload.product_id = parseInt(form.product_id);
+            }
+            if (form.type === 'product_weight') {
+                payload.target_weight_uom = form.target_weight_uom || 'kg';
             }
             if (form.type === 'sales_amount' && form.currency_id) {
-                payload.currency_id = form.currency_id;
+                payload.currency_id = parseInt(form.currency_id);
             }
 
-            await this.orm.create('shahtaj.visit.target', [payload]);
+            if (this.state.editingTargetId) {
+                await this.orm.write('shahtaj.visit.target', [this.state.editingTargetId], payload);
+            } else {
+                await this.orm.create('shahtaj.visit.target', [payload]);
+            }
 
             this.state.showForm = false;
             await this._loadBookerTargets(this.state.selectedBooker.id);
@@ -303,6 +377,7 @@ export class SchedulesTargets extends Component {
     // ─── Delete ──────────────────────────────────────────────────────────────────
 
     async deleteSchedule(scheduleId) {
+        if (!confirm("Are you sure you want to delete this schedule?")) return;
         const schedule = this.state.schedules.find(s => s.id === scheduleId);
         if (schedule?.isLocked) {
             this.state.errorMessage = "Cannot delete today's schedule — visits are already in progress.";
@@ -317,6 +392,7 @@ export class SchedulesTargets extends Component {
     }
 
     async deleteTarget(targetId) {
+        if (!confirm("Are you sure you want to delete this target?")) return;
         try {
             await this.orm.unlink('shahtaj.visit.target', [targetId]);
             await this._loadBookerTargets(this.state.selectedBooker.id);

@@ -14,6 +14,8 @@ export class StaffManagement extends Component {
             showForm: false,
             isLoading: false,
             
+            editingStaffId: null, // Tracks if we are editing an existing record
+            
             staffList: [],
             detailSchedules: [],
             detailTargets: [],
@@ -33,12 +35,12 @@ export class StaffManagement extends Component {
     }
 
     async fetchStaffData() {
-        // Fetch both active and deactivated bookers by explicitly defining the active domain
+        // Included 'login' in the fields to pre-fill the email when editing
         const bookers = await this.orm.searchRead(
             "res.users",
             [["shahtaj_is_order_booker", "=", true], ["active", "in", [true, false]]],
             [
-                "id", "name", "shahtaj_employee_code", "shahtaj_online_status",
+                "id", "name", "login", "shahtaj_employee_code", "shahtaj_online_status",
                 "shahtaj_task_today_total", "shahtaj_task_today_pending", "shahtaj_task_today_done",
                 "shahtaj_active_target_progress", "shahtaj_active_target_summary", "active"
             ]
@@ -47,6 +49,7 @@ export class StaffManagement extends Component {
         this.state.staffList = bookers.map(u => ({
             id: u.id,
             name: u.name,
+            login: u.login,
             employee_code: u.shahtaj_employee_code,
             role: "Order Booker",
             status: u.shahtaj_online_status,
@@ -108,38 +111,78 @@ export class StaffManagement extends Component {
 
     openForm() {
         this.state.formData = { name: '', employee_code: '', email: '', password: '', role: 'order_booker' };
+        this.state.editingStaffId = null;
+        this.state.showForm = true;
+    }
+
+    cancelForm() {
+        this.state.showForm = false;
+        this.state.editingStaffId = null;
+        this.state.formData = { name: '', employee_code: '', email: '', password: '', role: 'order_booker' };
+    }
+
+    editStaff(staff) {
+        this.state.formData = {
+            name: staff.name,
+            employee_code: staff.employee_code || '',
+            email: staff.login || '',
+            password: '', // Kept blank for security; only update if user types a new one
+            role: 'order_booker'
+        };
+        this.state.editingStaffId = staff.id;
         this.state.showForm = true;
     }
 
     async saveStaff() {
-        if (!this.state.formData.name || !this.state.formData.email || !this.state.formData.password) {
-            alert("Name, Email, and Password are required.");
+        // Name and Email are always required
+        if (!this.state.formData.name || !this.state.formData.email) {
+            alert("Name and App Login Email are required.");
             return;
         }
 
         try {
-            const wizardIds = await this.orm.create("shahtaj.create.order.booker.wizard", [{
-                name: this.state.formData.name,
-                login: this.state.formData.email,
-                password: this.state.formData.password,
-                shahtaj_employee_code: this.state.formData.employee_code,
-            }]);
+            if (this.state.editingStaffId) {
+                // --- UPDATE EXISTING STAFF ---
+                const payload = {
+                    name: this.state.formData.name,
+                    login: this.state.formData.email,
+                    shahtaj_employee_code: this.state.formData.employee_code,
+                };
+                
+                // Only include the password in the update if they actually typed a new one
+                if (this.state.formData.password) {
+                    payload.password = this.state.formData.password;
+                }
 
-            await this.orm.call("shahtaj.create.order.booker.wizard", "action_create_booker", [wizardIds]);
+                await this.orm.write("res.users", [this.state.editingStaffId], payload);
 
-            this.state.showForm = false;
-            this.state.formData = { name: '', employee_code: '', email: '', password: '', role: 'order_booker' };
-            
+            } else {
+                // --- CREATE NEW STAFF ---
+                if (!this.state.formData.password) {
+                    alert("Password is required for new accounts.");
+                    return;
+                }
+
+                const wizardIds = await this.orm.create("shahtaj.create.order.booker.wizard", [{
+                    name: this.state.formData.name,
+                    login: this.state.formData.email,
+                    password: this.state.formData.password,
+                    shahtaj_employee_code: this.state.formData.employee_code,
+                }]);
+
+                await this.orm.call("shahtaj.create.order.booker.wizard", "action_create_booker", [wizardIds]);
+            }
+
+            this.cancelForm();
             await this.fetchStaffData();
 
         } catch (error) {
-            console.error("Creation failed:", error);
+            console.error("Save failed:", error);
             const errorMessage = error.data?.message || error.message || "Unknown error occurred";
-            alert(`Failed to create order booker:\n\n${errorMessage}`);
+            alert(`Failed to save order booker:\n\n${errorMessage}`);
         }
     }
 
-    // Toggle user activation state via backend methods
     async toggleActiveStatus(staffId, currentStatus) {
         const newStatus = !currentStatus;
         const actionWord = newStatus ? "activate" : "deactivate";
@@ -150,7 +193,6 @@ export class StaffManagement extends Component {
             const methodName = newStatus ? "action_shahtaj_activate_booker" : "action_shahtaj_deactivate_booker";
             await this.orm.call("res.users", methodName, [[staffId]]);
             
-            // Refresh main list and update local state to trigger UI re-render
             await this.fetchStaffData();
             if (this.state.selectedStaff && this.state.selectedStaff.id === staffId) {
                 this.state.selectedStaff.active = newStatus;

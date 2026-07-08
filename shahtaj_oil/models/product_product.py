@@ -8,6 +8,11 @@ from odoo.tools import float_compare
 class ProductProduct(models.Model):
     _inherit = 'product.product'
 
+    def _shahtaj_get_kg_per_unit(self):
+        """Return kg equivalent for one selling unit of this variant."""
+        self.ensure_one()
+        return self.product_tmpl_id._shahtaj_get_kg_per_unit()
+
     @api.model
     def _get_shahtaj_cart_committed_qty(self, product_ids, exclude_visit_line_ids=None):
         """Qty in active visit carts (not yet turned into a sales order)."""

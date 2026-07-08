@@ -123,7 +123,9 @@
 
                 <t t-if="this.state.showForm and this.state.activeMainTab === 'schedules'">
                     <div class="p-4 bg-white border-bottom">
-                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">New Schedule Configuration</h6>
+                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">
+                            <t t-esc="this.state.editingScheduleId ? 'Edit Schedule Configuration' : 'New Schedule Configuration'"/>
+                        </h6>
 
                         <div class="row align-items-end mb-4">
                             <div class="col-md-3">
@@ -193,7 +195,9 @@
 
                         <div class="d-flex justify-content-end mt-3">
                             <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
-                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveSchedule">Save Schedule</button>
+                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveSchedule">
+                                <t t-esc="this.state.editingScheduleId ? 'Update Schedule' : 'Save Schedule'"/>
+                            </button>
                         </div>
                     </div>
                 </t>
@@ -201,7 +205,9 @@
 
                 <t t-if="this.state.showForm and this.state.activeMainTab === 'targets'">
                     <div class="p-4 bg-white border-bottom">
-                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">New Target Configuration</h6>
+                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">
+                            <t t-esc="this.state.editingTargetId ? 'Edit Target Configuration' : 'New Target Configuration'"/>
+                        </h6>
 
                         <div class="row mb-3">
                             <div class="col-md-3">
@@ -220,6 +226,7 @@
                                     <option value="order_count">Order Count</option>
                                     <option value="sales_amount">Sales Amount</option>
                                     <option value="product_qty">Product Quantity</option>
+                                    <option value="product_weight">Product Weight (kg/ton)</option>
                                 </select>
                             </div>
                             <div class="col-md-2 pt-4 mt-1">
@@ -249,7 +256,7 @@
                                 </div>
                             </t>
 
-                            <t t-if="this.state.targetForm.type === 'product_qty'">
+                            <t t-if="this.state.targetForm.type === 'product_qty' or this.state.targetForm.type === 'product_weight'">
                                 <div class="col-md-4">
                                     <label class="small fw-bold text-primary">Target Product</label>
                                     <select class="form-select form-control border-primary" t-model="this.state.targetForm.product_id">
@@ -259,6 +266,16 @@
                                                 <t t-esc="p.name"/>
                                             </option>
                                         </t>
+                                    </select>
+                                </div>
+                            </t>
+
+                            <t t-if="this.state.targetForm.type === 'product_weight'">
+                                <div class="col-md-4">
+                                    <label class="small fw-bold text-info">Weight Unit</label>
+                                    <select class="form-select form-control border-info" t-model="this.state.targetForm.target_weight_uom">
+                                        <option value="kg">Kilogram (kg)</option>
+                                        <option value="ton">Ton</option>
                                     </select>
                                 </div>
                             </t>
@@ -284,7 +301,9 @@
 
                         <div class="d-flex justify-content-end mt-3">
                             <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
-                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveTarget">Save Target</button>
+                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveTarget">
+                                <t t-esc="this.state.editingTargetId ? 'Update Target' : 'Save Target'"/>
+                            </button>
                         </div>
                     </div>
                 </t>
@@ -298,13 +317,14 @@
                                     <th class="border-top-0">Route Info</th>
                                     <th class="text-center border-top-0">Shops</th>
                                     <th class="text-center border-top-0">Progress</th>
-                                    <th class="text-end pe-4 border-top-0">Status</th>
+                                    <th class="border-top-0">Status</th>
+                                    <th class="text-end pe-4 border-top-0">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <t t-if="currentBookerSchedules.length === 0">
                                     <tr>
-                                        <td colspan="5" class="text-center py-4 text-muted">No schedules configured for this booker.</td>
+                                        <td colspan="6" class="text-center py-4 text-muted">No schedules configured for this booker.</td>
                                     </tr>
                                 </t>
                                 <t t-foreach="currentBookerSchedules" t-as="sched" t-key="sched.id">
@@ -326,10 +346,14 @@
                                         <td class="align-middle text-center fw-bold text-success">
                                             <t t-esc="sched.progress"/>
                                         </td>
-                                        <td class="align-middle text-end pe-4">
+                                        <td class="align-middle">
                                             <span t-attf-class="badge #{sched.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
                                                 <t t-esc="sched.status"/>
                                             </span>
+                                        </td>
+                                        <td class="align-middle text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editSchedule(sched)">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.deleteSchedule(sched.id)">Delete</button>
                                         </td>
                                     </tr>
                                 </t>
@@ -347,13 +371,14 @@
                                     <th class="border-top-0">Target Goal</th>
                                     <th class="border-top-0">Achieved</th>
                                     <th class="border-top-0">Progress</th>
-                                    <th class="text-end pe-4 border-top-0">Status</th>
+                                    <th class="border-top-0">Status</th>
+                                    <th class="text-end pe-4 border-top-0">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <t t-if="currentBookerTargets.length === 0">
                                     <tr>
-                                        <td colspan="5" class="text-center py-4 text-muted">No targets configured for this booker.</td>
+                                        <td colspan="6" class="text-center py-4 text-muted">No targets configured for this booker.</td>
                                     </tr>
                                 </t>
                                 <t t-foreach="currentBookerTargets" t-as="tgt" t-key="tgt.id">
@@ -371,6 +396,7 @@
                                             </div>
                                             <small class="text-muted">
                                                 <t t-esc="tgt.amount"/>
+                                                <t t-if="tgt.weightUom"> <t t-esc="tgt.weightUom"/></t>
                                                 <t t-if="tgt.currency">
                                                     <t t-esc="tgt.currency"/>
                                                 </t>
@@ -379,6 +405,11 @@
                                         </td>
                                         <td class="align-middle fw-bold">
                                             <t t-esc="tgt.achievedAmount"/>
+                                            <t t-if="tgt.type === 'product_weight' and tgt.weightUom">
+                                                <small class="d-block text-muted fw-normal">
+                                                    <t t-esc="tgt.remainingAmount"/> <t t-esc="tgt.weightUom"/> left
+                                                </small>
+                                            </t>
                                         </td>
                                         <td class="align-middle">
                                             <div class="progress" style="height: 6px; width: 100px;">
@@ -388,10 +419,14 @@
                                                 <t t-esc="tgt.progressPercentage"/>
                                             </small>
                                         </td>
-                                        <td class="align-middle text-end pe-4">
+                                        <td class="align-middle">
                                             <span t-attf-class="badge #{tgt.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
                                                 <t t-esc="tgt.status"/>
                                             </span>
+                                        </td>
+                                        <td class="align-middle text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editTarget(tgt)">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.deleteTarget(tgt.id)">Delete</button>
                                         </td>
                                     </tr>
                                 </t>
