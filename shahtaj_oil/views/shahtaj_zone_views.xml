@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_zone_list" model="ir.ui.view">
+        <field name="name">shahtaj.zone.list</field>
+        <field name="model">shahtaj.zone</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="distributor_id"/>
+                <field name="route_count"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_zone_form" model="ir.ui.view">
+        <field name="name">shahtaj.zone.form</field>
+        <field name="model">shahtaj.zone</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button string="Save" special="save" class="oe_highlight" data-hotkey="s"/>
+                    <button string="Discard" special="cancel" data-hotkey="j"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_shahtaj_route_by_zone)d" type="action"
+                                class="oe_stat_button" icon="fa-road">
+                            <field name="route_count" widget="statinfo" string="Routes"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" string="Zone Name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Islamabad North" required="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <field name="distributor_id" required="1"/>
+                        <field name="active"/>
+                    </group>
+                    <notebook>
+                        <page string="Routes in this zone" name="routes">
+                            <field name="route_ids" context="{'default_zone_id': id}">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="shop_count"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                            <p class="text-muted">
+                                Use <b>Add a line</b> to create a route already linked to this zone,
+                                or manage shops on the route form.
+                            </p>
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button string="Save" special="save" class="btn-primary" data-hotkey="s"/>
+                    <button string="Discard" special="cancel" class="btn-secondary" data-hotkey="j"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_zone" model="ir.actions.act_window">
+        <field name="name">Zones</field>
+        <field name="res_model">shahtaj.zone</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define your first sales zone
+            </p>
+            <p>
+                Zones are geographic areas. Create zones first, then routes, then assign shops to routes.
+            </p>
+        </field>
+    </record>
+
+</odoo>

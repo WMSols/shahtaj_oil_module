@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <delete model="ir.actions.act_window.view"
+                id="action_shahtaj_my_visits_view_list"/>
+        <delete model="ir.actions.act_window.view"
+                id="action_shahtaj_my_visits_form_booker"/>
+        <delete model="ir.actions.act_window"
+                id="action_shahtaj_my_visits"/>
+    </data>
+</odoo>

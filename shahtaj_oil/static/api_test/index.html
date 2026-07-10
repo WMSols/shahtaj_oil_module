@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Shahtaj Order Booker — API Explorer</title>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Shahtaj Order Booker</h1>
+      <p class="subtitle">API explorer for Flutter — mirrors Odoo booker menus</p>
+    </div>
+    <div id="header-user" class="header-user hidden">
+      <span id="session-user"></span>
+      <span id="session-status" class="status-pill hidden"></span>
+      <button id="btn-logout" class="ghost sm">Logout</button>
+    </div>
+  </header>
+
+  <!-- Login screen -->
+  <section id="screen-login" class="screen">
+    <div class="card login-card">
+      <h2>Booker login</h2>
+      <p class="hint">Uses <code>POST /api/shahtaj/v1/auth/login</code> — returns a Bearer API key (same as Flutter will use).</p>
+      <div class="alert alert-warn">
+        <strong>Tip:</strong> This page does not send Odoo session cookies (<code>credentials: omit</code>),
+        so you can stay logged in as admin in another tab without breaking the API key.
+      </div>
+      <div class="grid-2">
+        <label>Database<input id="inp-database" type="text" value="shahtaj_dev19"/></label>
+        <label>Login<input id="inp-login" type="text" placeholder="ob1"/></label>
+        <label>Password<input id="inp-password" type="password"/></label>
+      </div>
+      <button id="btn-login" class="primary">Login</button>
+      <p id="login-status" class="status"></p>
+    </div>
+  </section>
+
+  <!-- Main app (after login) -->
+  <div id="screen-app" class="screen hidden">
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="tasks">My Tasks Today</button>
+      <button class="tab" data-tab="visit">Active Visit</button>
+      <button class="tab" data-tab="history">My Shop Visits</button>
+      <button class="tab" data-tab="schedule">My Schedule</button>
+      <button class="tab" data-tab="targets">My Targets</button>
+      <button class="tab" data-tab="shops">Register Shop</button>
+      <button class="tab" data-tab="inspector">API Inspector</button>
+    </nav>
+
+    <!-- TAB: Tasks Today -->
+    <section id="tab-tasks" class="tab-panel active">
+      <div class="panel-head">
+        <div>
+          <h2>My Tasks Today</h2>
+          <p class="endpoint-tag">POST /api/shahtaj/v1/tasks/today · <em>List today tasks</em></p>
+        </div>
+        <button id="btn-refresh-tasks" class="secondary sm">Refresh</button>
+      </div>
+      <p id="tasks-date" class="meta"></p>
+      <div id="task-cards" class="card-grid"></div>
+
+      <div id="checkin-panel" class="card sub-card hidden">
+        <h3>Task detail</h3>
+        <p id="selected-task-label" class="hint"></p>
+        <div class="shop-gps-box" id="shop-gps-box"></div>
+        <div class="grid-2">
+          <label>Your latitude<input id="inp-lat" type="number" step="any"/></label>
+          <label>Your longitude<input id="inp-lng" type="number" step="any"/></label>
+        </div>
+        <div class="actions-row">
+          <button id="btn-use-shop-gps" class="ghost sm">Copy shop GPS</button>
+          <button id="btn-use-device-gps" class="ghost sm">Use device GPS</button>
+        </div>
+        <label>Task notes
+          <textarea id="inp-task-notes" rows="2" placeholder="Notes about this visit task..."></textarea>
+        </label>
+        <div class="actions-row">
+          <button id="btn-save-task-notes" class="secondary sm">Save notes</button>
+        </div>
+        <div class="actions-row">
+          <button id="btn-checkin" class="primary">I'm at shop (check in)</button>
+          <button id="btn-continue-visit" class="primary hidden">Continue visit</button>
+          <button id="btn-skip-task" class="ghost sm">Skip task</button>
+        </div>
+        <p class="endpoint-tag">check-in body: task_id, latitude, longitude</p>
+      </div>
+    </section>
+
+    <!-- TAB: Active Visit -->
+    <section id="tab-visit" class="tab-panel">
+      <div class="panel-head">
+        <div>
+          <h2>Active visit &amp; order</h2>
+          <p class="endpoint-tag">visits/active · line/add|update|remove · place-order · <em>Close empty visit</em> (notes required)</p>
+        </div>
+        <button id="btn-refresh-visit" class="secondary sm">Refresh</button>
+      </div>
+      <div id="visit-empty" class="empty-state">No active visit. Check in from <b>My Tasks Today</b>.</div>
+      <div id="visit-content" class="hidden">
+        <div class="visit-summary card" id="visit-summary"></div>
+
+        <h3>Order lines</h3>
+        <table class="data-table" id="visit-lines-table">
+          <thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+
+        <h3>Products — pick from list</h3>
+        <p class="endpoint-tag">POST /api/shahtaj/v1/products/list</p>
+        <div class="actions-row">
+          <button id="btn-load-products" class="secondary sm">Load product list</button>
+          <input id="inp-product-filter" type="search" placeholder="Filter locally (not sent to API)..." class="grow"/>
+          <label class="inline-label">Qty<input id="inp-add-qty" type="number" min="0.01" step="any" value="1" style="width:5rem"/></label>
+        </div>
+        <p id="products-meta" class="meta"></p>
+        <div id="product-cards" class="card-grid compact"></div>
+
+        <label>Visit notes <span class="muted">(required for end without order)</span>
+          <textarea id="inp-visit-notes" rows="2" placeholder="Reason if no order, or notes during visit..."></textarea>
+        </label>
+        <div class="actions-row">
+          <button id="btn-save-visit-notes" class="secondary sm">Save visit notes</button>
+        </div>
+
+        <div class="actions-row visit-actions">
+          <button id="btn-place-order" class="primary">Place order</button>
+          <button id="btn-end-visit" class="ghost">End without order</button>
+        </div>
+      </div>
+      <div id="visit-completed" class="card hidden">
+        <h3>Visit completed</h3>
+        <div id="visit-completed-body"></div>
+        <button id="btn-view-completed-visit" class="secondary sm">Reload via visits/get</button>
+      </div>
+    </section>
+
+    <!-- TAB: My Shop Visits -->
+    <section id="tab-history" class="tab-panel">
+      <div class="panel-head">
+        <div>
+          <h2>My shop visits</h2>
+          <p class="endpoint-tag">POST /api/shahtaj/v1/visits/mine · visits/get · <em>Past visits list</em></p>
+        </div>
+        <button id="btn-refresh-history" class="secondary sm">Refresh</button>
+      </div>
+      <div class="grid-2 history-filters">
+        <label>From (YYYY-MM-DD)<input id="hist-date-from" type="date"/></label>
+        <label>To (YYYY-MM-DD)<input id="hist-date-to" type="date"/></label>
+      </div>
+      <div id="history-list"></div>
+    </section>
+
+    <!-- TAB: Schedule -->
+    <section id="tab-schedule" class="tab-panel">
+      <div class="panel-head">
+        <div>
+          <h2>My weekly schedule</h2>
+          <p class="endpoint-tag">POST /api/shahtaj/v1/schedule/weekly · <em>Weekly route plan</em></p>
+        </div>
+        <button id="btn-refresh-schedule" class="secondary sm">Refresh</button>
+      </div>
+      <div id="schedule-list"></div>
+    </section>
+
+    <!-- TAB: Targets -->
+    <section id="tab-targets" class="tab-panel">
+      <div class="panel-head">
+        <div>
+          <h2>My targets</h2>
+          <p class="endpoint-tag">POST /api/shahtaj/v1/targets/mine · <em>List sales targets</em></p>
+        </div>
+        <button id="btn-refresh-targets" class="secondary sm">Refresh</button>
+      </div>
+      <div id="targets-list"></div>
+    </section>
+
+    <!-- TAB: Shops -->
+    <section id="tab-shops" class="tab-panel">
+      <div class="panel-head">
+        <div>
+          <h2>Register shop</h2>
+          <p class="endpoint-tag">POST /api/shahtaj/v1/shops/register · <em>Register new shop</em></p>
+        </div>
+        <button id="btn-refresh-shops" class="secondary sm">Refresh my shops</button>
+      </div>
+      <div class="card sub-card">
+        <div class="grid-2">
+          <label>Shop name<input id="reg-name" type="text"/></label>
+          <label>Owner name<input id="reg-owner" type="text"/></label>
+          <label>Owner phone<input id="reg-phone" type="text"/></label>
+          <label>Owner ID card no. (optional)<input id="reg-owner-cnic-number" type="text" placeholder="e.g. 35202-1234567-1"/></label>
+          <label>Credit limit (Rs)<input id="reg-credit" type="number" step="any"/></label>
+          <label>Legacy balance (Rs)<input id="reg-legacy" type="number" step="any"/></label>
+          <label>Zone ID (optional)<input id="reg-zone" type="number" placeholder="e.g. 1"/></label>
+          <label>Route ID (optional)<input id="reg-route" type="number" placeholder="e.g. 1"/></label>
+          <label>Latitude<input id="reg-lat" type="number" step="any"/></label>
+          <label>Longitude<input id="reg-lng" type="number" step="any"/></label>
+        </div>
+        <h3>Photos (optional — base64 in JSON)</h3>
+        <div class="photo-grid">
+          <label>Owner CNIC front<input id="reg-cnic-front" type="file" accept="image/*" data-preview="prev-cnic-front"/></label>
+          <img id="prev-cnic-front" class="photo-preview hidden" alt=""/>
+          <label>Owner CNIC back<input id="reg-cnic-back" type="file" accept="image/*" data-preview="prev-cnic-back"/></label>
+          <img id="prev-cnic-back" class="photo-preview hidden" alt=""/>
+          <label>Owner photo<input id="reg-owner-photo" type="file" accept="image/*" data-preview="prev-owner-photo"/></label>
+          <img id="prev-owner-photo" class="photo-preview hidden" alt=""/>
+          <label>Shop exterior<input id="reg-shop-exterior" type="file" accept="image/*" data-preview="prev-shop-exterior"/></label>
+          <img id="prev-shop-exterior" class="photo-preview hidden" alt=""/>
+        </div>
+        <button id="btn-register-shop" class="primary">Submit for approval</button>
+      </div>
+      <h3>My registered shops</h3>
+      <div id="shops-list"></div>
+      <div id="shop-detail-panel" class="card sub-card hidden">
+        <h3 id="shop-detail-title">Shop detail</h3>
+        <div id="shop-detail-photos" class="photo-grid"></div>
+      </div>
+    </section>
+
+    <!-- TAB: Inspector -->
+    <section id="tab-inspector" class="tab-panel">
+      <div class="panel-head">
+        <div>
+          <h2>API inspector</h2>
+          <p class="hint">Endpoint params reference + live request/response log for Flutter handoff.</p>
+        </div>
+        <button id="btn-clear-log" class="ghost sm">Clear log</button>
+      </div>
+      <div id="api-quick-index" class="card api-index"></div>
+      <div id="endpoint-reference" class="endpoint-ref card"></div>
+      <h3 class="log-heading">Live request log</h3>
+      <div id="api-log" class="log"></div>
+    </section>
+  </div>
+
+  <script src="./app.js?v=6"></script>
+</body>
+</html>

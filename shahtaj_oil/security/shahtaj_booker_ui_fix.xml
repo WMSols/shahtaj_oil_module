@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="0">
+    <!-- Ensure bookers can read their own shop registrations (user.id in action domains). -->
+    <record id="rule_shahtaj_shop_booker_own" model="ir.rule">
+      <field name="domain_force">[
+        '|',
+        ('is_shahtaj_shop', '=', False),
+        '|',
+        ('registered_by_id', '=', user.id),
+        ('route_id.weekly_schedule_ids.order_booker_id', '=', user.id),
+      ]</field>
+    </record>
+  </data>
+</odoo>
