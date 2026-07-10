@@ -238,7 +238,7 @@ class ProductTemplate(models.Model):
                         vals['uom_id'] = uom.id
         return super().create(vals_list)
 
-    def _shahtaj_set_on_hand_qty(self, quantity):
+    def action_shahtaj_set_on_hand_qty(self, quantity):
         """Set absolute on-hand quantity in the main warehouse."""
         self.ensure_one()
         if not self.is_storable:
@@ -261,9 +261,10 @@ class ProductTemplate(models.Model):
             'inventory_quantity': quantity,
         })._apply_inventory()
 
-    def _shahtaj_add_on_hand_qty(self, quantity):
+    def action_shahtaj_add_on_hand_qty(self, quantity):
         """Increase on-hand quantity."""
         self.ensure_one()
         if float_compare(quantity, 0.0, precision_rounding=self.uom_id.rounding) <= 0:
             raise UserError(_('Quantity to add must be greater than zero.'))
-        self._shahtaj_set_on_hand_qty(self.qty_available + quantity)
+        # ✅ Fixed: pointing to the new updated method name here
+        self.action_shahtaj_set_on_hand_qty(self.qty_available + quantity)
