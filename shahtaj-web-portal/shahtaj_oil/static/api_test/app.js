@@ -146,6 +146,20 @@
       params: [],
     },
     {
+      path: '/api/shahtaj/v1/zones/list',
+      purpose: 'Zone picker for shop registration',
+      auth: true,
+      params: [],
+    },
+    {
+      path: '/api/shahtaj/v1/routes/list',
+      purpose: 'Route picker (filter by zone)',
+      auth: true,
+      params: [
+        { name: 'zone_id', required: false, type: 'int', note: 'When set, only routes in that zone' },
+      ],
+    },
+    {
       path: '/api/shahtaj/v1/shops/register',
       purpose: 'Register new shop',
       auth: true,
@@ -405,8 +419,55 @@
     if (tab === 'history') await loadVisitHistory();
     if (tab === 'schedule') await loadSchedule();
     if (tab === 'targets') await loadTargets();
-    if (tab === 'shops') await loadMyShops();
+    if (tab === 'shops') {
+      await loadZonePicker();
+      await loadMyShops();
+    }
   }
+
+  async function loadZonePicker() {
+    const zoneSelect = $('reg-zone');
+    const routeSelect = $('reg-route');
+    zoneSelect.innerHTML = '<option value="">— Select zone —</option>';
+    routeSelect.innerHTML = '<option value="">— Select route —</option>';
+    routeSelect.disabled = true;
+    try {
+      const data = await api('/api/shahtaj/v1/zones/list', {});
+      (data.zones || []).forEach((zone) => {
+        const opt = document.createElement('option');
+        opt.value = zone.id;
+        opt.textContent = `${zone.name} (${zone.route_count} routes)`;
+        zoneSelect.appendChild(opt);
+      });
+    } catch (e) {
+      console.warn('zones/list failed', e);
+    }
+  }
+
+  async function loadRoutePicker(zoneId) {
+    const routeSelect = $('reg-route');
+    routeSelect.innerHTML = '<option value="">— Select route —</option>';
+    if (!zoneId) {
+      routeSelect.disabled = true;
+      return;
+    }
+    routeSelect.disabled = false;
+    try {
+      const data = await api('/api/shahtaj/v1/routes/list', { zone_id: parseInt(zoneId, 10) });
+      (data.routes || []).forEach((route) => {
+        const opt = document.createElement('option');
+        opt.value = route.id;
+        opt.textContent = `${route.name} (${route.shop_count} shops)`;
+        routeSelect.appendChild(opt);
+      });
+    } catch (e) {
+      console.warn('routes/list failed', e);
+    }
+  }
+
+  $('reg-zone').addEventListener('change', () => {
+    loadRoutePicker($('reg-zone').value).catch(console.warn);
+  });
 
   function switchTab(name) {
     const btn = document.querySelector(`.tab[data-tab="${name}"]`);

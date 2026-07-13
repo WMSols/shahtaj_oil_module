@@ -124,6 +124,28 @@ def visit_dict(visit, include_lines=True):
     return data
 
 
+def zone_brief(zone):
+    if not zone:
+        return None
+    return {
+        'id': zone.id,
+        'name': zone.name,
+        'route_count': zone.route_count,
+    }
+
+
+def route_brief(route):
+    if not route:
+        return None
+    return {
+        'id': route.id,
+        'name': route.name,
+        'zone_id': route.zone_id.id,
+        'zone': _m2o(route.zone_id),
+        'shop_count': route.shop_count,
+    }
+
+
 def schedule_dict(schedule):
     return {
         'id': schedule.id,
