@@ -82,8 +82,8 @@
             <form string="Schedule Line">
                 <sheet>
                     <div class="alert alert-warning" role="alert" invisible="not is_day_locked">
-                        This weekday is <b>today</b> — existing assignments cannot be changed
-                        (visit statistics are in progress). Add a new line for another day instead.
+                        Visits for this route are <b>in progress or completed today</b> — finish or
+                        skip them before changing or deleting this line.
                     </div>
                     <group>
                         <group>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="action_report_shahtaj_manufacturer_summary" model="ir.actions.report">
+        <field name="name">Manufacturer Stock Summary</field>
+        <field name="model">product.template</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">shahtaj_oil.report_manufacturer_summary</field>
+        <field name="report_file">shahtaj_oil.report_manufacturer_summary</field>
+        <field name="print_report_name">'Manufacturer Summary'</field>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_manufacturer_summary">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2>Manufacturer Stock Summary</h2>
+                    <p>
+                        Stock received from manufacturer, sold to shops, remaining on hand,
+                        and amount payable (received × cost price).
+                    </p>
+                    <table class="table table-sm table-bordered mt-3">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="text-end">Cost/Unit</th>
+                                <th class="text-end">Received</th>
+                                <th class="text-end">Sold</th>
+                                <th class="text-end">On Hand</th>
+                                <th class="text-end">Payable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-set="total_payable" t-value="0.0"/>
+                            <tr t-foreach="docs" t-as="product">
+                                <td><span t-field="product.name"/></td>
+                                <td class="text-end">
+                                    <span t-field="product.standard_price"
+                                          t-options="{'widget': 'monetary', 'display_currency': product.currency_id}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="'%.2f' % product.shahtaj_qty_received"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="'%.2f' % product.shahtaj_qty_sold"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="'%.2f' % product.qty_available"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-field="product.shahtaj_payable_to_manufacturer"
+                                          t-options="{'widget': 'monetary', 'display_currency': product.currency_id}"/>
+                                </td>
+                                <t t-set="total_payable"
+                                   t-value="total_payable + product.shahtaj_payable_to_manufacturer"/>
+                            </tr>
+                        </tbody>
+                        <tfoot t-if="docs">
+                            <tr>
+                                <th colspan="5" class="text-end">Total Payable to Manufacturer</th>
+                                <th class="text-end">
+                                    <span t-esc="total_payable"
+                                          t-options="{'widget': 'monetary', 'display_currency': docs[0].currency_id}"/>
+                                </th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>

@@ -51,6 +51,97 @@ class ProductTemplate(models.Model):
         digits='Product Unit of Measure',
         help='Quantity order bookers can still place on visits.',
     )
+    shahtaj_unit_margin = fields.Float(
+        string='Unit Profit',
+        compute='_compute_shahtaj_margin',
+        digits='Product Price',
+        help='Sales price minus cost price per unit.',
+    )
+    shahtaj_margin_percent = fields.Float(
+        string='Margin %',
+        compute='_compute_shahtaj_margin',
+        digits=(16, 1),
+    )
+    shahtaj_qty_sold = fields.Float(
+        string='Qty Sold',
+        compute='_compute_shahtaj_stock_stats',
+        digits='Product Unit of Measure',
+    )
+    shahtaj_qty_received = fields.Float(
+        string='Qty Received',
+        compute='_compute_shahtaj_stock_stats',
+        digits='Product Unit of Measure',
+        help='Total stock received into your warehouse (from Add Stock and opening stock).',
+    )
+    shahtaj_payable_to_manufacturer = fields.Monetary(
+        string='Payable to Manufacturer',
+        compute='_compute_shahtaj_stock_stats',
+        currency_field='currency_id',
+        help='Received quantity × cost price — amount owed to manufacturer for stock received.',
+    )
+
+    @api.depends('list_price', 'standard_price')
+    def _compute_shahtaj_margin(self):
+        for template in self:
+            cost = template.standard_price or 0.0
+            price = template.list_price or 0.0
+            template.shahtaj_unit_margin = price - cost
+            template.shahtaj_margin_percent = (
+                ((price - cost) / price) * 100.0 if price else 0.0
+            )
+
+    @api.depends('product_variant_ids')
+    def _compute_shahtaj_stock_stats(self):
+        templates = self.filtered('id')
+        for template in self - templates:
+            template.shahtaj_qty_sold = 0.0
+            template.shahtaj_qty_received = 0.0
+            template.shahtaj_payable_to_manufacturer = 0.0
+        if not templates:
+            return
+
+        variant_ids = templates.mapped('product_variant_ids').ids
+        SaleLine = self.env['sale.order.line']
+        sold_groups = SaleLine.read_group(
+            [
+                ('product_id', 'in', variant_ids),
+                ('order_id.state', 'in', ('sale', 'done')),
+            ],
+            ['product_uom_qty'],
+            ['product_id'],
+            lazy=False,
+        )
+        sold_by_variant = {
+            group['product_id'][0]: group['product_uom_qty']
+            for group in sold_groups if group.get('product_id')
+        }
+
+        Move = self.env['stock.move']
+        received_groups = Move.read_group(
+            [
+                ('product_id', 'in', variant_ids),
+                ('state', '=', 'done'),
+                ('location_dest_id.usage', '=', 'internal'),
+                ('location_id.usage', '!=', 'internal'),
+            ],
+            ['product_uom_qty'],
+            ['product_id'],
+            lazy=False,
+        )
+        received_by_variant = {
+            group['product_id'][0]: group['product_uom_qty']
+            for group in received_groups if group.get('product_id')
+        }
+
+        for template in templates:
+            variants = template.product_variant_ids
+            sold = sum(sold_by_variant.get(v.id, 0.0) for v in variants)
+            received = sum(received_by_variant.get(v.id, 0.0) for v in variants)
+            template.shahtaj_qty_sold = sold
+            template.shahtaj_qty_received = received
+            template.shahtaj_payable_to_manufacturer = (
+                received * (template.standard_price or 0.0)
+            )
 
     @api.depends('qty_available', 'product_variant_ids')
     def _compute_shahtaj_qty_bookable(self):

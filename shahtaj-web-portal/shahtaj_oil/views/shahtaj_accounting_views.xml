@@ -1,6 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- Customer invoices & credit notes — distributor list -->
+    <record id="view_shahtaj_customer_invoice_list" model="ir.ui.view">
+        <field name="name">account.move.list.shahtaj.customer</field>
+        <field name="model">account.move</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <list string="Shop Invoices"
+                  decoration-muted="state == 'cancel'"
+                  decoration-info="move_type == 'out_refund'"
+                  decoration-danger="payment_state == 'not_paid' and move_type == 'out_invoice' and state == 'posted'"
+                  decoration-success="payment_state == 'paid' and move_type == 'out_invoice'">
+                <field name="name" string="Number"/>
+                <field name="invoice_date" string="Date"/>
+                <field name="partner_id" string="Shop"/>
+                <field name="move_type" string="Type" widget="badge"
+                       decoration-info="move_type == 'out_refund'"
+                       decoration-success="move_type == 'out_invoice'"/>
+                <field name="payment_state" string="Payment"
+                       widget="badge"
+                       invisible="move_type == 'out_refund'"
+                       decoration-danger="payment_state == 'not_paid'"
+                       decoration-warning="payment_state == 'partial'"
+                       decoration-success="payment_state in ('paid', 'in_payment')"/>
+                <field name="state" string="Status" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state == 'posted'"/>
+                <field name="amount_total" string="Total"/>
+                <field name="amount_residual" string="Due"/>
+                <field name="reversed_entry_id" string="Reversal Of" optional="show"/>
+                <field name="invoice_origin" string="Source" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_customer_invoice_search" model="ir.ui.view">
+        <field name="name">account.move.search.shahtaj.customer</field>
+        <field name="model">account.move</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <search string="Shop Invoices">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="invoice_origin"/>
+                <filter string="All Documents" name="all_documents"
+                        domain="[('move_type', 'in', ('out_invoice', 'out_refund', 'out_receipt'))]"/>
+                <filter string="Invoices" name="invoices_only"
+                        domain="[('move_type', '=', 'out_invoice')]"/>
+                <filter string="Credit Notes" name="credit_notes"
+                        domain="[('move_type', '=', 'out_refund')]"/>
+                <separator/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Posted" name="posted" domain="[('state', '=', 'posted')]"/>
+                <separator/>
+                <filter string="Not Paid" name="not_paid"
+                        domain="[('payment_state', '=', 'not_paid'), ('move_type', '=', 'out_invoice')]"/>
+                <filter string="Partially Paid" name="partial"
+                        domain="[('payment_state', '=', 'partial')]"/>
+                <filter string="Paid" name="paid"
+                        domain="[('payment_state', 'in', ('paid', 'in_payment'))]"/>
+                <separator/>
+                <filter string="Reversed Invoices" name="reversed"
+                        domain="[('move_type', '=', 'out_invoice'), ('payment_state', '=', 'reversed')]"/>
+                <group>
+                    <filter string="Shop" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Type" name="group_type" context="{'group_by': 'move_type'}"/>
+                    <filter string="Payment Status" name="group_payment"
+                            context="{'group_by': 'payment_state'}"/>
+                    <filter string="Date" name="group_date" context="{'group_by': 'invoice_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <!-- Shop balances: accounting-focused list -->
     <record id="view_shahtaj_shop_balances_list" model="ir.ui.view">
         <field name="name">res.partner.list.shahtaj.shop.balances</field>
@@ -109,17 +183,56 @@
         ]</field>
         <field name="context">{
             'default_move_type': 'out_invoice',
-            'search_default_out_invoice': 1,
+            'search_default_all_documents': 1,
         }</field>
+        <field name="search_view_id" ref="view_shahtaj_customer_invoice_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No customer invoices yet
             </p>
             <p>
-                Invoices for retail shops. Create them from confirmed field sales orders
-                or manually for a shop.
+                Invoices and credit notes for retail shops. Use <b>Regular invoice</b>
+                from field sales orders. Credit notes appear here after you reverse an invoice.
             </p>
         </field>
+    </record>
+
+    <record id="action_shahtaj_customer_invoices_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_customer_invoice_list"/>
+        <field name="act_window_id" ref="action_shahtaj_customer_invoices"/>
+    </record>
+
+    <record id="action_shahtaj_credit_notes" model="ir.actions.act_window">
+        <field name="name">Credit Notes</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[
+            ('move_type', '=', 'out_refund'),
+            ('partner_id.is_shahtaj_shop', '=', True),
+        ]</field>
+        <field name="context">{
+            'default_move_type': 'out_refund',
+            'search_default_credit_notes': 1,
+        }</field>
+        <field name="search_view_id" ref="view_shahtaj_customer_invoice_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No credit notes yet
+            </p>
+            <p>
+                Credit notes reduce what a shop owes (returns, corrections).
+                Create them from a posted invoice using <b>Credit Note</b>.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_credit_notes_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_customer_invoice_list"/>
+        <field name="act_window_id" ref="action_shahtaj_credit_notes"/>
     </record>
 
     <record id="action_shahtaj_customer_payments" model="ir.actions.act_window">

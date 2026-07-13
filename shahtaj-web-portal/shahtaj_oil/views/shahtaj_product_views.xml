@@ -10,12 +10,16 @@
             <list string="Products">
                 <field name="name"/>
                 <field name="shahtaj_sale_uom" string="Unit"/>
+                <field name="standard_price" string="Cost"/>
                 <field name="list_price" string="Sales Price"/>
+                <field name="shahtaj_unit_margin" string="Profit/Unit" optional="show"/>
+                <field name="shahtaj_margin_percent" string="Margin %" optional="show"/>
                 <field name="taxes_id" widget="many2many_tags" string="Taxes" optional="show"/>
                 <field name="qty_available" string="On Hand"/>
                 <field name="shahtaj_qty_bookable" string="Available to Book"/>
                 <field name="is_storable" string="Tracked" widget="boolean"/>
                 <field name="active" widget="boolean_toggle" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
             </list>
         </field>
     </record>
@@ -33,8 +37,14 @@
                         <h1><field name="name" placeholder="e.g. Cheese Burger"/></h1>
                     </div>
                     <group>
-                        <group string="Sales">
+                        <group string="Pricing">
+                            <field name="standard_price" string="Cost Price"/>
                             <field name="list_price" string="Sales Price"/>
+                            <field name="shahtaj_unit_margin" string="Profit per Unit" readonly="1"/>
+                            <field name="shahtaj_margin_percent" string="Margin %" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Sales">
                             <field name="shahtaj_sale_uom" string="Selling Unit"/>
                             <field name="shahtaj_kg_per_unit"
                                    invisible="shahtaj_sale_uom in ('kg', 'ton')"
@@ -42,8 +52,10 @@
                             <field name="taxes_id" widget="many2many_tags"
                                    string="Customer Taxes"
                                    domain="[('type_tax_use', '=', 'sale'), ('active', '=', True)]"
-                                   options="{'no_create': True}"/>
+                                   context="{'default_type_tax_use': 'sale'}"/>
                         </group>
+                    </group>
+                    <group>
                         <group string="Inventory">
                             <field name="is_storable" string="Track Inventory"/>
                             <field name="qty_available" string="On Hand"
@@ -51,6 +63,11 @@
                             <field name="shahtaj_qty_bookable" string="Available to Book"
                                    readonly="1"/>
                             <field name="uom_id" readonly="1"/>
+                        </group>
+                        <group string="Sales Summary" invisible="not id">
+                            <field name="shahtaj_qty_received" readonly="1"/>
+                            <field name="shahtaj_qty_sold" readonly="1"/>
+                            <field name="shahtaj_payable_to_manufacturer" readonly="1"/>
                         </group>
                     </group>
                     <group string="Optional">
@@ -75,10 +92,34 @@
         <field name="arch" type="xml">
             <list string="Stock Overview" create="false">
                 <field name="name"/>
+                <field name="shahtaj_qty_received" string="Received"/>
+                <field name="shahtaj_qty_sold" string="Sold"/>
                 <field name="qty_available" string="On Hand"/>
                 <field name="shahtaj_qty_bookable" string="Available to Book"/>
-                <field name="virtual_available" string="Forecast" optional="show"/>
+                <field name="standard_price" string="Cost" optional="hide"/>
+                <field name="shahtaj_payable_to_manufacturer" string="Payable" optional="show"/>
+                <field name="virtual_available" string="Forecast" optional="hide"/>
                 <field name="list_price" string="Price" optional="show"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Manufacturer printable summary list -->
+    <record id="view_shahtaj_manufacturer_summary_list" model="ir.ui.view">
+        <field name="name">product.template.list.shahtaj.manufacturer</field>
+        <field name="model">product.template</field>
+        <field name="priority">32</field>
+        <field name="arch" type="xml">
+            <list string="Manufacturer Summary" create="false">
+                <field name="name"/>
+                <field name="shahtaj_sale_uom" string="Unit"/>
+                <field name="standard_price" string="Cost/Unit"/>
+                <field name="shahtaj_qty_received" string="Received"/>
+                <field name="shahtaj_qty_sold" string="Sold"/>
+                <field name="qty_available" string="On Hand"/>
+                <field name="shahtaj_payable_to_manufacturer" string="Payable to Manufacturer"/>
+                <field name="currency_id" column_invisible="1"/>
             </list>
         </field>
     </record>
@@ -115,7 +156,8 @@
                 No products yet
             </p>
             <p>
-                Use <b>Quick Add Product</b> to create a product with name, price, and opening stock.
+                Use <b>Quick Add Product</b> to create a product with cost, sales price,
+                and optional opening stock.
             </p>
         </field>
     </record>
@@ -163,6 +205,32 @@
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_shahtaj_product_form"/>
         <field name="act_window_id" ref="action_shahtaj_stock_overview"/>
+    </record>
+
+    <record id="action_shahtaj_manufacturer_summary" model="ir.actions.act_window">
+        <field name="name">Manufacturer Summary</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_shahtaj_product_search"/>
+        <field name="domain">[('sale_ok', '=', True), ('is_storable', '=', True)]</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No products to report
+            </p>
+            <p>
+                Shows received, sold, and on-hand quantities per product, plus the amount
+                payable to the manufacturer. Select products and use <b>Print</b> to share
+                with your manufacturer.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_manufacturer_summary_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_manufacturer_summary_list"/>
+        <field name="act_window_id" ref="action_shahtaj_manufacturer_summary"/>
     </record>
 
     <!-- Full Odoo product form — optional advanced access -->

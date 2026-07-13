@@ -113,6 +113,12 @@
               action="action_shahtaj_product_list"
               sequence="10"/>
 
+    <menuitem id="menu_shahtaj_sale_taxes"
+              name="Sales Taxes"
+              parent="menu_shahtaj_products"
+              action="action_shahtaj_sale_taxes"
+              sequence="20"/>
+
     <menuitem id="menu_shahtaj_products_advanced"
               name="Advanced Product Settings"
               parent="menu_shahtaj_products"
@@ -136,6 +142,12 @@
               parent="menu_shahtaj_inventory"
               action="action_shahtaj_stock_overview"
               sequence="10"/>
+
+    <menuitem id="menu_shahtaj_manufacturer_summary"
+              name="Manufacturer Summary"
+              parent="menu_shahtaj_inventory"
+              action="action_shahtaj_manufacturer_summary"
+              sequence="20"/>
 
     <menuitem id="menu_shahtaj_visit_task_today"
               name="My Tasks Today"

@@ -19,6 +19,10 @@ class ShahtajAccountingHub(models.TransientModel):
         string='Open Invoices',
         compute='_compute_counts',
     )
+    credit_note_count = fields.Integer(
+        string='Credit Notes',
+        compute='_compute_counts',
+    )
     shop_count = fields.Integer(
         string='Approved Shops',
         compute='_compute_counts',
@@ -42,6 +46,11 @@ class ShahtajAccountingHub(models.TransientModel):
                 ('partner_id.is_shahtaj_shop', '=', True),
                 ('state', '=', 'posted'),
                 ('payment_state', 'in', ('not_paid', 'partial')),
+            ])
+            hub.credit_note_count = AccountMove.search_count([
+                ('move_type', '=', 'out_refund'),
+                ('partner_id.is_shahtaj_shop', '=', True),
+                ('state', '=', 'posted'),
             ])
             hub.shop_count = Partner.search_count([
                 ('is_shahtaj_shop', '=', True),
@@ -89,4 +98,9 @@ class ShahtajAccountingHub(models.TransientModel):
     def action_open_shop_balances(self):
         return self.env['ir.actions.act_window']._for_xml_id(
             'shahtaj_oil.action_shahtaj_shop_balances',
+        )
+
+    def action_open_credit_notes(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_credit_notes',
         )

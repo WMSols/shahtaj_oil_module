@@ -10,6 +10,12 @@ class ShahtajQuickAddProductWizard(models.TransientModel):
     _description = 'Quick Add Product'
 
     name = fields.Char(string='Product Name', required=True)
+    standard_price = fields.Float(
+        string='Cost Price',
+        digits='Product Price',
+        default=0.0,
+        help='What you pay the manufacturer per unit.',
+    )
     list_price = fields.Float(
         string='Sales Price',
         required=True,
@@ -71,9 +77,11 @@ class ShahtajQuickAddProductWizard(models.TransientModel):
         if self.shahtaj_sale_uom:
             self.shahtaj_kg_per_unit = defaults.get(self.shahtaj_sale_uom, 1.0)
 
-    @api.constrains('list_price', 'opening_qty')
+    @api.constrains('list_price', 'opening_qty', 'standard_price')
     def _check_values(self):
         for wizard in self:
+            if float_compare(wizard.standard_price, 0.0, precision_digits=2) < 0:
+                raise UserError(_('Cost price cannot be negative.'))
             if float_compare(wizard.list_price, 0.0, precision_digits=2) < 0:
                 raise UserError(_('Sales price cannot be negative.'))
             if float_compare(wizard.opening_qty, 0.0, precision_digits=2) < 0:
@@ -84,6 +92,7 @@ class ShahtajQuickAddProductWizard(models.TransientModel):
         Product = self.env['product.template'].with_context(shahtaj_simple_product=True)
         product = Product.create({
             'name': self.name.strip(),
+            'standard_price': self.standard_price,
             'list_price': self.list_price,
             'is_storable': self.track_inventory,
             'shahtaj_sale_uom': self.shahtaj_sale_uom,

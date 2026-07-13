@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.0.44',
+    'version': '19.0.1.0.45',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -49,6 +49,7 @@
         'views/shahtaj_sale_accounting_views.xml',
         'views/shahtaj_accounting_hub_views.xml',
         'views/shahtaj_product_views.xml',
+        'views/shahtaj_tax_views.xml',
         'views/shahtaj_sale_stock_fix.xml',
 
         # ── 6. HUB + USER MANAGEMENT VIEWS ──
@@ -62,6 +63,8 @@
         'wizard/shahtaj_create_order_booker_views.xml',
         'wizard/shahtaj_quick_add_product_views.xml',
         'wizard/shahtaj_add_stock_views.xml',
+
+        'report/shahtaj_manufacturer_summary_report.xml',
         
         # ── 8. SECURITY FIXES (must update rules created in step 1) ──
         'security/shahtaj_record_rules_fix.xml',

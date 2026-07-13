@@ -8,13 +8,14 @@
             <form string="Quick Add Product">
                 <group>
                     <field name="name" placeholder="e.g. Cheese Burger"/>
-                    <field name="list_price"/>
+                    <field name="standard_price" string="Cost Price"/>
+                    <field name="list_price" string="Sales Price"/>
                     <field name="shahtaj_sale_uom"/>
                     <field name="shahtaj_kg_per_unit"
                            invisible="shahtaj_sale_uom in ('kg', 'ton')"/>
                     <field name="tax_ids" widget="many2many_tags"
                            string="Customer Taxes"
-                           options="{'no_create': True}"/>
+                           context="{'default_type_tax_use': 'sale'}"/>
                     <field name="track_inventory"/>
                     <field name="opening_qty" invisible="not track_inventory"/>
                 </group>

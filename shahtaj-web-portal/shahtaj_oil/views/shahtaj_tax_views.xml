@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_tax_list" model="ir.ui.view">
+        <field name="name">account.tax.list.shahtaj</field>
+        <field name="model">account.tax</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <list string="Sales Taxes">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="amount" string="Rate"/>
+                <field name="amount_type"/>
+                <field name="type_tax_use"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_tax_form" model="ir.ui.view">
+        <field name="name">account.tax.form.shahtaj</field>
+        <field name="model">account.tax</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <form string="Sales Tax">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. GST 17%"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="amount" string="Tax Rate (%)"/>
+                            <field name="amount_type" invisible="1"/>
+                            <field name="type_tax_use" invisible="1"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        This tax is applied on customer invoices when assigned to a product.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_tax_search" model="ir.ui.view">
+        <field name="name">account.tax.search.shahtaj</field>
+        <field name="model">account.tax</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_sale_taxes" model="ir.actions.act_window">
+        <field name="name">Sales Taxes</field>
+        <field name="res_model">account.tax</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('type_tax_use', '=', 'sale')]</field>
+        <field name="context">{
+            'default_type_tax_use': 'sale',
+            'default_amount_type': 'percent',
+            'search_default_active': 1,
+        }</field>
+        <field name="search_view_id" ref="view_shahtaj_tax_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first sales tax
+            </p>
+            <p>
+                Define taxes here, then assign them to products under
+                <b>Products → Product List</b>.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_sale_taxes_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_tax_list"/>
+        <field name="act_window_id" ref="action_shahtaj_sale_taxes"/>
+    </record>
+
+    <record id="action_shahtaj_sale_taxes_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shahtaj_tax_form"/>
+        <field name="act_window_id" ref="action_shahtaj_sale_taxes"/>
+    </record>
+
+</odoo>

@@ -56,7 +56,8 @@
                     <group string="Current Route Plan (read-only summary)">
                         <p colspan="2" class="text-muted">
                             Click <b>Edit Weekly Routes</b> to add, change, or remove route assignments.
-                            Today's weekday cannot be edited — other days can be changed freely.
+                            Today's routes can be changed or deleted unless visits are already
+                            in progress or completed.
                         </p>
                         <field name="shahtaj_schedule_ids" nolabel="1" colspan="2" readonly="1">
                             <list default_order="day_of_week,route_id">
