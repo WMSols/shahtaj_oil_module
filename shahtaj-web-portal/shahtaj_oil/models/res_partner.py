@@ -252,9 +252,14 @@ class ResPartner(models.Model):
                 raise ValidationError(_('Shop GPS latitude and longitude are required.'))
 
     def _prepare_shop_vals(self, vals):
-        """Set defaults when creating a shop from distributor or booker forms."""
+        """Set defaults when creating a shop from distributor, portal, or booker API."""
         vals = dict(vals)
-        if vals.get('is_shahtaj_shop') or self.env.context.get('shahtaj_shop_form'):
+        is_shop_create = (
+            vals.get('is_shahtaj_shop')
+            or self.env.context.get('shahtaj_shop_form')
+            or self.env.context.get('shahtaj_shop_register')
+        )
+        if is_shop_create:
             vals.setdefault('is_shahtaj_shop', True)
             vals.setdefault('shahtaj_shop_category', 'credit')
             vals.setdefault('company_type', 'company')

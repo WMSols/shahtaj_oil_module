@@ -32,6 +32,8 @@ class ShahtajApiShops(http.Controller):
             raise UserError(_(
                 'name, owner_name, owner_phone, latitude, and longitude are required.'
             ))
+        # Explicit shop flags so create() always marks this as a pending Shahtaj shop
+        # (visible in shops/mine and distributor pending-approval screens).
         vals = {
             'name': name,
             'owner_name': owner_name,
@@ -39,7 +41,20 @@ class ShahtajApiShops(http.Controller):
             'owner_cnic_number': kwargs.get('owner_cnic_number') or False,
             'partner_latitude': float(latitude),
             'partner_longitude': float(longitude),
+            'is_shahtaj_shop': True,
+            'shop_approval_state': 'pending',
+            'registered_by_id': request.env.user.id,
+            'company_type': 'company',
+            'customer_rank': 1,
         }
+        shop_category = (
+            kwargs.get('shop_category')
+            or kwargs.get('shahtaj_shop_category')
+            or 'credit'
+        )
+        if shop_category not in ('credit', 'cash'):
+            raise UserError(_('shop_category must be "credit" or "cash".'))
+        vals['shahtaj_shop_category'] = shop_category
         if kwargs.get('zone_id'):
             vals['zone_id'] = int(kwargs['zone_id'])
         if kwargs.get('route_id'):

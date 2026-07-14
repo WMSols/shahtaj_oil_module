@@ -16,7 +16,7 @@
                        decoration-success="shahtaj_online_status == 'online'"
                        decoration-warning="shahtaj_online_status == 'away'"
                        decoration-muted="shahtaj_online_status == 'offline'"/>
-                <field name="shahtaj_last_seen_at" optional="show"/>
+                <field name="shahtaj_last_seen_at" string="Last Seen Online"/>
                 <field name="shahtaj_task_today_total" string="Tasks Today"/>
                 <field name="shahtaj_task_today_pending" string="Pending"/>
                 <field name="shahtaj_task_today_done" string="Done"/>
@@ -83,7 +83,7 @@
                                    decoration-success="shahtaj_online_status == 'online'"
                                    decoration-warning="shahtaj_online_status == 'away'"
                                    decoration-muted="shahtaj_online_status == 'offline'"/>
-                            <field name="shahtaj_last_seen_at"/>
+                            <field name="shahtaj_last_seen_at" string="Last Seen Online"/>
                             <field name="shahtaj_im_status" invisible="1"/>
                         </group>
                     </group>

@@ -60,6 +60,11 @@ class ShahtajApiAuth(http.Controller):
                 name='Shahtaj Order Booker API',
                 expiration_date=expiration,
             )
+            presence = user.action_shahtaj_touch_presence()
+            # Ensure visit tasks exist for coming days (same as web session_info).
+            user_env['shahtaj.visit.task'].sudo()._auto_generate_window(
+                order_booker=user,
+            )
             cr.commit()
             user_payload = serializers.user_brief(user)
 
@@ -68,13 +73,17 @@ class ShahtajApiAuth(http.Controller):
             'api_key': api_key,
             'expires_in_days': API_KEY_DAYS,
             'user': user_payload,
+            'online_status': presence['online_status'],
+            'last_seen_at': presence['last_seen_at'],
         })
 
     @http.route('/api/shahtaj/v1/auth/me', **API_ROUTE)
     def me(self, **kwargs):
         ensure_order_booker()
         user = request.env.user
+        presence = user.action_shahtaj_touch_presence()
         return api_success({
             'user': serializers.user_brief(user),
-            'online_status': user.shahtaj_online_status,
+            'online_status': presence['online_status'],
+            'last_seen_at': presence['last_seen_at'],
         })

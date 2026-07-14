@@ -38,6 +38,7 @@ export class StaffManagement extends Component {
             [["shahtaj_is_order_booker", "=", true]],
             [
                 "id", "name", "shahtaj_employee_code", "shahtaj_online_status",
+                "shahtaj_last_seen_at",
                 "shahtaj_task_today_total", "shahtaj_task_today_pending", "shahtaj_task_today_done",
                 "shahtaj_active_target_progress", "shahtaj_active_target_summary"
             ]
@@ -49,6 +50,8 @@ export class StaffManagement extends Component {
             employee_code: u.shahtaj_employee_code,
             role: "Order Booker",
             status: u.shahtaj_online_status,
+            last_seen_at: u.shahtaj_last_seen_at || false,
+            last_seen_label: this.formatLastSeen(u.shahtaj_last_seen_at),
             metrics: {
                 today: { 
                     total: u.shahtaj_task_today_total, 
@@ -61,6 +64,23 @@ export class StaffManagement extends Component {
                 }
             }
         }));
+    }
+
+    formatLastSeen(value) {
+        if (!value) {
+            return "Never seen";
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return String(value);
+        }
+        return date.toLocaleString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
     }
 
     async openDetails(staff) {

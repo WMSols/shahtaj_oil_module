@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from . import auth
+from . import presence
 from . import products
 from . import schedule
 from . import shops

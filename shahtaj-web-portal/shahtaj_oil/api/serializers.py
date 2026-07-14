@@ -10,12 +10,15 @@ def _m2o(record):
 
 
 def user_brief(user):
+    last_seen = user.shahtaj_last_seen_at
     return {
         'id': user.id,
         'order_booker_id': user.id,
         'name': user.name,
         'login': user.login,
         'employee_code': user.shahtaj_employee_code or False,
+        'online_status': user.shahtaj_online_status or False,
+        'last_seen_at': last_seen.isoformat(sep=' ') if last_seen else False,
     }
 
 

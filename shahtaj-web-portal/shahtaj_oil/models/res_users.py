@@ -18,7 +18,11 @@ class ResUsers(models.Model):
     _inherit = 'res.users'
 
     shahtaj_employee_code = fields.Char(string='Booker Code')
-    shahtaj_last_seen_at = fields.Datetime(string='Last Seen', readonly=True)
+    shahtaj_last_seen_at = fields.Datetime(
+        string='Last Seen Online',
+        readonly=True,
+        help='Last time this order booker was seen online via the mobile app or Odoo web.',
+    )
     shahtaj_is_order_booker = fields.Boolean(
         string='Is Order Booker',
         compute='_compute_shahtaj_is_order_booker',
@@ -321,6 +325,24 @@ class ResUsers(models.Model):
                 user.shahtaj_online_status = 'online'
             else:
                 user.shahtaj_online_status = 'offline'
+
+    def action_shahtaj_touch_presence(self):
+        """Update last-seen timestamp so distributors see this booker as online.
+
+        Called from the mobile heartbeat API, login, and /auth/me.
+        Online window is ONLINE_THRESHOLD_MINUTES (default 5).
+        """
+        self.ensure_one()
+        self.sudo().write({
+            'shahtaj_last_seen_at': fields.Datetime.now(),
+        })
+        # Stored compute depends on last_seen; invalidate then read fresh status.
+        self.invalidate_recordset(['shahtaj_online_status', 'shahtaj_last_seen_at'])
+        last_seen = self.shahtaj_last_seen_at
+        return {
+            'online_status': self.shahtaj_online_status or 'offline',
+            'last_seen_at': fields.Datetime.to_string(last_seen) if last_seen else False,
+        }
 
     def _compute_task_subsets(self):
         """Split visit tasks into today / this week / older for booker hub views."""
