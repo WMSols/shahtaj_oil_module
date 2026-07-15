@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Link confirmed sales orders back to the shop visit and daily task."""
 from odoo import _, api, fields, models
+from odoo.tools import float_compare
 
 
 class SaleOrder(models.Model):
@@ -34,6 +35,68 @@ class SaleOrder(models.Model):
         store=True,
         readonly=True,
     )
+    shahtaj_delivery_status = fields.Selection(
+        [
+            ('no_stock', 'No Stock Moves'),
+            ('pending', 'To Deliver'),
+            ('partial', 'Partially Delivered'),
+            ('done', 'Fully Delivered'),
+        ],
+        string='Delivery Status',
+        compute='_compute_shahtaj_delivery_status',
+        store=True,
+    )
+    shahtaj_qty_to_deliver = fields.Float(
+        string='Qty Still to Deliver',
+        compute='_compute_shahtaj_delivery_status',
+        digits='Product Unit of Measure',
+        store=True,
+    )
+
+    @api.depends(
+        'order_line.product_uom_qty',
+        'order_line.qty_delivered',
+        'order_line.product_id',
+        'order_line.product_id.is_storable',
+        'picking_ids.state',
+        'state',
+    )
+    def _compute_shahtaj_delivery_status(self):
+        for order in self:
+            storable_lines = order.order_line.filtered(
+                lambda l: l.product_id and l.product_id.is_storable and not l.display_type
+            )
+            if not storable_lines:
+                order.shahtaj_delivery_status = 'no_stock'
+                order.shahtaj_qty_to_deliver = 0.0
+                continue
+            ordered = sum(storable_lines.mapped('product_uom_qty'))
+            delivered = sum(storable_lines.mapped('qty_delivered'))
+            remaining = ordered - delivered
+            order.shahtaj_qty_to_deliver = max(remaining, 0.0)
+            if float_compare(delivered, 0.0, precision_digits=2) <= 0:
+                order.shahtaj_delivery_status = 'pending'
+            elif float_compare(remaining, 0.0, precision_digits=2) <= 0:
+                order.shahtaj_delivery_status = 'done'
+            else:
+                order.shahtaj_delivery_status = 'partial'
+
+    def action_shahtaj_mark_delivery(self):
+        """Open wizard so distributor can validate full/partial delivery."""
+        self.ensure_one()
+        if self.state not in ('sale', 'done'):
+            return False
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Mark Delivery — %s', self.name),
+            'res_model': 'shahtaj.mark.delivery.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'active_id': self.id,
+                'default_sale_order_id': self.id,
+            },
+        }
 
     def action_shahtaj_view_visit(self):
         self.ensure_one()

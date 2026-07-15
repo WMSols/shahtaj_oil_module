@@ -95,6 +95,13 @@
               sequence="42"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_pnl_dashboard"
+              name="8. Profit &amp; Loss"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_pnl_dashboard"
+              sequence="43"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_products"
               name="Products"
               parent="menu_shahtaj_root"
@@ -136,6 +143,12 @@
               parent="menu_shahtaj_inventory"
               action="action_shahtaj_add_stock"
               sequence="5"/>
+
+    <menuitem id="menu_shahtaj_orders_to_deliver"
+              name="Orders to Deliver"
+              parent="menu_shahtaj_inventory"
+              action="action_shahtaj_orders_to_deliver"
+              sequence="8"/>
 
     <menuitem id="menu_shahtaj_inventory_overview"
               name="Stock Overview"

@@ -6,6 +6,20 @@
         <field name="parent_id" ref="product.product_category_goods"/>
     </record>
 
+    <record id="product_template_legacy_balance" model="product.template">
+        <field name="name">Opening / Legacy Shop Balance</field>
+        <field name="default_code">SHAHTAJ-LEGACY</field>
+        <field name="type">service</field>
+        <field name="categ_id" ref="product_category_shahtaj"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_storable" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="taxes_id" eval="[(5, 0, 0)]"/>
+        <field name="shahtaj_sale_uom">piece</field>
+        <field name="shahtaj_kg_per_unit">1.0</field>
+    </record>
+
     <function model="product.template" name="_shahtaj_setup_category_accounts"/>
 
 </odoo>

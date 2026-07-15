@@ -45,7 +45,7 @@ export class WarehouseInventory extends Component {
         return {
             name: '', track_inventory: true, on_hand: 0,
             list_price: 0.0, standard_price: 0.0,
-            invoice_policy: 'order', type: 'consu',
+            invoice_policy: 'delivery', type: 'consu',
             shahtaj_sale_uom: 'piece', shahtaj_kg_per_unit: 1.0,
             tax_ids: [...this.state.defaultTaxIds],
             barcode: '', weight: 0.0, volume: 0.0,

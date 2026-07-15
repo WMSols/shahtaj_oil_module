@@ -18,7 +18,7 @@
                 <div class="page">
                     <h2>Manufacturer Stock Summary</h2>
                     <p>
-                        Stock received from manufacturer, sold to shops, remaining on hand,
+                        Stock received from manufacturer, delivered to shops, remaining on hand,
                         and amount payable (received × cost price).
                     </p>
                     <table class="table table-sm table-bordered mt-3">
@@ -27,7 +27,7 @@
                                 <th>Product</th>
                                 <th class="text-end">Cost/Unit</th>
                                 <th class="text-end">Received</th>
-                                <th class="text-end">Sold</th>
+                                <th class="text-end">Delivered</th>
                                 <th class="text-end">On Hand</th>
                                 <th class="text-end">Payable</th>
                             </tr>

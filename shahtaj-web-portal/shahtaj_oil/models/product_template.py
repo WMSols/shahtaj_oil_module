@@ -63,9 +63,10 @@ class ProductTemplate(models.Model):
         digits=(16, 1),
     )
     shahtaj_qty_sold = fields.Float(
-        string='Qty Sold',
+        string='Qty Delivered (Sold)',
         compute='_compute_shahtaj_stock_stats',
         digits='Product Unit of Measure',
+        help='Quantity delivered to shops from confirmed sales orders.',
     )
     shahtaj_qty_received = fields.Float(
         string='Qty Received',
@@ -107,12 +108,12 @@ class ProductTemplate(models.Model):
                 ('product_id', 'in', variant_ids),
                 ('order_id.state', 'in', ('sale', 'done')),
             ],
-            ['product_uom_qty'],
+            ['qty_delivered'],
             ['product_id'],
             lazy=False,
         )
         sold_by_variant = {
-            group['product_id'][0]: group['product_uom_qty']
+            group['product_id'][0]: group['qty_delivered']
             for group in sold_groups if group.get('product_id')
         }
 
@@ -199,7 +200,8 @@ class ProductTemplate(models.Model):
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
         if self.env.context.get('shahtaj_simple_product'):
-            defaults = self._shahtaj_product_vals({})
+            # Prefill UI defaults only — create() must not re-apply tax if user cleared it.
+            defaults = self._shahtaj_product_vals({}, apply_tax_default=True)
             for key in (
                 'type', 'sale_ok', 'purchase_ok', 'is_storable', 'tracking',
                 'categ_id', 'shahtaj_sale_uom', 'shahtaj_kg_per_unit', 'uom_id',
@@ -276,16 +278,21 @@ class ProductTemplate(models.Model):
         self._ensure_shahtaj_category_accounts()
 
     @api.model
-    def _shahtaj_product_vals(self, vals):
-        """Merge Shahtaj defaults into product create values."""
+    def _shahtaj_product_vals(self, vals, apply_tax_default=False):
+        """Merge Shahtaj defaults into product create values.
+
+        Tax defaults are only for form prefills (`default_get`). On create we must
+        respect an empty Customer Taxes selection — re-injecting company tax when
+        `taxes_id` is omitted is what made "clear tax" fail after save.
+        """
         vals = dict(vals)
         category = self._ensure_shahtaj_category_accounts()
-        tax = self._get_shahtaj_default_sale_taxes()
         vals.setdefault('type', 'consu')
         vals.setdefault('sale_ok', True)
         vals.setdefault('purchase_ok', False)
         vals.setdefault('is_storable', True)
         vals.setdefault('tracking', 'none')
+        vals.setdefault('invoice_policy', 'delivery')
         sale_uom = vals.get('shahtaj_sale_uom', 'piece')
         vals.setdefault('shahtaj_sale_uom', sale_uom)
         vals.setdefault(
@@ -298,8 +305,10 @@ class ProductTemplate(models.Model):
                 vals['uom_id'] = uom.id
         if category:
             vals.setdefault('categ_id', category.id)
-        if 'taxes_id' not in vals and tax:
-            vals['taxes_id'] = [(6, 0, tax.ids)]
+        if apply_tax_default and 'taxes_id' not in vals:
+            tax = self._get_shahtaj_default_sale_taxes()
+            if tax:
+                vals['taxes_id'] = [(6, 0, tax.ids)]
         return vals
 
     def write(self, vals):
@@ -318,8 +327,25 @@ class ProductTemplate(models.Model):
     def create(self, vals_list):
         if self.env.context.get('shahtaj_simple_product'):
             vals_list = [
-                self._shahtaj_product_vals(vals) for vals in vals_list
+                self._shahtaj_product_vals(vals, apply_tax_default=False)
+                for vals in vals_list
             ]
+            # Prefill only for the form. On create, missing taxes_id usually means
+            # the user cleared Customer Taxes (empty many2many is often omitted) —
+            # write an explicit empty command so company/core defaults cannot reattach.
+            for vals in vals_list:
+                if 'taxes_id' not in vals:
+                    vals['taxes_id'] = [(5, 0, 0)]
+                else:
+                    # Normalize empty set commands so [(6, 0, [])] stays empty.
+                    commands = vals.get('taxes_id') or []
+                    if (
+                        isinstance(commands, (list, tuple))
+                        and len(commands) == 1
+                        and commands[0][:2] == (6, 0)
+                        and not commands[0][2]
+                    ):
+                        vals['taxes_id'] = [(5, 0, 0)]
         else:
             vals_list = [dict(vals) for vals in vals_list]
             for vals in vals_list:

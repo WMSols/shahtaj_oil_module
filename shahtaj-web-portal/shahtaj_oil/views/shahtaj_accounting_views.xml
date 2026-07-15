@@ -29,6 +29,7 @@
                        decoration-success="state == 'posted'"/>
                 <field name="amount_total" string="Total"/>
                 <field name="amount_residual" string="Due"/>
+                <field name="shahtaj_is_legacy_balance" string="Opening" optional="show"/>
                 <field name="reversed_entry_id" string="Reversal Of" optional="show"/>
                 <field name="invoice_origin" string="Source" optional="hide"/>
                 <field name="currency_id" column_invisible="1"/>
@@ -64,6 +65,8 @@
                 <separator/>
                 <filter string="Reversed Invoices" name="reversed"
                         domain="[('move_type', '=', 'out_invoice'), ('payment_state', '=', 'reversed')]"/>
+                <filter string="Opening Balance" name="legacy_balance"
+                        domain="[('shahtaj_is_legacy_balance', '=', True)]"/>
                 <group>
                     <filter string="Shop" name="group_partner" context="{'group_by': 'partner_id'}"/>
                     <filter string="Type" name="group_type" context="{'group_by': 'move_type'}"/>
@@ -156,6 +159,28 @@
         </field>
     </record>
 
+    <record id="action_shahtaj_orders_to_deliver" model="ir.actions.act_window">
+        <field name="name">Orders to Deliver</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[
+            ('shahtaj_visit_id', '!=', False),
+            ('state', 'in', ('sale', 'done')),
+            ('shahtaj_delivery_status', 'in', ('pending', 'partial')),
+        ]</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No deliveries waiting
+            </p>
+            <p>
+                Open an order and click <b>Mark Delivery</b> (or the list <b>Deliver</b> button)
+                to ship full or partial quantity. Stock on hand and Delivered qty update automatically.
+                Then invoice from <b>Orders to Invoice</b> (delivered quantities).
+            </p>
+        </field>
+    </record>
+
     <record id="action_shahtaj_orders_to_invoice" model="ir.actions.act_window">
         <field name="name">Orders to Invoice</field>
         <field name="res_model">sale.order</field>
@@ -169,7 +194,10 @@
             <p class="o_view_nocontent_smiling_face">
                 No field orders waiting for invoice
             </p>
-            <p>Select orders and use <b>Create Invoice</b> to bill shops.</p>
+            <p>
+                Products use <b>Delivered quantities</b> invoicing.
+                Mark delivery first, then use <b>Create Invoice → Regular</b>.
+            </p>
         </field>
     </record>
 
@@ -233,6 +261,38 @@
         <field name="view_mode">list</field>
         <field name="view_id" ref="view_shahtaj_customer_invoice_list"/>
         <field name="act_window_id" ref="action_shahtaj_credit_notes"/>
+    </record>
+
+    <record id="action_shahtaj_opening_balance_invoices" model="ir.actions.act_window">
+        <field name="name">Opening Balance Invoices</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[
+            ('move_type', '=', 'out_invoice'),
+            ('partner_id.is_shahtaj_shop', '=', True),
+            ('shahtaj_is_legacy_balance', '=', True),
+        ]</field>
+        <field name="context">{
+            'default_move_type': 'out_invoice',
+            'create': False,
+        }</field>
+        <field name="search_view_id" ref="view_shahtaj_customer_invoice_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No opening balance invoices yet
+            </p>
+            <p>
+                These are created when a shop is approved with a <b>Legacy Balance</b>
+                (previous debt). Open an invoice and use <b>Register Payment</b> to collect.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_opening_balance_invoices_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_customer_invoice_list"/>
+        <field name="act_window_id" ref="action_shahtaj_opening_balance_invoices"/>
     </record>
 
     <record id="action_shahtaj_customer_payments" model="ir.actions.act_window">

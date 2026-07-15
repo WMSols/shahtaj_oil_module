@@ -50,7 +50,7 @@
                     <button name="action_reject_shop" type="object" string="Reject"
                             invisible="shop_approval_state == 'rejected'"/>
                     <button name="action_view_legacy_balance_move" type="object"
-                            string="Legacy Balance Entry"
+                            string="Legacy Balance Invoice"
                             invisible="not legacy_balance_move_id"
                             groups="shahtaj_oil.group_shahtaj_distributor,account.group_account_readonly,account.group_account_invoice"/>
                     <field name="shop_approval_state" widget="statusbar"

@@ -107,11 +107,13 @@ class ResPartner(models.Model):
     legacy_balance = fields.Monetary(
         string='Legacy Balance',
         currency_field='currency_id',
-        help='Outstanding balance from before the system. Posted to accounting when the shop is approved.',
+        help='Previous amount the shop already owed before this system. '
+             'When the shop is approved, a customer invoice is created so you can '
+             'collect payment against it (Register Payment).',
     )
     legacy_balance_move_id = fields.Many2one(
         'account.move',
-        string='Legacy Balance Entry',
+        string='Legacy Balance Invoice',
         readonly=True,
         copy=False,
         ondelete='restrict',
@@ -308,8 +310,43 @@ class ResPartner(models.Model):
             partner.sudo().property_account_receivable_id = receivable
         return receivable
 
+    def _get_legacy_balance_product(self):
+        """Service product used on opening-balance customer invoices."""
+        template = self.env.ref(
+            'shahtaj_oil.product_template_legacy_balance',
+            raise_if_not_found=False,
+        )
+        if template:
+            return template.product_variant_id
+        # Fallback if XML data missing (e.g. partial upgrade).
+        Product = self.env['product.product'].sudo()
+        product = Product.search([
+            ('default_code', '=', 'SHAHTAJ-LEGACY'),
+        ], limit=1)
+        if product:
+            return product
+        template = self.env['product.template'].sudo().with_context(
+            shahtaj_simple_product=True,
+        ).create({
+            'name': 'Opening / Legacy Shop Balance',
+            'default_code': 'SHAHTAJ-LEGACY',
+            'type': 'service',
+            'sale_ok': True,
+            'purchase_ok': False,
+            'is_storable': False,
+            'list_price': 0.0,
+            'taxes_id': [(5, 0, 0)],
+            'shahtaj_sale_uom': 'piece',
+        })
+        return template.product_variant_id
+
     def _post_legacy_balance_entry(self):
-        """Post one journal entry: debit shop receivable, credit opening balance."""
+        """Create and post a customer invoice for previous shop debt.
+
+        Distributors can then Register Payment against this invoice — same flow
+        as field sales invoices. Older shops may still have a misc journal entry
+        linked in legacy_balance_move_id; those are left unchanged.
+        """
         AccountMove = self.env['account.move'].sudo()
         AccountJournal = self.env['account.journal'].sudo()
         for partner in self.filtered(
@@ -320,48 +357,38 @@ class ResPartner(models.Model):
         ):
             company = partner.company_id or self.env.company
             partner = partner.with_company(company)
+            currency = partner.currency_id or company.currency_id
             if float_is_zero(
                 partner.legacy_balance,
-                precision_rounding=(partner.currency_id or company.currency_id).rounding,
+                precision_rounding=currency.rounding,
             ):
                 continue
-            receivable = partner._get_shop_receivable_account(company)
-            if not receivable:
-                raise UserError(_(
-                    'No receivable account found for shop "%(shop)s". '
-                    'Install a chart of accounts for company "%(company)s" first.',
-                    shop=partner.name,
-                    company=company.display_name,
-                ))
+            partner._get_shop_receivable_account(company)
             journal = AccountJournal.search([
-                ('type', '=', 'general'),
+                ('type', '=', 'sale'),
                 ('company_id', '=', company.id),
             ], limit=1)
             if not journal:
                 raise UserError(_(
-                    'No miscellaneous journal found. Install accounting before setting legacy balance.'
+                    'No Sales journal found. Install accounting / chart of accounts '
+                    'before setting legacy balance.'
                 ))
-            equity_account = company.sudo().get_unaffected_earnings_account()
+            product = self._get_legacy_balance_product()
             move = AccountMove.create({
-                'move_type': 'entry',
+                'move_type': 'out_invoice',
+                'partner_id': partner.id,
                 'journal_id': journal.id,
-                'date': fields.Date.context_today(self),
+                'invoice_date': fields.Date.context_today(self),
+                'invoice_origin': _('Legacy balance'),
                 'ref': _('Legacy shop balance: %s', partner.name),
-                'line_ids': [
-                    (0, 0, {
-                        'name': _('Legacy balance'),
-                        'partner_id': partner.id,
-                        'account_id': receivable.id,
-                        'debit': partner.legacy_balance,
-                        'credit': 0.0,
-                    }),
-                    (0, 0, {
-                        'name': _('Legacy balance'),
-                        'account_id': equity_account.id,
-                        'debit': 0.0,
-                        'credit': partner.legacy_balance,
-                    }),
-                ],
+                'shahtaj_is_legacy_balance': True,
+                'invoice_line_ids': [(0, 0, {
+                    'product_id': product.id,
+                    'name': _('Opening / Legacy Balance — %s', partner.name),
+                    'quantity': 1.0,
+                    'price_unit': partner.legacy_balance,
+                    'tax_ids': [(5, 0, 0)],
+                })],
             })
             move.action_post()
             partner.with_context(shahtaj_posting_legacy_move=True).write({
@@ -386,8 +413,7 @@ class ResPartner(models.Model):
         if vals.get('legacy_balance_move_id') and not self.env.context.get(
             'shahtaj_posting_legacy_move'
         ):
-            # Block manual edits; only _post_legacy_balance_entry may set this link.
-            raise UserError(_('Legacy balance journal entry cannot be changed manually.'))
+            raise UserError(_('Legacy balance invoice cannot be changed manually.'))
         res = super().write(vals)
         if 'shahtaj_shop_category' in vals:
             credit_shops = self.filtered(
@@ -463,10 +489,10 @@ class ResPartner(models.Model):
     def action_view_legacy_balance_move(self):
         self.ensure_one()
         if not self.legacy_balance_move_id:
-            raise UserError(_('No legacy balance journal entry exists for this shop.'))
+            raise UserError(_('No legacy balance invoice exists for this shop.'))
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Legacy Balance Entry'),
+            'name': _('Legacy Balance Invoice'),
             'res_model': 'account.move',
             'res_id': self.legacy_balance_move_id.id,
             'view_mode': 'form',

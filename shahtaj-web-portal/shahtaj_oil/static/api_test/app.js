@@ -491,6 +491,7 @@
     const password = $('inp-password').value;
     $('login-status').textContent = 'Logging in...';
     $('login-status').className = 'status';
+    state.database=database;
     try {
       const data = await api('/api/shahtaj/v1/auth/login', { database, login, password });
       state.apiKey = data.api_key;

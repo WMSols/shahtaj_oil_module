@@ -15,6 +15,10 @@ class ShahtajAccountingHub(models.TransientModel):
         string='To Invoice',
         compute='_compute_counts',
     )
+    orders_to_deliver_count = fields.Integer(
+        string='To Deliver',
+        compute='_compute_counts',
+    )
     open_invoice_count = fields.Integer(
         string='Open Invoices',
         compute='_compute_counts',
@@ -40,6 +44,11 @@ class ShahtajAccountingHub(models.TransientModel):
             hub.orders_to_invoice_count = SaleOrder.search_count([
                 ('shahtaj_visit_id', '!=', False),
                 ('invoice_status', '=', 'to invoice'),
+            ])
+            hub.orders_to_deliver_count = SaleOrder.search_count([
+                ('shahtaj_visit_id', '!=', False),
+                ('state', 'in', ('sale', 'done')),
+                ('shahtaj_delivery_status', 'in', ('pending', 'partial')),
             ])
             hub.open_invoice_count = AccountMove.search_count([
                 ('move_type', '=', 'out_invoice'),
@@ -85,6 +94,11 @@ class ShahtajAccountingHub(models.TransientModel):
             'shahtaj_oil.action_shahtaj_orders_to_invoice',
         )
 
+    def action_open_orders_to_deliver(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_orders_to_deliver',
+        )
+
     def action_open_customer_invoices(self):
         return self.env['ir.actions.act_window']._for_xml_id(
             'shahtaj_oil.action_shahtaj_customer_invoices',
@@ -104,3 +118,11 @@ class ShahtajAccountingHub(models.TransientModel):
         return self.env['ir.actions.act_window']._for_xml_id(
             'shahtaj_oil.action_shahtaj_credit_notes',
         )
+
+    def action_open_opening_balance_invoices(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_opening_balance_invoices',
+        )
+
+    def action_open_pnl_dashboard(self):
+        return self.env['shahtaj.pnl.dashboard'].action_open_pnl_dashboard()

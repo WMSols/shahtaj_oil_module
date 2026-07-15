@@ -51,6 +51,7 @@
                                    required="shahtaj_sale_uom in ('litre', 'piece')"/>
                             <field name="taxes_id" widget="many2many_tags"
                                    string="Customer Taxes"
+                                   force_save="1"
                                    domain="[('type_tax_use', '=', 'sale'), ('active', '=', True)]"
                                    context="{'default_type_tax_use': 'sale'}"/>
                         </group>
@@ -58,6 +59,7 @@
                     <group>
                         <group string="Inventory">
                             <field name="is_storable" string="Track Inventory"/>
+                            <field name="invoice_policy" string="Invoice Policy"/>
                             <field name="qty_available" string="On Hand"
                                    readonly="not is_storable"/>
                             <field name="shahtaj_qty_bookable" string="Available to Book"
@@ -116,7 +118,7 @@
                 <field name="shahtaj_sale_uom" string="Unit"/>
                 <field name="standard_price" string="Cost/Unit"/>
                 <field name="shahtaj_qty_received" string="Received"/>
-                <field name="shahtaj_qty_sold" string="Sold"/>
+                <field name="shahtaj_qty_sold" string="Delivered"/>
                 <field name="qty_available" string="On Hand"/>
                 <field name="shahtaj_payable_to_manufacturer" string="Payable to Manufacturer"/>
                 <field name="currency_id" column_invisible="1"/>
@@ -219,9 +221,9 @@
                 No products to report
             </p>
             <p>
-                Shows received, sold, and on-hand quantities per product, plus the amount
-                payable to the manufacturer. Select products and use <b>Print</b> to share
-                with your manufacturer.
+                Shows received, delivered (to shops), and on-hand quantities per product, plus the amount
+                payable to the manufacturer. Delivered updates when you use <b>Mark Delivery</b>.
+                Select products and use <b>Print</b> to share with your manufacturer.
             </p>
         </field>
     </record>

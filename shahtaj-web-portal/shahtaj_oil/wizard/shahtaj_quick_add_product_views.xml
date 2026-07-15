@@ -15,6 +15,7 @@
                            invisible="shahtaj_sale_uom in ('kg', 'ton')"/>
                     <field name="tax_ids" widget="many2many_tags"
                            string="Customer Taxes"
+                           force_save="1"
                            context="{'default_type_tax_use': 'sale'}"/>
                     <field name="track_inventory"/>
                     <field name="opening_qty" invisible="not track_inventory"/>

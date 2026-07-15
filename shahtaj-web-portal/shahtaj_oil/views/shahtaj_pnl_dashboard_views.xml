@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_pnl_dashboard_form" model="ir.ui.view">
+        <field name="name">shahtaj.pnl.dashboard.form</field>
+        <field name="model">shahtaj.pnl.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="Profit &amp; Loss" create="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"
+                            class="oe_highlight" icon="fa-refresh"/>
+                    <button name="action_open_product_invoices" type="object"
+                            string="Product Invoices"/>
+                    <button name="action_open_credit_notes" type="object"
+                            string="Credit Notes"/>
+                    <button name="action_open_legacy_invoices" type="object"
+                            string="Opening Balance Invoices"/>
+                    <button name="action_open_manufacturer_summary" type="object"
+                            string="Manufacturer Summary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Profit &amp; Loss</h1>
+                        <p class="text-muted">
+                            Product trading profit from <b>posted invoices</b>
+                            (sales price) vs <b>product cost</b>, after credit notes.
+                            Manufacturer payable comes from stock received × cost.
+                        </p>
+                    </div>
+                    <group string="Period">
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="invoice_count" readonly="1"/>
+                            <field name="credit_note_count" readonly="1"/>
+                            <field name="legacy_invoice_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Trading (products)">
+                        <group>
+                            <field name="amount_invoiced" readonly="1"/>
+                            <field name="amount_credit_notes" readonly="1"/>
+                            <field name="amount_net_sales" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="amount_cogs" readonly="1"/>
+                            <field name="amount_gross_profit" readonly="1"
+                                   decoration-success="amount_gross_profit &gt; 0"
+                                   decoration-danger="amount_gross_profit &lt; 0"/>
+                        </group>
+                    </group>
+                    <group string="Manufacturer &amp; Collections">
+                        <group>
+                            <field name="amount_manufacturer_payable" readonly="1"/>
+                            <field name="amount_legacy_invoiced" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="amount_payments_received" readonly="1"/>
+                            <field name="amount_shop_outstanding" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <b>How to read this</b>
+                        <ul class="mb-0 mt-2">
+                            <li><b>Gross Profit</b> = Net Sales − Cost (cost = invoiced qty × product cost, minus credit-note qty).</li>
+                            <li><b>Payable to Manufacturer</b> = all stock received × cost (Inventory → Manufacturer Summary).</li>
+                            <li><b>Opening Balance Invoices</b> = old shop debt (legacy) — not included in product profit.</li>
+                            <li>Change dates and click <b>Refresh</b> to recalculate.</li>
+                        </ul>
+                    </div>
+                    <notebook>
+                        <page string="By Product" name="products">
+                            <field name="line_ids" readonly="1" nolabel="1">
+                                <list create="false" delete="false" edit="false">
+                                    <field name="product_id"/>
+                                    <field name="qty_invoiced"/>
+                                    <field name="qty_credited"/>
+                                    <field name="amount_revenue"/>
+                                    <field name="amount_credit"/>
+                                    <field name="amount_net_sales"/>
+                                    <field name="amount_cogs"/>
+                                    <field name="amount_profit"
+                                           decoration-success="amount_profit &gt; 0"
+                                           decoration-danger="amount_profit &lt; 0"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_pnl_dashboard" model="ir.actions.server">
+        <field name="name">Profit &amp; Loss</field>
+        <field name="model_id" ref="model_shahtaj_pnl_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_pnl_dashboard()</field>
+    </record>
+
+</odoo>

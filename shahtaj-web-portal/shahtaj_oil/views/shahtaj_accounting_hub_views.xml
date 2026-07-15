@@ -16,6 +16,7 @@
                     <group string="Overview">
                         <group>
                             <field name="field_order_count" readonly="1"/>
+                            <field name="orders_to_deliver_count" readonly="1"/>
                             <field name="orders_to_invoice_count" readonly="1"/>
                         </group>
                         <group>
@@ -28,7 +29,8 @@
                         <strong>Typical workflow</strong>
                         <ol class="mb-0 mt-2">
                             <li>Order bookers place orders during shop visits.</li>
-                            <li>Create a <b>Regular invoice</b> from confirmed field orders.</li>
+                            <li>Mark <b>Delivery</b> (full or partial) so stock leaves the warehouse.</li>
+                            <li>Create a <b>Regular invoice</b> for delivered quantities.</li>
                             <li>Record payments on the invoice (partial payments are allowed).</li>
                             <li>For returns, open a posted invoice → <b>Credit Note</b> → post the credit note.</li>
                             <li>Review each shop's balance under Shop Balances.</li>
@@ -40,6 +42,10 @@
                                     string="Field Sales Orders"
                                     class="btn btn-primary mb-2"
                                     icon="fa-shopping-cart"/>
+                            <button name="action_open_orders_to_deliver" type="object"
+                                    string="Orders to Deliver"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-truck"/>
                             <button name="action_open_orders_to_invoice" type="object"
                                     string="Orders to Invoice"
                                     class="btn btn-secondary mb-2"
@@ -54,6 +60,10 @@
                                     string="Credit Notes Only"
                                     class="btn btn-secondary mb-2"
                                     icon="fa-undo"/>
+                            <button name="action_open_opening_balance_invoices" type="object"
+                                    string="Opening Balance Invoices"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-bookmark"/>
                             <button name="action_open_customer_payments" type="object"
                                     string="Customer Payments"
                                     class="btn btn-secondary mb-2"
@@ -64,8 +74,14 @@
                         <group string="Step 3 — Shop balances">
                             <button name="action_open_shop_balances" type="object"
                                     string="Shop Balances"
-                                    class="btn btn-primary"
+                                    class="btn btn-primary mb-2"
                                     icon="fa-balance-scale"/>
+                        </group>
+                        <group string="Step 4 — Profit">
+                            <button name="action_open_pnl_dashboard" type="object"
+                                    string="Profit &amp; Loss Dashboard"
+                                    class="btn btn-primary"
+                                    icon="fa-line-chart"/>
                         </group>
                     </group>
                 </sheet>

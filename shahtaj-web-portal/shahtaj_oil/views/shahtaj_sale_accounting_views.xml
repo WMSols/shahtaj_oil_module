@@ -17,6 +17,13 @@
                     <span class="o_stat_text">Shop Visit</span>
                 </button>
             </div>
+            <header position="inside">
+                <button name="action_shahtaj_mark_delivery" type="object"
+                        string="Mark Delivery"
+                        class="oe_highlight"
+                        invisible="state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"
+                        groups="shahtaj_oil.group_shahtaj_distributor"/>
+            </header>
             <field name="partner_id" position="after">
                 <field name="shahtaj_visit_id" readonly="1"
                        groups="shahtaj_oil.group_shahtaj_distributor"
@@ -27,6 +34,14 @@
                 <field name="shahtaj_order_booker_id" readonly="1"
                        groups="shahtaj_oil.group_shahtaj_distributor"
                        invisible="not shahtaj_order_booker_id"/>
+                <field name="shahtaj_delivery_status" widget="badge" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       decoration-warning="shahtaj_delivery_status == 'pending'"
+                       decoration-info="shahtaj_delivery_status == 'partial'"
+                       decoration-success="shahtaj_delivery_status == 'done'"/>
+                <field name="shahtaj_qty_to_deliver" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       invisible="shahtaj_delivery_status in ('done', 'no_stock')"/>
             </field>
         </field>
     </record>
@@ -41,6 +56,17 @@
                        groups="shahtaj_oil.group_shahtaj_distributor"/>
                 <field name="shahtaj_visit_id" optional="hide"
                        groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_delivery_status" optional="show" widget="badge"
+                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       decoration-warning="shahtaj_delivery_status == 'pending'"
+                       decoration-info="shahtaj_delivery_status == 'partial'"
+                       decoration-success="shahtaj_delivery_status == 'done'"/>
+                <field name="shahtaj_qty_to_deliver" optional="show"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <button name="action_shahtaj_mark_delivery" type="object"
+                        string="Deliver" icon="fa-truck"
+                        groups="shahtaj_oil.group_shahtaj_distributor"
+                        invisible="state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"/>
             </field>
         </field>
     </record>

@@ -10,6 +10,7 @@ distributor pending approvals.
 
 def migrate(cr, version):
     # Mark orphaned booker registrations as pending shops and link the booker.
+    # Note: company_type is not a DB column in Odoo 19 — use is_company.
     cr.execute("""
         UPDATE res_partner p
            SET is_shahtaj_shop = TRUE,
@@ -22,10 +23,7 @@ def migrate(cr, version):
                    WHEN COALESCE(p.customer_rank, 0) < 1 THEN 1
                    ELSE p.customer_rank
                END,
-               company_type = CASE
-                   WHEN COALESCE(p.company_type, '') = '' THEN 'company'
-                   ELSE p.company_type
-               END,
+               is_company = TRUE,
                shahtaj_shop_category = COALESCE(
                    NULLIF(p.shahtaj_shop_category, ''),
                    'credit'
