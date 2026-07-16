@@ -5,7 +5,7 @@
         <field name="name">shahtaj.visit.list</field>
         <field name="model">shahtaj.visit</field>
         <field name="arch" type="xml">
-            <list decoration-muted="outcome == 'no_order'"
+            <list decoration-muted="outcome in ('no_order', 'incomplete')"
                   decoration-success="outcome == 'order'">
                 <field name="started_at"/>
                 <field name="order_booker_id"/>
@@ -14,7 +14,8 @@
                 <field name="state" widget="badge"/>
                 <field name="outcome" widget="badge"
                        decoration-success="outcome == 'order'"
-                       decoration-warning="outcome == 'no_order'"/>
+                       decoration-warning="outcome == 'no_order'"
+                       decoration-danger="outcome == 'incomplete'"/>
                 <field name="duration_minutes" string="Duration (min)"/>
                 <field name="order_amount" optional="show"/>
                 <field name="check_in_distance_m" optional="hide"/>
@@ -101,7 +102,7 @@
         <field name="priority">20</field>
         <field name="arch" type="xml">
             <list string="My Shop Visits" create="false" edit="false" delete="false"
-                  decoration-muted="outcome == 'no_order'"
+                  decoration-muted="outcome in ('no_order', 'incomplete')"
                   decoration-success="outcome == 'order'"
                   decoration-info="state == 'in_progress'">
                 <field name="started_at" string="Check-in"/>
@@ -110,7 +111,8 @@
                 <field name="state" widget="badge"/>
                 <field name="outcome" widget="badge"
                        decoration-success="outcome == 'order'"
-                       decoration-warning="outcome == 'no_order'"/>
+                       decoration-warning="outcome == 'no_order'"
+                       decoration-danger="outcome == 'incomplete'"/>
                 <field name="duration_minutes" string="Duration (min)"/>
                 <field name="order_amount" string="Order Total" optional="show"/>
                 <field name="shop_id" column_invisible="1"/>
@@ -272,6 +274,8 @@
                         domain="[('outcome', '=', 'order')]"/>
                 <filter string="No Order" name="no_order"
                         domain="[('outcome', '=', 'no_order')]"/>
+                <filter string="Incomplete" name="incomplete"
+                        domain="[('outcome', '=', 'incomplete')]"/>
                 <separator/>
                 <filter string="Day" name="group_day"
                         context="{'group_by': 'started_at:day'}"/>
@@ -292,6 +296,7 @@
                 <filter string="In Progress" name="in_progress" domain="[('state', '=', 'in_progress')]"/>
                 <filter string="Order Placed" name="with_order" domain="[('outcome', '=', 'order')]"/>
                 <filter string="No Order" name="no_order" domain="[('outcome', '=', 'no_order')]"/>
+                <filter string="Incomplete" name="incomplete" domain="[('outcome', '=', 'incomplete')]"/>
                 <separator/>
                 <filter string="Order Booker" name="group_booker" context="{'group_by': 'order_booker_id'}"/>
                 <filter string="Shop" name="group_shop" context="{'group_by': 'shop_id'}"/>

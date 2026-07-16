@@ -310,42 +310,30 @@ class ResPartner(models.Model):
             partner.sudo().property_account_receivable_id = receivable
         return receivable
 
-    def _get_legacy_balance_product(self):
-        """Service product used on opening-balance customer invoices."""
-        template = self.env.ref(
-            'shahtaj_oil.product_template_legacy_balance',
-            raise_if_not_found=False,
-        )
-        if template:
-            return template.product_variant_id
-        # Fallback if XML data missing (e.g. partial upgrade).
-        Product = self.env['product.product'].sudo()
-        product = Product.search([
-            ('default_code', '=', 'SHAHTAJ-LEGACY'),
+    def _get_legacy_balance_income_account(self, company):
+        """Income account for opening-balance invoice lines (no product)."""
+        self.ensure_one()
+        Account = self.env['account.account'].sudo()
+        category = self.env['product.template']._get_shahtaj_default_category()
+        if category and category.property_account_income_categ_id:
+            return category.property_account_income_categ_id
+        income = Account.search([
+            ('company_ids', 'in', company.id),
+            ('account_type', '=', 'income'),
+            ('active', '=', True),
         ], limit=1)
-        if product:
-            return product
-        template = self.env['product.template'].sudo().with_context(
-            shahtaj_simple_product=True,
-        ).create({
-            'name': 'Opening / Legacy Shop Balance',
-            'default_code': 'SHAHTAJ-LEGACY',
-            'type': 'service',
-            'sale_ok': True,
-            'purchase_ok': False,
-            'is_storable': False,
-            'list_price': 0.0,
-            'taxes_id': [(5, 0, 0)],
-            'shahtaj_sale_uom': 'piece',
-        })
-        return template.product_variant_id
+        if not income:
+            raise UserError(_(
+                'No income account found. Install the chart of accounts '
+                'before setting legacy balance.'
+            ))
+        return income
 
     def _post_legacy_balance_entry(self):
-        """Create and post a customer invoice for previous shop debt.
+        """Create and post a customer invoice for previous shop debt (no product).
 
-        Distributors can then Register Payment against this invoice — same flow
-        as field sales invoices. Older shops may still have a misc journal entry
-        linked in legacy_balance_move_id; those are left unchanged.
+        Line is description + amount on an income account so distributors can
+        Register Payment without a confusing catalog product.
         """
         AccountMove = self.env['account.move'].sudo()
         AccountJournal = self.env['account.journal'].sudo()
@@ -373,7 +361,7 @@ class ResPartner(models.Model):
                     'No Sales journal found. Install accounting / chart of accounts '
                     'before setting legacy balance.'
                 ))
-            product = self._get_legacy_balance_product()
+            income_account = partner._get_legacy_balance_income_account(company)
             move = AccountMove.create({
                 'move_type': 'out_invoice',
                 'partner_id': partner.id,
@@ -383,11 +371,11 @@ class ResPartner(models.Model):
                 'ref': _('Legacy shop balance: %s', partner.name),
                 'shahtaj_is_legacy_balance': True,
                 'invoice_line_ids': [(0, 0, {
-                    'product_id': product.id,
                     'name': _('Opening / Legacy Balance — %s', partner.name),
                     'quantity': 1.0,
                     'price_unit': partner.legacy_balance,
                     'tax_ids': [(5, 0, 0)],
+                    'account_id': income_account.id,
                 })],
             })
             move.action_post()

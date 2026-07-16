@@ -18,6 +18,10 @@ class ShahtajApiTasks(http.Controller):
     @http.route('/api/shahtaj/v1/tasks/today', **API_ROUTE)
     def tasks_today(self, **kwargs):
         ensure_order_booker()
+        # Expire leftover visits from previous days before listing today's work.
+        request.env['shahtaj.visit']._close_stale_in_progress_visits(
+            order_booker=request.env.user,
+        )
         today = fields.Date.context_today(request.env['shahtaj.visit.task'])
         tasks = request.env['shahtaj.visit.task'].search([
             ('order_booker_id', '=', request.env.user.id),

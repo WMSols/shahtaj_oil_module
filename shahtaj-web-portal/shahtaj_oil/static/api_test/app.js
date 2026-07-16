@@ -180,7 +180,7 @@
         { name: 'route_id', required: false, type: 'int' },
         { name: 'credit_limit', required: false, type: 'float' },
         { name: 'legacy_balance', required: false, type: 'float' },
-        { name: 'shop_category', required: false, type: 'string', note: 'credit|cash — accepted on register (defaults to credit). Also returned in shop payloads.' },
+        { name: 'shop_category', required: false, type: 'string', note: 'credit|cash — accepted on register (defaults to credit). Returned on all shop payloads with credit_limit, outstanding_balance, credit_remaining.' },
         { name: 'owner_cnic_front', required: false, type: 'base64' },
         { name: 'owner_cnic_back', required: false, type: 'base64' },
         { name: 'owner_photo', required: false, type: 'base64' },

@@ -20,6 +20,7 @@ VISIT_OUTCOMES = [
     ('none', 'In Progress'),
     ('order', 'Order Placed'),
     ('no_order', 'No Order'),
+    ('incomplete', 'Incomplete'),
 ]
 
 # Fields a booker may change on their own during a visit (security in write()).
@@ -218,10 +219,64 @@ class ShahtajVisit(models.Model):
     @api.model
     def _get_active_visit_for_user(self, user=None):
         user = user or self.env.user
+        # Drop leftover visits from previous days so they cannot block today.
+        self._close_stale_in_progress_visits(order_booker=user)
         return self.search([
             ('order_booker_id', '=', user.id),
             ('state', '=', 'in_progress'),
         ], limit=1)
+
+    @api.model
+    def _close_stale_in_progress_visits(self, order_booker=None):
+        """End visits still in progress after their check-in day has passed.
+
+        Called by cron and before resolving the booker's active visit so
+        yesterday's abandoned check-in cannot block today's work.
+        """
+        today = fields.Date.context_today(self)
+        domain = [('state', '=', 'in_progress')]
+        if order_booker:
+            domain.append(('order_booker_id', '=', order_booker.id))
+        stale = self.sudo().search(domain).filtered(
+            lambda v: fields.Datetime.context_timestamp(v, v.started_at).date() < today
+        )
+        for visit in stale:
+            visit._auto_close_incomplete()
+        return stale
+
+    def _auto_close_incomplete(self):
+        """Mark an abandoned overnight visit incomplete and free the booker."""
+        self.ensure_one()
+        if self.state != 'in_progress':
+            return
+        note = _(
+            'Auto-closed: visit was still in progress after the day ended '
+            '(incomplete — no order placed).'
+        )
+        existing = (self.notes or '').strip()
+        notes = f'{existing}\n{note}' if existing else note
+        now = fields.Datetime.now()
+        duration = int((now - self.started_at).total_seconds()) if self.started_at else 0
+        self.with_context(shahtaj_system_visit_write=True).write({
+            'state': 'completed',
+            'outcome': 'incomplete',
+            'ended_at': now,
+            'duration_seconds': max(duration, 0),
+            'notes': notes,
+        })
+        task = self.visit_task_id
+        if task and task.state == 'in_progress':
+            task_note = _('Skipped automatically: visit left incomplete overnight.')
+            task_notes = (task.notes or '').strip()
+            task.with_context(shahtaj_system_visit_write=True).write({
+                'state': 'skipped',
+                'notes': f'{task_notes}\n{task_note}' if task_notes else task_note,
+            })
+
+    @api.model
+    def _cron_close_stale_visits(self):
+        """Daily job: close leftover in-progress visits from previous days."""
+        self._close_stale_in_progress_visits()
 
     def action_open_booker_form(self):
         """Open the order-booker visit form (continue active or review completed)."""

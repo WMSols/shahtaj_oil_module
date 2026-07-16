@@ -11,8 +11,9 @@
         <field name="default_code">SHAHTAJ-LEGACY</field>
         <field name="type">service</field>
         <field name="categ_id" ref="product_category_shahtaj"/>
-        <field name="sale_ok" eval="True"/>
+        <field name="sale_ok" eval="False"/>
         <field name="purchase_ok" eval="False"/>
+        <field name="active" eval="False"/>
         <field name="is_storable" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="taxes_id" eval="[(5, 0, 0)]"/>

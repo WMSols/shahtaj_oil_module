@@ -146,7 +146,7 @@
         <field name="res_model">product.template</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_shahtaj_product_search"/>
-        <field name="domain">[('sale_ok', '=', True)]</field>
+        <field name="domain">[('sale_ok', '=', True), ('default_code', '!=', 'SHAHTAJ-LEGACY')]</field>
         <field name="context">{
             'shahtaj_simple_product': True,
             'default_sale_ok': True,
@@ -240,7 +240,7 @@
         <field name="name">Advanced Product Settings</field>
         <field name="res_model">product.template</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('sale_ok', '=', True)]</field>
+        <field name="domain">[('sale_ok', '=', True), ('default_code', '!=', 'SHAHTAJ-LEGACY')]</field>
         <field name="context">{'default_is_storable': True}</field>
         <field name="help" type="html">
             <p>Full Odoo product form with all tabs (purchase, accounting, variants, etc.).</p>

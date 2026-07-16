@@ -41,6 +41,15 @@ def task_dict(task):
 def shop_brief(partner):
     if not partner:
         return None
+    # Bookers are in the Shahtaj credit groups; sudo covers receivable read safely.
+    shop = partner.sudo()
+    category = shop.shahtaj_shop_category or 'credit'
+    credit_limit = float(shop.credit_limit or 0.0)
+    outstanding = float(shop.outstanding_balance or 0.0)
+    if category == 'cash':
+        credit_remaining = False
+    else:
+        credit_remaining = max(credit_limit - outstanding, 0.0)
     return {
         'id': partner.id,
         'shop_id': partner.id,
@@ -51,7 +60,10 @@ def shop_brief(partner):
         'latitude': partner.partner_latitude,
         'longitude': partner.partner_longitude,
         'approval_state': partner.shop_approval_state,
-        'shop_category': partner.shahtaj_shop_category,
+        'shop_category': category,
+        'credit_limit': credit_limit,
+        'outstanding_balance': outstanding,
+        'credit_remaining': credit_remaining,
         'photos': shop_photo_flags(partner),
     }
 

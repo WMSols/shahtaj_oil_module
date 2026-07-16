@@ -119,7 +119,7 @@ export class WarehouseInventory extends Component {
     async loadInventory() {
         const products = await this.orm.searchRead(
             "product.template",
-            [['sale_ok', '=', true]], 
+            [['sale_ok', '=', true], ['default_code', '!=', 'SHAHTAJ-LEGACY']], 
             [
                 "id", "name", "categ_id", "qty_available", "uom_name", "type",
                 "list_price", "standard_price", "barcode", "weight", "volume",

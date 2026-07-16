@@ -10,8 +10,10 @@ from odoo.exceptions import AccessError, UserError, ValidationError
 
 from .shahtaj_visit_task import shahtaj_week_bounds
 
-# Treat booker as online if seen within this many minutes.
+# Treat booker as online if seen within this many minutes (Flutter heartbeat).
 ONLINE_THRESHOLD_MINUTES = 5
+# Soft "away" window after online expires (still recent, not fully offline).
+AWAY_THRESHOLD_MINUTES = 15
 
 
 class ResUsers(models.Model):
@@ -38,6 +40,8 @@ class ResUsers(models.Model):
         string='Online Status',
         compute='_compute_shahtaj_online_status',
         store=True,
+        index=True,
+        help='Based on mobile heartbeat last-seen. Refreshed by a light cron.',
     )
     shahtaj_im_status = fields.Char(
         related='partner_id.im_status',
@@ -308,21 +312,21 @@ class ResUsers(models.Model):
                 'shahtaj_oil.group_shahtaj_order_booker'
             )
 
-    @api.depends('shahtaj_last_seen_at', 'partner_id.im_status', 'shahtaj_is_order_booker')
+    @api.depends('shahtaj_last_seen_at', 'shahtaj_is_order_booker')
     def _compute_shahtaj_online_status(self):
+        """Presence from Flutter heartbeat only (not Odoo Discuss im_status)."""
         now = fields.Datetime.now()
-        threshold = now - timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
+        online_after = now - timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
+        away_after = now - timedelta(minutes=AWAY_THRESHOLD_MINUTES)
         for user in self:
             if not user.shahtaj_is_order_booker:
                 user.shahtaj_online_status = False
                 continue
-            im = user.partner_id.im_status
-            if im == 'online':
+            last_seen = user.shahtaj_last_seen_at
+            if last_seen and last_seen >= online_after:
                 user.shahtaj_online_status = 'online'
-            elif im == 'away':
+            elif last_seen and last_seen >= away_after:
                 user.shahtaj_online_status = 'away'
-            elif user.shahtaj_last_seen_at and user.shahtaj_last_seen_at >= threshold:
-                user.shahtaj_online_status = 'online'
             else:
                 user.shahtaj_online_status = 'offline'
 
@@ -343,6 +347,37 @@ class ResUsers(models.Model):
             'online_status': self.shahtaj_online_status or 'offline',
             'last_seen_at': fields.Datetime.to_string(last_seen) if last_seen else False,
         }
+
+    @api.model
+    def _cron_refresh_order_booker_presence(self):
+        """Light job: flip stale online/away bookers when heartbeat window expires.
+
+        Only loads bookers still marked online/away that are past their window
+        (usually a few rows). Does not scan the full user table.
+        """
+        now = fields.Datetime.now()
+        online_cut = now - timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
+        away_cut = now - timedelta(minutes=AWAY_THRESHOLD_MINUTES)
+        candidates = self.sudo().search([
+            ('shahtaj_is_order_booker', '=', True),
+            '|',
+            '&',
+            ('shahtaj_online_status', '=', 'online'),
+            '|',
+            ('shahtaj_last_seen_at', '=', False),
+            ('shahtaj_last_seen_at', '<', online_cut),
+            '&',
+            ('shahtaj_online_status', '=', 'away'),
+            '|',
+            ('shahtaj_last_seen_at', '=', False),
+            ('shahtaj_last_seen_at', '<', away_cut),
+        ], limit=200)
+        if not candidates:
+            return True
+        candidates.invalidate_recordset(['shahtaj_online_status'])
+        candidates._compute_shahtaj_online_status()
+        candidates.flush_recordset(['shahtaj_online_status'])
+        return True
 
     def _compute_task_subsets(self):
         """Split visit tasks into today / this week / older for booker hub views."""

@@ -104,12 +104,12 @@ class ProductTemplate(models.Model):
         variant_ids = templates.mapped('product_variant_ids').ids
         SaleLine = self.env['sale.order.line']
         sold_groups = SaleLine.read_group(
-            [
+            domain=[
                 ('product_id', 'in', variant_ids),
                 ('order_id.state', 'in', ('sale', 'done')),
             ],
-            ['qty_delivered'],
-            ['product_id'],
+            fields=[ 'qty_delivered'],
+            groupby=['product_id'],
             lazy=False,
         )
         sold_by_variant = {

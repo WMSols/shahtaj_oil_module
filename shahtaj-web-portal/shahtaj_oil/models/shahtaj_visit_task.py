@@ -293,13 +293,19 @@ class ShahtajVisitTask(models.Model):
         return created, skipped
 
     @api.model
+    def _cron_auto_generate_visit_tasks(self):
+        """Called daily by scheduled action for all bookers."""
+        # Close abandoned visits first so leftover check-ins cannot block today.
+        self.env['shahtaj.visit']._cron_close_stale_visits()
+        self._auto_generate_window()
+
+    @api.model
     def _auto_generate_window(self, order_booker=None):
         """Generate visit tasks for today through the rolling window."""
+        # Also expire leftover visits for this booker (or all) before new day work.
+        self.env['shahtaj.visit']._close_stale_in_progress_visits(
+            order_booker=order_booker,
+        )
         today = fields.Date.context_today(self)
         end = fields.Date.add(today, days=AUTO_GENERATE_DAYS_AHEAD)
         return self._generate_from_schedules(today, end, order_booker=order_booker)
-
-    @api.model
-    def _cron_auto_generate_visit_tasks(self):
-        """Called daily by scheduled action for all bookers."""
-        self._auto_generate_window()
