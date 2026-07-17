@@ -88,11 +88,39 @@
               sequence="40"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <!-- Parent is a folder; Overview restores the hub screen that child menus had hidden. -->
     <menuitem id="menu_shahtaj_accounting"
               name="7. Shop Accounting"
               parent="menu_shahtaj_root"
-              action="action_shahtaj_accounting_hub"
               sequence="42"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_accounting_overview"
+              name="Overview"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_accounting_hub"
+              sequence="1"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_bank_cash_journals"
+              name="Bank &amp; Cash Journals"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_bank_cash_journals"
+              sequence="10"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_journal_transactions"
+              name="Journal Transactions"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_journal_transactions"
+              sequence="20"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_customer_payments_native"
+              name="Customer Payments"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_customer_payments"
+              sequence="30"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_pnl_dashboard"

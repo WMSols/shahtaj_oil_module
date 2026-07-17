@@ -13,6 +13,8 @@ from . import sale_order_line
 from . import product_product
 from . import product_template
 from . import account_move
+from . import account_payment
+from . import account_journal
 from . import res_users
 from . import shahtaj_accounting_hub
 from . import shahtaj_pnl_dashboard

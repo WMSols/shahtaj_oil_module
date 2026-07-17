@@ -19,6 +19,13 @@
                     ('commercial_partner_id.is_shahtaj_shop', '=', True),
                 ]</attribute>
             </field>
+            <field name="journal_id" position="after">
+                <field name="payment_type" string="Direction" optional="show"/>
+                <field name="shahtaj_payment_channel" optional="show"/>
+                <field name="shahtaj_payer_bank_name" optional="hide"/>
+                <field name="shahtaj_payer_account_number" optional="hide"/>
+                <field name="shahtaj_instrument_reference" optional="show"/>
+            </field>
         </field>
     </record>
 
@@ -45,6 +52,147 @@
                     ('shop_approval_state', '=', 'approved'),
                 ]</attribute>
             </xpath>
+            <field name="journal_id" position="after">
+                <field name="shahtaj_journal_type" invisible="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_payment_channel"
+                       invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'cash', 'credit')"
+                       required="partner_type == 'customer' and shahtaj_journal_type in ('bank', 'credit')"
+                       readonly="state != 'draft'"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_payer_bank_name"
+                       invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
+                       readonly="state != 'draft'"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_payer_account_number"
+                       invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
+                       readonly="state != 'draft'"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_instrument_reference"
+                       invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
+                       readonly="state != 'draft'"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_payment_notes"
+                       invisible="partner_type != 'customer'"
+                       placeholder="Collection or refund notes..."
+                       readonly="state != 'draft'"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_account_payment_register_shahtaj" model="ir.ui.view">
+        <field name="name">account.payment.register.form.shahtaj</field>
+        <field name="model">account.payment.register</field>
+        <field name="inherit_id" ref="account.view_account_payment_register_form"/>
+        <field name="arch" type="xml">
+            <field name="journal_id" position="after">
+                <field name="shahtaj_journal_type" invisible="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_payment_channel"
+                       invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'cash', 'credit')"
+                       required="partner_type == 'customer' and shahtaj_journal_type in ('bank', 'credit')"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_payer_bank_name"
+                       invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_payer_account_number"
+                       invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_instrument_reference"
+                       invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_payment_notes"
+                       invisible="partner_type != 'customer'"
+                       placeholder="Collection or refund notes..."
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Dated inflow/outflow history for every distributor bank and cash journal. -->
+    <record id="view_shahtaj_journal_transaction_list" model="ir.ui.view">
+        <field name="name">account.payment.list.shahtaj.journal.transactions</field>
+        <field name="model">account.payment</field>
+        <field name="arch" type="xml">
+            <list string="Journal Transactions" create="false" edit="false" delete="false"
+                  decoration-success="payment_type == 'inbound'"
+                  decoration-warning="payment_type == 'outbound'"
+                  decoration-muted="state == 'canceled'">
+                <field name="date"/>
+                <field name="name" string="Receipt / Payment"/>
+                <field name="journal_id" string="Bank / Cash Journal"/>
+                <field name="payment_type" string="Direction" widget="badge"
+                       decoration-success="payment_type == 'inbound'"
+                       decoration-warning="payment_type == 'outbound'"/>
+                <field name="partner_id" string="Shop / Customer"/>
+                <field name="shahtaj_payment_channel" string="Method"/>
+                <field name="shahtaj_payer_bank_name" optional="show"/>
+                <field name="shahtaj_payer_account_number" optional="show"/>
+                <field name="shahtaj_instrument_reference" optional="show"/>
+                <field name="memo" optional="hide"/>
+                <field name="amount_signed" string="In / Out Amount" sum="Net"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_journal_transaction_search" model="ir.ui.view">
+        <field name="name">account.payment.search.shahtaj.journal.transactions</field>
+        <field name="model">account.payment</field>
+        <field name="arch" type="xml">
+            <search string="Journal Transactions">
+                <field name="name"/>
+                <field name="partner_id" string="Shop / Customer"/>
+                <field name="journal_id"/>
+                <field name="shahtaj_instrument_reference"/>
+                <filter name="received" string="Money In" domain="[('payment_type', '=', 'inbound')]"/>
+                <filter name="paid_out" string="Money Out" domain="[('payment_type', '=', 'outbound')]"/>
+                <separator/>
+                <filter name="bank" string="Bank" domain="[('journal_id.type', '=', 'bank')]"/>
+                <filter name="cash" string="Cash" domain="[('journal_id.type', '=', 'cash')]"/>
+                <filter name="payment_date" string="Payment Date" date="date"/>
+                <separator/>
+                <filter name="group_journal" string="Bank / Cash Journal"
+                        context="{'group_by': 'journal_id'}"/>
+                <filter name="group_method" string="Payment Method"
+                        context="{'group_by': 'shahtaj_payment_channel'}"/>
+                <filter name="group_date" string="Date"
+                        context="{'group_by': 'date'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_bank_cash_journals" model="ir.actions.act_window">
+        <field name="name">Bank &amp; Cash Journals</field>
+        <field name="res_model">account.journal</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('type', 'in', ('bank', 'cash'))]</field>
+        <field name="context">{
+            'default_type': 'bank',
+            'search_default_liquidity': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a bank or cash journal</p>
+            <p>
+                Use one journal per company bank account (for example HBL Main,
+                Meezan Collection) and a separate Cash journal.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_journal_transactions" model="ir.actions.act_window">
+        <field name="name">Journal Transactions</field>
+        <field name="res_model">account.payment</field>
+        <field name="view_mode">list,form,graph</field>
+        <field name="view_id" ref="view_shahtaj_journal_transaction_list"/>
+        <field name="search_view_id" ref="view_shahtaj_journal_transaction_search"/>
+        <field name="domain">[('journal_id.type', 'in', ('bank', 'cash'))]</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No bank or cash transactions yet</p>
+            <p>Incoming amounts are positive; outgoing payments and refunds are negative.</p>
         </field>
     </record>
 
