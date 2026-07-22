@@ -1,2 +1,0 @@
-- Laurent Mignon \<<laurent.mignon@acsone.eu>\>
-- Lois Rilo \<<lois.rilo@forgeflow.com>\>
