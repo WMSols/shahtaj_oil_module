@@ -16,11 +16,15 @@ class ShahtajApiProducts(http.Controller):
         limit = min(int(limit or 500), 500)
         offset = max(int(offset or 0), 0)
 
+        # Explicit active filter: archived catalog items must not reach the app.
+        domain = [
+            ('active', '=', True),
+            ('product_tmpl_id.active', '=', True),
+            ('sale_ok', '=', True),
+            ('default_code', '!=', 'SHAHTAJ-LEGACY'),
+        ]
         products = request.env['product.product'].search(
-            [
-                ('sale_ok', '=', True),
-                ('default_code', '!=', 'SHAHTAJ-LEGACY'),
-            ],
+            domain,
             limit=limit,
             offset=offset,
             order='name',
@@ -31,19 +35,20 @@ class ShahtajApiProducts(http.Controller):
             if visit.exists() and visit.order_booker_id == request.env.user:
                 exclude_lines = visit.line_ids.ids
 
-        total = request.env['product.product'].search_count([
-            ('sale_ok', '=', True),
-            ('default_code', '!=', 'SHAHTAJ-LEGACY'),
-        ])
+        total = request.env['product.product'].search_count(domain)
         return api_success({
             'total': total,
             'offset': offset,
             'limit': limit,
             'products': [
-                serializers.product_brief(
-                    product,
-                    visit_line_ids=exclude_lines,
+                brief
+                for brief in (
+                    serializers.product_brief(
+                        product,
+                        visit_line_ids=exclude_lines,
+                    )
+                    for product in products
                 )
-                for product in products
+                if brief
             ],
         })

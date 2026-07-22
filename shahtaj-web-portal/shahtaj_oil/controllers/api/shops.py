@@ -83,13 +83,17 @@ class ShahtajApiShops(http.Controller):
 
     @http.route('/api/shahtaj/v1/shops/mine', **API_ROUTE)
     def my_shops(self, **kwargs):
+        """Return all shops this booker registered (pending / approved / rejected).
+
+        Each shop includes approval_state and is_operational so the app can show
+        rejection or pending status. Only approved+operational shops are visitable.
+        """
         ensure_order_booker()
         shops = request.env['res.partner'].search([
             ('is_shahtaj_shop', '=', True),
             ('registered_by_id', '=', request.env.user.id),
             ('active', '=', True),
         ], order='create_date desc', limit=50)
-        shops = shops.filtered(lambda s: s._shahtaj_is_operational_for_booker())
         return api_success({
             'shops': [serializers.shop_brief(shop) for shop in shops],
         })

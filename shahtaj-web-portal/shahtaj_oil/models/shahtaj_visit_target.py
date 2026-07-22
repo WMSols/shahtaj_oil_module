@@ -60,6 +60,7 @@ class ShahtajVisitTarget(models.Model):
         string='Product',
         domain=(
             "[('sale_ok', '=', True), ('active', '=', True), "
+            "('product_tmpl_id.active', '=', True), "
             "('default_code', '!=', 'SHAHTAJ-LEGACY')]"
         ),
         help='Required when target type is Product Quantity or Product Weight.',

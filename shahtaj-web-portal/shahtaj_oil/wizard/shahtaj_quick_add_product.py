@@ -89,7 +89,10 @@ class ShahtajQuickAddProductWizard(models.TransientModel):
 
     def action_create_product(self):
         self.ensure_one()
-        Product = self.env['product.template'].with_context(shahtaj_simple_product=True)
+        create_ctx = {'shahtaj_simple_product': True}
+        if self.track_inventory and self.opening_qty > 0:
+            create_ctx['shahtaj_initial_on_hand'] = self.opening_qty
+        Product = self.env['product.template'].with_context(**create_ctx)
         product = Product.create({
             'name': self.name.strip(),
             'standard_price': self.standard_price,
@@ -99,11 +102,6 @@ class ShahtajQuickAddProductWizard(models.TransientModel):
             'shahtaj_kg_per_unit': self.shahtaj_kg_per_unit,
             'taxes_id': [(6, 0, self.tax_ids.ids)],
         })
-        if self.track_inventory and self.opening_qty > 0:
-            product.action_shahtaj_set_on_hand_qty(
-                self.opening_qty,
-                receipt_source='opening',
-            )
         return {
             'type': 'ir.actions.act_window',
             'name': _('Product'),

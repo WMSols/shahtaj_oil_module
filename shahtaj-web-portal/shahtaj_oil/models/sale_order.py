@@ -58,10 +58,11 @@ class SaleOrder(models.Model):
         'order_line.qty_delivered',
         'order_line.product_id',
         'order_line.product_id.is_storable',
-        'picking_ids.state',
         'state',
     )
     def _compute_shahtaj_delivery_status(self):
+        # Intentionally do not depend on picking_ids: custom-portal distributors
+        # lack stock.picking ACL, and qty_delivered already updates on validate.
         for order in self:
             storable_lines = order.order_line.filtered(
                 lambda l: l.product_id and l.product_id.is_storable and not l.display_type
@@ -125,6 +126,30 @@ class SaleOrder(models.Model):
         if any(k in vals for k in ('state', 'date_order', 'create_uid', 'amount_total', 'active')):
             self._shahtaj_recompute_visit_targets()
         return res
+
+    def _shahtaj_distributor_needs_stock_sudo(self):
+        """Custom-portal distributors lack stock.picking ACL used by delivery fields."""
+        if self.env.su:
+            return False
+        user = self.env.user
+        if user.has_group('stock.group_stock_user'):
+            return False
+        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
+
+    def _compute_delivery_status(self):
+        if self._shahtaj_distributor_needs_stock_sudo():
+            return super(SaleOrder, self.sudo())._compute_delivery_status()
+        return super()._compute_delivery_status()
+
+    def _compute_picking_ids(self):
+        if self._shahtaj_distributor_needs_stock_sudo():
+            return super(SaleOrder, self.sudo())._compute_picking_ids()
+        return super()._compute_picking_ids()
+
+    def _compute_effective_date(self):
+        if self._shahtaj_distributor_needs_stock_sudo():
+            return super(SaleOrder, self.sudo())._compute_effective_date()
+        return super()._compute_effective_date()
 
     def unlink(self):
         bookers = self.mapped('create_uid')

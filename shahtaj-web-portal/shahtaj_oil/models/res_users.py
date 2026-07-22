@@ -101,18 +101,20 @@ class ResUsers(models.Model):
         string='Use Custom Distributor Portal',
         default=False,
         help=(
-            'When enabled, this distributor logs into the Shahtaj OWL portal only '
-            '(no standard Odoo apps or native Shahtaj menus). When disabled, only '
-            'the standard Odoo / Shahtaj backend is available.'
+            'Distributor only. When enabled, this distributor logs into the Shahtaj '
+            'OWL portal only (no standard Odoo apps or native Shahtaj menus). When '
+            'disabled, only the standard Odoo / Shahtaj backend is available. '
+            'Ignored for order bookers.'
         ),
     )
     shahtaj_distributor_financial_access = fields.Boolean(
         string='Financial & Pricing Access',
-        default=True,
+        default=False,
         help=(
-            'When enabled, this distributor can view invoices, payments, bank/cash, '
-            'P&L, shop balances, and product cost/sales prices. When disabled, only '
-            'operational screens (visits, orders, targets, stock quantities) are available.'
+            'Distributor only. When enabled, this distributor can view invoices, '
+            'payments, bank/cash, P&L, shop balances, and product cost/sales prices. '
+            'When disabled, only operational screens (visits, orders, targets, stock '
+            'quantities) are available. Ignored for order bookers.'
         ),
     )
     shahtaj_is_distributor = fields.Boolean(
@@ -205,9 +207,46 @@ class ResUsers(models.Model):
                     'Distributor role.'
                 ))
 
+    def _shahtaj_vals_include_group(self, vals, xmlid):
+        """True if vals['group_ids'] commands assign the given group."""
+        group = self.env.ref(xmlid, raise_if_not_found=False)
+        if not group:
+            return False
+        commands = vals.get('group_ids') or []
+        assigned = set()
+        for cmd in commands:
+            if not cmd:
+                continue
+            code = cmd[0]
+            if code == 6:
+                assigned = set(cmd[2] or [])
+            elif code == 4:
+                assigned.add(cmd[1])
+            elif code == 3:
+                assigned.discard(cmd[1])
+            elif code == 5:
+                assigned.clear()
+            elif code == 1 and len(cmd) > 1:
+                assigned.add(cmd[1])
+        return group.id in assigned
+
     @api.model_create_multi
     def create(self, vals_list):
-        users = super().create(vals_list)
+        """Distributor-only portal/financial flags; bookers always stay off."""
+        prepared = []
+        for vals in vals_list:
+            vals = dict(vals)
+            is_distributor = self._shahtaj_vals_include_group(
+                vals, 'shahtaj_oil.group_shahtaj_distributor',
+            )
+            if not is_distributor:
+                vals['shahtaj_custom_frontend'] = False
+                vals['shahtaj_distributor_financial_access'] = False
+            elif 'shahtaj_distributor_financial_access' not in vals:
+                # New distributors get financial access unless explicitly disabled.
+                vals['shahtaj_distributor_financial_access'] = True
+            prepared.append(vals)
+        users = super().create(prepared)
         users._sync_shahtaj_ui_groups()
         users._sync_shahtaj_financial_group()
         return users
@@ -366,6 +405,23 @@ class ResUsers(models.Model):
     def _sync_all_shahtaj_financial_groups(self):
         users = self.search([('shahtaj_is_distributor', '=', True)])
         users._sync_shahtaj_financial_group()
+
+    @api.model
+    def _clear_shahtaj_distributor_flags_on_non_distributors(self):
+        """Force portal/financial toggles off for every non-distributor (e.g. bookers)."""
+        users = self.with_context(active_test=False).search([
+            '|',
+            ('shahtaj_custom_frontend', '=', True),
+            ('shahtaj_distributor_financial_access', '=', True),
+        ])
+        non_distributors = users.filtered(lambda u: not u.shahtaj_is_distributor)
+        if non_distributors:
+            non_distributors.with_context(shahtaj_skip_ui_sync=True).write({
+                'shahtaj_custom_frontend': False,
+                'shahtaj_distributor_financial_access': False,
+            })
+            non_distributors._sync_shahtaj_ui_groups()
+            non_distributors._sync_shahtaj_financial_group()
 
     @api.depends('group_ids')
     def _compute_shahtaj_is_order_booker(self):

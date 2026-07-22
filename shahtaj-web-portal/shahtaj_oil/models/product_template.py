@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Simplified product defaults for Shahtaj distributors."""
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import float_compare, float_is_zero
 
 SHAHTAJ_SALE_UOMS = [
@@ -148,11 +148,35 @@ class ProductTemplate(models.Model):
             variant = template.product_variant_id
             if variant:
                 bookable = variant._get_shahtaj_bookable_qty()
-                template.shahtaj_qty_bookable = (
-                    bookable if bookable is not None else template.qty_available
-                )
+                if bookable is not None:
+                    template.shahtaj_qty_bookable = bookable
+                else:
+                    # Non-storable: fall back to on-hand without stock.move ACL issues.
+                    template.shahtaj_qty_bookable = template.sudo().qty_available
             else:
                 template.shahtaj_qty_bookable = 0.0
+
+    def _shahtaj_needs_stock_qty_sudo(self):
+        """Custom-portal distributors / bookers lack stock.move ACL for qty fields."""
+        if self.env.su:
+            return False
+        user = self.env.user
+        if user.has_group('stock.group_stock_user'):
+            return False
+        return user.has_group('shahtaj_oil.group_shahtaj_distributor') or user.has_group(
+            'shahtaj_oil.group_shahtaj_order_booker'
+        )
+
+    def _compute_quantities(self):
+        # Template qty aggregates variant reads; those hit stock.move with compute_sudo=False.
+        if self._shahtaj_needs_stock_qty_sudo():
+            return super(ProductTemplate, self.sudo())._compute_quantities()
+        return super()._compute_quantities()
+
+    def _compute_nbr_moves(self):
+        if self._shahtaj_needs_stock_qty_sudo():
+            return super(ProductTemplate, self.sudo())._compute_nbr_moves()
+        return super()._compute_nbr_moves()
 
     @api.constrains('shahtaj_kg_per_unit')
     def _check_shahtaj_kg_per_unit(self):
@@ -319,7 +343,24 @@ class ProductTemplate(models.Model):
             uom = self._shahtaj_uom_for_sale_uom(vals['shahtaj_sale_uom'])
             if uom:
                 vals['uom_id'] = uom.id
-        return super().write(vals)
+        # Custom-portal distributors have product write ACL but not stock.move /
+        # orderpoint ACL. Archive/edit still touch those via stock/product hooks.
+        needs_sudo = self._shahtaj_distributor_needs_stock_sudo()
+        if needs_sudo:
+            self.check_access('write')
+            res = super(ProductTemplate, self.sudo()).write(vals)
+        else:
+            res = super().write(vals)
+        # Core archives variants when template is archived, but does not restore
+        # them when the template is unarchived — keep active flags in sync.
+        if vals.get('active') is True:
+            templates = self.sudo() if needs_sudo else self
+            inactive_variants = templates.with_context(active_test=False).mapped(
+                'product_variant_ids',
+            ).filtered(lambda variant: not variant.active)
+            if inactive_variants:
+                inactive_variants.write({'active': True})
+        return res
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -351,7 +392,22 @@ class ProductTemplate(models.Model):
                     uom = self._shahtaj_uom_for_sale_uom(vals['shahtaj_sale_uom'])
                     if uom:
                         vals['uom_id'] = uom.id
-        return super().create(vals_list)
+        products = super().create(vals_list)
+        # Portal create passes opening qty in context so stock is set in the same
+        # request (avoids a fragile follow-up RPC after create).
+        initial_qty = self.env.context.get('shahtaj_initial_on_hand')
+        if initial_qty is not None:
+            try:
+                initial_qty = float(initial_qty)
+            except (TypeError, ValueError):
+                initial_qty = 0.0
+            if float_compare(initial_qty, 0.0, precision_digits=4) > 0:
+                for product in products.filtered('is_storable'):
+                    product.action_shahtaj_set_on_hand_qty(
+                        initial_qty,
+                        receipt_source='opening',
+                    )
+        return products
 
     def _shahtaj_log_stock_receipt(self, qty, unit_cost=None, source='add_stock'):
         """Record manufacturer stock receipt with frozen unit cost."""
@@ -359,7 +415,12 @@ class ProductTemplate(models.Model):
         if float_compare(qty, 0.0, precision_rounding=self.uom_id.rounding) <= 0:
             return
         variant = self.product_variant_id
-        self.env['shahtaj.stock.receipt'].create({
+        # Receipt ACL is on the financial group; stock add is allowed for all
+        # distributors via portal, so log with elevated rights only here.
+        Receipt = self.env['shahtaj.stock.receipt']
+        if self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            Receipt = Receipt.sudo()
+        Receipt.create({
             'product_id': variant.id,
             'qty': qty,
             'unit_cost': (
@@ -369,12 +430,39 @@ class ProductTemplate(models.Model):
             'receipt_date': fields.Date.context_today(self),
         })
 
+    def _shahtaj_distributor_needs_stock_sudo(self):
+        """Custom-portal distributors lack Inventory app groups but must adjust stock."""
+        user = self.env.user
+        if self.env.su:
+            return False
+        if user.has_group('stock.group_stock_user'):
+            return False
+        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
+
+    def _shahtaj_ensure_distributor_stock_access(self):
+        """Only Shahtaj distributors (or real Inventory users) may use stock helpers."""
+        user = self.env.user
+        if self.env.su:
+            return
+        if user.has_group('stock.group_stock_user'):
+            return
+        if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            return
+        raise AccessError(_(
+            'Only distributors can adjust Shahtaj warehouse stock from the portal.'
+        ))
+
     def action_shahtaj_set_on_hand_qty(self, quantity, receipt_source=None):
         """Set absolute on-hand quantity in the main warehouse."""
         self.ensure_one()
+        self._shahtaj_ensure_distributor_stock_access()
         if not self.is_storable:
             raise UserError(_('Enable inventory tracking before setting stock.'))
-        warehouse = self.env['stock.warehouse'].search([
+
+        # Elevate only the inventory apply: custom-portal users intentionally do not
+        # have stock.move ACL (native Inventory menus stay hidden).
+        stock_self = self.sudo() if self._shahtaj_distributor_needs_stock_sudo() else self
+        warehouse = stock_self.env['stock.warehouse'].search([
             ('company_id', '=', self.env.company.id),
         ], limit=1)
         if not warehouse:
@@ -382,9 +470,9 @@ class ProductTemplate(models.Model):
                 'No warehouse found for company "%(company)s".',
                 company=self.env.company.display_name,
             ))
-        old_qty = self.qty_available
-        variant = self.product_variant_id
-        self.env['stock.quant'].with_context(
+        old_qty = stock_self.qty_available
+        variant = stock_self.product_variant_id
+        stock_self.env['stock.quant'].with_context(
             inventory_mode=True,
             from_inverse_qty=True,
         ).create({
@@ -406,11 +494,14 @@ class ProductTemplate(models.Model):
     def action_shahtaj_add_on_hand_qty(self, quantity):
         """Increase on-hand quantity."""
         self.ensure_one()
+        self._shahtaj_ensure_distributor_stock_access()
         if float_compare(quantity, 0.0, precision_rounding=self.uom_id.rounding) <= 0:
             raise UserError(_('Quantity to add must be greater than zero.'))
+        # Read current qty with the same rights used for inventory apply.
+        stock_self = self.sudo() if self._shahtaj_distributor_needs_stock_sudo() else self
         self._shahtaj_log_stock_receipt(quantity, source='add_stock')
         self.with_context(shahtaj_skip_receipt_log=True).action_shahtaj_set_on_hand_qty(
-            self.qty_available + quantity,
+            stock_self.qty_available + quantity,
         )
 
     def _shahtaj_add_on_hand_qty(self, quantity):

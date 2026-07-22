@@ -304,7 +304,7 @@
                             <label class="small fw-bold">Select Product</label>
                             <select class="form-select shadow-sm" t-model="this.state.adjustmentForm.product_id">
                                 <option value="">-- Choose an item --</option>
-                                <t t-foreach="this.state.inventory" t-as="inv" t-key="inv.id">
+                                <t t-foreach="this.activeInventory" t-as="inv" t-key="inv.id">
                                     <option t-att-value="inv.id">
                                         <t t-esc="inv.name"/>
                                     </option>

@@ -95,6 +95,9 @@ def visit_line_dict(line):
 def product_brief(product, bookable_qty=None, visit_line_ids=None):
     if not product:
         return None
+    # Never expose archived catalog items to API clients.
+    if not product.active or not product.product_tmpl_id.active:
+        return None
     if bookable_qty is None:
         bookable_qty = product._get_shahtaj_bookable_qty(
             exclude_visit_line_ids=visit_line_ids or [],

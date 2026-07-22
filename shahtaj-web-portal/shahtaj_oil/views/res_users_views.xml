@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- Same placement pattern as sale_stock.property_warehouse_id -->
+    <!-- Portal / financial toggles: distributors only (hidden for order bookers). -->
 
     <record id="view_users_form_shahtaj_ui_mode" model="ir.ui.view">
         <field name="name">res.users.form.shahtaj.ui.mode</field>
@@ -8,10 +9,13 @@
         <field name="inherit_id" ref="base.view_users_form"/>
         <field name="arch" type="xml">
             <group name="other_preferences" position="inside">
+                <field name="shahtaj_is_distributor" invisible="1"/>
                 <field name="shahtaj_custom_frontend" widget="boolean_toggle"
-                         groups="base.group_system"/>
+                         groups="base.group_system"
+                         invisible="not shahtaj_is_distributor"/>
                 <field name="shahtaj_distributor_financial_access" widget="boolean_toggle"
-                         groups="base.group_system"/>
+                         groups="base.group_system"
+                         invisible="not shahtaj_is_distributor"/>
             </group>
         </field>
     </record>
@@ -22,10 +26,13 @@
         <field name="inherit_id" ref="base.view_users_form_simple_modif"/>
         <field name="arch" type="xml">
             <group name="other_preferences" position="inside">
+                <field name="shahtaj_is_distributor" invisible="1"/>
                 <field name="shahtaj_custom_frontend" widget="boolean_toggle"
-                         groups="base.group_system"/>
+                         groups="base.group_system"
+                         invisible="not shahtaj_is_distributor"/>
                 <field name="shahtaj_distributor_financial_access" widget="boolean_toggle"
-                         groups="base.group_system"/>
+                         groups="base.group_system"
+                         invisible="not shahtaj_is_distributor"/>
             </group>
         </field>
     </record>
@@ -36,7 +43,9 @@
         <field name="inherit_id" ref="base.view_users_simple_form"/>
         <field name="arch" type="xml">
             <xpath expr="//group[@name='access_groups']" position="after">
-                <group string="Shahtaj Interface" groups="base.group_system">
+                <field name="shahtaj_is_distributor" invisible="1"/>
+                <group string="Shahtaj Interface" groups="base.group_system"
+                       invisible="not shahtaj_is_distributor">
                     <field name="shahtaj_custom_frontend" widget="boolean_toggle"/>
                     <field name="shahtaj_distributor_financial_access" widget="boolean_toggle"/>
                 </group>

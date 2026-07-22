@@ -239,31 +239,31 @@
 
                 <div class="flex-grow-1 p-2 p-md-3 overflow-y-auto" style="min-height: 0; background-color: #f8fafc;">
 
-                    <div t-attf-class="h-100 #{this.state.activeTab === 'territory' ? '' : 'd-none'}">
-                        <TerritoryRoutes requestedSubTab="this.state.activeTab === 'territory' ? this.state.activeSubTab : ''" />
+                    <div t-if="this.state.activeTab === 'territory'" class="h-100">
+                        <TerritoryRoutes requestedSubTab="this.state.activeSubTab" />
                     </div>
 
-                    <div t-attf-class="h-100 #{this.state.activeTab === 'warehouse' ? '' : 'd-none'}">
-                        <WarehouseInventory requestedSubTab="this.state.activeTab === 'warehouse' ? this.state.activeSubTab : ''" />
+                    <div t-if="this.state.activeTab === 'warehouse'" class="h-100">
+                        <WarehouseInventory requestedSubTab="this.state.activeSubTab" />
                     </div>
 
-                    <div t-attf-class="h-100 #{this.state.activeTab === 'operations' ? '' : 'd-none'}">
-                        <OperationsTracking requestedSubTab="this.state.activeTab === 'operations' ? this.state.activeSubTab : ''" />
+                    <div t-if="this.state.activeTab === 'operations'" class="h-100">
+                        <OperationsTracking requestedSubTab="this.state.activeSubTab" />
                     </div>
 
-                    <div t-if="this.hasFinancialAccess" t-attf-class="h-100 #{this.state.activeTab === 'financials' ? '' : 'd-none'}">
-                        <FinancialsInvoicing requestedSubTab="this.state.activeTab === 'financials' ? this.state.activeSubTab : ''" />
+                    <div t-if="this.hasFinancialAccess and this.state.activeTab === 'financials'" class="h-100">
+                        <FinancialsInvoicing requestedSubTab="this.state.activeSubTab" />
                     </div>
 
-                    <div t-attf-class="h-100 #{this.state.activeTab === 'staff' ? '' : 'd-none'}">
+                    <div t-if="this.state.activeTab === 'staff'" class="h-100">
                         <StaffManagement />
                     </div>
 
-                    <div t-attf-class="h-100 #{this.state.activeTab === 'schedules' ? '' : 'd-none'}">
-                        <SchedulesTargets requestedSubTab="this.state.activeTab === 'schedules' ? this.state.activeSubTab : ''" />
+                    <div t-if="this.state.activeTab === 'schedules'" class="h-100">
+                        <SchedulesTargets requestedSubTab="this.state.activeSubTab" />
                     </div>
 
-                    <div t-if="this.hasFinancialAccess" t-attf-class="h-100 #{this.state.activeTab === 'transactions' ? '' : 'd-none'}">
+                    <div t-if="this.hasFinancialAccess and this.state.activeTab === 'transactions'" class="h-100">
                         <BankTransactions />
                     </div>
 

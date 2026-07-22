@@ -72,8 +72,13 @@ class ShahtajApiVisits(http.Controller):
         if visit.state != 'in_progress':
             raise UserError(_('This visit is not in progress.'))
         product = request.env['product.product'].browse(int(product_id))
-        if not product.exists() or not product.sale_ok:
-            raise UserError(_('Product not found or not for sale.'))
+        if (
+            not product.exists()
+            or not product.active
+            or not product.product_tmpl_id.active
+            or not product.sale_ok
+        ):
+            raise UserError(_('Product not found, archived, or not for sale.'))
         qty = float(quantity)
         if qty <= 0:
             raise UserError(_('Quantity must be greater than zero.'))

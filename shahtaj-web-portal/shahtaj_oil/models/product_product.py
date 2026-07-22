@@ -8,6 +8,44 @@ from odoo.tools import float_compare
 class ProductProduct(models.Model):
     _inherit = 'product.product'
 
+    def _shahtaj_needs_stock_qty_sudo(self):
+        """Custom-portal distributors / bookers lack stock.move ACL for qty fields."""
+        if self.env.su:
+            return False
+        user = self.env.user
+        if user.has_group('stock.group_stock_user'):
+            return False
+        return user.has_group('shahtaj_oil.group_shahtaj_distributor') or user.has_group(
+            'shahtaj_oil.group_shahtaj_order_booker'
+        )
+
+    def _compute_quantities(self):
+        # stock.qty_* use compute_sudo=False and read stock.move — elevate for portal users.
+        if self._shahtaj_needs_stock_qty_sudo():
+            return super(ProductProduct, self.sudo())._compute_quantities()
+        return super()._compute_quantities()
+
+    def _compute_nbr_moves(self):
+        if self._shahtaj_needs_stock_qty_sudo():
+            return super(ProductProduct, self.sudo())._compute_nbr_moves()
+        return super()._compute_nbr_moves()
+
+    def _shahtaj_distributor_needs_stock_sudo(self):
+        """Custom-portal distributors lack Inventory groups but may edit products."""
+        if self.env.su:
+            return False
+        user = self.env.user
+        if user.has_group('stock.group_stock_user'):
+            return False
+        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
+
+    def write(self, vals):
+        # Archive syncs orderpoint_ids; UoM/price edits can read stock.move.
+        if self._shahtaj_distributor_needs_stock_sudo():
+            self.check_access('write')
+            return super(ProductProduct, self.sudo()).write(vals)
+        return super().write(vals)
+
     def _shahtaj_get_kg_per_unit(self):
         """Return kg equivalent for one selling unit of this variant."""
         self.ensure_one()
@@ -49,7 +87,7 @@ class ProductProduct(models.Model):
         )
         cart_committed = cart_map.get(self.id, 0.0)
         rounding = self.uom_id.rounding
-        # Order bookers lack stock.move ACL; read on-hand qty with elevated rights.
+        # Order bookers / portal distributors lack stock.move ACL; elevate qty read.
         qty_on_hand = self.sudo().qty_available
         bookable = qty_on_hand - cart_committed
         if float_compare(bookable, 0.0, precision_rounding=rounding) < 0:

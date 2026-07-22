@@ -33,7 +33,9 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
         if not order.exists():
             return res
         res['sale_order_id'] = order.id
-        pickings = order.picking_ids.filtered(
+        # Custom-portal distributors lack stock.move / picking ACL; elevate only
+        # this delivery preparation path (confirm path already uses sudo on moves).
+        pickings = order.sudo().picking_ids.filtered(
             lambda p: p.state not in ('done', 'cancel')
             and p.picking_type_code == 'outgoing'
         )
@@ -179,6 +181,8 @@ class ShahtajMarkDeliveryWizardLine(models.TransientModel):
     def create(self, vals_list):
         """Fill product/qty context from the move when readonly fields are dropped."""
         Move = self.env['stock.move']
+        if self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            Move = Move.sudo()
         for vals in vals_list:
             move = Move.browse(vals.get('move_id')) if vals.get('move_id') else Move
             if move and not vals.get('sale_line_id') and move.sale_line_id:

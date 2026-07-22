@@ -117,6 +117,7 @@ export class SchedulesTargets extends Component {
             this.orm.searchRead('product.product', [
                 ['sale_ok', '=', true],
                 ['active', '=', true],
+                ['product_tmpl_id.active', '=', true],
                 ['default_code', '!=', 'SHAHTAJ-LEGACY'],
             ], ['id', 'name']),
             this.orm.searchRead('res.currency', [['active', '=', true]], ['id', 'name']),

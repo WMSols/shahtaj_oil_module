@@ -321,7 +321,10 @@ export class OperationsTracking extends Component {
         this.state.saleTaxes = taxes;
 
         // Fetch Products (for the dropdown)
-        const prods = await this.orm.searchRead("product.template", [["sale_ok", "=", true]], ["id", "name"]);
+        const prods = await this.orm.searchRead("product.template", [
+            ["sale_ok", "=", true],
+            ["active", "=", true],
+        ], ["id", "name"]);
         this.state.allProducts = prods;
     }
 

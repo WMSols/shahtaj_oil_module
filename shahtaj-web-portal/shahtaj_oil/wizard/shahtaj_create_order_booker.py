@@ -40,6 +40,9 @@ class ShahtajCreateOrderBookerWizard(models.TransientModel):
             'password': self.password,
             'shahtaj_employee_code': self.shahtaj_employee_code,
             'group_ids': [(6, 0, [booker_group.id])],
+            # Distributor-only options — never apply to order bookers.
+            'shahtaj_custom_frontend': False,
+            'shahtaj_distributor_financial_access': False,
         })
         return {
             'type': 'ir.actions.act_window',

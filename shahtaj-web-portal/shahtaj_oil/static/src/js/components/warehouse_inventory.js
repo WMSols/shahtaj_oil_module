@@ -184,7 +184,8 @@ export class WarehouseInventory extends Component {
             list_price: 0.0, standard_price: 0.0,
             invoice_policy: 'delivery', type: 'consu',
             shahtaj_sale_uom: 'piece', shahtaj_kg_per_unit: 1.0,
-            tax_id: this.state?.defaultTaxId || "", 
+            // Start with no tax — user must opt in (do not auto-apply company default).
+            tax_id: "",
             barcode: '', weight: 0.0, volume: 0.0,
             income_account: 'static_inc', expense_account: 'static_exp',
             image_1920: false
@@ -213,10 +214,7 @@ export class WarehouseInventory extends Component {
         if (defaultTax) {
             this.state.defaultTaxId = defaultTax.id.toString();
         }
-            
-        if (!this.state.productForm.tax_id && this.state.defaultTaxId) {
-            this.state.productForm.tax_id = this.state.defaultTaxId;
-        }
+        // Intentionally do not pre-select defaultTaxId on the create form.
     }
 
     getTaxLabel(taxIds) {
@@ -349,6 +347,7 @@ export class WarehouseInventory extends Component {
     }
 
     async saveProduct() {
+        const initialOnHand = parseFloat(this.state.productForm.on_hand || 0);
         const vals = {
             name: this.state.productForm.name,
             type: this.state.productForm.type,
@@ -368,21 +367,25 @@ export class WarehouseInventory extends Component {
             vals.image_1920 = this.state.productForm.image_1920;
         }
 
-        const productIds = await this.orm.create("product.template", [vals], { context: { shahtaj_simple_product: true } });
-        const newProductId = productIds[0];
-
-        if (this.state.productForm.track_inventory && this.state.productForm.on_hand > 0) {
-            await this.orm.call("product.template", "action_shahtaj_set_on_hand_qty", [newProductId, parseFloat(this.state.productForm.on_hand)]);
+        const createContext = { shahtaj_simple_product: true };
+        if (this.state.productForm.track_inventory && initialOnHand > 0) {
+            createContext.shahtaj_initial_on_hand = initialOnHand;
         }
+
+        await this.orm.create("product.template", [vals], { context: createContext });
 
         await this.loadInventory();
         this.state.showProductAddForm = false;
         this.state.productForm = this.getEmptyProductForm();
     }
 
+    get activeInventory() {
+        return this.state.inventory.filter((product) => product.active);
+    }
+
     get selectedProductStock() {
         if (!this.state.adjustmentForm.product_id) return 0;
-        const prod = this.state.inventory.find(p => p.id == this.state.adjustmentForm.product_id);
+        const prod = this.activeInventory.find(p => p.id == this.state.adjustmentForm.product_id);
         return prod ? prod.qty_available : 0;
     }
 

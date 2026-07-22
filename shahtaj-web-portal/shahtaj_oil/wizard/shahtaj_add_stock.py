@@ -13,7 +13,7 @@ class ShahtajAddStockWizard(models.TransientModel):
         'product.template',
         string='Product',
         required=True,
-        domain=[('sale_ok', '=', True), ('is_storable', '=', True)],
+        domain=[('sale_ok', '=', True), ('is_storable', '=', True), ('active', '=', True)],
     )
     qty_on_hand = fields.Float(
         related='product_id.qty_available',

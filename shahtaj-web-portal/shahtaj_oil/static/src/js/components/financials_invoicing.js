@@ -290,7 +290,11 @@ export class FinancialsInvoicing extends Component {
             ["id", "name", "amount"]
         );
         this.state.availableTaxes = taxes;
-        const prods = await this.orm.searchRead("product.product", [["sale_ok", "=", true]], ["id", "name"]);
+        const prods = await this.orm.searchRead("product.product", [
+            ["sale_ok", "=", true],
+            ["active", "=", true],
+            ["product_tmpl_id.active", "=", true],
+        ], ["id", "name"]);
         this.state.allProducts = prods;
         
         try {
@@ -321,7 +325,11 @@ export class FinancialsInvoicing extends Component {
         try { this.state.journals = await this.orm.searchRead("account.journal", [["type", "in", ["bank", "cash"]]], ["name", "type"]); } catch (error) {}
 
         try {
-            const prodData = await this.orm.searchRead("product.product", [["sale_ok", "=", true]], ["id", "display_name"]);
+            const prodData = await this.orm.searchRead("product.product", [
+                ["sale_ok", "=", true],
+                ["active", "=", true],
+                ["product_tmpl_id.active", "=", true],
+            ], ["id", "display_name"]);
             this.state.products = prodData.map(p => ({ id: p.id, name: p.display_name }));
         } catch (error) {}
 

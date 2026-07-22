@@ -556,7 +556,11 @@ class ShahtajVisitLine(models.Model):
         'product.product',
         string='Product',
         required=True,
-        domain=[('sale_ok', '=', True)],
+        domain=[
+            ('active', '=', True),
+            ('product_tmpl_id.active', '=', True),
+            ('sale_ok', '=', True),
+        ],
     )
     product_name = fields.Char(
         string='Product',
@@ -619,15 +623,41 @@ class ShahtajVisitLine(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if vals.get('product_id') and not vals.get('product_name'):
-                product = self.env['product.product'].browse(vals['product_id'])
-                vals['product_name'] = product.display_name
+            if vals.get('product_id'):
+                product = self.env['product.product'].with_context(
+                    active_test=False,
+                ).browse(vals['product_id'])
+                if (
+                    not product.exists()
+                    or not product.active
+                    or not product.product_tmpl_id.active
+                    or not product.sale_ok
+                ):
+                    raise UserError(_(
+                        'Cannot add archived or unavailable product "%(product)s".',
+                        product=product.display_name or vals['product_id'],
+                    ))
+                if not vals.get('product_name'):
+                    vals['product_name'] = product.display_name
         return super().create(vals_list)
 
     def write(self, vals):
-        if vals.get('product_id') and not vals.get('product_name'):
-            product = self.env['product.product'].browse(vals['product_id'])
-            vals['product_name'] = product.display_name
+        if vals.get('product_id'):
+            product = self.env['product.product'].with_context(
+                active_test=False,
+            ).browse(vals['product_id'])
+            if (
+                not product.exists()
+                or not product.active
+                or not product.product_tmpl_id.active
+                or not product.sale_ok
+            ):
+                raise UserError(_(
+                    'Cannot use archived or unavailable product "%(product)s".',
+                    product=product.display_name or vals['product_id'],
+                ))
+            if not vals.get('product_name'):
+                vals['product_name'] = product.display_name
         return super().write(vals)
 
     @api.constrains('product_uom_qty', 'product_id', 'visit_id')
