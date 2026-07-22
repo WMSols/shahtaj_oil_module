@@ -54,29 +54,29 @@
             </xpath>
             <field name="journal_id" position="after">
                 <field name="shahtaj_journal_type" invisible="1"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payment_channel"
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'cash', 'credit')"
                        required="partner_type == 'customer' and shahtaj_journal_type in ('bank', 'credit')"
                        readonly="state != 'draft'"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payer_bank_name"
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
                        readonly="state != 'draft'"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payer_account_number"
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
                        readonly="state != 'draft'"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_instrument_reference"
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
                        readonly="state != 'draft'"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payment_notes"
                        invisible="partner_type != 'customer'"
                        placeholder="Collection or refund notes..."
                        readonly="state != 'draft'"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
             </field>
         </field>
     </record>
@@ -88,24 +88,24 @@
         <field name="arch" type="xml">
             <field name="journal_id" position="after">
                 <field name="shahtaj_journal_type" invisible="1"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payment_channel"
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'cash', 'credit')"
                        required="partner_type == 'customer' and shahtaj_journal_type in ('bank', 'credit')"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payer_bank_name"
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payer_account_number"
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_instrument_reference"
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payment_notes"
                        invisible="partner_type != 'customer'"
                        placeholder="Collection or refund notes..."
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
             </field>
         </field>
     </record>

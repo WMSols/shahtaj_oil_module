@@ -48,7 +48,7 @@ class ShahtajPnlDashboard(models.TransientModel):
     amount_cogs = fields.Monetary(
         string='Cost of Goods (invoiced)',
         currency_field='currency_id',
-        help='Invoiced qty × current product cost, net of credit-note qty.',
+        help='Invoiced qty × frozen cost at invoice post, net of credit-note qty.',
     )
     amount_gross_profit = fields.Monetary(
         string='Gross Profit',
@@ -56,9 +56,10 @@ class ShahtajPnlDashboard(models.TransientModel):
         help='Net sales − cost of goods.',
     )
     amount_manufacturer_payable = fields.Monetary(
-        string='Payable to Manufacturer',
+        string='Stock Purchased (period)',
         currency_field='currency_id',
-        help='Stock received × cost price (what you owe the manufacturer for stock).',
+        help='Stock received in the selected period at frozen receipt cost '
+             '(purchase value, not cash paid to manufacturer).',
     )
     amount_payments_received = fields.Monetary(
         string='Payments Collected',
@@ -177,7 +178,7 @@ class ShahtajPnlDashboard(models.TransientModel):
                 })
                 qty = line.quantity
                 untaxed = line.price_subtotal
-                cost_unit = product.standard_price or 0.0
+                cost_unit = line.shahtaj_cost_unit or product.standard_price or 0.0
                 if sign > 0:
                     data['qty_invoiced'] += qty
                     data['amount_revenue'] += untaxed
@@ -198,12 +199,12 @@ class ShahtajPnlDashboard(models.TransientModel):
 
         amount_legacy = sum(legacy_invoices.mapped('amount_untaxed'))
 
-        # Manufacturer payable = all storable sale products received × cost
-        templates = self.env['product.template'].sudo().search([
-            ('sale_ok', '=', True),
-            ('is_storable', '=', True),
+        Receipt = self.env['shahtaj.stock.receipt'].sudo()
+        period_receipts = Receipt.search([
+            ('receipt_date', '>=', date_from),
+            ('receipt_date', '<=', date_to),
         ])
-        amount_mfr = sum(templates.mapped('shahtaj_payable_to_manufacturer'))
+        amount_mfr = sum(period_receipts.mapped('subtotal'))
 
         payments = Payment.search([
             ('partner_type', '=', 'customer'),
@@ -302,9 +303,11 @@ class ShahtajPnlDashboard(models.TransientModel):
         }
 
     def action_open_manufacturer_summary(self):
-        return self.env['ir.actions.act_window']._for_xml_id(
-            'shahtaj_oil.action_shahtaj_manufacturer_summary',
-        )
+        summary = self.env['shahtaj.manufacturer.summary'].create({
+            'date_from': self.date_from,
+            'date_to': self.date_to,
+        })
+        return summary.action_refresh()
 
 
 class ShahtajPnlDashboardLine(models.TransientModel):

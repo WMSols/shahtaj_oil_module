@@ -23,11 +23,13 @@ def user_brief(user):
 
 
 def task_dict(task):
+    operational = task._shahtaj_is_operational_for_booker()
     return {
         'id': task.id,
         'order_booker_id': task.order_booker_id.id,
         'scheduled_date': str(task.scheduled_date) if task.scheduled_date else False,
         'state': task.state,
+        'is_operational': operational,
         'route': _m2o(task.route_id),
         'zone': _m2o(task.zone_id),
         'shop': shop_brief(task.shop_id),
@@ -60,6 +62,8 @@ def shop_brief(partner):
         'latitude': partner.partner_latitude,
         'longitude': partner.partner_longitude,
         'approval_state': partner.shop_approval_state,
+        'is_operational': partner._shahtaj_is_operational_for_booker(),
+        'is_active': partner.active,
         'shop_category': category,
         'credit_limit': credit_limit,
         'outstanding_balance': outstanding,
@@ -146,6 +150,7 @@ def zone_brief(zone):
         'id': zone.id,
         'name': zone.name,
         'route_count': zone.route_count,
+        'is_active': zone.active,
     }
 
 
@@ -158,6 +163,8 @@ def route_brief(route):
         'zone_id': route.zone_id.id,
         'zone': _m2o(route.zone_id),
         'shop_count': route.shop_count,
+        'is_active': route.active,
+        'is_operational': route._shahtaj_is_operational_for_booker(),
     }
 
 
@@ -168,6 +175,7 @@ def schedule_dict(schedule):
         'day_label': dict(schedule._fields['day_of_week'].selection).get(
             schedule.day_of_week, ''
         ),
+        'is_operational': schedule.route_id._shahtaj_is_operational_for_booker(),
         'route': _m2o(schedule.route_id),
         'zone': _m2o(schedule.zone_id),
         'shop_count': schedule.shop_count,

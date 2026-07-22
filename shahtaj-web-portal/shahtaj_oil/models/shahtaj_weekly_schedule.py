@@ -77,6 +77,15 @@ class ShahtajWeeklySchedule(models.Model):
         help='Locked when today\'s visits for this route are in progress or completed.',
     )
 
+    @api.constrains('route_id', 'active')
+    def _check_route_operational(self):
+        for schedule in self.filtered('active'):
+            if schedule.route_id and not schedule.route_id._shahtaj_is_operational_for_booker():
+                raise ValidationError(_(
+                    'Weekly schedule route "%(route)s" is archived or its zone is inactive.',
+                    route=schedule.route_id.display_name,
+                ))
+
     _booker_route_day_unique = models.Constraint(
         'unique(order_booker_id, route_id, day_of_week)',
         'This order booker already has this route on the selected day.',

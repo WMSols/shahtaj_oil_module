@@ -16,6 +16,9 @@ class ShahtajApiSchedule(http.Controller):
             ('order_booker_id', '=', request.env.user.id),
             ('active', '=', True),
         ], order='day_of_week, route_id')
+        schedules = schedules.filtered(
+            lambda s: s.route_id._shahtaj_is_operational_for_booker(),
+        )
         return api_success({
             'schedules': [serializers.schedule_dict(schedule) for schedule in schedules],
         })

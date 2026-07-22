@@ -76,7 +76,8 @@
             </p>
             <p>
                 Examples: monthly sales amount, visit count, or product quantity to book.
-                Progress updates from completed tasks and sale orders.
+                Progress uses confirmed orders (booked qty), not delivery.
+                Cancelled or archived orders are excluded automatically.
             </p>
         </field>
     </record>

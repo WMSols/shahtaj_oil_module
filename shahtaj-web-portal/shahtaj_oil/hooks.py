@@ -98,6 +98,7 @@ def post_init_hook(env):
     _sync_distributor_booker_user_rule(env)
     _recompute_shahtaj_order_booker_flags(env)
     env['res.users']._sync_all_shahtaj_ui_groups()
+    env['res.users']._sync_all_shahtaj_financial_groups()
     env.registry.clear_cache('templates')
 
 

@@ -21,7 +21,8 @@ _SHAHTAJ_CREDIT_GROUPS = (
 
 
 class ResPartner(models.Model):
-    _inherit = 'res.partner'
+    _name = 'res.partner'
+    _inherit = ['res.partner', 'shahtaj.territory.sync.mixin']
 
     def _check_access(self, operation):
         """Let distributors read company partners required by accounting screens."""
@@ -147,7 +148,64 @@ class ResPartner(models.Model):
         domain = [('active', '=', True)]
         if zone_id:
             domain.append(('zone_id', '=', zone_id))
+            zone = self.env['shahtaj.zone'].browse(zone_id).exists()
+            if not zone or not zone.active:
+                return []
         return self.env['shahtaj.route'].search(domain).ids
+
+    def _shahtaj_is_operational_for_booker(self):
+        """Shop is usable by order bookers only when the full territory chain is active."""
+        self.ensure_one()
+        if not self.is_shahtaj_shop:
+            return False
+        partner = self.with_context(active_test=False)
+        if not partner.active:
+            return False
+        if partner.shop_approval_state != 'approved':
+            return False
+        route = partner.route_id.with_context(active_test=False)
+        if not route or not route.active:
+            return False
+        zone = route.zone_id.with_context(active_test=False)
+        if not zone or not zone.active:
+            return False
+        return True
+
+    def get_archive_impact(self):
+        self.ensure_one()
+        if not self.is_shahtaj_shop:
+            return {'pending_task_count': 0}
+        pending_tasks = self.env['shahtaj.visit.task'].search_count([
+            ('shop_id', '=', self.id),
+            ('state', '=', 'pending'),
+        ])
+        return {'pending_task_count': pending_tasks}
+
+    def _validate_operational_territory_assignment(self):
+        for partner in self.filtered('is_shahtaj_shop'):
+            if partner.route_id and not partner.route_id._shahtaj_is_operational_for_booker():
+                raise ValidationError(_(
+                    'Route "%(route)s" is archived or its zone is inactive.',
+                    route=partner.route_id.display_name,
+                ))
+            if partner.zone_id and not partner.zone_id.active:
+                raise ValidationError(_(
+                    'Zone "%(zone)s" is archived.',
+                    zone=partner.zone_id.display_name,
+                ))
+
+    def _sync_visit_tasks_after_territory_restore(self):
+        Task = self.env['shahtaj.visit.task']
+        for partner in self.filtered('is_shahtaj_shop'):
+            if not partner._shahtaj_is_operational_for_booker():
+                continue
+            bookers = partner.route_id.mapped('weekly_schedule_ids.order_booker_id')
+            partner._reactivate_cancelled_visit_tasks(bookers=bookers)
+            if bookers:
+                for booker in bookers:
+                    Task._auto_generate_window(order_booker=booker)
+            else:
+                Task._auto_generate_window()
 
     @api.depends('zone_id')
     @api.depends_context('uid')
@@ -389,12 +447,27 @@ class ResPartner(models.Model):
         partners = super().create(prepared)
         shop_partners = partners.filtered('is_shahtaj_shop')
         shop_partners._validate_shop_required_fields()
+        shop_partners._validate_operational_territory_assignment()
         shop_partners.filtered(
             lambda p: p.shop_approval_state == 'approved'
         )._post_legacy_balance_entry()
         return partners
 
     def write(self, vals):
+        if vals.get('active') is True:
+            for partner in self.filtered('is_shahtaj_shop'):
+                route = partner.route_id.with_context(active_test=False)
+                if route and not route.active:
+                    self._shahtaj_raise_restore_parent_error(
+                        _('shop'),
+                        route.display_name,
+                    )
+                zone = route.zone_id.with_context(active_test=False) if route else False
+                if zone and not zone.active:
+                    self._shahtaj_raise_restore_parent_error(
+                        _('shop'),
+                        zone.display_name,
+                    )
         vals = self._sync_shop_category_credit_flags(vals)
         if vals.get('owner_phone'):
             vals.setdefault('phone', vals['owner_phone'])
@@ -403,6 +476,18 @@ class ResPartner(models.Model):
         ):
             raise UserError(_('Legacy balance invoice cannot be changed manually.'))
         res = super().write(vals)
+        if vals.get('active') is False:
+            shops = self.filtered('is_shahtaj_shop')
+            if shops:
+                today = fields.Date.context_today(self)
+                self._shahtaj_cancel_pending_tasks_for_shops(
+                    shops.ids,
+                    date_from=today,
+                )
+        if vals.get('active') is True:
+            self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_territory_restore()
+        if any(k in vals for k in ('route_id', 'zone_id')):
+            self.filtered('is_shahtaj_shop')._validate_operational_territory_assignment()
         if 'shahtaj_shop_category' in vals:
             credit_shops = self.filtered(
                 lambda p: p.is_shahtaj_shop

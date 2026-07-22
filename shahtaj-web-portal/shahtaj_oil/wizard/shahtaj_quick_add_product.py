@@ -100,7 +100,10 @@ class ShahtajQuickAddProductWizard(models.TransientModel):
             'taxes_id': [(6, 0, self.tax_ids.ids)],
         })
         if self.track_inventory and self.opening_qty > 0:
-            product._shahtaj_set_on_hand_qty(self.opening_qty)
+            product.action_shahtaj_set_on_hand_qty(
+                self.opening_qty,
+                receipt_source='opening',
+            )
         return {
             'type': 'ir.actions.act_window',
             'name': _('Product'),

@@ -23,6 +23,9 @@ TARGET_WEIGHT_UOMS = [
 
 KG_PER_TON = 1000.0
 
+# Confirmed shop orders only — progress follows booked qty, not delivery.
+ORDER_STATES_FOR_TARGET = ('sale', 'done')
+
 
 class ShahtajVisitTarget(models.Model):
     _name = 'shahtaj.visit.target'
@@ -55,6 +58,10 @@ class ShahtajVisitTarget(models.Model):
     product_id = fields.Many2one(
         'product.product',
         string='Product',
+        domain=(
+            "[('sale_ok', '=', True), ('active', '=', True), "
+            "('default_code', '!=', 'SHAHTAJ-LEGACY')]"
+        ),
         help='Required when target type is Product Quantity or Product Weight.',
     )
     currency_id = fields.Many2one(
@@ -114,6 +121,47 @@ class ShahtajVisitTarget(models.Model):
                         'Select kg or ton for the weight target unit.'
                     ))
 
+    @api.constrains('product_id', 'target_type')
+    def _check_target_product(self):
+        for target in self:
+            if target.target_type not in ('product_qty', 'product_weight'):
+                continue
+            product = target.product_id
+            if not product:
+                continue
+            if product.default_code == 'SHAHTAJ-LEGACY' or not product.sale_ok:
+                raise ValidationError(_(
+                    'Select a normal sellable product for this target.'
+                ))
+
+    @api.model
+    def _sale_order_domain_for_target(self, booker, date_start, date_end):
+        """Confirmed, active sale orders placed by the booker in the period."""
+        return [
+            ('create_uid', '=', booker.id),
+            ('date_order', '>=', date_start),
+            ('date_order', '<=', date_end),
+            ('state', 'in', ORDER_STATES_FOR_TARGET),
+            ('active', '=', True),
+        ]
+
+    @api.model
+    def _sale_order_line_domain_for_target(self, booker, date_start, date_end, product=None):
+        """Order lines counted toward product qty/weight targets (ordered, not delivered)."""
+        domain = [
+            ('order_id.create_uid', '=', booker.id),
+            ('order_id.date_order', '>=', date_start),
+            ('order_id.date_order', '<=', date_end),
+            ('order_id.state', 'in', ORDER_STATES_FOR_TARGET),
+            ('order_id.active', '=', True),
+            ('display_type', '=', False),
+            ('product_id', '!=', False),
+            ('product_id.default_code', '!=', 'SHAHTAJ-LEGACY'),
+        ]
+        if product:
+            domain.append(('product_id', '=', product.id))
+        return domain
+
     @api.model
     def _weight_to_kg(self, value, weight_uom):
         if weight_uom == 'ton':
@@ -127,17 +175,18 @@ class ShahtajVisitTarget(models.Model):
         return kg_value
 
     def _achieved_product_weight_kg(self):
-        """Sum sold weight in kg for this target's product and period."""
+        """Sum ordered weight in kg for this target's product and period."""
         self.ensure_one()
         if not self.product_id:
             return 0.0
-        lines = self.env['sale.order.line'].search([
-            ('order_id.create_uid', '=', self.order_booker_id.id),
-            ('order_id.date_order', '>=', self.date_start),
-            ('order_id.date_order', '<=', self.date_end),
-            ('order_id.state', '!=', 'cancel'),
-            ('product_id', '=', self.product_id.id),
-        ])
+        lines = self.env['sale.order.line'].search(
+            self._sale_order_line_domain_for_target(
+                self.order_booker_id,
+                self.date_start,
+                self.date_end,
+                product=self.product_id,
+            )
+        )
         achieved_kg = 0.0
         for line in lines:
             kg_per_unit = line.product_id._shahtaj_get_kg_per_unit()
@@ -166,28 +215,31 @@ class ShahtajVisitTarget(models.Model):
                         ('started_at', '<', end_dt),
                     ])
                 elif target.target_type == 'order_count':
-                    achieved = SaleOrder.search_count([
-                        ('create_uid', '=', target.order_booker_id.id),
-                        ('date_order', '>=', target.date_start),
-                        ('date_order', '<=', target.date_end),
-                        ('state', '!=', 'cancel'),
-                    ])
+                    achieved = SaleOrder.search_count(
+                        target._sale_order_domain_for_target(
+                            target.order_booker_id,
+                            target.date_start,
+                            target.date_end,
+                        )
+                    )
                 elif target.target_type == 'sales_amount':
-                    orders = SaleOrder.search([
-                        ('create_uid', '=', target.order_booker_id.id),
-                        ('date_order', '>=', target.date_start),
-                        ('date_order', '<=', target.date_end),
-                        ('state', '!=', 'cancel'),
-                    ])
+                    orders = SaleOrder.search(
+                        target._sale_order_domain_for_target(
+                            target.order_booker_id,
+                            target.date_start,
+                            target.date_end,
+                        )
+                    )
                     achieved = sum(orders.mapped('amount_total'))
                 elif target.target_type == 'product_qty' and target.product_id:
-                    lines = self.env['sale.order.line'].search([
-                        ('order_id.create_uid', '=', target.order_booker_id.id),
-                        ('order_id.date_order', '>=', target.date_start),
-                        ('order_id.date_order', '<=', target.date_end),
-                        ('order_id.state', '!=', 'cancel'),
-                        ('product_id', '=', target.product_id.id),
-                    ])
+                    lines = self.env['sale.order.line'].search(
+                        target._sale_order_line_domain_for_target(
+                            target.order_booker_id,
+                            target.date_start,
+                            target.date_end,
+                            product=target.product_id,
+                        )
+                    )
                     achieved = sum(lines.mapped('product_uom_qty'))
                 elif target.target_type == 'product_weight' and target.product_id:
                     achieved_kg = target._achieved_product_weight_kg()

@@ -52,7 +52,7 @@
                     <button name="action_view_legacy_balance_move" type="object"
                             string="Legacy Balance Invoice"
                             invisible="not legacy_balance_move_id"
-                            groups="shahtaj_oil.group_shahtaj_distributor,account.group_account_readonly,account.group_account_invoice"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor_financial,account.group_account_readonly,account.group_account_invoice"/>
                     <field name="shop_approval_state" widget="statusbar"
                            statusbar_visible="pending,approved,rejected"/>
                 </header>
@@ -79,7 +79,7 @@
                                 name="action_view_partner_invoices"
                                 class="oe_stat_button"
                                 icon="fa-pencil-square-o"
-                                groups="shahtaj_oil.group_shahtaj_distributor">
+                                groups="shahtaj_oil.group_shahtaj_distributor_financial">
                             <div class="o_field_widget o_stat_info">
                                 <span class="o_stat_value">
                                     <field name="total_invoiced" widget="monetary"
@@ -92,7 +92,7 @@
                                 name="action_shahtaj_view_customer_payments"
                                 class="oe_stat_button"
                                 icon="fa-money"
-                                groups="shahtaj_oil.group_shahtaj_distributor">
+                                groups="shahtaj_oil.group_shahtaj_distributor_financial">
                             <div class="o_field_widget o_stat_info">
                                 <span class="o_stat_value">
                                     <field name="outstanding_balance" widget="monetary"
@@ -105,7 +105,7 @@
                                 name="action_shahtaj_view_receivable_entries"
                                 class="oe_stat_button"
                                 icon="fa-book"
-                                groups="shahtaj_oil.group_shahtaj_distributor">
+                                groups="shahtaj_oil.group_shahtaj_distributor_financial">
                             <span class="o_stat_text">Receivable Lines</span>
                         </button>
                     </div>
@@ -154,13 +154,15 @@
                             <field name="credit_limit" string="Credit Limit (Rs)"
                                    invisible="shahtaj_shop_category != 'credit'"/>
                             <field name="legacy_balance" string="Legacy Balance (Rs)"
-                                   readonly="legacy_balance_move_id"/>
+                                   readonly="legacy_balance_move_id"
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                             <field name="property_payment_term_id"
                                    string="Payment Terms"
                                    options="{'no_create': True}"/>
                         </group>
                         <group>
-                            <field name="outstanding_balance" string="Outstanding Balance (Rs)"/>
+                            <field name="outstanding_balance" string="Outstanding Balance (Rs)"
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                             <field name="credit" string="Total Receivable (Odoo)"
                                    groups="account.group_account_invoice,account.group_account_readonly"/>
                             <field name="property_account_receivable_id"

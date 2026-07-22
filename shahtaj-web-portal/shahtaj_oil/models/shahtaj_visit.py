@@ -346,6 +346,12 @@ class ShahtajVisit(models.Model):
                 'You cannot visit until the distributor approves it.',
                 shop=task.shop_id.name,
             ))
+        if not task._shahtaj_is_operational_for_booker():
+            raise UserError(_(
+                'Shop "%(shop)s" is no longer active on an operational route/zone. '
+                'Ask your distributor to review the territory setup.',
+                shop=task.shop_id.name,
+            ))
         if task.state in ('completed', 'cancelled', 'skipped'):
             raise UserError(_('This visit task is already closed.'))
         existing = self.search([('visit_task_id', '=', task.id)], limit=1)
@@ -471,6 +477,11 @@ class ShahtajVisit(models.Model):
         self.ensure_one()
         if self.state != 'in_progress':
             raise UserError(_('This visit is not in progress.'))
+        if not self.shop_id._shahtaj_is_operational_for_booker():
+            raise UserError(_(
+                'Shop "%(shop)s" is no longer active on an operational route/zone.',
+                shop=self.shop_id.name,
+            ))
         if not self.line_ids:
             raise UserError(_('Add at least one product before placing an order.'))
         self._check_visit_line_stock()

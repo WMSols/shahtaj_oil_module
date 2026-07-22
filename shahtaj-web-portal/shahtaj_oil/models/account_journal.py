@@ -18,10 +18,13 @@ class AccountJournal(models.Model):
         is_distributor = self.env.user.has_group(
             'shahtaj_oil.group_shahtaj_distributor',
         )
+        is_financial = self.env.user.has_group(
+            'shahtaj_oil.group_shahtaj_distributor_financial',
+        )
         is_account_manager = self.env.user.has_group(
             'account.group_account_manager',
         )
-        if is_distributor and not is_account_manager:
+        if is_distributor and is_financial and not is_account_manager:
             invalid_types = {
                 vals.get('type', 'general')
                 for vals in vals_list

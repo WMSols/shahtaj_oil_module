@@ -187,7 +187,7 @@
     <menuitem id="menu_shahtaj_manufacturer_summary"
               name="Manufacturer Summary"
               parent="menu_shahtaj_inventory"
-              action="action_shahtaj_manufacturer_summary"
+              action="action_shahtaj_manufacturer_summary_open"
               sequence="20"/>
 
     <menuitem id="menu_shahtaj_visit_task_today"

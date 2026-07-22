@@ -10,6 +10,8 @@
             <group name="other_preferences" position="inside">
                 <field name="shahtaj_custom_frontend" widget="boolean_toggle"
                          groups="base.group_system"/>
+                <field name="shahtaj_distributor_financial_access" widget="boolean_toggle"
+                         groups="base.group_system"/>
             </group>
         </field>
     </record>
@@ -21,6 +23,8 @@
         <field name="arch" type="xml">
             <group name="other_preferences" position="inside">
                 <field name="shahtaj_custom_frontend" widget="boolean_toggle"
+                         groups="base.group_system"/>
+                <field name="shahtaj_distributor_financial_access" widget="boolean_toggle"
                          groups="base.group_system"/>
             </group>
         </field>
@@ -34,6 +38,7 @@
             <xpath expr="//group[@name='access_groups']" position="after">
                 <group string="Shahtaj Interface" groups="base.group_system">
                     <field name="shahtaj_custom_frontend" widget="boolean_toggle"/>
+                    <field name="shahtaj_distributor_financial_access" widget="boolean_toggle"/>
                 </group>
             </xpath>
         </field>

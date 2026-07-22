@@ -2,7 +2,7 @@
 """Simplified product defaults for Shahtaj distributors."""
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import float_compare
+from odoo.tools import float_compare, float_is_zero
 
 SHAHTAJ_SALE_UOMS = [
     ('kg', 'Kilogram (kg)'),
@@ -75,10 +75,10 @@ class ProductTemplate(models.Model):
         help='Total stock received into your warehouse (from Add Stock and opening stock).',
     )
     shahtaj_payable_to_manufacturer = fields.Monetary(
-        string='Payable to Manufacturer',
+        string='Stock Purchased Value',
         compute='_compute_shahtaj_stock_stats',
         currency_field='currency_id',
-        help='Received quantity × cost price — amount owed to manufacturer for stock received.',
+        help='Lifetime stock received at frozen receipt cost (purchase value, not cash paid).',
     )
 
     @api.depends('list_price', 'standard_price')
@@ -117,32 +117,30 @@ class ProductTemplate(models.Model):
             for group in sold_groups if group.get('product_id')
         }
 
-        Move = self.env['stock.move']
-        received_groups = Move.read_group(
-            [
-                ('product_id', 'in', variant_ids),
-                ('state', '=', 'done'),
-                ('location_dest_id.usage', '=', 'internal'),
-                ('location_id.usage', '!=', 'internal'),
-            ],
-            ['product_uom_qty'],
+        Receipt = self.env['shahtaj.stock.receipt']
+        received_groups = Receipt.read_group(
+            [('product_id', 'in', variant_ids)],
+            ['qty:sum', 'subtotal:sum'],
             ['product_id'],
             lazy=False,
         )
-        received_by_variant = {
-            group['product_id'][0]: group['product_uom_qty']
+        received_qty_by_variant = {
+            group['product_id'][0]: group['qty']
+            for group in received_groups if group.get('product_id')
+        }
+        purchased_by_variant = {
+            group['product_id'][0]: group['subtotal']
             for group in received_groups if group.get('product_id')
         }
 
         for template in templates:
             variants = template.product_variant_ids
             sold = sum(sold_by_variant.get(v.id, 0.0) for v in variants)
-            received = sum(received_by_variant.get(v.id, 0.0) for v in variants)
+            received = sum(received_qty_by_variant.get(v.id, 0.0) for v in variants)
+            purchased = sum(purchased_by_variant.get(v.id, 0.0) for v in variants)
             template.shahtaj_qty_sold = sold
             template.shahtaj_qty_received = received
-            template.shahtaj_payable_to_manufacturer = (
-                received * (template.standard_price or 0.0)
-            )
+            template.shahtaj_payable_to_manufacturer = purchased
 
     @api.depends('qty_available', 'product_variant_ids')
     def _compute_shahtaj_qty_bookable(self):
@@ -355,7 +353,23 @@ class ProductTemplate(models.Model):
                         vals['uom_id'] = uom.id
         return super().create(vals_list)
 
-    def action_shahtaj_set_on_hand_qty(self, quantity):
+    def _shahtaj_log_stock_receipt(self, qty, unit_cost=None, source='add_stock'):
+        """Record manufacturer stock receipt with frozen unit cost."""
+        self.ensure_one()
+        if float_compare(qty, 0.0, precision_rounding=self.uom_id.rounding) <= 0:
+            return
+        variant = self.product_variant_id
+        self.env['shahtaj.stock.receipt'].create({
+            'product_id': variant.id,
+            'qty': qty,
+            'unit_cost': (
+                unit_cost if unit_cost is not None else (self.standard_price or 0.0)
+            ),
+            'source': source,
+            'receipt_date': fields.Date.context_today(self),
+        })
+
+    def action_shahtaj_set_on_hand_qty(self, quantity, receipt_source=None):
         """Set absolute on-hand quantity in the main warehouse."""
         self.ensure_one()
         if not self.is_storable:
@@ -368,6 +382,7 @@ class ProductTemplate(models.Model):
                 'No warehouse found for company "%(company)s".',
                 company=self.env.company.display_name,
             ))
+        old_qty = self.qty_available
         variant = self.product_variant_id
         self.env['stock.quant'].with_context(
             inventory_mode=True,
@@ -378,10 +393,26 @@ class ProductTemplate(models.Model):
             'inventory_quantity': quantity,
         })._apply_inventory()
 
+        if not self.env.context.get('shahtaj_skip_receipt_log'):
+            delta = quantity - old_qty
+            if float_compare(delta, 0.0, precision_rounding=self.uom_id.rounding) > 0:
+                source = receipt_source
+                if source is None:
+                    source = 'opening' if float_is_zero(
+                        old_qty, precision_rounding=self.uom_id.rounding,
+                    ) else 'adjustment'
+                self._shahtaj_log_stock_receipt(delta, source=source)
+
     def action_shahtaj_add_on_hand_qty(self, quantity):
         """Increase on-hand quantity."""
         self.ensure_one()
         if float_compare(quantity, 0.0, precision_rounding=self.uom_id.rounding) <= 0:
             raise UserError(_('Quantity to add must be greater than zero.'))
-        # ✅ Fixed: pointing to the new updated method name here
-        self.action_shahtaj_set_on_hand_qty(self.qty_available + quantity)
+        self._shahtaj_log_stock_receipt(quantity, source='add_stock')
+        self.with_context(shahtaj_skip_receipt_log=True).action_shahtaj_set_on_hand_qty(
+            self.qty_available + quantity,
+        )
+
+    def _shahtaj_add_on_hand_qty(self, quantity):
+        """Backward-compatible alias used by stock wizards."""
+        return self.action_shahtaj_add_on_hand_qty(quantity)

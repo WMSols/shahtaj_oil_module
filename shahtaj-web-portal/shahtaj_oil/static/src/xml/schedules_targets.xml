@@ -1,48 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
     <t t-name="shahtaj_oil.SchedulesTargets" owl="1">
-        <div class="card border-0 shadow-sm bg-white rounded-3">
+        <div class="card border-0 shadow-sm bg-white rounded-3 position-relative">
 
             <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center rounded-top">
                 <div>
                     <h2 class="h4 fw-bold text-dark mb-0">Schedules &amp; Targets Hub</h2>
                     <small class="text-muted">Manage weekly routes and performance KPIs for field staff.</small>
                 </div>
+                <div>
+                    <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center bg-white" t-on-click="refreshData" t-att-disabled="this.state.isRefreshing" title="Refresh Live Data">
+                        <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isRefreshing}"></i> Refresh
+                    </button>
+                </div>
             </div>
 
             <t t-if="this.state.viewMode === 'list'">
-                <div class="p-3 border-bottom">
-                    <ul class="nav nav-pills nav-fill">
-                        <li class="nav-item">
-                            <button t-on-click="() => this.switchMainTab('schedules')" t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeMainTab === 'schedules' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-days me-2">
-                                    <path d="M8 2v4"/>
-                                    <path d="M16 2v4"/>
-                                    <rect width="18" height="18" x="3" y="4" rx="2"/>
-                                    <path d="M3 10h18"/>
-                                    <path d="M8 14h.01"/>
-                                    <path d="M12 14h.01"/>
-                                    <path d="M16 14h.01"/>
-                                    <path d="M8 18h.01"/>
-                                    <path d="M12 18h.01"/>
-                                    <path d="M16 18h.01"/>
-                                </svg>
-                                Weekly Schedules
-                            </button>
-                        </li>
-                        <li class="nav-item mx-2">
-                            <button t-on-click="() => this.switchMainTab('targets')" t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeMainTab === 'targets' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target me-2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <circle cx="12" cy="12" r="6"/>
-                                    <circle cx="12" cy="12" r="2"/>
-                                </svg>
-                                Performance Targets
-                            </button>
-                        </li>
-                    </ul>
-                </div>
-
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="bg-light text-uppercase small fw-bold text-muted">
@@ -123,7 +96,9 @@
 
                 <t t-if="this.state.showForm and this.state.activeMainTab === 'schedules'">
                     <div class="p-4 bg-white border-bottom">
-                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">New Schedule Configuration</h6>
+                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">
+                            <t t-esc="this.state.editingScheduleId ? 'Edit Schedule Configuration' : 'New Schedule Configuration'"/>
+                        </h6>
 
                         <div class="row align-items-end mb-4">
                             <div class="col-md-3">
@@ -152,7 +127,7 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="small fw-bold">Route</label>
-                                <select class="form-select form-control" t-model="this.state.scheduleForm.route_id">
+                                <select class="form-select form-control" t-model="this.state.scheduleForm.route_id" t-on-change="onScheduleRouteChange">
                                     <option value="">-- Select Route --</option>
                                     <t t-foreach="this.filteredRoutes" t-as="r" t-key="r.id">
                                         <option t-att-value="r.id">
@@ -160,6 +135,16 @@
                                         </option>
                                     </t>
                                 </select>
+                                <t t-if="this.state.scheduleForm.route_id and this.state.scheduleForm.operational_shop_count !== null">
+                                    <small t-att-class="this.state.scheduleForm.operational_shop_count === 0 ? 'text-warning fw-bold' : 'text-muted'">
+                                        <t t-if="this.state.scheduleForm.operational_shop_count === 0">
+                                            No active approved shops on this route — order booker will see no visits.
+                                        </t>
+                                        <t t-else="">
+                                            <t t-esc="this.state.scheduleForm.operational_shop_count"/> active approved shop(s) on this route.
+                                        </t>
+                                    </small>
+                                </t>
                             </div>
                             <div class="col-md-2 pb-2">
                                 <div class="form-check form-switch">
@@ -169,31 +154,16 @@
                             </div>
                         </div>
 
-                        <div class="p-3 bg-light rounded-3 border mb-4">
-                            <h6 class="fw-bold text-muted mb-3 small text-uppercase">Tracking Parameters (Auto-Calculated)</h6>
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <label class="small fw-bold text-muted">Shops on Route</label>
-                                    <input type="text" class="form-control bg-white text-center fw-bold" value="0" disabled="1"/>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="small fw-bold text-muted">Planned Visits</label>
-                                    <input type="text" class="form-control bg-white text-center fw-bold" value="0" disabled="1"/>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="small fw-bold text-muted">Done Visits</label>
-                                    <input type="text" class="form-control bg-white text-center fw-bold" value="0" disabled="1"/>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="small fw-bold text-muted">Day Progress</label>
-                                    <input type="text" class="form-control bg-white text-center fw-bold text-success" value="0%" disabled="1"/>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="d-flex justify-content-end mt-3">
                             <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
-                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveSchedule">Save Schedule</button>
+                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveSchedule" t-att-disabled="this.state.isLoading">
+                                <t t-if="this.state.isLoading">
+                                    <i class="fa fa-spinner fa-spin me-1"></i> Saving...
+                                </t>
+                                <t t-else="">
+                                    <t t-esc="this.state.editingScheduleId ? 'Update Schedule' : 'Save Schedule'"/>
+                                </t>
+                            </button>
                         </div>
                     </div>
                 </t>
@@ -201,7 +171,9 @@
 
                 <t t-if="this.state.showForm and this.state.activeMainTab === 'targets'">
                     <div class="p-4 bg-white border-bottom">
-                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">New Target Configuration</h6>
+                        <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">
+                            <t t-esc="this.state.editingTargetId ? 'Edit Target Configuration' : 'New Target Configuration'"/>
+                        </h6>
 
                         <div class="row mb-3">
                             <div class="col-md-3">
@@ -275,27 +247,16 @@
                             </t>
                         </div>
 
-                        <hr class="mb-4"/>
-
-                        <div class="p-3 bg-light rounded-3 border mb-4">
-                            <h6 class="fw-bold text-muted mb-3 small text-uppercase">Live Progress Details (Auto-Calculated)</h6>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <label class="small fw-bold text-muted">Achieved So Far</label>
-                                    <input type="text" class="form-control bg-white fw-bold" value="0 / Pending" disabled="1"/>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="small fw-bold text-muted">Overall Progress</label>
-                                    <div class="progress mt-2" style="height: 25px;">
-                                        <div class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="d-flex justify-content-end mt-3">
                             <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
-                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveTarget">Save Target</button>
+                            <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveTarget" t-att-disabled="this.state.isLoading">
+                                <t t-if="this.state.isLoading">
+                                    <i class="fa fa-spinner fa-spin me-1"></i> Saving...
+                                </t>
+                                <t t-else="">
+                                    <t t-esc="this.state.editingTargetId ? 'Update Target' : 'Save Target'"/>
+                                </t>
+                            </button>
                         </div>
                     </div>
                 </t>
@@ -308,8 +269,8 @@
                                     <th class="ps-4 border-top-0">Day</th>
                                     <th class="border-top-0">Route Info</th>
                                     <th class="text-center border-top-0">Shops</th>
-                                    <th class="text-center border-top-0">Progress</th>
-                                    <th class="text-end pe-4 border-top-0">Status</th>
+                                    <th class="border-top-0">Status</th>
+                                    <th class="text-end pe-4 border-top-0">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -334,13 +295,14 @@
                                         <td class="align-middle text-center">
                                             <t t-esc="sched.shops"/>
                                         </td>
-                                        <td class="align-middle text-center fw-bold text-success">
-                                            <t t-esc="sched.progress"/>
-                                        </td>
-                                        <td class="align-middle text-end pe-4">
+                                        <td class="align-middle">
                                             <span t-attf-class="badge #{sched.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
                                                 <t t-esc="sched.status"/>
                                             </span>
+                                        </td>
+                                        <td class="align-middle text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editSchedule(sched)">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.promptDeleteSchedule(sched)">Delete</button>
                                         </td>
                                     </tr>
                                 </t>
@@ -357,8 +319,8 @@
                                     <th class="ps-4 border-top-0">Period</th>
                                     <th class="border-top-0">Target Goal</th>
                                     <th class="border-top-0">Achieved</th>
-                                    <th class="border-top-0">Progress</th>
-                                    <th class="text-end pe-4 border-top-0">Status</th>
+                                    <th class="border-top-0">Status</th>
+                                    <th class="text-end pe-4 border-top-0">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -383,9 +345,7 @@
                                             <small class="text-muted">
                                                 <t t-esc="tgt.amount"/>
                                                 <t t-if="tgt.weightUom"> <t t-esc="tgt.weightUom"/></t>
-                                                <t t-if="tgt.currency">
-                                                    <t t-esc="tgt.currency"/>
-                                                </t>
+                                                <t t-if="tgt.currency"> <t t-esc="tgt.currency"/></t>
                                                 <t t-if="tgt.product"> (<t t-esc="tgt.product"/>) </t>
                                             </small>
                                         </td>
@@ -398,17 +358,13 @@
                                             </t>
                                         </td>
                                         <td class="align-middle">
-                                            <div class="progress" style="height: 6px; width: 100px;">
-                                                <div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{tgt.progressPercentage};"></div>
-                                            </div>
-                                            <small class="fw-bold text-success mt-1 d-block">
-                                                <t t-esc="tgt.progressPercentage"/>
-                                            </small>
-                                        </td>
-                                        <td class="align-middle text-end pe-4">
                                             <span t-attf-class="badge #{tgt.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
                                                 <t t-esc="tgt.status"/>
                                             </span>
+                                        </td>
+                                        <td class="align-middle text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editTarget(tgt)">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.promptDeleteTarget(tgt)">Delete</button>
                                         </td>
                                     </tr>
                                 </t>
@@ -417,6 +373,45 @@
                     </div>
                 </t>
             </t>
+
+            <!-- ========================================== -->
+            <!-- CUSTOM DELETE CONFIRMATION MODAL           -->
+            <!-- ========================================== -->
+            <t t-if="this.state.showDeleteModal">
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background: rgba(15, 23, 42, 0.6); z-index: 1055; backdrop-filter: blur(4px);">
+                    <div class="card border-0 shadow-lg rounded-4 overflow-hidden" style="width: 100%; max-width: 480px; animation: fadeIn 0.2s ease-out;">
+                        <div class="bg-danger text-white p-3 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 fw-bold text-white d-flex align-items-center">
+                                <i class="fa fa-exclamation-triangle me-2"></i> Confirm Deletion
+                            </h5>
+                            <button class="btn btn-sm text-black btn-light bg-opacity-25 border-0 text-white rounded-circle d-flex align-items-center justify-content-center p-1" style="width: 28px; height: 28px;" t-on-click="closeDeleteModal">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="p-4 bg-light">
+                            <p class="text-dark mb-2 fs-6">
+                                Are you sure you want to delete <strong class="text-danger"><t t-esc="this.state.deleteTitle"/></strong>?
+                            </p>
+                            <p class="text-muted small mb-4">This action cannot be undone and will permanently remove this record from Odoo.</p>
+                            
+                            <div class="d-flex justify-content-end gap-2">
+                                <button class="btn btn-light border fw-bold px-4" t-on-click="closeDeleteModal" t-att-disabled="this.state.isLoading">
+                                    Cancel
+                                </button>
+                                <button class="btn btn-danger fw-bold px-4 text-white d-flex align-items-center" t-on-click="confirmDelete" t-att-disabled="this.state.isLoading">
+                                    <t t-if="this.state.isLoading">
+                                        <i class="fa fa-spinner fa-spin me-2"></i> Deleting...
+                                    </t>
+                                    <t t-else="">
+                                        <i class="fa fa-trash me-2"></i> Confirm Delete
+                                    </t>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
         </div>
     </t>
 </templates>

@@ -23,8 +23,8 @@
                         <h1>Profit &amp; Loss</h1>
                         <p class="text-muted">
                             Product trading profit from <b>posted invoices</b>
-                            (sales price) vs <b>product cost</b>, after credit notes.
-                            Manufacturer payable comes from stock received × cost.
+                            (sales price) vs <b>frozen cost at invoice post</b>, after credit notes.
+                            Stock purchased shows receipts in the selected period.
                         </p>
                     </div>
                     <group string="Period">
@@ -65,8 +65,8 @@
                     <div class="alert alert-info" role="alert">
                         <b>How to read this</b>
                         <ul class="mb-0 mt-2">
-                            <li><b>Gross Profit</b> = Net Sales − Cost (cost = invoiced qty × product cost, minus credit-note qty).</li>
-                            <li><b>Payable to Manufacturer</b> = all stock received × cost (Inventory → Manufacturer Summary).</li>
+                            <li><b>Gross Profit</b> = Net Sales − Cost (cost frozen when each invoice was posted).</li>
+                            <li><b>Stock Purchased (period)</b> = stock received in the date range at frozen receipt cost.</li>
                             <li><b>Opening Balance Invoices</b> = old shop debt (legacy) — not included in product profit.</li>
                             <li>Change dates and click <b>Refresh</b> to recalculate.</li>
                         </ul>

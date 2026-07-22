@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_manufacturer_summary_form" model="ir.ui.view">
+        <field name="name">shahtaj.manufacturer.summary.form</field>
+        <field name="model">shahtaj.manufacturer.summary</field>
+        <field name="arch" type="xml">
+            <form string="Manufacturer Summary" create="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"
+                            class="oe_highlight" icon="fa-refresh"/>
+                    <button name="action_print_summary" type="object"
+                            string="Print PDF" icon="fa-print"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Manufacturer Stock Summary</h1>
+                        <p class="text-muted">
+                            Stock received from manufacturer, delivered to shops, and on-hand value
+                            using frozen receipt costs (standard distributor inventory reporting).
+                        </p>
+                    </div>
+                    <group string="Period">
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="total_received_qty" readonly="1"/>
+                            <field name="total_delivered_qty" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Totals">
+                        <group>
+                            <field name="total_purchase_value_period" readonly="1"/>
+                            <field name="total_purchase_value_lifetime" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="total_on_hand_qty" readonly="1"/>
+                            <field name="total_stock_value_on_hand" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="By Product" name="products">
+                            <field name="line_ids" readonly="1" nolabel="1">
+                                <list create="false" delete="false" edit="false">
+                                    <field name="product_id"/>
+                                    <field name="avg_unit_cost"/>
+                                    <field name="qty_received"/>
+                                    <field name="purchase_value_period"/>
+                                    <field name="qty_delivered"/>
+                                    <field name="qty_on_hand"/>
+                                    <field name="stock_value_on_hand"/>
+                                    <field name="purchase_value_lifetime" optional="hide"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_manufacturer_summary_open" model="ir.actions.server">
+        <field name="name">Manufacturer Summary</field>
+        <field name="model_id" ref="model_shahtaj_manufacturer_summary"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_manufacturer_summary()</field>
+    </record>
+
+</odoo>

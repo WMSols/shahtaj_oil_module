@@ -28,6 +28,7 @@ class ShahtajApiTasks(http.Controller):
             ('scheduled_date', '=', today),
             ('state', 'not in', ['cancelled']),
         ], order='route_id, shop_id')
+        tasks = tasks.filtered(lambda t: t._shahtaj_is_operational_for_booker())
         return api_success({
             'date': str(today),
             'tasks': [serializers.task_dict(task) for task in tasks],

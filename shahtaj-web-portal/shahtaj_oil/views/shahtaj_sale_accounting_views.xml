@@ -13,7 +13,7 @@
                         class="oe_stat_button"
                         icon="fa-map-marker"
                         invisible="not shahtaj_visit_id"
-                        groups="shahtaj_oil.group_shahtaj_distributor">
+                        groups="shahtaj_oil.group_shahtaj_distributor_financial">
                     <span class="o_stat_text">Shop Visit</span>
                 </button>
             </div>
@@ -22,25 +22,25 @@
                         string="Mark Delivery"
                         class="oe_highlight"
                         invisible="state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"
-                        groups="shahtaj_oil.group_shahtaj_distributor"/>
+                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
             </header>
             <field name="partner_id" position="after">
                 <field name="shahtaj_visit_id" readonly="1"
-                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        invisible="not shahtaj_visit_id"/>
                 <field name="shahtaj_visit_task_id" readonly="1"
-                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        invisible="not shahtaj_visit_task_id"/>
                 <field name="shahtaj_order_booker_id" readonly="1"
-                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        invisible="not shahtaj_order_booker_id"/>
                 <field name="shahtaj_delivery_status" widget="badge" readonly="1"
-                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        decoration-warning="shahtaj_delivery_status == 'pending'"
                        decoration-info="shahtaj_delivery_status == 'partial'"
                        decoration-success="shahtaj_delivery_status == 'done'"/>
                 <field name="shahtaj_qty_to_deliver" readonly="1"
-                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        invisible="shahtaj_delivery_status in ('done', 'no_stock')"/>
             </field>
         </field>
@@ -53,19 +53,19 @@
         <field name="arch" type="xml">
             <field name="partner_id" position="after">
                 <field name="shahtaj_order_booker_id" optional="show"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_visit_id" optional="hide"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_delivery_status" optional="show" widget="badge"
-                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        decoration-warning="shahtaj_delivery_status == 'pending'"
                        decoration-info="shahtaj_delivery_status == 'partial'"
                        decoration-success="shahtaj_delivery_status == 'done'"/>
                 <field name="shahtaj_qty_to_deliver" optional="show"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <button name="action_shahtaj_mark_delivery" type="object"
                         string="Deliver" icon="fa-truck"
-                        groups="shahtaj_oil.group_shahtaj_distributor"
+                        groups="shahtaj_oil.group_shahtaj_distributor_financial"
                         invisible="state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"/>
             </field>
         </field>
@@ -82,11 +82,11 @@
                         string="Open Sales Order"
                         class="oe_highlight"
                         invisible="not sale_order_id"
-                        groups="shahtaj_oil.group_shahtaj_distributor"/>
+                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <button name="action_open_shop" type="object"
                         string="Shop Account"
                         invisible="not shop_id"
-                        groups="shahtaj_oil.group_shahtaj_distributor"/>
+                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
             </header>
             <field name="sale_order_id" position="attributes">
                 <attribute name="groups">shahtaj_oil.group_shahtaj_distributor</attribute>
@@ -101,7 +101,7 @@
         <field name="arch" type="xml">
             <field name="order_amount" position="after">
                 <field name="sale_order_id" optional="hide"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
             </field>
         </field>
     </record>

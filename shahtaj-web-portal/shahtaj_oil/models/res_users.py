@@ -106,6 +106,15 @@ class ResUsers(models.Model):
             'the standard Odoo / Shahtaj backend is available.'
         ),
     )
+    shahtaj_distributor_financial_access = fields.Boolean(
+        string='Financial & Pricing Access',
+        default=True,
+        help=(
+            'When enabled, this distributor can view invoices, payments, bank/cash, '
+            'P&L, shop balances, and product cost/sales prices. When disabled, only '
+            'operational screens (visits, orders, targets, stock quantities) are available.'
+        ),
+    )
     shahtaj_is_distributor = fields.Boolean(
         string='Is Distributor',
         compute='_compute_shahtaj_is_distributor',
@@ -119,6 +128,7 @@ class ResUsers(models.Model):
     def SELF_READABLE_FIELDS(self):
         return super().SELF_READABLE_FIELDS + [
             'shahtaj_custom_frontend',
+            'shahtaj_distributor_financial_access',
             'shahtaj_is_distributor',
         ]
 
@@ -135,7 +145,11 @@ class ResUsers(models.Model):
                 'shahtaj_oil.group_shahtaj_distributor'
             )
 
-    _SHAHTAJ_USER_FORM_FIELDS = ('shahtaj_custom_frontend', 'shahtaj_is_distributor')
+    _SHAHTAJ_USER_FORM_FIELDS = (
+        'shahtaj_custom_frontend',
+        'shahtaj_distributor_financial_access',
+        'shahtaj_is_distributor',
+    )
 
     @api.model
     def get_views(self, views, options=None):
@@ -171,7 +185,7 @@ class ResUsers(models.Model):
         return result
 
 
-    @api.constrains('shahtaj_custom_frontend', 'group_ids')
+    @api.constrains('shahtaj_custom_frontend', 'shahtaj_distributor_financial_access', 'group_ids')
     def _check_shahtaj_custom_frontend_role(self):
         dist_group = self.env.ref(
             'shahtaj_oil.group_shahtaj_distributor',
@@ -185,11 +199,17 @@ class ResUsers(models.Model):
                     'Custom Distributor Portal can only be enabled for users '
                     'with the Distributor role.'
                 ))
+            if user.shahtaj_distributor_financial_access and dist_group not in user.group_ids:
+                raise ValidationError(_(
+                    'Financial access can only be enabled for users with the '
+                    'Distributor role.'
+                ))
 
     @api.model_create_multi
     def create(self, vals_list):
         users = super().create(vals_list)
         users._sync_shahtaj_ui_groups()
+        users._sync_shahtaj_financial_group()
         return users
 
     def _shahtaj_split_managed_bookers(self):
@@ -227,13 +247,15 @@ class ResUsers(models.Model):
                 res = super(ResUsers, bookers.sudo()).write(vals)
                 if others:
                     res = super(ResUsers, others).write(vals) and res
-                if {'shahtaj_custom_frontend', 'group_ids'} & set(vals):
+                if {'shahtaj_custom_frontend', 'shahtaj_distributor_financial_access', 'group_ids'} & set(vals):
                     self._sync_shahtaj_ui_groups()
+                    self._sync_shahtaj_financial_group()
                 return res
 
         res = super().write(vals)
-        if {'shahtaj_custom_frontend', 'group_ids'} & set(vals):
+        if {'shahtaj_custom_frontend', 'shahtaj_distributor_financial_access', 'group_ids'} & set(vals):
             self._sync_shahtaj_ui_groups()
+            self._sync_shahtaj_financial_group()
         return res
 
     def _sync_shahtaj_ui_groups(self):
@@ -259,6 +281,7 @@ class ResUsers(models.Model):
 
         for user in self.sudo():
             is_distributor = dist_group in user.group_ids
+            has_financial = user.shahtaj_distributor_financial_access
             commands = []
             if is_distributor and user.shahtaj_custom_frontend:
                 commands = [
@@ -270,12 +293,19 @@ class ResUsers(models.Model):
                 commands = [
                     (3, custom_group.id),
                     (4, native_ui_group.id),
-                    (4, native_apps_group.id),
                 ]
+                if has_financial:
+                    commands.append((4, native_apps_group.id))
+                else:
+                    commands.append((3, native_apps_group.id))
             else:
                 if user.shahtaj_custom_frontend:
                     user.with_context(shahtaj_skip_ui_sync=True).write({
                         'shahtaj_custom_frontend': False,
+                    })
+                if user.shahtaj_distributor_financial_access:
+                    user.with_context(shahtaj_skip_ui_sync=True).write({
+                        'shahtaj_distributor_financial_access': False,
                     })
                 commands = [
                     (3, custom_group.id),
@@ -295,6 +325,34 @@ class ResUsers(models.Model):
                     'group_ids': [(6, 0, list(desired))],
                 })
 
+    def _sync_shahtaj_financial_group(self):
+        """Assign financial security group from the per-user toggle."""
+        financial_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_distributor_financial',
+            raise_if_not_found=False,
+        )
+        dist_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_distributor',
+            raise_if_not_found=False,
+        )
+        if not financial_group or not dist_group:
+            return
+
+        for user in self.sudo():
+            group_ids = set(user.group_ids.ids)
+            desired = set(group_ids)
+            if (
+                dist_group.id in desired
+                and user.shahtaj_distributor_financial_access
+            ):
+                desired.add(financial_group.id)
+            else:
+                desired.discard(financial_group.id)
+            if desired != group_ids:
+                user.with_context(shahtaj_skip_ui_sync=True).write({
+                    'group_ids': [(6, 0, list(desired))],
+                })
+
     @api.model
     def _sync_all_shahtaj_ui_groups(self):
         users = self.search([
@@ -303,6 +361,11 @@ class ResUsers(models.Model):
             ('shahtaj_custom_frontend', '=', True),
         ])
         users._sync_shahtaj_ui_groups()
+
+    @api.model
+    def _sync_all_shahtaj_financial_groups(self):
+        users = self.search([('shahtaj_is_distributor', '=', True)])
+        users._sync_shahtaj_financial_group()
 
     @api.depends('group_ids')
     def _compute_shahtaj_is_order_booker(self):

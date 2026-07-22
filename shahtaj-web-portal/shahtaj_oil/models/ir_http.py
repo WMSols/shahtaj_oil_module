@@ -19,6 +19,10 @@ class IrHttp(models.AbstractModel):
                     order_booker=user,
                 )
         result = super().session_info()
-        if request.session.uid and request.env.user.shahtaj_custom_frontend:
-            result['shahtaj_custom_frontend'] = True
+        if request.session.uid:
+            user = request.env.user
+            if user.shahtaj_custom_frontend:
+                result['shahtaj_custom_frontend'] = True
+            if user.has_group('shahtaj_oil.group_shahtaj_distributor_financial'):
+                result['shahtaj_financial_access'] = True
         return result

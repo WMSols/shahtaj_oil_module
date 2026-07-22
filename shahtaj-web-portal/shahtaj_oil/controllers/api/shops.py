@@ -63,6 +63,14 @@ class ShahtajApiShops(http.Controller):
             vals['credit_limit'] = float(kwargs['credit_limit'])
         if kwargs.get('legacy_balance') is not None:
             vals['legacy_balance'] = float(kwargs['legacy_balance'])
+        if kwargs.get('zone_id'):
+            zone = request.env['shahtaj.zone'].browse(int(kwargs['zone_id']))
+            if not zone.exists() or not zone.active:
+                raise UserError(_('Zone not found or archived.'))
+        if kwargs.get('route_id'):
+            route = request.env['shahtaj.route'].browse(int(kwargs['route_id']))
+            if not route.exists() or not route._shahtaj_is_operational_for_booker():
+                raise UserError(_('Route not found or archived.'))
         vals.update(shop_photo_vals_from_kwargs(kwargs))
 
         partner = request.env['res.partner'].with_context(
@@ -79,7 +87,9 @@ class ShahtajApiShops(http.Controller):
         shops = request.env['res.partner'].search([
             ('is_shahtaj_shop', '=', True),
             ('registered_by_id', '=', request.env.user.id),
+            ('active', '=', True),
         ], order='create_date desc', limit=50)
+        shops = shops.filtered(lambda s: s._shahtaj_is_operational_for_booker())
         return api_success({
             'shops': [serializers.shop_brief(shop) for shop in shops],
         })

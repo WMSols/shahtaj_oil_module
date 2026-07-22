@@ -122,7 +122,7 @@ class SaleOrder(models.Model):
 
     def write(self, vals):
         res = super().write(vals)
-        if any(k in vals for k in ('state', 'date_order', 'create_uid', 'amount_total')):
+        if any(k in vals for k in ('state', 'date_order', 'create_uid', 'amount_total', 'active')):
             self._shahtaj_recompute_visit_targets()
         return res
 

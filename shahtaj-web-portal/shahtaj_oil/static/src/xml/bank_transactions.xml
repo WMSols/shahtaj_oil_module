@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.BankTransactions" owl="1">
+        <div t-attf-class="#{this.props.embedded ? 'bg-white' : 'card border-0 shadow-sm p-4 rounded-3 bg-white'}">
+            
+            <!-- Navigation Tabs -->
+           <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3" t-if="this.state.viewMode === 'list'">
+                <ul class="nav nav-pills gap-2 mb-0">
+                    <li class="nav-item">
+                        <button t-attf-class="nav-link fw-bold rounded-pill px-4 #{this.state.activeTab === 'transactions' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light border'}" 
+                                t-on-click="() => this.switchTab('transactions')">
+                            <i class="fa fa-exchange me-2"></i> Transaction History
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button t-attf-class="nav-link fw-bold rounded-pill px-4 #{this.state.activeTab === 'journals' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light border'}" 
+                                t-on-click="() => this.switchTab('journals')">
+                            <i class="fa fa-building-o me-2"></i> Bank &amp; Cash Journals
+                        </button>
+                    </li>
+                </ul>
+                
+                <!-- NEW REFRESH BUTTON -->
+                <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center" t-on-click="refreshData" t-att-disabled="this.state.isLoading.data" title="Refresh Financial Data">
+                    <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isLoading.data}"></i> Refresh
+                </button>
+            </div>
+
+            <!-- Global Loading State -->
+            <t t-if="this.state.isLoading.data">
+                <div class="d-flex justify-content-center align-items-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-3 fw-bold text-muted">Synchronizing financial records...</span>
+                </div>
+            </t>
+
+            <t t-else="">
+                <!-- ================= TRANSACTIONS TAB ================= -->
+                <t t-if="this.state.activeTab === 'transactions'">
+                    <t t-if="this.state.viewMode === 'list'">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                    <input type="text" class="form-control border-start-0" placeholder="Search Payee or Ref..." t-model="this.state.searchQuery"/>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" t-model="this.state.filterDirection" title="Filter money in or out">
+                                    <option value="all">All Activity</option>
+                                    <option value="inbound">Collected (In)</option>
+                                    <option value="outbound">Paid Out</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" t-model="this.state.filterJournal">
+                                    <option value="all">All Journals</option>
+                                    <t t-foreach="this.state.journals" t-as="j" t-key="j.id">
+                                        <option t-att-value="j.id"><t t-esc="j.name"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" t-model="this.state.sortBy">
+                                    <option value="date_desc">Newest First</option>
+                                    <option value="amount_asc">Amount: Low to High</option>
+                                    <option value="amount_desc">Amount: High to Low</option>
+                                </select>
+                            </div>
+                            <div class="col-md-1">
+                                <input type="date" class="form-control" t-model="this.state.dateFrom" title="From Date"/>
+                            </div>
+                            <div class="col-md-2">
+                                <input type="date" class="form-control" t-model="this.state.dateTo" title="To Date"/>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <div class="border rounded-3 p-3 bg-light h-100">
+                                    <small class="text-muted fw-bold text-uppercase">Collected</small>
+                                    <div class="fw-bold text-success fs-5">+ Rs. <t t-esc="this.activityTotals.moneyIn.toLocaleString()"/></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded-3 p-3 bg-light h-100">
+                                    <small class="text-muted fw-bold text-uppercase">Paid Out</small>
+                                    <div class="fw-bold text-danger fs-5">- Rs. <t t-esc="this.activityTotals.moneyOut.toLocaleString()"/></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded-3 p-3 bg-light h-100">
+                                    <small class="text-muted fw-bold text-uppercase">Net Cash</small>
+                                    <div t-attf-class="fw-bold fs-5 #{this.activityTotals.net &lt; 0 ? 'text-danger' : 'text-dark'}">
+                                        Rs. <t t-esc="this.activityTotals.net.toLocaleString()"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="border-top-0 ps-3">Date &amp; Ref</th>
+                                        <th class="border-top-0">Flow</th>
+                                        <th class="border-top-0">Journal</th>
+                                        <th class="border-top-0">Shop / Payee</th>
+                                        <th class="border-top-0 text-end">Amount</th>
+                                        <th class="border-top-0 text-center">Status</th>
+                                        <th class="border-top-0 text-end pe-3">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Empty State for Transactions -->
+                                    <t t-if="this.filteredTransactions.length === 0">
+                                        <tr>
+                                            <td colspan="7" class="text-center py-5 text-muted fw-bold">
+                                                <i class="fa fa-folder-open-o fa-3x mb-3 text-light-gray d-block"></i>
+                                                No transactions found matching your criteria.
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-foreach="this.filteredTransactions" t-as="t" t-key="t.id">
+                                        <tr t-on-click="() => this.viewDetails(t)" style="cursor: pointer;">
+                                            <td class="ps-3">
+                                                <div class="fw-bold text-dark"><t t-esc="t.date"/></div>
+                                                <small class="text-muted"><t t-esc="t.name"/></small>
+                                            </td>
+                                            <td>
+                                                <span t-attf-class="badge #{t.payment_type === 'outbound' ? 'bg-danger' : 'bg-success'} text-white">
+                                                    <t t-esc="t.flow_label"/>
+                                                </span>
+                                            </td>
+                                            <td><span class="badge bg-light text-dark border"><t t-esc="t.journal_name"/></span></td>
+                                            <td>
+                                                <div class="text-dark"><t t-esc="t.partner_name"/></div>
+                                                <small class="text-muted"><t t-esc="t.shahtaj_payment_channel || 'System'"/></small>
+                                            </td>
+                                            <td class="text-end fw-bold">
+                                                <span t-attf-class="#{t.payment_type === 'outbound' ? 'text-danger' : 'text-success'}">
+                                                    <t t-esc="t.payment_type === 'outbound' ? '-' : '+'"/> Rs. <t t-esc="t.display_amount.toLocaleString()"/>
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span t-attf-class="badge #{t.state === 'posted' or t.state === 'paid' or t.state === 'in_process' ? 'bg-success' : (t.state === 'draft' ? 'bg-warning text-dark' : 'bg-secondary')}">
+                                                    <t t-esc="t.state.toUpperCase()"/>
+                                                </span>
+                                            </td>
+                                            <td class="text-end pe-3">
+                                                <button class="btn btn-sm btn-outline-primary fw-bold">View</button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+
+                    <t t-if="this.state.viewMode === 'detail'">
+                        <button class="btn btn-sm btn-dark border p-2 shadow-sm fw-bold mb-4" t-on-click="goBack">
+                            <i class="fa fa-arrow-left me-2 text-white"></i> Back to Ledger
+                        </button>
+                        <div class="card p-4 bg-light border-0 shadow-sm rounded-3">
+                            <div class="d-flex justify-content-between align-items-start mb-3 border-bottom pb-3">
+                                <div>
+                                    <h4 class="fw-bold mb-1"><t t-esc="this.state.selectedTransaction.name"/></h4>
+                                    <span class="text-muted">Shop/Customer: <strong class="text-dark"><t t-esc="this.state.selectedTransaction.partner_name"/></strong></span>
+                                </div>
+                                <span t-attf-class="badge fs-6 #{this.state.selectedTransaction.state === 'posted' ? 'bg-success' : 'bg-warning text-dark'}">
+                                    <t t-esc="this.state.selectedTransaction.state.toUpperCase()"/>
+                                </span>
+                            </div>
+                            
+                            <div class="row g-4 mt-2">
+                                <div class="col-md-6">
+                                    <h6 class="fw-bold text-primary mb-3">Transaction Info</h6>
+                                    <p class="mb-2"><strong>Date:</strong> <t t-esc="this.state.selectedTransaction.date"/></p>
+                                    <p class="mb-2"><strong>Journal:</strong> <t t-esc="this.state.selectedTransaction.journal_name"/></p>
+                                    <p class="mb-2"><strong>Type:</strong> <t t-esc="this.state.selectedTransaction.payment_type === 'inbound' ? 'Money In' : 'Money Out'"/></p>
+                                    <p class="mb-0"><strong>Net Amount:</strong> 
+                                        <span t-attf-class="fw-bold #{this.state.selectedTransaction.amount_signed &lt; 0 ? 'text-danger' : 'text-success'}">
+                                            Rs. <t t-esc="this.state.selectedTransaction.display_amount.toLocaleString()"/>
+                                        </span>
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="fw-bold text-primary mb-3">Payment Details</h6>
+                                    <p class="mb-2"><strong>Method:</strong> <span class="text-capitalize"><t t-esc="this.state.selectedTransaction.shahtaj_payment_channel || 'N/A'"/></span></p>
+                                    <p class="mb-2" t-if="this.state.selectedTransaction.shahtaj_payer_bank_name"><strong>Bank:</strong> <t t-esc="this.state.selectedTransaction.shahtaj_payer_bank_name"/></p>
+                                    <p class="mb-2" t-if="this.state.selectedTransaction.shahtaj_instrument_reference"><strong>Reference:</strong> <t t-esc="this.state.selectedTransaction.shahtaj_instrument_reference"/></p>
+                                    <p class="mb-0" t-if="this.state.selectedTransaction.shahtaj_payment_notes"><strong>Notes:</strong> <t t-esc="this.state.selectedTransaction.shahtaj_payment_notes"/></p>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+
+                <!-- ================= JOURNALS TAB ================= -->
+                <t t-if="this.state.activeTab === 'journals'">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h4 class="fw-bold mb-0">Configured Journals</h4>
+                            <small class="text-muted">Manage your physical cash registers and bank accounts.</small>
+                        </div>
+                        <button class="btn btn-dark fw-bold  ms-2 shadow-sm d-flex align-items-center" t-on-click="openJournalModal">
+                            <i class="fa fa-plus me-2"></i> Create Journal
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                <tr>
+                                    <th class="border-top-0 ps-3">Journal Name</th>
+                                    <th class="border-top-0">Short Code</th>
+                                    <th class="border-top-0">Type</th>
+                                    <th class="border-top-0 text-end pe-3">ID</th>
+                                    <th class="border-top-0 text-end pe-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Empty State for Journals -->
+                                <t t-if="this.state.journals.length === 0">
+                                    <tr>
+                                        <td colspan="4" class="text-center py-5 text-muted fw-bold">
+                                            <i class="fa fa-bank fa-3x mb-3 text-light-gray d-block"></i>
+                                            No journals configured. Create one to start processing payments.
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="this.state.journals" t-as="j" t-key="j.id">
+                                    <tr>
+                                        <td class="ps-3 fw-bold text-dark"><t t-esc="j.name"/></td>
+                                        <td><span class="badge bg-light text-dark border"><t t-esc="j.code"/></span></td>
+                                        <td class="text-capitalize">
+                                            <i t-attf-class="fa #{j.type === 'bank' ? 'fa-building text-primary' : 'fa-money text-success'} me-2"></i>
+                                            <t t-esc="j.type"/>
+                                        </td>
+                                        <td class="text-end pe-3 text-muted">#<t t-esc="j.id"/></td>
+                                        <td>
+                                            <button class="btn btn-outline-primary btn-sm" t-on-click="() => this.editJournal(j)">Edit</button>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </div>
+
+        <!-- ================= CUSTOM JOURNAL CREATION MODAL ================= -->
+        <t t-if="this.state.showJournalModal">
+            <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg rounded-3">
+                        <div class="modal-header bg-light border-bottom-0">
+                            <h5 class="modal-title fw-bold text-dark">Create New Journal</h5>
+                            <button type="button" class="btn-close" t-on-click="closeJournalModal" t-att-disabled="this.state.isLoading.saveJournal"></button>
+                        </div>
+                        <div class="modal-body py-4">
+                            <div class="mb-3">
+                                <label class="small fw-bold mb-1">Journal Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" t-model="this.state.journalForm.name" placeholder="e.g. HBL Main Branch" t-att-disabled="this.state.isLoading.saveJournal"/>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="small fw-bold mb-1">Journal Type</label>
+                                    <select class="form-select" t-model="this.state.journalForm.type" t-att-disabled="this.state.isLoading.saveJournal">
+                                        <option value="bank">Bank Account</option>
+                                        <option value="cash">Cash Register</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold mb-1">Short Code <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control text-uppercase" t-model="this.state.journalForm.code" placeholder="e.g. HBL01" maxlength="5" t-att-disabled="this.state.isLoading.saveJournal"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-top-0 bg-light">
+                            <button type="button" class="btn btn-outline-secondary fw-bold px-4" t-on-click="closeJournalModal" t-att-disabled="this.state.isLoading.saveJournal">Cancel</button>
+                            <button type="button" class="btn btn-dark fw-bold px-4 d-flex align-items-center" t-on-click="saveJournal" t-att-disabled="this.state.isLoading.saveJournal">
+                                <t t-if="this.state.isLoading.saveJournal">
+                                    <i class="fa fa-circle-o-notch fa-spin me-2"></i> Saving...
+                                </t>
+                                <t t-else="">
+                                    Create Journal
+                                </t>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+
+    </t>
+</templates>

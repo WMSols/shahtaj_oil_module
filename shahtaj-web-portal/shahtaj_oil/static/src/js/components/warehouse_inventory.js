@@ -1,26 +1,49 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { ConfirmModal } from "./confirm_modal";
+import { hasFinancialAccess } from "../shahtaj_access";
 
 export class WarehouseInventory extends Component {
+    static props = {
+        requestedSubTab: { type: String, optional: true },
+    };
+    static components = { ConfirmModal };
     setup() {
         this.orm = useService("orm");
         
         this.state = useState({
-            activeSubTab: 'inventory',
+            activeSubTab: this._normalizeSubTab(this.props.requestedSubTab || 'inventory'),
+            previousSubTab: 'inventory',
             
             showWarehouseForm: false,
             showAdjustmentForm: false,
             showProductAddForm: false,
             showProductDetails: false,
+            
+            // --- NEW: Tax Management States ---
+            showTaxForm: false,
+            editingTaxId: null,
+            taxForm: { name: '', amount: 0.0, active: true },
+            taxesList: [],
+
+            // --- Search & Filter States ---
+            productSearchQuery: '',
+            productSortFilter: 'default', // 'price_asc', 'price_desc', 'qty_asc', 'qty_desc'
+
+            stockSearchQuery: '',
+            stockFilterStatus: 'all', // 'in_stock', 'out_of_stock'
 
             warehouseForm: { name: '', type: '', location: '', manager: '' },
             adjustmentForm: { product_id: '', qty: 0 },
+            
             productForm: this.getEmptyProductForm(),
             currentProduct: null,
             saleTaxes: [],
-            defaultTaxIds: [],
+            defaultTaxId: "", 
+            confirmModal: { isOpen: false, title: '', message: '', onConfirm: null },
+            isLoading: false,
 
             warehouses: [
                 { id: "WH-MAIN", name: "Central Hub - Lahore", type: "Main Warehouse", location: "Sundar Industrial Estate", manager: "Zafar Iqbal", status: "Active" },
@@ -30,13 +53,127 @@ export class WarehouseInventory extends Component {
 
             inventory: []
         });
+        onWillUpdateProps((nextProps) => {
+            if (nextProps.requestedSubTab && nextProps.requestedSubTab !== this.state.activeSubTab) {
+                this.setSubTab(nextProps.requestedSubTab);
+            }
+        });
 
         onWillStart(async () => {
-            await this.loadSaleTaxes();
-            await this.loadInventory();
+            this.state.activeSubTab = this._normalizeSubTab(this.state.activeSubTab);
+            if (!hasFinancialAccess()) {
+                await this.loadInventory();
+            } else {
+                await this.loadSaleTaxes();
+                await this.loadInventory();
+                await this.loadTaxesList();
+            }
         });
     }
 
+    get hasFinancialAccess() {
+        return hasFinancialAccess();
+    }
+
+    _normalizeSubTab(tabName) {
+        if (!hasFinancialAccess() && ['inventory', 'taxes', 'archive'].includes(tabName)) {
+            return 'management';
+        }
+        return tabName || 'management';
+    }
+    // NEW Refresh Method
+    async refreshData() {
+        this.state.isLoading = true;
+        try {
+            await Promise.all([
+                this.loadInventory(),
+                this.loadTaxesList()
+            ]);
+        } finally {
+            this.state.isLoading = false;
+        }
+    }
+   // --- Dynamic Search, Filter, and Sort Getters ---
+    get displayProducts() {
+        let filtered = this.state.inventory.filter(product =>
+            product.active && product.name.toLowerCase().includes(this.state.productSearchQuery.toLowerCase())
+        );
+
+        if (this.state.productSortFilter === 'price_asc') {
+            filtered.sort((a, b) => (a.list_price || 0) - (b.list_price || 0));
+        } else if (this.state.productSortFilter === 'price_desc') {
+            filtered.sort((a, b) => (b.list_price || 0) - (a.list_price || 0));
+        } else if (this.state.productSortFilter === 'qty_asc') {
+            filtered.sort((a, b) => (a.qty_available || 0) - (b.qty_available || 0));
+        } else if (this.state.productSortFilter === 'qty_desc') {
+            filtered.sort((a, b) => (b.qty_available || 0) - (a.qty_available || 0));
+        }
+
+        return filtered;
+    }
+
+    get displayStock() {
+        let filtered = this.state.inventory.filter(product =>
+            product.active && product.name.toLowerCase().includes(this.state.stockSearchQuery.toLowerCase())
+        );
+
+        if (this.state.stockFilterStatus === 'in_stock') {
+            filtered = filtered.filter(p => p.qty_available > 0);
+        } else if (this.state.stockFilterStatus === 'out_of_stock') {
+            filtered = filtered.filter(p => p.qty_available <= 0);
+        }
+
+        return filtered;
+    }
+
+    get activeTaxes() { return this.state.taxesList.filter(t => t.active); }
+    get archivedTaxes() { return this.state.taxesList.filter(t => !t.active); }
+    get archivedProducts() { return this.state.inventory.filter(p => !p.active); }
+
+    // --- Modal & Archive Handlers ---
+    showConfirm(title, message, onConfirmCallback) {
+        this.state.confirmModal = {
+            isOpen: true,
+            title: title,
+            message: message,
+            onConfirm: async () => {
+                this.state.confirmModal.isOpen = false;
+                await onConfirmCallback();
+            }
+        };
+    }
+
+    closeConfirm() {
+        this.state.confirmModal.isOpen = false;
+    }
+
+    toggleArchive(model, id, makeActive) {
+        if (makeActive) {
+            this.executeToggleArchive(model, id, makeActive);
+        } else {
+            const itemType = model === 'product.template' ? 'product' : 'tax configuration';
+            this.showConfirm(
+                `Archive ${itemType}`,
+                `Are you sure you want to move this ${itemType} to the archive?`,
+                () => this.executeToggleArchive(model, id, makeActive)
+            );
+        }
+    }
+
+    async executeToggleArchive(model, id, makeActive) {
+        try {
+            await this.orm.write(model, [id], { active: makeActive });
+            if (model === 'product.template') {
+                await this.loadInventory();
+            } else if (model === 'account.tax') {
+                await this.loadTaxesList();
+                await this.loadSaleTaxes();
+            }
+        } catch (error) {
+            alert("Failed to update archive status: " + (error.data?.message || error.message));
+        }
+    }
+    // --- Data Fetching Logic ---
     get totalStockItems() {
         return this.state.inventory.reduce((sum, p) => sum + (p.qty_available || 0), 0);
     }
@@ -47,7 +184,7 @@ export class WarehouseInventory extends Component {
             list_price: 0.0, standard_price: 0.0,
             invoice_policy: 'delivery', type: 'consu',
             shahtaj_sale_uom: 'piece', shahtaj_kg_per_unit: 1.0,
-            tax_ids: [...this.state.defaultTaxIds],
+            tax_id: this.state?.defaultTaxId || "", 
             barcode: '', weight: 0.0, volume: 0.0,
             income_account: 'static_inc', expense_account: 'static_exp',
             image_1920: false
@@ -71,41 +208,33 @@ export class WarehouseInventory extends Component {
             ...tax,
             label: this.formatTaxLabel(tax),
         }));
-        this.state.defaultTaxIds = this.state.saleTaxes
-            .filter((tax) => tax.is_default)
-            .map((tax) => tax.id);
-        if (!this.state.productForm.tax_ids.length && this.state.defaultTaxIds.length) {
-            this.state.productForm.tax_ids = [...this.state.defaultTaxIds];
+        
+        const defaultTax = this.state.saleTaxes.find((tax) => tax.is_default);
+        if (defaultTax) {
+            this.state.defaultTaxId = defaultTax.id.toString();
         }
-    }
-
-    toggleProductTax(formTarget, taxId, checked) {
-        const form = formTarget === 'edit' ? this.state.currentProduct : this.state.productForm;
-        if (!form) {
-            return;
+            
+        if (!this.state.productForm.tax_id && this.state.defaultTaxId) {
+            this.state.productForm.tax_id = this.state.defaultTaxId;
         }
-        const ids = new Set(form.tax_ids || []);
-        if (checked) {
-            ids.add(taxId);
-        } else {
-            ids.delete(taxId);
-        }
-        form.tax_ids = Array.from(ids);
-    }
-
-    isTaxSelected(formTarget, taxId) {
-        const form = formTarget === 'edit' ? this.state.currentProduct : this.state.productForm;
-        return (form?.tax_ids || []).includes(taxId);
     }
 
     getTaxLabel(taxIds) {
         if (!taxIds || !taxIds.length) {
             return 'No tax';
         }
-        return taxIds
-            .map((id) => this.state.saleTaxes.find((tax) => tax.id === id)?.label)
-            .filter(Boolean)
-            .join(', ');
+        const primaryTaxId = taxIds[0];
+        const tax = this.state.saleTaxes.find((t) => t.id === primaryTaxId);
+        return tax ? tax.label : 'No tax';
+    }
+
+    async loadTaxesList() {
+        const taxes = await this.orm.searchRead(
+            "account.tax",
+            [["type_tax_use", "=", "sale"], ["active", "in", [true, false]]],
+            ["id", "name", "amount", "active"]
+        );
+        this.state.taxesList = taxes;
     }
 
     onSaleUomChange(formTarget) {
@@ -119,22 +248,31 @@ export class WarehouseInventory extends Component {
     async loadInventory() {
         const products = await this.orm.searchRead(
             "product.template",
-            [['sale_ok', '=', true], ['default_code', '!=', 'SHAHTAJ-LEGACY']], 
+            [
+                ['sale_ok', '=', true], 
+                ['default_code', '!=', 'SHAHTAJ-LEGACY'],
+                ['active', 'in', [true, false]] // Fetch both active and archived
+            ], 
             [
                 "id", "name", "categ_id", "qty_available", "uom_name", "type",
                 "list_price", "standard_price", "barcode", "weight", "volume",
                 "invoice_policy", "image_1920", "shahtaj_qty_bookable", "virtual_available",
-                "shahtaj_sale_uom", "shahtaj_kg_per_unit", "taxes_id",
+                "shahtaj_sale_uom", "shahtaj_kg_per_unit", "taxes_id", "active" // Add 'active'
             ]
         );
         this.state.inventory = products.map((product) => ({
             ...product,
-            tax_ids: product.taxes_id || [],
             tax_label: this.getTaxLabel(product.taxes_id || []),
         }));
     }
 
-    setSubTab(tabName) {
+   setSubTab(tabName) {
+        tabName = this._normalizeSubTab(tabName);
+        // Save the current tab if we are navigating to the archive
+        if (tabName === 'archive' && this.state.activeSubTab !== 'archive') {
+            this.state.previousSubTab = this.state.activeSubTab;
+        }
+        
         this.state.activeSubTab = tabName;
         this.resetForms();
     }
@@ -144,7 +282,54 @@ export class WarehouseInventory extends Component {
         this.state.showAdjustmentForm = false;
         this.state.showProductAddForm = false;
         this.state.showProductDetails = false;
+        this.state.showTaxForm = false;
         this.state.currentProduct = null;
+        this.state.editingTaxId = null;
+    }
+
+    // --- NEW: Tax Management Handlers ---
+    openTaxForm(tax = null) {
+        if (tax) {
+            this.state.taxForm = { name: tax.name, amount: tax.amount, active: tax.active };
+            this.state.editingTaxId = tax.id;
+        } else {
+            this.state.taxForm = { name: '', amount: 0.0, active: true };
+            this.state.editingTaxId = null;
+        }
+        this.state.showTaxForm = true;
+    }
+
+    cancelTaxForm() {
+        this.state.showTaxForm = false;
+        this.state.editingTaxId = null;
+    }
+
+    async saveTax() {
+        if (!this.state.taxForm.name) {
+            alert("Tax name is required.");
+            return;
+        }
+
+        const vals = {
+            name: this.state.taxForm.name,
+            amount: parseFloat(this.state.taxForm.amount || 0),
+            active: this.state.taxForm.active,
+        };
+
+        try {
+            if (this.state.editingTaxId) {
+                await this.orm.write("account.tax", [this.state.editingTaxId], vals);
+            } else {
+                vals.type_tax_use = 'sale';
+                vals.amount_type = 'percent';
+                await this.orm.create("account.tax", [vals]);
+            }
+            this.cancelTaxForm();
+            await this.loadTaxesList(); // Refresh the grid
+            await this.loadSaleTaxes(); // Refresh the product creation dropdown
+        } catch (error) {
+            alert("Failed to save tax: " + (error.data?.message || error.message));
+        }
     }
 
     onImageChange(ev, target) {
@@ -176,7 +361,7 @@ export class WarehouseInventory extends Component {
             is_storable: this.state.productForm.track_inventory,
             shahtaj_sale_uom: this.state.productForm.shahtaj_sale_uom,
             shahtaj_kg_per_unit: parseFloat(this.state.productForm.shahtaj_kg_per_unit || 1),
-            taxes_id: [[6, 0, (this.state.productForm.tax_ids || []).map((id) => parseInt(id, 10))]],
+            taxes_id: this.state.productForm.tax_id ? [[6, 0, [parseInt(this.state.productForm.tax_id, 10)]]] : [[5, 0, 0]],
         };
 
         if (this.state.productForm.image_1920) {
@@ -215,9 +400,14 @@ export class WarehouseInventory extends Component {
     }
 
     viewProductDetails(product) {
+        let currentTaxId = "";
+        if (product.taxes_id && product.taxes_id.length > 0) {
+            currentTaxId = product.taxes_id[0].toString();
+        }
+        
         this.state.currentProduct = {
             ...product,
-            tax_ids: [...(product.tax_ids || product.taxes_id || [])],
+            tax_id: currentTaxId,
         };
         this.state.showProductDetails = true;
         this.state.showProductAddForm = false;
@@ -235,7 +425,7 @@ export class WarehouseInventory extends Component {
             type: this.state.currentProduct.type,
             shahtaj_sale_uom: this.state.currentProduct.shahtaj_sale_uom,
             shahtaj_kg_per_unit: parseFloat(this.state.currentProduct.shahtaj_kg_per_unit || 1),
-            taxes_id: [[6, 0, (this.state.currentProduct.tax_ids || []).map((id) => parseInt(id, 10))]],
+            taxes_id: this.state.currentProduct.tax_id ? [[6, 0, [parseInt(this.state.currentProduct.tax_id, 10)]]] : [[5, 0, 0]],
         };
 
         if (this.state.currentProduct.image_1920) {

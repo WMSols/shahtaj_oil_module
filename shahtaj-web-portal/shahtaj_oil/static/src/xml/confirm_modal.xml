@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.ConfirmModal" owl="1">
+        <!-- Overlay backdrop -->
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-3">
+                    <div class="modal-header bg-light border-bottom-0">
+                        <h5 class="modal-title fw-bold text-dark">
+                            <t t-esc="props.title || 'Confirm Action'"/>
+                        </h5>
+                        <button type="button" class="btn-close" t-on-click="props.onCancel"></button>
+                    </div>
+                    <div class="modal-body py-4">
+                        <p class="mb-0 text-muted fs-6"><t t-esc="props.message"/></p>
+                    </div>
+                    <div class="modal-footer border-top-0 bg-light">
+                        <button type="button" class="btn btn-outline-secondary fw-bold px-4" t-on-click="props.onCancel">Cancel</button>
+                        <button type="button" class="btn btn-danger ms-2 fw-bold px-4" t-on-click="props.onConfirm">Confirm</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

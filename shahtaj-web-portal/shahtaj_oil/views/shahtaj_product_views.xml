@@ -99,7 +99,7 @@
                 <field name="qty_available" string="On Hand"/>
                 <field name="shahtaj_qty_bookable" string="Available to Book"/>
                 <field name="standard_price" string="Cost" optional="hide"/>
-                <field name="shahtaj_payable_to_manufacturer" string="Payable" optional="show"/>
+                <field name="shahtaj_payable_to_manufacturer" string="Purchased Value" optional="show"/>
                 <field name="virtual_available" string="Forecast" optional="hide"/>
                 <field name="list_price" string="Price" optional="show"/>
                 <field name="currency_id" column_invisible="1"/>
@@ -120,7 +120,7 @@
                 <field name="shahtaj_qty_received" string="Received"/>
                 <field name="shahtaj_qty_sold" string="Delivered"/>
                 <field name="qty_available" string="On Hand"/>
-                <field name="shahtaj_payable_to_manufacturer" string="Payable to Manufacturer"/>
+                <field name="shahtaj_payable_to_manufacturer" string="Purchased Value"/>
                 <field name="currency_id" column_invisible="1"/>
             </list>
         </field>
@@ -207,32 +207,6 @@
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_shahtaj_product_form"/>
         <field name="act_window_id" ref="action_shahtaj_stock_overview"/>
-    </record>
-
-    <record id="action_shahtaj_manufacturer_summary" model="ir.actions.act_window">
-        <field name="name">Manufacturer Summary</field>
-        <field name="res_model">product.template</field>
-        <field name="view_mode">list</field>
-        <field name="search_view_id" ref="view_shahtaj_product_search"/>
-        <field name="domain">[('sale_ok', '=', True), ('is_storable', '=', True)]</field>
-        <field name="context">{'create': False}</field>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                No products to report
-            </p>
-            <p>
-                Shows received, delivered (to shops), and on-hand quantities per product, plus the amount
-                payable to the manufacturer. Delivered updates when you use <b>Mark Delivery</b>.
-                Select products and use <b>Print</b> to share with your manufacturer.
-            </p>
-        </field>
-    </record>
-
-    <record id="action_shahtaj_manufacturer_summary_view_list" model="ir.actions.act_window.view">
-        <field name="sequence">1</field>
-        <field name="view_mode">list</field>
-        <field name="view_id" ref="view_shahtaj_manufacturer_summary_list"/>
-        <field name="act_window_id" ref="action_shahtaj_manufacturer_summary"/>
     </record>
 
     <!-- Full Odoo product form — optional advanced access -->

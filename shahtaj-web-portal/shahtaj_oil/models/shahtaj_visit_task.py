@@ -246,15 +246,42 @@ class ShahtajVisitTask(models.Model):
             pending.with_context(shahtaj_system_visit_write=True).write({'state': 'cancelled'})
 
     @api.model
+    def _cancel_pending_tasks_for_non_operational(self, date_from=None, date_to=None):
+        """Cancel pending tasks tied to archived or inactive territory."""
+        domain = [('state', '=', 'pending')]
+        if date_from:
+            domain.append(('scheduled_date', '>=', date_from))
+        if date_to:
+            domain.append(('scheduled_date', '<=', date_to))
+        pending = self.search(domain)
+        invalid = pending.filtered(
+            lambda t: not t._shahtaj_is_operational_for_booker(),
+        )
+        if invalid:
+            invalid.with_context(shahtaj_system_visit_write=True).write({
+                'state': 'cancelled',
+            })
+
+    def _shahtaj_is_operational_for_booker(self):
+        self.ensure_one()
+        return (
+            self.route_id._shahtaj_is_operational_for_booker()
+            and self.shop_id._shahtaj_is_operational_for_booker()
+        )
+
+    @api.model
     def _generate_from_schedules(self, date_from, date_to, order_booker=None):
         """For each day in range: match weekday schedules → one task per shop on route."""
         self._cancel_pending_tasks_for_unapproved_shops(date_from, date_to)
+        self._cancel_pending_tasks_for_non_operational(date_from, date_to)
 
         Schedule = self.env['shahtaj.weekly.schedule']
         schedule_domain = [('active', '=', True)]
         if order_booker:
             schedule_domain.append(('order_booker_id', '=', order_booker.id))
-        schedules = Schedule.search(schedule_domain)
+        schedules = Schedule.search(schedule_domain).filtered(
+            lambda s: s.route_id._shahtaj_is_operational_for_booker(),
+        )
 
         created = self.env['shahtaj.visit.task']
         skipped = 0
@@ -264,7 +291,7 @@ class ShahtajVisitTask(models.Model):
             day_schedules = schedules.filtered(lambda s: s.day_of_week == weekday)
             for schedule in day_schedules:
                 approved_shops = schedule.route_id.shop_ids.filtered(
-                    lambda s: s.shop_approval_state == 'approved'
+                    lambda s: s._shahtaj_is_operational_for_booker(),
                 )
                 for shop in approved_shops:
                     existing = self.search([
@@ -273,10 +300,17 @@ class ShahtajVisitTask(models.Model):
                         ('order_booker_id', '=', schedule.order_booker_id.id),
                     ], limit=1)
                     if existing:
-                        if existing.state == 'cancelled':
+                        if (
+                            existing.state == 'cancelled'
+                            and shop._shahtaj_is_operational_for_booker()
+                        ):
                             existing.with_context(
                                 shahtaj_system_visit_write=True,
-                            ).write({'state': 'pending'})
+                            ).write({
+                                'state': 'pending',
+                                'route_id': schedule.route_id.id,
+                                'weekly_schedule_id': schedule.id,
+                            })
                         else:
                             skipped += 1
                         continue
