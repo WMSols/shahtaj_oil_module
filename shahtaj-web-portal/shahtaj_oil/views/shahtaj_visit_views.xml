@@ -56,6 +56,13 @@
                             <field name="check_in_distance_m" readonly="1"/>
                         </group>
                     </group>
+                    <group string="GPS at Place Order" invisible="not place_order_distance_m">
+                        <group>
+                            <field name="place_order_latitude" readonly="1"/>
+                            <field name="place_order_longitude" readonly="1"/>
+                            <field name="place_order_distance_m" readonly="1"/>
+                        </group>
+                    </group>
                     <group string="Order" invisible="not sale_order_id">
                         <field name="sale_order_id" readonly="1"/>
                         <field name="order_amount" readonly="1"/>

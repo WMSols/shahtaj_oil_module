@@ -8,7 +8,7 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_compare
 
-from .shahtaj_gps import MAX_SHOP_DISTANCE_M, shahtaj_distance_meters
+from .shahtaj_gps import shahtaj_distance_meters, get_shop_distance_limits
 
 VISIT_STATES = [
     ('in_progress', 'In Progress'),
@@ -101,6 +101,22 @@ class ShahtajVisit(models.Model):
         string='Distance at Check-in (m)',
         digits=(16, 2),
         readonly=True,
+    )
+    place_order_latitude = fields.Float(
+        string='Place-order Latitude',
+        digits=(10, 7),
+        copy=False,
+    )
+    place_order_longitude = fields.Float(
+        string='Place-order Longitude',
+        digits=(10, 7),
+        copy=False,
+    )
+    place_order_distance_m = fields.Float(
+        string='Distance at Place Order (m)',
+        digits=(16, 2),
+        readonly=True,
+        copy=False,
     )
     sale_order_id = fields.Many2one(
         'sale.order',
@@ -306,8 +322,10 @@ class ShahtajVisit(models.Model):
         )
 
     @api.model
-    def _validate_check_in_coordinates(self, shop, latitude, longitude):
-        """Reject check-in if booker is farther than MAX_SHOP_DISTANCE_M from shop."""
+    def _validate_check_in_coordinates(
+        self, shop, latitude, longitude, purpose='start a visit',
+    ):
+        """Reject if booker is outside company min/max shop GPS distance."""
         if not shop.partner_latitude or not shop.partner_longitude:
             raise UserError(_(
                 'Shop "%(shop)s" has no GPS coordinates. '
@@ -315,22 +333,40 @@ class ShahtajVisit(models.Model):
                 shop=shop.name,
             ))
         if latitude is None or longitude is None:
-            raise UserError(_('Your GPS coordinates are required to check in at the shop.'))
+            raise UserError(_(
+                'Your GPS coordinates are required to %(purpose)s.',
+                purpose=purpose,
+            ))
         if not (-90 <= latitude <= 90):
             raise ValidationError(_('GPS latitude must be between -90 and 90.'))
         if not (-180 <= longitude <= 180):
             raise ValidationError(_('GPS longitude must be between -180 and 180.'))
+        limits = get_shop_distance_limits(self.env)
+        min_m = limits['min_m']
+        max_m = limits['max_m']
         distance = shahtaj_distance_meters(
             latitude, longitude,
             shop.partner_latitude, shop.partner_longitude,
         )
-        if distance > MAX_SHOP_DISTANCE_M:
+        if distance < min_m:
             raise UserError(_(
                 'You are %(distance).0f m from shop "%(shop)s". '
-                'You must be within %(max).0f m to start a visit.',
+                'You must be at least %(min).0f m away to %(purpose)s '
+                '(current company setting).',
                 distance=distance,
                 shop=shop.name,
-                max=MAX_SHOP_DISTANCE_M,
+                min=min_m,
+                purpose=purpose,
+            ))
+        if distance > max_m:
+            raise UserError(_(
+                'You are %(distance).0f m from shop "%(shop)s". '
+                'You must be within %(max).0f m to %(purpose)s '
+                '(current company setting).',
+                distance=distance,
+                shop=shop.name,
+                max=max_m,
+                purpose=purpose,
             ))
         return distance
 
@@ -472,8 +508,12 @@ class ShahtajVisit(models.Model):
                     exclude_visit_line_ids=exclude_lines,
                 )
 
-    def action_place_order(self):
-        """Create and confirm sale order from visit lines; finish visit."""
+    def action_place_order(self, latitude=None, longitude=None):
+        """Create and confirm sale order from visit lines; finish visit.
+
+        Booker API must pass current GPS (same 100 m rule as check-in).
+        Distributor backend Place Order without GPS is allowed for support.
+        """
         self.ensure_one()
         if self.state != 'in_progress':
             raise UserError(_('This visit is not in progress.'))
@@ -482,6 +522,27 @@ class ShahtajVisit(models.Model):
                 'Shop "%(shop)s" is no longer active on an operational route/zone.',
                 shop=self.shop_id.name,
             ))
+        require_gps = (
+            self.env.context.get('shahtaj_require_place_order_gps')
+            if 'shahtaj_require_place_order_gps' in self.env.context
+            else self._is_booker_only_user()
+        )
+        if require_gps or latitude is not None or longitude is not None:
+            if latitude is None or longitude is None:
+                raise UserError(_(
+                    'Your GPS coordinates are required to place an order.'
+                ))
+            distance = self._validate_check_in_coordinates(
+                self.shop_id,
+                float(latitude),
+                float(longitude),
+                purpose='place an order',
+            )
+            self.with_context(shahtaj_system_visit_write=True).write({
+                'place_order_latitude': float(latitude),
+                'place_order_longitude': float(longitude),
+                'place_order_distance_m': distance,
+            })
         if not self.line_ids:
             raise UserError(_('Add at least one product before placing an order.'))
         self._check_visit_line_stock()

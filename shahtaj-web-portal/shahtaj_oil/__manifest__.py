@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.0.79',
+    'version': '19.0.1.0.83',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -59,6 +59,7 @@
         'views/shahtaj_visit_hub_views.xml',
         'views/shahtaj_order_booker_users_views.xml',
         'views/res_users_views.xml',
+        'views/res_config_settings_views.xml',
 
         # ── 7. WIZARDS (actions used by menus) ──
         'wizard/shahtaj_generate_tasks_views.xml',

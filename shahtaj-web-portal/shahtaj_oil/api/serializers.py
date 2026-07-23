@@ -132,6 +132,7 @@ def visit_dict(visit, include_lines=True):
         'ended_at': visit.ended_at.isoformat() if visit.ended_at else False,
         'duration_minutes': visit.duration_minutes,
         'check_in_distance_m': visit.check_in_distance_m,
+        'place_order_distance_m': visit.place_order_distance_m,
         'notes': visit.notes or '',
         'task_id': visit.visit_task_id.id,
         'shop': shop_brief(visit.shop_id),

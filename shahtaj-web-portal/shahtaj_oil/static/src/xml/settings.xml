@@ -5,194 +5,127 @@
 
             <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center rounded-top">
                 <div>
-                    <h2 class="h4 fw-bold text-dark mb-0">Portal Configuration</h2>
-                    <small class="text-muted">Manage system preferences and user access rights.</small>
+                    <h2 class="h4 fw-bold text-dark mb-0">General Settings</h2>
+                    <small class="text-muted">Company profile, branding, and order booker GPS range.</small>
                 </div>
-                <div>
-                    <span class="badge bg-dark px-3 py-2 fs-6 shadow-sm d-flex align-items-center text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings me-2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                        Admin Controls
-                    </span>
-                </div>
+                <span class="badge bg-dark px-3 py-2 fs-6 text-white">Admin</span>
             </div>
 
-            <div class="p-3 border-bottom">
-                <ul class="nav nav-pills nav-fill">
-                    <li class="nav-item me-2">
-                        <button t-on-click="() => this.setSubTab('general')" t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeSubTab === 'general' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building-2 me-2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
-                            General Settings
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button t-on-click="() => this.setSubTab('users')" t-attf-class="nav-link fw-bold rounded-pill border-0 px-4 py-2 w-100 transition-all d-flex justify-content-center align-items-center #{this.state.activeSubTab === 'users' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-white'}">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-check me-2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2-1 4-2 7-2 2.94 0 5.02 1.1 7 2a1 1 0 0 1 1 1v7z"/><path d="m9 12 2 2 4-4"/></svg>
-                            Access Management
-                        </button>
-                    </li>
-                </ul>
-            </div>
-
-            <t t-if="this.state.activeSubTab === 'general'">
+            <t t-if="this.state.isLoading">
+                <div class="p-5 text-center text-muted">
+                    <i class="fa fa-circle-o-notch fa-spin me-2"/> Loading settings...
+                </div>
+            </t>
+            <t t-else="">
                 <div class="p-4">
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card border shadow-sm p-4 rounded-3 bg-white">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <h5 class="fw-bold mb-1">Order Booker GPS Range</h5>
+                                        <small class="text-muted">
+                                            Check-in and place-order must be within this range of the shop pin.
+                                            Changes apply immediately on the next GPS check.
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-dark text-white px-3 py-2">Live setting</span>
+                                </div>
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="small fw-bold text-muted mb-1">Min distance (metres)</label>
+                                        <input type="number" class="form-control" min="0" step="1"
+                                               t-model="this.state.gpsForm.min_m"
+                                               t-att-disabled="this.state.isSavingGps"/>
+                                        <small class="text-muted">Use 0 for no minimum</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="small fw-bold text-muted mb-1">Max distance (metres)</label>
+                                        <input type="number" class="form-control" min="10" step="1"
+                                               t-model="this.state.gpsForm.max_m"
+                                               t-att-disabled="this.state.isSavingGps"/>
+                                        <small class="text-muted">Recommended 150–200 if 100 is too strict</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-dark fw-bold text-white px-4"
+                                                t-on-click="saveGpsSettings"
+                                                t-att-disabled="this.state.isSavingGps">
+                                            <span t-if="this.state.isSavingGps" class="spinner-border spinner-border-sm me-2"/>
+                                            Save GPS Range
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-7 border-end pe-4">
                             <h5 class="fw-bold mb-4">Company Profile</h5>
 
                             <div class="mb-3">
                                 <label class="small fw-bold text-muted mb-1">Distributor Name (Appears on Invoices)</label>
-                                <input type="text" class="form-control" t-model="this.state.companyForm.name"/>
+                                <input type="text" class="form-control" t-model="this.state.companyForm.name"
+                                       t-att-disabled="this.state.isSavingCompany"/>
                             </div>
 
                             <div class="mb-4">
                                 <label class="small fw-bold text-muted mb-1">Primary Contact Number</label>
-                                <input type="text" class="form-control" t-model="this.state.companyForm.phone"/>
+                                <input type="text" class="form-control" t-model="this.state.companyForm.phone"
+                                       t-att-disabled="this.state.isSavingCompany"/>
                             </div>
 
-                            <button class="btn btn-dark fw-bold px-4 text-white" t-on-click="saveCompanySettings">Save Changes</button>
+                            <button class="btn btn-dark fw-bold px-4 text-white"
+                                    t-on-click="saveCompanySettings"
+                                    t-att-disabled="this.state.isSavingCompany">
+                                <span t-if="this.state.isSavingCompany" class="spinner-border spinner-border-sm me-2"/>
+                                Save Company Profile
+                            </button>
                         </div>
 
                         <div class="col-md-5 ps-4">
-                            <h5 class="fw-bold mb-4">Corporate Branding</h5>
+                            <h5 class="fw-bold mb-4">Company Logo</h5>
 
                             <div class="p-4 border rounded-3 bg-light text-center shadow-sm">
                                 <div class="mb-3">
                                     <t t-if="this.state.companyForm.logo_preview">
-                                        <img t-att-src="this.state.companyForm.logo_preview" class="img-fluid rounded-3 border shadow-sm" style="max-height: 120px; object-fit: contain;"/>
+                                        <img t-att-src="this.state.companyForm.logo_preview"
+                                             class="img-fluid rounded-3 border shadow-sm bg-white"
+                                             style="max-height: 120px; object-fit: contain;"/>
                                     </t>
                                     <t t-else="">
-                                        <div class="bg-white border rounded-3 d-inline-flex justify-content-center align-items-center shadow-sm" style="width: 120px; height: 120px;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image text-muted opacity-50"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                                        <div class="bg-white border rounded-3 d-inline-flex justify-content-center align-items-center shadow-sm"
+                                             style="width: 120px; height: 120px;">
+                                            <i class="fa fa-image fa-3x text-muted opacity-50"/>
                                         </div>
                                     </t>
                                 </div>
 
-                                <h6 class="fw-bold text-dark">Company Logo</h6>
-                                <small class="text-muted d-block mb-3">Recommended size: 400x150px (PNG or JPG)</small>
-                                
-                                <input type="file" id="companyLogoInput" class="d-none" accept="image/png, image/jpeg" t-on-change="triggerLogoUpload" t-ref="logoInput"/>
-                                <label for="companyLogoInput" class="btn btn-sm btn-outline-dark fw-bold d-inline-flex align-items-center cursor-pointer mb-0">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload me-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                                    Upload New Image
-                                </label>
+                                <h6 class="fw-bold text-dark mb-1">Upload Logo</h6>
+                                <small class="text-muted d-block mb-3">PNG or JPG, max 2 MB. Saved as soon as you choose a file.</small>
+
+                                <input type="file" id="companyLogoInput" class="d-none"
+                                       accept="image/png,image/jpeg"
+                                       t-on-change="onLogoSelected"/>
+                                <div class="d-flex flex-wrap justify-content-center gap-2">
+                                    <label for="companyLogoInput"
+                                           class="btn btn-sm btn-outline-dark fw-bold d-inline-flex align-items-center cursor-pointer mb-0"
+                                           t-att-class="{'disabled': this.state.isSavingLogo}">
+                                        <span t-if="this.state.isSavingLogo" class="spinner-border spinner-border-sm me-2"/>
+                                        <i t-else="" class="fa fa-upload me-2"/>
+                                        Choose Image
+                                    </label>
+                                    <button t-if="this.state.companyForm.logo_preview"
+                                            class="btn btn-sm btn-outline-danger fw-bold"
+                                            t-on-click="removeLogo"
+                                            t-att-disabled="this.state.isSavingLogo">
+                                        Remove
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </t>
-
-            <t t-if="this.state.activeSubTab === 'users'">
-
-                <t t-if="!this.state.showUserForm">
-                    <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center">
-                        <h6 class="fw-bold mb-0">System Users &amp; Permissions</h6>
-                        <button class="btn btn-sm btn-dark d-flex align-items-center text-white fw-bold" t-on-click="openUserForm">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                            Add Portal User
-                        </button>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light text-uppercase small fw-bold text-muted">
-                                <tr>
-                                    <th class="border-top-0 ps-4">User Name</th>
-                                    <th class="border-top-0">Login Email</th>
-                                    <th class="border-top-0">System Role (RBAC)</th>
-                                    <th class="border-top-0 text-center">Status</th>
-                                    <th class="border-top-0 text-end pe-4">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-if="!this.state.users || this.state.users.length === 0">
-                                    <tr><td colspan="5" class="text-center py-4 text-muted fw-bold">No users configured yet.</td></tr>
-                                </t>
-                                <t t-foreach="this.state.users" t-as="user" t-key="user.id">
-                                    <tr>
-                                        <td class="ps-4 fw-bold align-middle text-dark">
-                                            <t t-esc="user.name"/>
-                                        </td>
-                                        <td class="align-middle text-muted">
-                                            <t t-esc="user.email"/>
-                                        </td>
-                                        <td class="align-middle">
-                                            <span class="badge bg-secondary text-white p-2 fs-6 shadow-sm">
-                                                <t t-esc="user.role"/>
-                                            </span>
-                                        </td>
-                                        <td class="align-middle text-center">
-                                            <span class="text-success fw-bold d-flex align-items-center justify-content-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle me-1"><circle cx="12" cy="12" r="10"/></svg>
-                                                <t t-esc="user.status"/>
-                                            </span>
-                                        </td>
-                                        <td class="align-middle text-end pe-4">
-                                            <button class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
-                    </div>
-                </t>
-
-                <t t-else="">
-                    <div class="p-4" style="background-color: #f8fafc;">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <button class="btn btn-sm btn-light border shadow-sm fw-bold text-dark d-flex align-items-center" t-on-click="() => this.state.showUserForm = false">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                                Back to User List
-                            </button>
-                            <h5 class="fw-bold text-dark mb-0">Provision New User</h5>
-                        </div>
-
-                        <div class="card border-0 shadow-sm p-4 rounded-3">
-                            <div class="row">
-                                <div class="col-md-6 border-end pe-4">
-                                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Identity Details</h6>
-
-                                    <div class="mb-3">
-                                        <label class="small fw-bold">Full Name</label>
-                                        <input type="text" class="form-control" t-model="this.state.userForm.name" placeholder="e.g. Adeel Hassan"/>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="small fw-bold">Assign System Role</label>
-                                        <select class="form-select form-control" t-model="this.state.userForm.role">
-                                            <option value="">-- Select Security Group --</option>
-                                            <option value="Distributor (Super Admin)">Distributor (Super Admin)</option>
-                                            <option value="Area Manager">Area Manager</option>
-                                            <option value="KPO (Key Punch Operator)">KPO (Key Punch Operator)</option>
-                                        </select>
-                                        <small class="text-muted mt-1 d-block">This dictates what tabs and actions this user can see.</small>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6 ps-4">
-                                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Authentication Credentials</h6>
-
-                                    <div class="mb-3">
-                                        <label class="small fw-bold">Login Email</label>
-                                        <input type="email" class="form-control" t-model="this.state.userForm.email" placeholder="user@shahtaj.com" autocomplete="off"/>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="small fw-bold">Initial Password</label>
-                                        <input type="password" class="form-control" t-model="this.state.userForm.password" placeholder="••••••••" autocomplete="new-password"/>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                                <button class="btn btn-outline-secondary fw-bold" t-on-click="() => this.state.showUserForm = false">Cancel</button>
-                                <button class="btn btn-dark fw-bold px-4 text-white" t-on-click="saveUser">Create User Account</button>
-                            </div>
-                        </div>
-                    </div>
-                </t>
-
             </t>
         </div>
     </t>

@@ -19,6 +19,8 @@ from . import account_payment
 from . import account_move_reversal
 from . import account_journal
 from . import res_users
+from . import res_company
+from . import res_config_settings
 from . import shahtaj_accounting_hub
 from . import shahtaj_pnl_dashboard
 from . import shahtaj_stock_receipt

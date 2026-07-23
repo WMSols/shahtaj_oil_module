@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_shahtaj_gps" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.shahtaj.gps</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Shahtaj Oil" string="Shahtaj Oil" name="shahtaj_oil"
+                     groups="shahtaj_oil.group_shahtaj_distributor,base.group_system">
+                    <block title="Order Booker GPS" name="shahtaj_gps_distance">
+                        <setting string="Shop proximity range"
+                                 help="Used for visit check-in and place-order. Changes apply on the next GPS check.">
+                            <div class="content-group">
+                                <div class="row mt-2">
+                                    <label for="shahtaj_min_shop_distance_m" class="col-lg-4 o_light_label"/>
+                                    <field name="shahtaj_min_shop_distance_m" class="col-lg-2"/>
+                                    <div class="text-muted col-lg-6">Minimum metres from shop (0 = no minimum)</div>
+                                </div>
+                                <div class="row mt-2">
+                                    <label for="shahtaj_max_shop_distance_m" class="col-lg-4 o_light_label"/>
+                                    <field name="shahtaj_max_shop_distance_m" class="col-lg-2"/>
+                                    <div class="text-muted col-lg-6">Maximum metres from shop (default 100)</div>
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

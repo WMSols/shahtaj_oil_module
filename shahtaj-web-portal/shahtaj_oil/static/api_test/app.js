@@ -107,9 +107,13 @@
     },
     {
       path: '/api/shahtaj/v1/visits/place-order',
-      purpose: 'Submit sales order',
+      purpose: 'Submit sales order (GPS required, same 100m rule as check-in)',
       auth: true,
-      params: [{ name: 'visit_id', required: true, type: 'int' }],
+      params: [
+        { name: 'visit_id', required: true, type: 'int' },
+        { name: 'latitude', required: true, type: 'float' },
+        { name: 'longitude', required: true, type: 'float' },
+      ],
     },
     {
       path: '/api/shahtaj/v1/visits/end-without-order',
@@ -893,8 +897,16 @@
     if (!state.visit) return;
     if (!confirm('Place order from cart lines?')) return;
     try {
+      const lat = parseFloat($('inp-lat').value);
+      const lng = parseFloat($('inp-lng').value);
+      if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        alert('Set latitude/longitude (same GPS fields as check-in) before placing order.');
+        return;
+      }
       const data = await api('/api/shahtaj/v1/visits/place-order', {
         visit_id: state.visit.id,
+        latitude: lat,
+        longitude: lng,
       });
       state.lastCompletedVisit = data.visit;
       state.visit = null;
