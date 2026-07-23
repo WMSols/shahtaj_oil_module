@@ -59,7 +59,8 @@ class ShahtajPnlDashboard(models.TransientModel):
         string='Stock Purchased (period)',
         currency_field='currency_id',
         help='Stock received in the selected period at frozen receipt cost '
-             '(purchase value, not cash paid to manufacturer).',
+             '(active products only; archived products are excluded). '
+             'This is purchase value, not cash paid to manufacturer.',
     )
     amount_payments_received = fields.Monetary(
         string='Payments Collected',
@@ -200,10 +201,7 @@ class ShahtajPnlDashboard(models.TransientModel):
         amount_legacy = sum(legacy_invoices.mapped('amount_untaxed'))
 
         Receipt = self.env['shahtaj.stock.receipt'].sudo()
-        period_receipts = Receipt.search([
-            ('receipt_date', '>=', date_from),
-            ('receipt_date', '<=', date_to),
-        ])
+        period_receipts = Receipt.shahtaj_search_period_receipts(date_from, date_to)
         amount_mfr = sum(period_receipts.mapped('subtotal'))
 
         payments = Payment.search([

@@ -71,6 +71,23 @@ class ShahtajStockReceipt(models.Model):
         for receipt in self:
             receipt.subtotal = (receipt.qty or 0.0) * (receipt.unit_cost or 0.0)
 
+    @api.model
+    def _shahtaj_active_product_domain(self):
+        """Receipts for archived products are excluded from stock summaries."""
+        return [
+            ('product_id.active', '=', True),
+            ('product_tmpl_id.active', '=', True),
+        ]
+
+    @api.model
+    def shahtaj_search_period_receipts(self, date_from, date_to):
+        """Period receipts for active products only (archive hides them from P&L / summary)."""
+        return self.search([
+            ('receipt_date', '>=', date_from),
+            ('receipt_date', '<=', date_to),
+            *self._shahtaj_active_product_domain(),
+        ])
+
     @api.constrains('qty', 'unit_cost')
     def _check_positive_values(self):
         for receipt in self:

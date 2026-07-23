@@ -52,7 +52,12 @@ export class FinancialsInvoicing extends Component {
             showPaymentModal: false,
 
             showRefundModal: false,
-            refundForm: { date: '', reason: '' },
+            refundForm: {
+                date: '',
+                reason: '',
+                mode: 'full', // 'full' | 'partial'
+                lines: [],
+            },
 
             journals: [], 
             products: [], // Loaded for the edit dropdown
@@ -359,18 +364,18 @@ export class FinancialsInvoicing extends Component {
         try {
             const shopsData = await this.orm.searchRead(
                 "res.partner", [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]],
-                ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "credit"] 
+                ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "outstanding_balance"]
             );
             this.state.balances = shopsData.map(shop => ({
                 id: shop.id, shopId: shop.id, shop: shop.name, owner: shop.owner_name || 'N/A', route: shop.route_id ? shop.route_id[1] : 'Unassigned',
                 category: shop.shahtaj_shop_category === 'cash' ? 'Cash' : 'Credit', limit: shop.shahtaj_shop_category === 'cash' ? 'N/A' : (shop.credit_limit || 0).toLocaleString(),
-                rawLimit: shop.credit_limit || 0, outstanding: (shop.credit || 0).toLocaleString(),
-                rawOutstanding: shop.credit || 0, 
+                rawLimit: shop.credit_limit || 0, outstanding: (shop.outstanding_balance || 0).toLocaleString(),
+                rawOutstanding: shop.outstanding_balance || 0,
             }));
 
             this.state.credits = shopsData.map(shop => {
                 const limit = shop.credit_limit || 0;
-                const utilized = shop.credit || 0;
+                const utilized = shop.outstanding_balance || 0;
                 let status = "Healthy";
                 if (shop.shahtaj_shop_category === 'cash') status = "Cash";
                 else if (limit > 0) {
@@ -826,28 +831,247 @@ export class FinancialsInvoicing extends Component {
         this.state.isSavingInvoice = false;
     }
 
-    openRefundModal() {
+    canIssueCreditNote(invoice) {
+        return Boolean(
+            invoice && ['Posted', 'Partial', 'Paid'].includes(invoice.status)
+        );
+    }
+
+    getRefundEstimate() {
+        const form = this.state.refundForm;
+        if (!form) {
+            return 0;
+        }
+        if (form.mode === 'full') {
+            return this.state.selectedInvoice?.rawAmount || 0;
+        }
+        return (form.lines || []).reduce((sum, line) => {
+            const qty = parseFloat(line.qty) || 0;
+            const price = parseFloat(line.price) || 0;
+            return sum + (qty * price);
+        }, 0);
+    }
+
+    setRefundMode(mode) {
+        this.state.refundForm.mode = mode;
+        if (mode === 'partial' && this.state.refundForm.lines.length) {
+            // Default return qty to full line qty; user reduces for partial returns.
+            this.state.refundForm.lines = this.state.refundForm.lines.map((line) => ({
+                ...line,
+                qty: line.maxQty,
+            }));
+        }
+    }
+
+    async openRefundModal() {
+        if (!this.state.selectedInvoice || !this.canIssueCreditNote(this.state.selectedInvoice)) {
+            return;
+        }
         const today = new Date().toISOString().split('T')[0];
-        this.state.refundForm = { date: today, reason: '' };
+        // Ensure product lines are loaded for partial mode.
+        if (!this.state.selectedInvoice.full_lines?.length) {
+            await this.viewInvoice(this.state.selectedInvoice);
+        }
+        const sourceLines = this.state.selectedInvoice.full_lines || [];
+        this.state.refundForm = {
+            date: today,
+            reason: '',
+            mode: 'full',
+            lines: sourceLines.map((line) => ({
+                sourceLineId: line.id,
+                productId: line.productId || line.product_id || null,
+                product: line.product || '',
+                maxQty: parseFloat(line.qty) || 0,
+                qty: parseFloat(line.qty) || 0,
+                price: parseFloat(line.price) || 0,
+                tax_id: line.tax_id || '',
+            })),
+        };
         this.state.showRefundModal = true;
     }
 
-    closeRefundModal() { this.state.showRefundModal = false; }
+    closeRefundModal() {
+        this.state.showRefundModal = false;
+        this.state.refundForm = {
+            date: '',
+            reason: '',
+            mode: 'full',
+            lines: [],
+        };
+    }
+
+    _validateRefundForm() {
+        const form = this.state.refundForm;
+        if (!form.date) {
+            alert('Please select a refund date.');
+            return false;
+        }
+        if (form.mode !== 'partial') {
+            return true;
+        }
+        if (!form.lines.length) {
+            alert('This invoice has no product lines to credit.');
+            return false;
+        }
+        let hasReturn = false;
+        for (const line of form.lines) {
+            const qty = parseFloat(line.qty);
+            if (Number.isNaN(qty) || qty < 0) {
+                alert(`Invalid return quantity for "${line.product}".`);
+                return false;
+            }
+            if (qty > line.maxQty) {
+                alert(
+                    `Return quantity for "${line.product}" cannot exceed invoiced qty (${line.maxQty}).`
+                );
+                return false;
+            }
+            if (qty > 0) {
+                hasReturn = true;
+            }
+        }
+        if (!hasReturn) {
+            alert('Set at least one product return quantity greater than zero.');
+            return false;
+        }
+        const isFullSelection = form.lines.every(
+            (line) => (parseFloat(line.qty) || 0) === (parseFloat(line.maxQty) || 0)
+        );
+        if (isFullSelection) {
+            // Treat as full credit note — no line surgery needed after reverse.
+            form.mode = 'full';
+        }
+        return true;
+    }
+
+    async _applyPartialCreditNoteLines(creditNoteId) {
+        const form = this.state.refundForm;
+        const cnLines = await this.orm.searchRead(
+            'account.move.line',
+            [
+                ['move_id', '=', creditNoteId],
+                ['display_type', '=', 'product'],
+            ],
+            ['id', 'product_id', 'quantity', 'name']
+        );
+        cnLines.sort((a, b) => a.id - b.id);
+        const sourceLines = form.lines || [];
+        if (!cnLines.length || cnLines.length !== sourceLines.length) {
+            return this._applyPartialCreditNoteLinesByProduct(creditNoteId, cnLines, sourceLines);
+        }
+
+        const commands = [];
+        for (let i = 0; i < sourceLines.length; i++) {
+            const src = sourceLines[i];
+            const cnLine = cnLines[i];
+            const qty = parseFloat(src.qty) || 0;
+            if (qty <= 0) {
+                commands.push([2, cnLine.id, false]);
+            } else if (Math.abs(qty - (cnLine.quantity || 0)) > 1e-6) {
+                commands.push([1, cnLine.id, { quantity: qty }]);
+            }
+        }
+        if (!commands.length) {
+            return;
+        }
+        await this.orm.write('account.move', [creditNoteId], {
+            invoice_line_ids: commands,
+        });
+    }
+
+    async _applyPartialCreditNoteLinesByProduct(creditNoteId, cnLines, sourceLines) {
+        const pool = [...cnLines];
+        const commands = [];
+        for (const src of sourceLines) {
+            const productId = src.productId ? parseInt(src.productId, 10) : null;
+            const idx = pool.findIndex((line) => {
+                const lineProductId = Array.isArray(line.product_id)
+                    ? line.product_id[0]
+                    : line.product_id;
+                return productId && lineProductId === productId;
+            });
+            if (idx < 0) {
+                continue;
+            }
+            const cnLine = pool.splice(idx, 1)[0];
+            const qty = parseFloat(src.qty) || 0;
+            if (qty <= 0) {
+                commands.push([2, cnLine.id, false]);
+            } else if (Math.abs(qty - (cnLine.quantity || 0)) > 1e-6) {
+                commands.push([1, cnLine.id, { quantity: qty }]);
+            }
+        }
+        for (const leftover of pool) {
+            commands.push([2, leftover.id, false]);
+        }
+        if (!commands.length) {
+            return;
+        }
+        await this.orm.write('account.move', [creditNoteId], {
+            invoice_line_ids: commands,
+        });
+    }
 
     async processRefund() {
+        if (!this._validateRefundForm()) {
+            return;
+        }
         this.state.isRefunding = true;
+        const refundMode = this.state.refundForm.mode;
         try {
-            const context = { active_model: 'account.move', active_ids: [this.state.selectedInvoice.id] };
-            const wizardIds = await this.orm.create("account.move.reversal", [{
-                reason: this.state.refundForm.reason, date: this.state.refundForm.date,
-                journal_id: this.state.selectedInvoice.journal_id
+            const invoiceId = this.state.selectedInvoice.id;
+            const context = {
+                active_model: 'account.move',
+                active_ids: [invoiceId],
+            };
+            const wizardIds = await this.orm.create('account.move.reversal', [{
+                reason: this.state.refundForm.reason,
+                date: this.state.refundForm.date,
+                journal_id: this.state.selectedInvoice.journal_id,
             }], { context });
-            
-            await this.orm.call("account.move.reversal", "reverse_moves", [wizardIds], { context });
-            await this.fetchRealData(); 
+
+            const action = await this.orm.call(
+                'account.move.reversal',
+                'reverse_moves',
+                [wizardIds],
+                { context }
+            );
+            const creditNoteId = action?.res_id;
+            if (!creditNoteId) {
+                throw new Error('Credit note was created but could not be opened.');
+            }
+
+            // Ensure draft before trimming lines (future-dated reverses may auto-post).
+            const [cnState] = await this.orm.read('account.move', [creditNoteId], ['state']);
+            if (cnState?.state === 'posted' && refundMode === 'partial') {
+                await this.orm.call('account.move', 'button_draft', [[creditNoteId]]);
+            }
+
+            if (refundMode === 'partial') {
+                await this._applyPartialCreditNoteLines(creditNoteId);
+            }
+
             this.closeRefundModal();
-            this.state.selectedInvoice = null; 
-        } catch (error) { alert(`Refund failed:\n\n${error.data?.message || error.message}`); }
+            await this.fetchRealData();
+            // Open the draft CN for review/confirm — avoid setInvoiceSubTab
+            // (it clears selection via resetDetailViews).
+            this.state.invoiceSubTab = 'credit_notes';
+            this.state.activeSubTab = 'invoices';
+            const created = this.state.creditNotes.find((cn) => cn.id === creditNoteId);
+            if (created) {
+                await this.viewInvoice(created);
+            } else {
+                this.state.selectedInvoice = null;
+            }
+            this.notification.add(
+                refundMode === 'partial'
+                    ? 'Partial credit note created as draft. Review lines, then Confirm Refund.'
+                    : 'Credit note created as draft. Review and Confirm Refund when ready.',
+                { type: 'success' }
+            );
+        } catch (error) {
+            alert(`Refund failed:\n\n${error.data?.message || error.message}`);
+        }
         this.state.isRefunding = false;
     }
 

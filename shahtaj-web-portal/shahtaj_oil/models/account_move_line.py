@@ -10,6 +10,7 @@ class AccountMoveLine(models.Model):
         string='Frozen Unit Cost',
         digits='Product Price',
         copy=False,
-        help='Product cost per unit locked when the invoice or credit note was posted. '
-             'Used for stable gross margin in the distributor P&L.',
+        help='Product cost per unit locked when the invoice was posted. '
+             'Credit notes from a reversal reuse the original invoice frozen '
+             'cost so P&L COGS matches the sale being refunded.',
     )

@@ -113,9 +113,12 @@ class ShahtajManufacturerSummary(models.TransientModel):
 
         date_from = self.date_from
         date_to = self.date_to
-        templates = Template.search([
+        # Active products only — archiving a product hides it from this summary;
+        # unarchiving brings its receipt history back into the totals.
+        templates = Template.with_context(active_test=True).search([
             ('sale_ok', '=', True),
             ('is_storable', '=', True),
+            ('active', '=', True),
         ])
 
         total_received_qty = 0.0
@@ -136,9 +139,11 @@ class ShahtajManufacturerSummary(models.TransientModel):
                 ('product_id', 'in', variant_ids),
                 ('receipt_date', '>=', date_from),
                 ('receipt_date', '<=', date_to),
+                *Receipt._shahtaj_active_product_domain(),
             ])
             lifetime_receipts = Receipt.search([
                 ('product_id', 'in', variant_ids),
+                *Receipt._shahtaj_active_product_domain(),
             ])
 
             qty_received = sum(period_receipts.mapped('qty'))

@@ -137,13 +137,15 @@ class ShahtajVisitTarget(models.Model):
 
     @api.model
     def _sale_order_domain_for_target(self, booker, date_start, date_end):
-        """Confirmed, active sale orders placed by the booker in the period."""
+        """Confirmed sale orders placed by the booker in the period.
+
+        Cancelled orders are excluded via state (sale.order has no `active` field).
+        """
         return [
             ('create_uid', '=', booker.id),
             ('date_order', '>=', date_start),
             ('date_order', '<=', date_end),
             ('state', 'in', ORDER_STATES_FOR_TARGET),
-            ('active', '=', True),
         ]
 
     @api.model
@@ -154,7 +156,6 @@ class ShahtajVisitTarget(models.Model):
             ('order_id.date_order', '>=', date_start),
             ('order_id.date_order', '<=', date_end),
             ('order_id.state', 'in', ORDER_STATES_FOR_TARGET),
-            ('order_id.active', '=', True),
             ('display_type', '=', False),
             ('product_id', '!=', False),
             ('product_id.default_code', '!=', 'SHAHTAJ-LEGACY'),

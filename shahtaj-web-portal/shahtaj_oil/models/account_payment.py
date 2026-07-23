@@ -12,6 +12,16 @@ SHAHTAJ_PAYMENT_CHANNELS = [
 ]
 
 
+def _shahtaj_needs_financial_sudo(env):
+    """Custom-portal financial distributors lack Accounting/Invoicing group."""
+    if env.su:
+        return False
+    user = env.user
+    if user.has_group('account.group_account_invoice'):
+        return False
+    return user.has_group('shahtaj_oil.group_shahtaj_distributor_financial')
+
+
 class AccountPayment(models.Model):
     _inherit = 'account.payment'
 
@@ -63,6 +73,13 @@ class AccountPayment(models.Model):
                 and payment.shahtaj_payment_channel == 'cash'
             ):
                 payment.shahtaj_payment_channel = False
+
+    def action_post(self):
+        # Posting creates/reconciles move lines; elevate only for portal financial users.
+        if _shahtaj_needs_financial_sudo(self.env):
+            self.check_access('write')
+            return super(AccountPayment, self.sudo()).action_post()
+        return super().action_post()
 
 
 class AccountPaymentRegister(models.TransientModel):
@@ -129,3 +146,11 @@ class AccountPaymentRegister(models.TransientModel):
         vals = super()._create_payment_vals_from_batch(batch_result)
         vals.update(self._shahtaj_payment_detail_vals())
         return vals
+
+    def action_create_payments(self):
+        # Register payment posts + reconciles; portal financial users lack
+        # native Accounting/Invoicing and need elevated execution after ACL check.
+        if _shahtaj_needs_financial_sudo(self.env):
+            self.check_access('write')
+            return super(AccountPaymentRegister, self.sudo()).action_create_payments()
+        return super().action_create_payments()

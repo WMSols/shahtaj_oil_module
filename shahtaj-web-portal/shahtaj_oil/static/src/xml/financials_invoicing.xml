@@ -742,7 +742,7 @@
                                             <i class="fa fa-money me-1"></i> Register Payment
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Paid'" class="btn btn-danger fw-bold text-white px-3 shadow-sm" t-on-click="openRefundModal" title="Create a Credit Note to refund this invoice before cancelling">
+                                        <button t-if="this.canIssueCreditNote(this.state.selectedInvoice)" class="btn btn-danger fw-bold text-white px-3 shadow-sm" t-on-click="openRefundModal" title="Create a full or partial Credit Note for this invoice">
                                             <i class="fa fa-reply me-1"></i> Refund / Credit Note
                                         </button>
                                     </div>
@@ -903,12 +903,12 @@
 
                         <t t-if="this.state.showRefundModal">
                             <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background-color: rgba(0, 0, 0, 0.6); z-index: 1050;">
-                                <div class="bg-white p-4 rounded-3 shadow-lg" style="width: 500px;">
+                                <div class="bg-white p-4 rounded-3 shadow-lg" t-att-style="this.state.refundForm.mode === 'partial' ? 'width: min(760px, 96vw); max-height: 90vh; overflow:auto;' : 'width: 520px;'">
                                     <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
                                         <div>
                                             <h5 class="fw-bold text-dark mb-0">
                                                 <i class="fa fa-reply text-danger me-2"></i> Issue Refund / Credit Note</h5>
-                                            <small class="text-muted">Reverse this paid invoice to balance the ledger.</small>
+                                            <small class="text-muted">Create a full or partial credit note against this invoice.</small>
                                         </div>
                                     </div>
 
@@ -917,24 +917,95 @@
                                         <input type="text" class="form-control bg-light fw-bold text-primary" t-att-value="this.state.selectedInvoice.display_name" disabled="1"/>
                                     </div>
 
+                                    <div class="mb-3">
+                                        <label class="small fw-bold d-block mb-2">Credit Note Type</label>
+                                        <div class="d-flex flex-wrap gap-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="shahtajRefundMode" id="shahtajRefundFull"
+                                                       t-att-checked="this.state.refundForm.mode === 'full'"
+                                                       t-on-change="() => this.setRefundMode('full')"/>
+                                                <label class="form-check-label fw-bold" for="shahtajRefundFull">Full credit note</label>
+                                                <div class="text-muted small">Reverse the entire invoice.</div>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="shahtajRefundMode" id="shahtajRefundPartial"
+                                                       t-att-checked="this.state.refundForm.mode === 'partial'"
+                                                       t-on-change="() => this.setRefundMode('partial')"/>
+                                                <label class="form-check-label fw-bold" for="shahtajRefundPartial">Partial credit note</label>
+                                                <div class="text-muted small">Return selected products / quantities (e.g. 1 unit).</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div class="row">
-                                        <div class="col-12 mb-3">
+                                        <div class="col-md-8 mb-3">
                                             <label class="small fw-bold">Reason for Refund</label>
                                             <input type="text" class="form-control" t-model="this.state.refundForm.reason" placeholder="e.g. Products returned damaged"/>
                                         </div>
-                                        <div class="col-12 mb-4">
+                                        <div class="col-md-4 mb-3">
                                             <label class="small fw-bold">Refund Date</label>
                                             <input type="date" class="form-control" t-model="this.state.refundForm.date"/>
                                         </div>
                                     </div>
 
-                                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
-                                        <button class="btn btn-light fw-bold border px-4" t-on-click="closeRefundModal" t-att-disabled="this.state.isRefunding">Cancel</button>
-                                        <button class="btn btn-danger fw-bold text-white px-4 shadow-sm" t-on-click="processRefund" t-att-disabled="this.state.isRefunding">
-                                            <span t-if="this.state.isRefunding" class="spinner-border spinner-border-sm me-2"/>
-                                            <t t-if="this.state.isRefunding">Processing...</t>
-                                            <t t-else="">Confirm Refund</t>
-                                        </button>
+                                    <t t-if="this.state.refundForm.mode === 'partial'">
+                                        <div class="mb-3">
+                                            <label class="small fw-bold d-block mb-2">Products to Credit</label>
+                                            <div class="table-responsive border rounded">
+                                                <table class="table table-sm align-middle mb-0">
+                                                    <thead class="bg-light text-muted small text-uppercase">
+                                                        <tr>
+                                                            <th class="ps-3">Product</th>
+                                                            <th class="text-center" style="width: 100px;">Invoiced</th>
+                                                            <th class="text-center" style="width: 120px;">Return Qty</th>
+                                                            <th class="text-end pe-3" style="width: 120px;">Unit Price</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <t t-if="!this.state.refundForm.lines.length">
+                                                            <tr>
+                                                                <td colspan="4" class="text-center text-muted py-3">No product lines on this invoice.</td>
+                                                            </tr>
+                                                        </t>
+                                                        <t t-foreach="this.state.refundForm.lines" t-as="rline" t-key="rline.sourceLineId">
+                                                            <tr>
+                                                                <td class="ps-3 fw-bold text-dark">
+                                                                    <t t-esc="rline.product"/>
+                                                                </td>
+                                                                <td class="text-center text-muted">
+                                                                    <t t-esc="rline.maxQty"/>
+                                                                </td>
+                                                                <td class="text-center">
+                                                                    <input type="number" class="form-control form-control-sm text-center mx-auto"
+                                                                           style="width: 90px;" min="0" step="any"
+                                                                           t-att-max="rline.maxQty"
+                                                                           t-model="rline.qty"/>
+                                                                </td>
+                                                                <td class="text-end pe-3">
+                                                                    <t t-esc="rline.price"/>
+                                                                </td>
+                                                            </tr>
+                                                        </t>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">Set return qty to 0 to exclude a product. Leave all at invoiced qty for a full credit.</small>
+                                        </div>
+                                    </t>
+
+                                    <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                                        <div class="small text-muted">
+                                            Est. untaxed credit:
+                                            <span class="fw-bold text-dark">Rs. <t t-esc="this.getRefundEstimate().toLocaleString(undefined, {minimumFractionDigits: 2})"/></span>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-light fw-bold border px-4" t-on-click="closeRefundModal" t-att-disabled="this.state.isRefunding">Cancel</button>
+                                            <button class="btn btn-danger fw-bold text-white px-4 shadow-sm" t-on-click="processRefund" t-att-disabled="this.state.isRefunding">
+                                                <span t-if="this.state.isRefunding" class="spinner-border spinner-border-sm me-2"/>
+                                                <t t-if="this.state.isRefunding">Processing...</t>
+                                                <t t-else="">Create Credit Note</t>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

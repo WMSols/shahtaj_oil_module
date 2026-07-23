@@ -17,12 +17,8 @@ class AccountMove(models.Model):
 
     def _shahtaj_needs_invoice_sudo(self):
         """Custom-portal financial distributors lack Accounting/Invoicing group."""
-        if self.env.su:
-            return False
-        user = self.env.user
-        if user.has_group('account.group_account_invoice'):
-            return False
-        return user.has_group('shahtaj_oil.group_shahtaj_distributor_financial')
+        from .account_payment import _shahtaj_needs_financial_sudo
+        return _shahtaj_needs_financial_sudo(self.env)
 
     def write(self, vals):
         # Invoice line edits write journal items; elevate only when needed.
@@ -55,12 +51,45 @@ class AccountMove(models.Model):
         return super().button_cancel()
 
     def _shahtaj_snapshot_invoice_costs(self):
-        """Lock product cost on invoice lines at posting (standard perpetual-inventory practice)."""
+        """Lock product cost on invoice / credit-note lines at posting.
+
+        Invoices: freeze current product standard cost.
+        Credit notes from a reversal: reuse the original invoice line's frozen
+        cost so P&L COGS matches the sale being refunded (not today's cost).
+        """
         for move in self.filtered(
             lambda m: m.move_type in ('out_invoice', 'out_refund')
         ):
             product_lines = move.invoice_line_ids.filtered(
                 lambda line: line.display_type == 'product' and line.product_id
             )
+            origin_pool = []
+            if move.move_type == 'out_refund' and move.reversed_entry_id:
+                origin_lines = move.reversed_entry_id.invoice_line_ids.filtered(
+                    lambda line: line.display_type == 'product' and line.product_id
+                )
+                origin_pool = [
+                    (
+                        line.product_id.id,
+                        line.shahtaj_cost_unit
+                        if line.shahtaj_cost_unit
+                        else (line.product_id.standard_price or 0.0),
+                    )
+                    for line in origin_lines
+                ]
+
             for line in product_lines:
-                line.shahtaj_cost_unit = line.product_id.standard_price or 0.0
+                if move.move_type == 'out_refund' and origin_pool:
+                    matched_cost = None
+                    for idx, (product_id, unit_cost) in enumerate(origin_pool):
+                        if product_id == line.product_id.id:
+                            matched_cost = unit_cost
+                            origin_pool.pop(idx)
+                            break
+                    line.shahtaj_cost_unit = (
+                        matched_cost
+                        if matched_cost is not None
+                        else (line.product_id.standard_price or 0.0)
+                    )
+                else:
+                    line.shahtaj_cost_unit = line.product_id.standard_price or 0.0
