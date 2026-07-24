@@ -511,8 +511,11 @@ class ShahtajVisit(models.Model):
     def action_place_order(self, latitude=None, longitude=None):
         """Create and confirm sale order from visit lines; finish visit.
 
-        Booker API must pass current GPS (same 100 m rule as check-in).
-        Distributor backend Place Order without GPS is allowed for support.
+        Mobile/API place-order must pass GPS with context
+        ``shahtaj_require_place_order_gps=True`` (same distance rule as check-in).
+
+        Native Odoo "Place Order" on the visit form has no GPS capture UI, so it
+        does not require coordinates (check-in already validated location).
         """
         self.ensure_one()
         if self.state != 'in_progress':
@@ -522,11 +525,8 @@ class ShahtajVisit(models.Model):
                 'Shop "%(shop)s" is no longer active on an operational route/zone.',
                 shop=self.shop_id.name,
             ))
-        require_gps = (
-            self.env.context.get('shahtaj_require_place_order_gps')
-            if 'shahtaj_require_place_order_gps' in self.env.context
-            else self._is_booker_only_user()
-        )
+        # API sets shahtaj_require_place_order_gps=True. Native form button does not.
+        require_gps = bool(self.env.context.get('shahtaj_require_place_order_gps'))
         if require_gps or latitude is not None or longitude is not None:
             if latitude is None or longitude is None:
                 raise UserError(_(

@@ -261,6 +261,12 @@ export class SchedulesTargets extends Component {
     // ─── Editing ─────────────────────────────────────────────────────────────────
 
     editSchedule(sched) {
+        if (sched.isLocked) {
+            const msg = `Cannot edit today's ${sched.day} schedule — visits are already in progress or completed. Finish or skip those visits first. You can change this weekday later for the next ${sched.day}.`;
+            this.state.errorMessage = msg;
+            this.notification.add(msg, { type: "warning" });
+            return;
+        }
         this.state.errorMessage = '';
         this.state.scheduleForm = {
             day: sched.day_raw.toString(),
@@ -335,6 +341,31 @@ export class SchedulesTargets extends Component {
 
     // ─── Save Handlers ──────────────────────────────────────────────────────────
 
+    _scheduleDayLabel(dayCode) {
+        const dayMap = {
+            '0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday',
+            '4': 'Friday', '5': 'Saturday', '6': 'Sunday',
+        };
+        return dayMap[String(dayCode)] || 'day';
+    }
+
+    _todayWeekdayCode() {
+        // Match backend: Monday = 0 ... Sunday = 6
+        const jsDay = new Date().getDay(); // Sunday = 0
+        return String(jsDay === 0 ? 6 : jsDay - 1);
+    }
+
+    _buildScheduleSaveMessage(dayCode, { created = false } = {}) {
+        const dayName = this._scheduleDayLabel(dayCode);
+        if (created) {
+            return `Schedule created. The order booker will see ${dayName} visits for this route from the next ${dayName} onward.`;
+        }
+        if (String(dayCode) === this._todayWeekdayCode()) {
+            return `Today's ${dayName} schedule updated. Pending visits were refreshed for the new plan. Completed visits stay as they are.`;
+        }
+        return `Schedule updated. Completed visits for this week stay as they are. The order booker will get the new route from the next ${dayName}.`;
+    }
+
     async saveSchedule() {
         const form = this.state.scheduleForm;
 
@@ -399,10 +430,13 @@ export class SchedulesTargets extends Component {
 
             if (editingScheduleId) {
                 await this.orm.write('shahtaj.weekly.schedule', [editingScheduleId], payload);
-                this.notification.add("Schedule updated successfully.", { type: "success" });
+                this.notification.add(this._buildScheduleSaveMessage(form.day), { type: "success" });
             } else {
                 await this.orm.create('shahtaj.weekly.schedule', [payload]);
-                this.notification.add("Schedule created successfully.", { type: "success" });
+                this.notification.add(
+                    this._buildScheduleSaveMessage(form.day, { created: true }),
+                    { type: "success" }
+                );
             }
 
             this.state.showForm = false;
@@ -500,7 +534,7 @@ export class SchedulesTargets extends Component {
 
     promptDeleteSchedule(sched) {
         if (sched.isLocked) {
-            const msg = "Cannot delete today's schedule — visits are already in progress.";
+            const msg = `Cannot delete today's ${sched.day} schedule — visits are already in progress or completed. Finish or skip those visits first. You can change this weekday later for the next ${sched.day}.`;
             this.state.errorMessage = msg;
             this.notification.add(msg, { type: "warning" });
             return;

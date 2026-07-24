@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Simplified product defaults for Shahtaj distributors."""
-from odoo import _, api, fields, models
+from odoo import _, api, fields, models, SUPERUSER_ID
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import float_compare, float_is_zero
 
@@ -472,7 +472,13 @@ class ProductTemplate(models.Model):
             ))
         old_qty = stock_self.qty_available
         variant = stock_self.product_variant_id
-        stock_self.env['stock.quant'].with_context(
+        # Odoo enables inventory_mode only when env.user has stock.group_stock_user.
+        # Portal distributors do not; sudo() also keeps the same user. Without that
+        # mode, create() inserts a NEW empty quant and _apply_inventory adds the
+        # full target qty on top of existing stock (e.g. 70 + 75 = 145).
+        # Run as SUPERUSER so create merges the existing warehouse quant like native
+        # "On Hand" edit, then applies only the difference.
+        stock_self.env['stock.quant'].with_user(SUPERUSER_ID).with_context(
             inventory_mode=True,
             from_inverse_qty=True,
         ).create({

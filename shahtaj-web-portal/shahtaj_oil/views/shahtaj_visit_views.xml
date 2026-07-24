@@ -211,6 +211,7 @@
                         <field name="shop_name" readonly="1" nolabel="1" class="oe_inline"/>
                         (<field name="route_name" readonly="1" nolabel="1" class="oe_inline"/>).
                         Add products below, then place the order or end without order.
+                        GPS at place-order is required on the mobile app; this screen uses the check-in already done.
                         Started <field name="started_at" readonly="1" nolabel="1" class="oe_inline"/>.
                     </div>
                     <group>

@@ -411,7 +411,7 @@ export class WarehouseInventory extends Component {
         const qty = parseFloat(this.state.adjustmentForm.qty);
         
         if (pid && qty > 0) {
-            await this.orm.call("product.template", "action_shahtaj_add_on_hand_qty", [pid, qty]);
+            await this.orm.call("product.template", "action_shahtaj_add_on_hand_qty", [[pid], qty]);
             await this.loadInventory();
         }
         

@@ -156,6 +156,12 @@
                             </div>
                         </div>
 
+                        <div class="alert alert-light border small text-muted mb-3 mb-md-2">
+                            <i class="fa fa-info-circle me-1 text-primary"></i>
+                            Changes apply from the <strong>next</strong> selected weekday (for example next Monday).
+                            Completed visits for this week stay as they are. Today's schedule stays locked only while visits are in progress or completed.
+                        </div>
+
                         <div class="d-flex justify-content-end mt-3">
                             <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
                             <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveSchedule" t-att-disabled="this.state.isLoading">
@@ -264,6 +270,13 @@
                 </t>
 
                 <t t-if="!this.state.showForm and this.state.activeMainTab === 'schedules'">
+                    <div class="px-4 pt-3">
+                        <div class="alert alert-light border small text-muted mb-0">
+                            <i class="fa fa-info-circle me-1 text-primary"></i>
+                            Editing a weekday updates the plan from the <strong>next</strong> that weekday.
+                            Today's row is locked only if visits are already in progress or completed.
+                        </div>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead class="bg-light text-uppercase small fw-bold text-muted">
@@ -285,6 +298,9 @@
                                     <tr>
                                         <td class="ps-4 align-middle fw-bold">
                                             <t t-esc="sched.day"/>
+                                            <t t-if="sched.isLocked">
+                                                <span class="badge bg-warning text-dark ms-2">Locked today</span>
+                                            </t>
                                         </td>
                                         <td class="align-middle">
                                             <div class="text-dark">
@@ -303,8 +319,8 @@
                                             </span>
                                         </td>
                                         <td class="align-middle text-end pe-4">
-                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editSchedule(sched)">Edit</button>
-                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.promptDeleteSchedule(sched)">Delete</button>
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editSchedule(sched)" t-att-disabled="sched.isLocked" title="Edit schedule (locked only while today has visits in progress or completed)">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.promptDeleteSchedule(sched)" t-att-disabled="sched.isLocked" title="Delete schedule (locked only while today has visits in progress or completed)">Delete</button>
                                         </td>
                                     </tr>
                                 </t>
