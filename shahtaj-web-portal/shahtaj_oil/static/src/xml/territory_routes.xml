@@ -10,11 +10,11 @@
                 </div>
                             <div>
                 
-                
-                <span class="badge bg-info px-3 py-2 text-white d-inline-flex align-items-center shadow-sm" title="Live mapping is enabled for shop coordinates">
+                <!--Removed Non-Functional Elements  -->
+                <!-- <span class="badge bg-info px-3 py-2 text-white d-inline-flex align-items-center shadow-sm" title="Live mapping is enabled for shop coordinates">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin me-2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                     Mapping Engine Active
-                </span>
+                </span> -->
                 <!-- NEW REFRESH BUTTON -->
                 <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center ms-3" t-on-click="refreshData" t-att-disabled="this.state.isLoading" title="Refresh Territory Data">
                     <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isLoading}"></i> Refresh
@@ -470,7 +470,8 @@
             </div>
         </div>
 
-        <div class="table-responsive">
+               <!-- Added min-height to prevent dropdown clipping on single-row tables -->
+        <div class="table-responsive" style="min-height: 250px;">
             <table class="table table-hover mb-0">
                 <thead class="bg-light text-uppercase small fw-bold text-muted">
                     <tr>
@@ -584,6 +585,7 @@
             </tbody>
         </table>
     </div>
+
 </t>
 
 <t t-else="">

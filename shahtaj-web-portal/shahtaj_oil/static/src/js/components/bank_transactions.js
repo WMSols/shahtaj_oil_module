@@ -18,7 +18,6 @@ export class BankTransactions extends Component {
             activeTab: 'transactions', // 'transactions' or 'journals'
             viewMode: 'list', // 'list' or 'detail'
             selectedTransaction: null,
-
             // Loading States
             isLoading: {
                 data: true,
@@ -79,12 +78,13 @@ export class BankTransactions extends Component {
             this.state.isLoading.data = false;
         }
     }
-
     async refreshData() {
+        // fetchAllData already handles the this.state.isLoading.data toggles
         await this.fetchAllData();
     }
 
     async loadJournals() {
+        // Fetch only bank and cash journals per the python domain[cite: 16]
         const journals = await this.orm.searchRead(
             "account.journal",
             [["type", "in", ["bank", "cash"]]],
@@ -94,6 +94,7 @@ export class BankTransactions extends Component {
     }
 
     async loadTransactions() {
+        // Fetch transactions linked to bank/cash journals[cite: 16]
         const payments = await this.orm.searchRead(
             "account.payment",
             [["journal_id.type", "in", ["bank", "cash"]]],
@@ -165,6 +166,31 @@ export class BankTransactions extends Component {
         this.state.showJournalModal = false;
     }
 
+    async saveJournal() {
+        if (!this.state.journalForm.name || !this.state.journalForm.code) {
+            this.notification("Please provide both a Name and a Short Code for the journal.");
+            return;
+        }
+
+        this.state.isLoading.saveJournal = true;
+        try {
+            // Distributors create bank/cash journals safely[cite: 14]
+            await this.orm.create("account.journal", [{
+                name: this.state.journalForm.name,
+                type: this.state.journalForm.type,
+                code: this.state.journalForm.code
+            }]);
+            
+            await this.loadJournals();
+            this.closeJournalModal();
+        } catch (error) {
+            alert("Failed to create journal: " + (error.data?.message || error.message));
+        } finally {
+            this.state.isLoading.saveJournal = false;
+        }
+    }
+
+    // --- Navigation Actions ---
     switchTab(tabName) {
         this.state.activeTab = tabName;
         this.state.viewMode = 'list';
@@ -180,32 +206,32 @@ export class BankTransactions extends Component {
         this.state.viewMode = 'list';
         this.state.selectedTransaction = null;
     }
-
     editJournal(journal) {
-        this.state.journalForm = {
-            id: journal.id,
-            name: journal.name,
-            type: journal.type,
-            code: journal.code || ''
+        this.state.journalForm = { 
+            id: journal.id, // Track the ID to know we are editing
+            name: journal.name, 
+            type: journal.type, 
+            code: journal.code || '' 
         };
         this.state.showJournalModal = true;
     }
 
     async saveJournal() {
         if (!this.state.journalForm.name || !this.state.journalForm.code) {
-            alert("Name and Short Code are required.");
-            return;
+            alert("Name and Short Code are required."); return;
         }
 
         this.state.isLoading.saveJournal = true;
         try {
             if (this.state.journalForm.id) {
+                // Update existing
                 await this.orm.write("account.journal", [this.state.journalForm.id], {
                     name: this.state.journalForm.name,
                     type: this.state.journalForm.type,
                     code: this.state.journalForm.code
                 });
             } else {
+                // Create new
                 await this.orm.create("account.journal", [{
                     name: this.state.journalForm.name,
                     type: this.state.journalForm.type,

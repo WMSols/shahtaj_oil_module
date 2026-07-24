@@ -8,9 +8,11 @@
                     <h2 class="h4 fw-bold text-dark mb-0">Financials &amp; Invoicing</h2>
                     <p class="text-muted">Process field orders into invoices, register received payments, and manage shop credit limits.</p>
                 </div>
+                <t t-if="this.state.activeSubTab !== 'pnl' and this.state.activeSubTab !== 'cash'">
                 <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center bg-white" t-on-click="refreshData" t-att-disabled="this.state.isRefreshing" title="Refresh Live Data">
                     <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isRefreshing}"></i> Refresh
                 </button>
+                </t>
             </div>
             <t t-if="this.state.activeSubTab !== 'pnl' and this.state.activeSubTab !== 'money' and this.state.activeSubTab !== 'cash'">
                 <div class="row g-3 px-4 pb-4 bg-light border-bottom">
@@ -169,7 +171,7 @@
                                 </div>
                                 <h4 class="fw-bold text-dark mb-2">Rs. <t t-esc="this.state.money.openInvoiceAmount.toLocaleString()"/></h4>
                                 <p class="small text-muted mb-3">Amount still open on posted shop invoices.</p>
-                                <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => { this.state.activeSubTab = 'invoices'; this.setInvoiceSubTab('customer_invoices'); }">
+                               <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.requestTabSwitch('financials', 'customer_invoices')">
                                     View Invoices
                                 </button>
                             </div>
@@ -179,11 +181,11 @@
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <h6 class="fw-bold mb-0">Quick Links</h6>
                                 </div>
-                                <div class="d-flex flex-wrap gap-2">
+                               <div class="d-flex flex-wrap gap-2">
                                     <button class="btn btn-sm btn-dark fw-bold text-white" t-on-click="() => this.openCashActivity('all')">Cash Activity</button>
                                     <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="openCreditNotesFromMoney">Credit Notes</button>
-                                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.setSubTab('credit')">Credit Risk</button>
-                                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.setSubTab('pnl')">Profit &amp; Loss</button>
+                                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.requestTabSwitch('financials', 'credit')">Credit Risk</button>
+                                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.requestTabSwitch('financials', 'pnl')">Profit &amp; Loss</button>
                                 </div>
                                 <p class="small text-muted mt-3 mb-0">
                                     Flow: Sold (invoices) → Collected (cash in) → Still with shops → Paid back (cash out).
@@ -201,7 +203,7 @@
                             <h3 class="fw-bold text-dark mb-0">Cash Activity</h3>
                             <small class="text-muted">Money in and out across bank &amp; cash journals.</small>
                         </div>
-                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.setSubTab('money')">
+                       <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.requestTabSwitch('financials', 'money')">
                             Back to Money Overview
                         </button>
                     </div>
@@ -246,7 +248,7 @@
                         </li>
                     </ul>
                 </div>
-
+                <!-- Sales Orders Tab -->
                 <t t-if="this.state.invoiceSubTab === 'all_orders'">
                     <t t-if="!this.state.selectedOrder">
                         <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
@@ -277,40 +279,25 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <t t-if="this.state.isLoadingLines">
+                                    <t t-if="this.filteredAllOrders.length === 0">
                                         <tr>
-                                            <td colspan="7" class="text-center py-4 text-muted">
-                                                <i class="fa fa-circle-o-notch fa-spin me-2"></i> Loading Order Lines...
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                <i class="fa fa-shopping-bag fs-1 mb-3 opacity-50"></i>
+                                                <p class="mb-1 fw-bold fs-5 text-dark">No sales orders found.</p>
                                             </td>
                                         </tr>
                                     </t>
-                                    <t t-foreach="this.filteredAllOrders" t-as="ord" t-key="ord.id">
-                                        <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewOrder(ord)">
-                                            <td class="ps-4 fw-bold text-dark">
-                                                <t t-esc="ord.display_name"/>
-                                            </td>
-                                            <td class="fw-bold">
-                                                <t t-esc="ord.shop"/>
-                                                <small class="d-block text-muted fw-normal">ID: <t t-esc="ord.shopId"/>
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <span class="badge ">
-                                                    <i class="fa fa-user me-1"></i>
-                                                    <t t-esc="ord.booker"/>
-                                                </span>
-                                            </td>
-                                            <td class="text-muted">
-                                                <t t-esc="ord.date"/>
-                                            </td>
-                                            <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/>
-                                            </td>
-                                            <td class="text-center pe-4">
-                                                <span t-attf-class="badge #{ord.status === 'Confirmed' ? 'bg-primary' : ord.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary'} text-white px-2 py-1 shadow-sm">
-                                                    <t t-esc="ord.status"/>
-                                                </span>
-                                            </td>
-                                        </tr>
+                                    <t t-else="">
+                                        <t t-foreach="this.filteredAllOrders" t-as="ord" t-key="ord.id">
+                                            <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewOrder(ord)">
+                                                <td class="ps-4 fw-bold text-dark"><t t-esc="ord.display_name"/></td>
+                                                <td class="fw-bold"><t t-esc="ord.shop"/><small class="d-block text-muted fw-normal">ID: <t t-esc="ord.shopId"/></small></td>
+                                                <td><span class="badge "><i class="fa fa-user me-1"></i><t t-esc="ord.booker"/></span></td>
+                                                <td class="text-muted"><t t-esc="ord.date"/></td>
+                                                <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/></td>
+                                                <td class="text-center pe-4"><span t-attf-class="badge #{ord.status === 'Confirmed' ? 'bg-primary' : ord.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary'} text-white px-2 py-1 shadow-sm"><t t-esc="ord.status"/></span></td>
+                                            </tr>
+                                        </t>
                                     </t>
                                 </tbody>
                             </table>
@@ -373,36 +360,32 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <t t-if="this.state.selectedOrderLines.length === 0">
+                                            <t t-if="this.state.isLoadingLines">
                                                 <tr>
                                                     <td colspan="7" class="text-center py-4 text-muted">
-                                                        <i class="fa fa-circle-o-notch fa-spin me-2"></i> Loading Order Lines...</td>
+                                                        <i class="fa fa-circle-o-notch fa-spin me-2"></i> Loading Order Lines...
+                                                    </td>
                                                 </tr>
                                             </t>
-                                            <t t-foreach="this.state.selectedOrderLines" t-as="line" t-key="line.id">
+                                            <t t-elif="this.state.selectedOrderLines.length === 0">
                                                 <tr>
-                                                    <td class="ps-4 fw-bold text-dark">
-                                                        <t t-esc="line.product"/>
-                                                    </td>
-                                                    <td class="text-center text-primary fw-bold">
-                                                        <t t-esc="line.qty"/>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <t t-esc="line.delivered"/>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <t t-esc="line.invoiced"/>
-                                                    </td>
-                                                    <td class="text-end text-muted">Rs. <t t-esc="line.price"/>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <span class="badge bg-light border text-dark">
-                                                            <t t-esc="line.taxes"/>
-                                                        </span>
-                                                    </td>
-                                                    <td class="text-end fw-bold text-dark pe-4">Rs. <t t-esc="line.subtotal"/>
+                                                    <td colspan="7" class="text-center py-4 text-muted">
+                                                        <i class="fa fa-exclamation-circle me-2"></i> No products found on this order.
                                                     </td>
                                                 </tr>
+                                            </t>
+                                            <t t-else="">
+                                                <t t-foreach="this.state.selectedOrderLines" t-as="line" t-key="line.id">
+                                                    <tr>
+                                                        <td class="ps-4 fw-bold text-dark"><t t-esc="line.product"/></td>
+                                                        <td class="text-center text-primary fw-bold"><t t-esc="line.qty"/></td>
+                                                        <td class="text-center"><t t-esc="line.delivered"/></td>
+                                                        <td class="text-center"><t t-esc="line.invoiced"/></td>
+                                                        <td class="text-end text-muted">Rs. <t t-esc="line.price"/></td>
+                                                        <td class="text-center"><span class="badge bg-light border text-dark"><t t-esc="line.taxes"/></span></td>
+                                                        <td class="text-end fw-bold text-dark pe-4">Rs. <t t-esc="line.subtotal"/></td>
+                                                    </tr>
+                                                </t>
                                             </t>
                                         </tbody>
                                     </table>
@@ -422,7 +405,7 @@
                         </div>
                     </t>
                 </t>
-
+                <!-- Orders to Invoice Tab -->
                 <t t-if="this.state.invoiceSubTab === 'orders'">
                     <t t-if="!this.state.selectedOrder">
                         <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
@@ -447,47 +430,25 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <t t-if="this.state.isLoadingLines">
+                                    <t t-if="this.filteredOrders.length === 0">
                                         <tr>
-                                            <td colspan="7" class="text-center py-4 text-muted">
-                                                <i class="fa fa-circle-o-notch fa-spin me-2"></i> Loading Order Lines...
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                <i class="fa fa-file-clock-o fs-1 mb-3 opacity-50"></i>
+                                                <p class="mb-1 fw-bold fs-5 text-dark">No pending orders to invoice.</p>
                                             </td>
                                         </tr>
                                     </t>
-                                    <!-- <t t-elif="this.state.selectedOrderLines.length === 0">
-                                        <tr>
-                                            <td colspan="7" class="text-center py-4 text-muted">
-                                                <i class="fa fa-exclamation-circle me-2"></i> No order lines found.
-                                            </td>
-                                        </tr>
-                                    </t> -->
-                                    <t t-foreach="this.filteredOrders" t-as="ord" t-key="ord.id">
-                                        <tr>
-                                            <td class="ps-4 fw-bold text-primary">
-                                                <t t-esc="ord.display_name"/>
-                                            </td>
-                                            <td class="fw-bold">
-                                                <t t-esc="ord.shop"/>
-                                                <small class="d-block text-muted fw-normal">Shop ID: <t t-esc="ord.shopId"/>
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <span class="badge bg-secondary">
-                                                    <i class="fa fa-user me-1"></i>
-                                                    <t t-esc="ord.booker"/>
-                                                </span>
-                                                <small class="d-block text-muted mt-1">Booker ID: <t t-esc="ord.bookerId"/>
-                                                </small>
-                                            </td>
-                                            <td class="text-muted">
-                                                <t t-esc="ord.date"/>
-                                            </td>
-                                            <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/>
-                                            </td>
-                                            <td class="text-end pe-4">
-                                                <button class="btn btn-sm btn-dark fw-bold px-3" t-on-click="() => this.viewOrder(ord)" title="Open this order to verify items and generate a bill">View &amp; Invoice</button>
-                                            </td>
-                                        </tr>
+                                    <t t-else="">
+                                        <t t-foreach="this.filteredOrders" t-as="ord" t-key="ord.id">
+                                            <tr>
+                                                <td class="ps-4 fw-bold text-primary"><t t-esc="ord.display_name"/></td>
+                                                <td class="fw-bold"><t t-esc="ord.shop"/><small class="d-block text-muted fw-normal">Shop ID: <t t-esc="ord.shopId"/></small></td>
+                                                <td><span class="badge bg-secondary"><i class="fa fa-user me-1"></i><t t-esc="ord.booker"/></span><small class="d-block text-muted mt-1">Booker ID: <t t-esc="ord.bookerId"/></small></td>
+                                                <td class="text-muted"><t t-esc="ord.date"/></td>
+                                                <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/></td>
+                                                <td class="text-end pe-4"><button class="btn btn-sm btn-dark fw-bold px-3" t-on-click="() => this.viewOrder(ord)" title="Open this order to verify items and generate a bill">View &amp; Invoice</button></td>
+                                            </tr>
+                                        </t>
                                     </t>
                                 </tbody>
                             </table>
@@ -569,36 +530,32 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <t t-if="this.state.selectedOrderLines.length === 0">
+                                            <t t-if="this.state.isLoadingLines">
                                                 <tr>
                                                     <td colspan="7" class="text-center py-4 text-muted">
-                                                        <i class="fa fa-circle-o-notch fa-spin me-2"></i> Loading Order Lines...</td>
+                                                        <i class="fa fa-circle-o-notch fa-spin me-2"></i> Loading Order Lines...
+                                                    </td>
                                                 </tr>
                                             </t>
-                                            <t t-foreach="this.state.selectedOrderLines" t-as="line" t-key="line.id">
+                                            <t t-elif="this.state.selectedOrderLines.length === 0">
                                                 <tr>
-                                                    <td class="ps-4 fw-bold text-dark">
-                                                        <t t-esc="line.product"/>
-                                                    </td>
-                                                    <td class="text-center text-primary fw-bold">
-                                                        <t t-esc="line.qty"/>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <t t-esc="line.delivered"/>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <t t-esc="line.invoiced"/>
-                                                    </td>
-                                                    <td class="text-end text-muted">Rs. <t t-esc="line.price"/>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <span class="badge bg-light border text-dark">
-                                                            <t t-esc="line.taxes"/>
-                                                        </span>
-                                                    </td>
-                                                    <td class="text-end fw-bold text-dark pe-4">Rs. <t t-esc="line.subtotal"/>
+                                                    <td colspan="7" class="text-center py-4 text-muted">
+                                                        <i class="fa fa-exclamation-circle me-2"></i> No products found on this order.
                                                     </td>
                                                 </tr>
+                                            </t>
+                                            <t t-else="">
+                                                <t t-foreach="this.state.selectedOrderLines" t-as="line" t-key="line.id">
+                                                    <tr>
+                                                        <td class="ps-4 fw-bold text-dark"><t t-esc="line.product"/></td>
+                                                        <td class="text-center text-primary fw-bold"><t t-esc="line.qty"/></td>
+                                                        <td class="text-center"><t t-esc="line.delivered"/></td>
+                                                        <td class="text-center"><t t-esc="line.invoiced"/></td>
+                                                        <td class="text-end text-muted">Rs. <t t-esc="line.price"/></td>
+                                                        <td class="text-center"><span class="badge bg-light border text-dark"><t t-esc="line.taxes"/></span></td>
+                                                        <td class="text-end fw-bold text-dark pe-4">Rs. <t t-esc="line.subtotal"/></td>
+                                                    </tr>
+                                                </t>
                                             </t>
                                         </tbody>
                                     </table>
@@ -619,7 +576,7 @@
                         </div>
                     </t>
                 </t>
-
+                <!-- Customer Invoices Tab -->
                 <t t-if="this.state.invoiceSubTab === 'customer_invoices'">
                     <t t-if="!this.state.selectedInvoice">
                         <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
@@ -1010,10 +967,12 @@
                                 </div>
                             </div>
                         </t>
-
+                        <!-- Regular Payment Modal -->
                         <t t-if="this.state.showPaymentModal">
-                            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background-color: rgba(0, 0, 0, 0.6); z-index: 1050;">
-                                <div class="bg-white p-4 rounded-3 shadow-lg" style="width: 500px;">
+                            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background-color: rgba(0, 0, 0, 0.6); z-index: 1050; padding: 1rem;">
+                                <!-- ADDED: max-height: 90vh and overflow-y: auto -->
+                                <div class="bg-white p-4 rounded-3 shadow-lg" style="width: 500px; max-height: 90vh; overflow-y: auto;">
+                                    
                                     <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
                                         <div>
                                             <h5 class="fw-bold text-dark mb-0">
@@ -1023,7 +982,7 @@
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="small fw-bold text-muted">Linking to Invoice</label>
+                                        <label class="small fw-bold text-muted">Linking to Document</label>
                                         <input type="text" class="form-control bg-light fw-bold text-primary" t-att-value="this.state.paymentForm.invoice_name" disabled="1"/>
                                     </div>
 
@@ -1038,8 +997,36 @@
                                             <input type="date" class="form-control" t-model="this.state.paymentForm.date"/>
                                         </div>
                                     </div>
+                                    
+                                    <div class="mb-3 mt-2">
+                                        <label class="small fw-bold">Payment Method</label>
+                                        <select class="form-select form-control" t-model="this.state.paymentForm.method">
+                                            <option value="cash">Cash</option>
+                                            <option value="cheque">Cheque</option>
+                                            <option value="online">Online Bank Transfer</option>
+                                            <option value="card">Card / POS</option>
+                                            <option value="other">Other Bank Payment</option>
+                                        </select>
+                                    </div>
 
-                                    <div class="mb-4 mt-2">
+                                    <t t-if="this.state.paymentForm.method !== 'cash'">
+                                        <div class="row bg-light border rounded-3 p-3 mb-3 mx-0">
+                                            <div class="col-12 mb-2">
+                                                <label class="small fw-bold text-muted">Customer Bank</label>
+                                                <input type="text" class="form-control form-control-sm" t-model="this.state.paymentForm.bank_name" placeholder="e.g. HBL, Meezan"/>
+                                            </div>
+                                            <div class="col-6 mb-2">
+                                                <label class="small fw-bold text-muted">Customer Acc No</label>
+                                                <input type="text" class="form-control form-control-sm" t-model="this.state.paymentForm.account_number"/>
+                                            </div>
+                                            <div class="col-6 mb-0">
+                                                <label class="small fw-bold text-muted">Cheque/Trans Ref</label>
+                                                <input type="text" class="form-control form-control-sm" t-model="this.state.paymentForm.reference"/>
+                                            </div>
+                                        </div>
+                                    </t>
+
+                                    <div class="mb-3">
                                         <label class="small fw-bold">Deposit Journal (Bank/Cash)</label>
                                         <select class="form-select form-control" t-model="this.state.paymentForm.journal_id" title="Select where the money is being deposited">
                                             <t t-foreach="this.state.journals" t-as="j" t-key="j.id">
@@ -1049,8 +1036,13 @@
                                             </t>
                                         </select>
                                     </div>
+                                    
+                                    <div class="mb-4">
+                                        <label class="small fw-bold">Payment Notes</label>
+                                        <textarea class="form-control" rows="2" t-model="this.state.paymentForm.notes" placeholder="Optional notes..."></textarea>
+                                    </div>
 
-                                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                                    <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-2">
                                         <button class="btn btn-light fw-bold border px-4" t-on-click="closePaymentModal" t-att-disabled="this.state.isPaying">Cancel</button>
                                         <button class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="processPayment" t-att-disabled="this.state.isPaying">
                                             <span t-if="this.state.isPaying" class="spinner-border spinner-border-sm me-2"/>
@@ -1063,7 +1055,7 @@
                         </t>
                     </t>
                 </t>
-
+                <!-- Credit Notes Tab -->
                 <t t-if="this.state.invoiceSubTab === 'credit_notes'">
                     <t t-if="!this.state.selectedInvoice">
                         <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
@@ -1115,7 +1107,7 @@
                                             <td class="text-end fw-bold">Rs. <t t-esc="cn.amount"/>
                                             </td>
                                             <td class="text-center pe-4">
-                                                <span t-attf-class="badge text-white #{cn.status === 'Paid/Reconciled' ? 'bg-success' : cn.status === 'Posted' ? 'bg-info ' : cn.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary'} px-2 py-1 shadow-sm">
+                                                <span t-attf-class="badge text-white #{cn.status === 'Paid/Reconciled' ? 'bg-success' : cn.status === 'Posted' ? 'bg-info ' : cn.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary text-black'} px-2 py-1 shadow-sm">
                                                     <t t-esc="cn.status"/>
                                                 </span>
                                             </td>
@@ -1183,12 +1175,12 @@
                                 </t>
                             </div>
 
-                            <div t-attf-class="card p-0 shadow-sm border-0 border-start border-4 #{this.state.selectedInvoice.status === 'Paid' ? 'border-success' : this.state.selectedInvoice.status === 'Posted' ? 'border-info' : this.state.selectedInvoice.status === 'Partial' ? 'border-warning text-dark' : this.state.selectedInvoice.status === 'Cancelled' ? 'border-danger' : 'border-secondary'}">
+                            <div t-attf-class="card p-0 shadow-sm border-0 border-start border-4 #{this.state.selectedInvoice.status === 'Paid' ? 'border-success' : this.state.selectedInvoice.status === 'Posted' ? 'border-info' : this.state.selectedInvoice.status === 'Partial' ? 'border-warning text-dark' : this.state.selectedInvoice.status === 'Cancelled' ? 'border-danger' : 'border-secondary '}">
                                 <div class="p-4 bg-white border-bottom">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <h4 class="text-dark fw-bold mb-0">Credit Note: <t t-esc="this.state.selectedInvoice.display_name"/>
                                         </h4>
-                                        <span t-attf-class="badge fs-6 #{this.state.selectedInvoice.status === 'Paid' ? 'bg-success' : this.state.selectedInvoice.status === 'Posted' ? 'bg-info' : this.state.selectedInvoice.status === 'Partial' ? 'bg-warning text-dark' : this.state.selectedInvoice.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary'} px-3 py-2 text-white shadow-sm">
+                                        <span t-attf-class="badge fs-6 #{this.state.selectedInvoice.status === 'Paid/Reconciled' ? 'bg-success text-white' : this.state.selectedInvoice.status === 'Posted' ? 'bg-info' : this.state.selectedInvoice.status === 'Partial' ? 'bg-warning text-dark' : this.state.selectedInvoice.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-secondary text-dark'} px-3 py-2  shadow-sm">
                                             <t t-esc="this.state.selectedInvoice.status"/>
                                         </span>
                                     </div>
@@ -1345,10 +1337,12 @@
                                 </div>
                             </div>
                         </div>
-
+                        <!-- Refund Payment Modal -->
                         <t t-if="this.state.showPaymentModal">
-                            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background-color: rgba(0, 0, 0, 0.6); z-index: 1050;">
-                                <div class="bg-white p-4 rounded-3 shadow-lg" style="width: 500px;">
+                            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background-color: rgba(0, 0, 0, 0.6); z-index: 1050; padding: 1rem;">
+                                <!-- ADDED: max-height: 90vh and overflow-y: auto -->
+                                <div class="bg-white p-4 rounded-3 shadow-lg" style="width: 500px; max-height: 90vh; overflow-y: auto;">
+                                    
                                     <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
                                         <div>
                                             <h5 class="fw-bold text-dark mb-0">
@@ -1358,7 +1352,7 @@
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="small fw-bold text-muted">Linking to Invoice</label>
+                                        <label class="small fw-bold text-muted">Linking to Document</label>
                                         <input type="text" class="form-control bg-light fw-bold text-primary" t-att-value="this.state.paymentForm.invoice_name" disabled="1"/>
                                     </div>
 
@@ -1373,8 +1367,36 @@
                                             <input type="date" class="form-control" t-model="this.state.paymentForm.date"/>
                                         </div>
                                     </div>
+                                    
+                                    <div class="mb-3 mt-2">
+                                        <label class="small fw-bold">Payment Method</label>
+                                        <select class="form-select form-control" t-model="this.state.paymentForm.method">
+                                            <option value="cash">Cash</option>
+                                            <option value="cheque">Cheque</option>
+                                            <option value="online">Online Bank Transfer</option>
+                                            <option value="card">Card / POS</option>
+                                            <option value="other">Other Bank Payment</option>
+                                        </select>
+                                    </div>
 
-                                    <div class="mb-4 mt-2">
+                                    <t t-if="this.state.paymentForm.method !== 'cash'">
+                                        <div class="row bg-light border rounded-3 p-3 mb-3 mx-0">
+                                            <div class="col-12 mb-2">
+                                                <label class="small fw-bold text-muted">Customer Bank</label>
+                                                <input type="text" class="form-control form-control-sm" t-model="this.state.paymentForm.bank_name" placeholder="e.g. HBL, Meezan"/>
+                                            </div>
+                                            <div class="col-6 mb-2">
+                                                <label class="small fw-bold text-muted">Customer Acc No</label>
+                                                <input type="text" class="form-control form-control-sm" t-model="this.state.paymentForm.account_number"/>
+                                            </div>
+                                            <div class="col-6 mb-0">
+                                                <label class="small fw-bold text-muted">Cheque/Trans Ref</label>
+                                                <input type="text" class="form-control form-control-sm" t-model="this.state.paymentForm.reference"/>
+                                            </div>
+                                        </div>
+                                    </t>
+
+                                    <div class="mb-3">
                                         <label class="small fw-bold">Deposit Journal (Bank/Cash)</label>
                                         <select class="form-select form-control" t-model="this.state.paymentForm.journal_id" title="Select where the money is being deposited">
                                             <t t-foreach="this.state.journals" t-as="j" t-key="j.id">
@@ -1384,8 +1406,13 @@
                                             </t>
                                         </select>
                                     </div>
+                                    
+                                    <div class="mb-4">
+                                        <label class="small fw-bold">Payment Notes</label>
+                                        <textarea class="form-control" rows="2" t-model="this.state.paymentForm.notes" placeholder="Optional notes..."></textarea>
+                                    </div>
 
-                                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                                    <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-2">
                                         <button class="btn btn-light fw-bold border px-4" t-on-click="closePaymentModal" t-att-disabled="this.state.isPaying">Cancel</button>
                                         <button class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="processPayment" t-att-disabled="this.state.isPaying">
                                             <span t-if="this.state.isPaying" class="spinner-border spinner-border-sm me-2"/>
@@ -1398,7 +1425,7 @@
                         </t>
                     </t>
                 </t>
-
+                <!-- Customer Payments Tab -->
                 <t t-if="this.state.invoiceSubTab === 'payments'">
                     <t t-if="!this.state.selectedPayment">
                         <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
@@ -1541,7 +1568,7 @@
                         </div>
                     </t>
                 </t>
-
+                <!-- Shop Balances Tab -->
                 <t t-if="this.state.invoiceSubTab === 'balances'">
                     <t t-if="!this.state.selectedShop">
                         <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
@@ -1652,10 +1679,10 @@
                         <small class="text-muted">Analyzes invoiced sales vs product cost over your selected period.</small>
                     </div>
                     <div class="d-flex align-items-center gap-2 bg-white p-2 rounded-3 shadow-sm border">
-                        <span class="text-muted fw-bold small text-uppercase ms-1">Period:</span>
-                        <input type="date" class="form-control form-control-sm border-0 bg-light" style="width: 140px;" t-model="this.state.pnl.date_from"/>
+                      <span class="text-muted fw-bold small text-uppercase ms-1">Period:</span>
+                        <input type="date" class="form-control form-control-sm border-0 bg-light" style="width: 140px;" t-model="this.state.pnl.date_from" t-att-max="this.todayStr"/>
                         <span class="text-muted small">to</span>
-                        <input type="date" class="form-control form-control-sm border-0 bg-light" style="width: 140px;" t-model="this.state.pnl.date_to"/>
+                        <input type="date" class="form-control form-control-sm border-0 bg-light" style="width: 140px;" t-model="this.state.pnl.date_to" t-att-max="this.todayStr"/>
                         <button class="btn btn-sm btn-dark fw-bold px-3 ms-2" t-on-click="() => this.fetchPnlData()" t-att-disabled="this.state.pnl.isLoading">
                             <span t-if="this.state.pnl.isLoading" class="spinner-border spinner-border-sm me-1"/>
                             <i t-else="" class="fa fa-refresh me-1"></i> Refresh
@@ -1754,8 +1781,12 @@
                                 </div>
                                 <div>
                                     <small class="fw-bold text-muted text-uppercase tracking-wider d-block mb-1">Stock Purchased (period)</small>
-                                    <h5 class="fw-bold text-dark mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_manufacturer_payable ? this.state.pnl.stats.amount_manufacturer_payable.toLocaleString() : '0'"/>
-                                    </h5>
+                                    
+                                    <h4 class="fw-bold text-dark mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_manufacturer_payable ? this.state.pnl.stats.amount_manufacturer_payable.toLocaleString() : '0'"/>
+                                    </h4>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class=" text-muted  mb-1">Total Stock Purchased in selected date range</small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1767,8 +1798,11 @@
                                 </div>
                                 <div>
                                     <small class="fw-bold text-muted text-uppercase tracking-wider d-block mb-1">Payments Collected</small>
-                                    <h5 class="fw-bold text-info mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_payments_received ? this.state.pnl.stats.amount_payments_received.toLocaleString() : '0'"/>
-                                    </h5>
+                                    <h4 class="fw-bold text-info mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_payments_received ? this.state.pnl.stats.amount_payments_received.toLocaleString() : '0'"/>
+                                    </h4>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class=" text-muted   mb-1">Total Payments Collected in selected date range</small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1780,8 +1814,11 @@
                                 </div>
                                 <div>
                                     <small class="fw-bold text-muted text-uppercase tracking-wider d-block mb-1">Total Shop AR</small>
-                                    <h5 class="fw-bold text-danger mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_shop_outstanding ? this.state.pnl.stats.amount_shop_outstanding.toLocaleString() : '0'"/>
-                                    </h5>
+                                    <h4 class="fw-bold text-danger mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_shop_outstanding ? this.state.pnl.stats.amount_shop_outstanding.toLocaleString() : '0'"/>
+                                    </h4>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class=" text-muted   mb-1">Total Outstanding Amount from Shops</small>
+                                    </div>
                                 </div>
                             </div>
                         </div>

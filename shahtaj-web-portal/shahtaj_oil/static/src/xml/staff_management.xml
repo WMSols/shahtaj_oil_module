@@ -81,8 +81,8 @@
                                 <small class="text-muted">Required for app authentication.</small>
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="small fw-bold text-muted">App Login Email <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" t-model="this.state.formData.email" placeholder="employee@shahtaj.com" autocomplete="off" required="1"/>
+                                <label class="small fw-bold text-muted">App Login <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" t-model="this.state.formData.email" placeholder="employee@shahtaj.com / 0300-0000000" autocomplete="off" required="1"/>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="small fw-bold text-muted">

@@ -13,13 +13,13 @@
                     <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center bg-white" t-on-click="refreshData" t-att-disabled="this.state.isRefreshing" title="Refresh Live Data">
                         <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isRefreshing}"></i> Refresh
                     </button>
-                    
-                    <span class="badge bg-success text-white px-3 py-2 fs-6 shadow-sm d-flex align-items-center" title="The system is actively receiving live updates from the field apps">
+                    <!-- Removed Non-Functional Elements -->
+                    <!-- <span class="badge bg-success text-white px-3 py-2 fs-6 shadow-sm d-flex align-items-center" title="The system is actively receiving live updates from the field apps">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity text-white me-2">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                         </svg>
                         System Online
-                    </span>
+                    </span> -->
                 </div>
             </div>
 
@@ -365,6 +365,7 @@
             <t t-if="!this.state.selectedCheckin">
                 <div class="p-3 bg-light border-bottom d-flex gap-2">
                     <input type="text" class="form-control form-control-sm w-50" placeholder="Search by Shop Name or Booker..." t-model="this.state.checkinFilters.search" t-on-input="() => this.state.checkinPage = 1"/>
+                     <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
                     <select class="form-select form-select-sm w-25" t-model="this.state.checkinFilters.status" t-on-change="() => this.state.checkinPage = 1" title="Filter check-ins by their current progress">
                         <option value="">All Feed Statuses</option>
                         <option value="Checked In">Active (Currently Checked In)</option>
@@ -407,7 +408,7 @@
                     </div>
                     <div class="text-end d-flex align-items-center">
                         <div class="me-3 text-end">
-                            <span t-attf-class="badge #{log.status === 'Checked In' ? 'bg-success text-white shadow-sm' : log.status === 'Cancelled' ? 'bg-danger text-white shadow-sm' : 'bg-secondary text-white shadow-sm'} p-2 fs-6 mb-1 d-inline-block">
+                            <span t-attf-class="badge #{log.status === 'Checked In' ? 'bg-info text-white shadow-sm' : log.status === 'Cancelled' ? 'bg-danger text-white shadow-sm' : 'bg-secondary text-dark shadow-sm'} p-2 fs-6 mb-1 d-inline-block">
                                 <t t-esc="log.status"/>
                             </span>
                             <div class="text-muted fw-bold small" title="Total time spent at the shop">
@@ -451,7 +452,7 @@
                                 Back to List
             </button>
             <div>
-                <span t-attf-class="badge #{this.state.selectedCheckin.status === 'Checked In' ? 'bg-success' : this.state.selectedCheckin.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary'} text-white p-2 fs-6 text-uppercase shadow-sm" style="letter-spacing: 1px;">
+                <span t-attf-class="badge #{this.state.selectedCheckin.status === 'Checked In' ? 'bg-info ' : this.state.selectedCheckin.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-secondary text-dark'}  p-2 fs-6 text-uppercase shadow-sm" style="letter-spacing: 1px;">
                     <t t-esc="this.state.selectedCheckin.status"/>
                 </span>
             </div>
@@ -534,6 +535,7 @@
             <div class="col-md-6">
                 <input type="text" class="form-control form-control-sm" placeholder="Search by Shop Name, Booker, or Order Reference..." t-model="this.state.orderFilters.search" t-on-input="() => this.state.orderPage = 1"/>
             </div>
+             <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
             <div class="col-md-4">
                 <select class="form-select form-select-sm" t-model="this.state.orderFilters.status" t-on-change="() => this.state.orderPage = 1" title="Filter orders by their current processing stage">
                     <option value="">All Order Statuses</option>
@@ -780,7 +782,7 @@
     <div class="row justify-content-end">
         <div class="col-md-5">
             <div class="d-flex justify-content-between mb-2">
-                <span class="text-muted">Total Units Requested:</span>
+                <span class="text-muted">Total Products Requested:</span>
                 <span class="fw-bold">
                     <t t-esc="this.state.selectedOrder.items"/>
                 </span>
@@ -836,6 +838,7 @@
 <t t-if="this.state.perfSubTab === 'schedules'">
 <t t-if="!this.state.selectedSchedule">
 <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
+    <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
 <select class="form-select form-select-sm shadow-sm" style="max-width: 200px;" t-model="this.state.schedFilterBooker" title="Filter by specific order booker">
     <option value="all">All Bookers</option>
     <t t-foreach="this.state.bookers" t-as="b" t-key="b.id">
@@ -1036,6 +1039,7 @@
 <t t-if="this.state.perfSubTab === 'targets'">
 <t t-if="!this.state.selectedTarget">
 <div class="p-3 bg-light border-bottom d-flex gap-2">
+     <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
 <select class="form-select form-select-sm shadow-sm w-25" t-model="this.state.targetFilterBooker" title="Filter by specific order booker">
     <option value="all">All Bookers</option>
     <t t-foreach="this.state.bookers" t-as="b" t-key="b.id">

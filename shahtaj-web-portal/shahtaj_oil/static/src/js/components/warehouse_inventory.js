@@ -70,6 +70,23 @@ export class WarehouseInventory extends Component {
             }
         });
     }
+    // NEW Refresh Method
+    async refreshData() {
+        this.state.isLoading = true;
+        try {
+            await Promise.all([
+                this.loadInventory(),
+                this.loadTaxesList()
+            ]);
+        } finally {
+            this.state.isLoading = false;
+        }
+    }
+   // --- Dynamic Search, Filter, and Sort Getters ---
+    get displayProducts() {
+        let filtered = this.state.inventory.filter(product =>
+            product.active && product.name.toLowerCase().includes(this.state.productSearchQuery.toLowerCase())
+        )};
 
     get hasFinancialAccess() {
         return hasFinancialAccess();

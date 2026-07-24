@@ -15,9 +15,18 @@ export class FinancialsInvoicing extends Component {
         this.notification = useService("notification");
         this.orm = useService("orm");
         this.action = useService("action");
+        // --- TIMEZONE SAFE DATE FORMATTING ---
         const today = new Date();
         const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-        const formatDate = (d) => d.toISOString().split('T')[0];
+        
+        // Manually build the string using local time to prevent UTC shift
+        const formatDate = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        this.todayStr = formatDate(today);
         // 2. SMART INITIALIZATION
         const target = this.props.requestedSubTab || 'invoices';
         const topLevelTabs = ['credit', 'pnl', 'money', 'cash'];
@@ -120,6 +129,7 @@ export class FinancialsInvoicing extends Component {
             isRefreshing: false,
             confirmModal: { isOpen: false, title: '', message: '', onConfirm: null },
         });
+        
      // 3. SMART PROP LISTENER FOR 2-LEVEL TABS
         onWillUpdateProps((nextProps) => {
             if (nextProps.requestedSubTab) {
@@ -132,6 +142,9 @@ export class FinancialsInvoicing extends Component {
                     }
                     if (req === 'cash') {
                         this.state.cashDirection = 'all';
+                    }
+                    if (req === 'pnl') {
+                        this.fetchPnlData();
                     }
                 } 
                 // Everything else belongs inside the Invoice Management parent
@@ -153,11 +166,67 @@ export class FinancialsInvoicing extends Component {
             }
         });
     }
+    //  NEW HELPER METHOD FOR GLOBAL SUBTAB SWITCHING ---
+    requestTabSwitch(tabName, subTabName) {
+        // Dispatch a global event so the parent Dashboard can update the sidebar highlight
+        window.dispatchEvent(new CustomEvent('shahtaj-dashboard-switch', { 
+            detail: { tab: tabName, subTab: subTabName } 
+        }));
+        
+        // Also update local state instantly for a snappy UI transition
+        if (tabName === 'financials') {
+            if (['credit', 'pnl', 'money', 'cash'].includes(subTabName)) {
+                this.setSubTab(subTabName);
+            } else {
+                this.state.activeSubTab = 'invoices';
+                this.setInvoiceSubTab(subTabName);
+            }
+        }
+    }
     // --- NEW: Core Methods ---
     async refreshData() {
         this.state.isRefreshing = true;
         try {
-            await this.fetchRealData();
+            await this.fetchRealData({ includeLookups: true, includePnl: this.state.activeSubTab === 'pnl' });
+            if (this.state.activeSubTab === 'money') {
+                await this.loadMoneyOverview();
+            }
+        } finally {
+            this.state.isRefreshing = false;
+        }
+    }
+
+    showConfirm(title, message, onConfirmCallback) {
+        this.state.confirmModal = {
+            isOpen: true,
+            title: title,
+            message: message,
+            onConfirm: async () => {
+                this.state.confirmModal.isOpen = false;
+                if (onConfirmCallback) await onConfirmCallback();
+            }
+        };
+    }
+
+    closeConfirm() {
+        this.state.confirmModal.isOpen = false;
+    }
+
+    // --- DYNAMIC FILTER GETTERS ---
+    get filteredAllOrders() {
+        const query = this.state.filters.allOrders.search.toLowerCase();
+        const status = this.state.filters.allOrders.status;
+        return this.state.allOrders.filter(o => {
+            const matchesSearch = !query || o.display_name.toLowerCase().includes(query) || o.shop.toLowerCase().includes(query);
+            const matchesStatus = status === 'all' || o.status === status;
+            return matchesSearch && matchesStatus;
+        });
+    }
+    // --- NEW: Core Methods ---
+    async refreshData() {
+        this.state.isRefreshing = true;
+        try {
+            await this.fetchRealData({ includeLookups: true, includePnl: this.state.activeSubTab === 'pnl' });
             if (this.state.activeSubTab === 'money') {
                 await this.loadMoneyOverview();
             }
@@ -244,158 +313,260 @@ export class FinancialsInvoicing extends Component {
         return this.state.pnl.lines.filter(l => String(l.id) === String(this.state.pnl.selectedProductLineId));
     }
 
-    // --- GLOBAL DATA FETCHER ---
-    async fetchRealData() {
-        try {
-            const allOrdersData = await this.orm.searchRead(
-                "sale.order",
-                [["shahtaj_visit_id", "!=", false]],
-                ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"]
-            );
-            this.state.allOrders = allOrdersData.map(o => ({
-                id: o.id, display_name: o.name, shop: o.partner_id ? o.partner_id[1] : 'Unknown', shopId: o.partner_id ? o.partner_id[0] : false,
-                booker: o.user_id ? o.user_id[1] : 'Unassigned', bookerId: o.user_id ? o.user_id[0] : false, date: o.date_order ? o.date_order.split(' ')[0] : 'N/A', 
-                amount: (o.amount_total || 0).toLocaleString(), rawAmount: o.amount_total || 0, untaxedAmount: (o.amount_untaxed || 0).toLocaleString(),
-                paymentTerms: o.payment_term_id ? o.payment_term_id[1] : 'Immediate', pricelist: o.pricelist_id ? o.pricelist_id[1] : 'Default (PKR)',
-                visit: o.shahtaj_visit_id ? o.shahtaj_visit_id[1] : 'N/A', status: o.state === 'cancel' ? 'Cancelled' : (o.state === 'draft' ? 'Draft' : 'Confirmed'),
-                invoice_status: o.invoice_status
-            }));
-        } catch (error) { console.error("All Orders Fetch Error:", error); }
+    // --- GLOBAL DATA FETCHER (parallel; lookups optional; P&L only when needed) ---
+    async fetchRealData(options = {}) {
+        const includeLookups = options.includeLookups !== false;
+        const includePnl = options.includePnl === true
+            || (options.includePnl !== false && this.state.activeSubTab === 'pnl');
 
-        this.state.orders = this.state.allOrders.filter(o => o.invoice_status === 'to invoice');
+        const safeSearch = async (label, ...args) => {
+            try {
+                return await this.orm.searchRead(...args);
+            } catch (error) {
+                console.error(`${label} Fetch Error:`, error);
+                return null;
+            }
+        };
 
-        try {
-            const invoicesData = await this.orm.searchRead(
-                "account.move",
-                [["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]],
-                ["name", "partner_id", "invoice_date","amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state","journal_id"]
-            );
-            this.state.invoices = invoicesData.map(inv => {
-                let status = 'Draft';
-                if (inv.state === 'cancel') status = 'Cancelled';
-                else if (inv.state === 'posted') {
-                    if (['paid', 'in_payment', 'reversed'].includes(inv.payment_state)) status = 'Paid';
-                    else if (inv.payment_state === 'partial') status = 'Partial';
-                    else status = 'Posted'; 
-                }
-                return {
-                    id: inv.id, display_name: (inv.name && inv.name !== '/') ? inv.name : `Draft Invoice (*${inv.id})`, shop: inv.partner_id ? inv.partner_id[1] : 'Unknown',
-                    untaxedAmount: (inv.amount_untaxed || 0).toLocaleString(),
-                    taxAmount: (inv.amount_tax || 0).toLocaleString(),
-                    date: inv.invoice_date || 'Not set', amount: (inv.amount_total || 0).toLocaleString(), rawAmount: inv.amount_total || 0,
-                    residual: (inv.amount_residual || 0).toLocaleString(), rawResidual: inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total, status: status,
-                    journal_id: inv.journal_id ? inv.journal_id[0] : false
-                };
-            });
-        } catch (error) { console.error("Invoices Fetch Error:", error); }
-        
-        const taxes = await this.orm.searchRead(
-            "account.tax",
-            [["type_tax_use", "=", "sale"], ["active", "=", true]],
-            ["id", "name", "amount"]
-        );
-        this.state.availableTaxes = taxes;
-        const prods = await this.orm.searchRead("product.product", [
+        const productDomain = [
             ["sale_ok", "=", true],
             ["active", "=", true],
             ["product_tmpl_id.active", "=", true],
-        ], ["id", "name"]);
-        this.state.allProducts = prods;
-        
-        try {
-            const creditNotesData = await this.orm.searchRead(
+        ];
+
+        const [
+            allOrdersData,
+            invoicesData,
+            creditNotesData,
+            paymentsData,
+            shopsData,
+            taxesData,
+            prodData,
+            journalsData,
+        ] = await Promise.all([
+            safeSearch(
+                "All Orders",
+                "sale.order",
+                [["shahtaj_visit_id", "!=", false]],
+                ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"]
+            ),
+            safeSearch(
+                "Invoices",
+                "account.move",
+                [["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]],
+                ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"]
+            ),
+            safeSearch(
+                "Credit Notes",
                 "account.move",
                 [["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]],
                 ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"]
-            );
-            this.state.creditNotes = creditNotesData.map(cn => {
-                let status = 'Draft';
-                if (cn.state === 'cancel') status = 'Cancelled';
-                else if (cn.state === 'posted') {
-                    if (['paid', 'in_payment', 'reversed'].includes(cn.payment_state)) status = 'Paid/Reconciled';
-                    else if (cn.payment_state === 'partial') status = 'Partial';
-                    else status = 'Posted'; 
+            ),
+            safeSearch(
+                "Payments",
+                "account.payment",
+                [["partner_id.is_shahtaj_shop", "=", true]],
+                [
+                    "name", "partner_id", "date", "amount", "journal_id", "memo", "state",
+                    "shahtaj_payment_channel", "shahtaj_payer_bank_name", "shahtaj_payer_account_number",
+                    "shahtaj_instrument_reference", "shahtaj_payment_notes",
+                ]
+            ),
+            safeSearch(
+                "Shop Balances",
+                "res.partner",
+                [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]],
+                ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "outstanding_balance"]
+            ),
+            includeLookups
+                ? safeSearch(
+                    "Taxes",
+                    "account.tax",
+                    [["type_tax_use", "=", "sale"], ["active", "=", true]],
+                    ["id", "name", "amount"]
+                )
+                : Promise.resolve(null),
+            includeLookups
+                ? safeSearch(
+                    "Products",
+                    "product.product",
+                    productDomain,
+                    ["id", "name", "display_name"]
+                )
+                : Promise.resolve(null),
+            includeLookups
+                ? safeSearch(
+                    "Journals",
+                    "account.journal",
+                    [["type", "in", ["bank", "cash"]]],
+                    ["name", "type"]
+                )
+                : Promise.resolve(null),
+        ]);
+
+        if (allOrdersData) {
+            this.state.allOrders = allOrdersData.map((o) => ({
+                id: o.id,
+                display_name: o.name,
+                shop: o.partner_id ? o.partner_id[1] : "Unknown",
+                shopId: o.partner_id ? o.partner_id[0] : false,
+                booker: o.user_id ? o.user_id[1] : "Unassigned",
+                bookerId: o.user_id ? o.user_id[0] : false,
+                date: o.date_order ? o.date_order.split(" ")[0] : "N/A",
+                amount: (o.amount_total || 0).toLocaleString(),
+                rawAmount: o.amount_total || 0,
+                untaxedAmount: (o.amount_untaxed || 0).toLocaleString(),
+                paymentTerms: o.payment_term_id ? o.payment_term_id[1] : "Immediate",
+                pricelist: o.pricelist_id ? o.pricelist_id[1] : "Default (PKR)",
+                visit: o.shahtaj_visit_id ? o.shahtaj_visit_id[1] : "N/A",
+                status: o.state === "cancel" ? "Cancelled" : (o.state === "draft" ? "Draft" : "Confirmed"),
+                invoice_status: o.invoice_status,
+            }));
+            this.state.orders = this.state.allOrders.filter((o) => o.invoice_status === "to invoice");
+        }
+
+        if (invoicesData) {
+            this.state.invoices = invoicesData.map((inv) => {
+                let status = "Draft";
+                if (inv.state === "cancel") status = "Cancelled";
+                else if (inv.state === "posted") {
+                    if (["paid", "in_payment", "reversed"].includes(inv.payment_state)) status = "Paid";
+                    else if (inv.payment_state === "partial") status = "Partial";
+                    else status = "Posted";
                 }
                 return {
-                    id: cn.id, display_name: (cn.name && cn.name !== '/') ? cn.name : `Draft Refund (*${cn.id})`, shop: cn.partner_id ? cn.partner_id[1] : 'Unknown',
-                    untaxedAmount: (cn.amount_untaxed || 0).toLocaleString(),
-                    taxAmount: (cn.amount_tax || 0).toLocaleString(),
-                    date: cn.invoice_date || 'Not set', amount: (cn.amount_total || 0).toLocaleString(), rawAmount: cn.amount_total || 0,
-                    residual: (cn.amount_residual || 0).toLocaleString(), rawResidual: cn.amount_residual !== undefined ? cn.amount_residual : cn.amount_total,
-                    status: status, journal_id: cn.journal_id ? cn.journal_id[0] : false 
+                    id: inv.id,
+                    display_name: (inv.name && inv.name !== "/") ? inv.name : `Draft Invoice (*${inv.id})`,
+                    shop: inv.partner_id ? inv.partner_id[1] : "Unknown",
+                    untaxedAmount: (inv.amount_untaxed || 0).toLocaleString(),
+                    taxAmount: (inv.amount_tax || 0).toLocaleString(),
+                    date: inv.invoice_date || "Not set",
+                    amount: (inv.amount_total || 0).toLocaleString(),
+                    rawAmount: inv.amount_total || 0,
+                    residual: (inv.amount_residual || 0).toLocaleString(),
+                    rawResidual: inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total,
+                    status,
+                    journal_id: inv.journal_id ? inv.journal_id[0] : false,
                 };
             });
-        } catch (error) { console.error("Credit Notes Fetch Error:", error); }
+        }
 
-        try { this.state.journals = await this.orm.searchRead("account.journal", [["type", "in", ["bank", "cash"]]], ["name", "type"]); } catch (error) {}
+        if (creditNotesData) {
+            this.state.creditNotes = creditNotesData.map((cn) => {
+                let status = "Draft";
+                if (cn.state === "cancel") status = "Cancelled";
+                else if (cn.state === "posted") {
+                    if (["paid", "in_payment", "reversed"].includes(cn.payment_state)) status = "Paid/Reconciled";
+                    else if (cn.payment_state === "partial") status = "Partial";
+                    else status = "Posted";
+                }
+                return {
+                    id: cn.id,
+                    display_name: (cn.name && cn.name !== "/") ? cn.name : `Draft Refund (*${cn.id})`,
+                    shop: cn.partner_id ? cn.partner_id[1] : "Unknown",
+                    untaxedAmount: (cn.amount_untaxed || 0).toLocaleString(),
+                    taxAmount: (cn.amount_tax || 0).toLocaleString(),
+                    date: cn.invoice_date || "Not set",
+                    amount: (cn.amount_total || 0).toLocaleString(),
+                    rawAmount: cn.amount_total || 0,
+                    residual: (cn.amount_residual || 0).toLocaleString(),
+                    rawResidual: cn.amount_residual !== undefined ? cn.amount_residual : cn.amount_total,
+                    status,
+                    journal_id: cn.journal_id ? cn.journal_id[0] : false,
+                };
+            });
+        }
 
-        try {
-            const prodData = await this.orm.searchRead("product.product", [
-                ["sale_ok", "=", true],
-                ["active", "=", true],
-                ["product_tmpl_id.active", "=", true],
-            ], ["id", "display_name"]);
-            this.state.products = prodData.map(p => ({ id: p.id, name: p.display_name }));
-        } catch (error) {}
-
-        try {
-           const paymentsData = await this.orm.searchRead(
-                "account.payment",
-                [["partner_id.is_shahtaj_shop", "=", true]], 
-                [
-                    "name", "partner_id", "date", "amount", "journal_id", "memo", "state", 
-                    "shahtaj_payment_channel", "shahtaj_payer_bank_name", "shahtaj_payer_account_number", 
-                    "shahtaj_instrument_reference", "shahtaj_payment_notes"
-                ]
-            ); 
-            this.state.payments = paymentsData.map(pay => ({
-                id: pay.id, display_name: pay.name ? pay.name : `Processing... (#${pay.id})`, shop: pay.partner_id ? pay.partner_id[1] : 'Unknown',
-                date: pay.date || 'N/A', amount: (pay.amount || 0).toLocaleString(), method: pay.journal_id ? pay.journal_id[1] : 'Manual',
-                ref: pay.memo || 'N/A', status: (pay.state === 'posted' || pay.state === 'reconciled') ? 'Posted' : (pay.state === 'cancel' ? 'Cancelled' : 'Draft'),
-                status: ['paid', 'in_process', 'posted', 'reconciled'].includes(pay.state) ? 'Paid' : (pay.state === 'cancel' ? 'Cancelled' : 'Draft'),
-                channel: pay.shahtaj_payment_channel || 'cash',
-                bank: pay.shahtaj_payer_bank_name || 'N/A',
-                account: pay.shahtaj_payer_account_number || 'N/A',
-                reference: pay.shahtaj_instrument_reference || 'N/A',
-                notes: pay.shahtaj_payment_notes || 'N/A'
+        if (paymentsData) {
+            this.state.payments = paymentsData.map((pay) => ({
+                id: pay.id,
+                display_name: pay.name ? pay.name : `Processing... (#${pay.id})`,
+                shop: pay.partner_id ? pay.partner_id[1] : "Unknown",
+                date: pay.date || "N/A",
+                amount: (pay.amount || 0).toLocaleString(),
+                method: pay.journal_id ? pay.journal_id[1] : "Manual",
+                ref: pay.memo || "N/A",
+                status: ["paid", "in_process", "posted", "reconciled"].includes(pay.state)
+                    ? "Paid"
+                    : (pay.state === "cancel" ? "Cancelled" : "Draft"),
+                channel: pay.shahtaj_payment_channel || "cash",
+                bank: pay.shahtaj_payer_bank_name || "N/A",
+                account: pay.shahtaj_payer_account_number || "N/A",
+                reference: pay.shahtaj_instrument_reference || "N/A",
+                notes: pay.shahtaj_payment_notes || "N/A",
             }));
-        } catch (error) { console.error("Payments Fetch Error:", error); }
+        }
 
-        try {
-            const shopsData = await this.orm.searchRead(
-                "res.partner", [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]],
-                ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "outstanding_balance"]
-            );
-            this.state.balances = shopsData.map(shop => ({
-                id: shop.id, shopId: shop.id, shop: shop.name, owner: shop.owner_name || 'N/A', route: shop.route_id ? shop.route_id[1] : 'Unassigned',
-                category: shop.shahtaj_shop_category === 'cash' ? 'Cash' : 'Credit', limit: shop.shahtaj_shop_category === 'cash' ? 'N/A' : (shop.credit_limit || 0).toLocaleString(),
-                rawLimit: shop.credit_limit || 0, outstanding: (shop.outstanding_balance || 0).toLocaleString(),
+        if (shopsData) {
+            this.state.balances = shopsData.map((shop) => ({
+                id: shop.id,
+                shopId: shop.id,
+                shop: shop.name,
+                owner: shop.owner_name || "N/A",
+                route: shop.route_id ? shop.route_id[1] : "Unassigned",
+                category: shop.shahtaj_shop_category === "cash" ? "Cash" : "Credit",
+                limit: shop.shahtaj_shop_category === "cash" ? "N/A" : (shop.credit_limit || 0).toLocaleString(),
+                rawLimit: shop.credit_limit || 0,
+                outstanding: (shop.outstanding_balance || 0).toLocaleString(),
                 rawOutstanding: shop.outstanding_balance || 0,
             }));
 
-            this.state.credits = shopsData.map(shop => {
+            this.state.credits = shopsData.map((shop) => {
                 const limit = shop.credit_limit || 0;
                 const utilized = shop.outstanding_balance || 0;
                 let status = "Healthy";
-                if (shop.shahtaj_shop_category === 'cash') status = "Cash";
+                if (shop.shahtaj_shop_category === "cash") status = "Cash";
                 else if (limit > 0) {
                     if (utilized > limit) status = "Exceeded";
                     else if (utilized >= limit * 0.85) status = "Critical";
                 }
                 return {
-                    id: shop.id, shopId: shop.id, shop: shop.name, limit: limit.toLocaleString(), rawLimit: limit,
-                    utilized: utilized.toLocaleString(), rawUtilized: utilized, available: Math.max(0, limit - utilized).toLocaleString(), status: status
+                    id: shop.id,
+                    shopId: shop.id,
+                    shop: shop.name,
+                    limit: limit.toLocaleString(),
+                    rawLimit: limit,
+                    utilized: utilized.toLocaleString(),
+                    rawUtilized: utilized,
+                    available: Math.max(0, limit - utilized).toLocaleString(),
+                    status,
                 };
             });
-        } catch (error) { console.error("Shop Balances Fetch Error:", error); }
+        }
+
+        if (taxesData) {
+            this.state.availableTaxes = taxesData;
+        }
+        if (prodData) {
+            this.state.allProducts = prodData;
+            this.state.products = prodData.map((p) => ({
+                id: p.id,
+                name: p.display_name || p.name,
+            }));
+        }
+        if (journalsData) {
+            this.state.journals = journalsData;
+        }
 
         this.state.stats = {
-            totalOrders: this.state.allOrders.length, toInvoice: this.state.orders.length,
-            openInvoices: this.state.invoices.filter(i => i.status === 'Posted' || i.status === 'Partial').length,
-            creditNotes: this.state.creditNotes.length, approvedShops: this.state.balances.length
+            totalOrders: this.state.allOrders.length,
+            toInvoice: this.state.orders.length,
+            openInvoices: this.state.invoices.filter((i) => i.status === "Posted" || i.status === "Partial").length,
+            creditNotes: this.state.creditNotes.length,
+            approvedShops: this.state.balances.length,
         };
-        // NEW: Load initial P&L data
-        await this.fetchPnlData();
+
+        if (includePnl) {
+            await this.fetchPnlData();
+        }
+    }
+
+    /** After invoice/payment/CN mutations: refresh lists only (reuse taxes/products/journals). */
+    async refreshFinancialLists() {
+        await this.fetchRealData({ includeLookups: false, includePnl: this.state.activeSubTab === "pnl" });
+        if (this.state.activeSubTab === "money") {
+            await this.loadMoneyOverview();
+        }
     }
   
 
@@ -457,18 +628,22 @@ export class FinancialsInvoicing extends Component {
         this.state.pnl.isLoading = false;
     }
     // --- MANUFACTURER SUMMARY PRINTING ---
-    async printManufacturerSummary() {
+   async printManufacturerSummary() {
+        // Optional: Trigger your existing loading spinner so the UI doesn't freeze
+        this.state.pnl.isLoading = true; 
+        
         try {
-            const [summaryId] = await this.orm.create("shahtaj.manufacturer.summary", [{
+            // 1. Create a Manufacturer Summary wizard record using your P&L dates
+            const summaryIds = await this.orm.create("shahtaj.manufacturer.summary", [{
                 date_from: this.state.pnl.date_from,
-                date_to: this.state.pnl.date_to,
+                date_to: this.state.pnl.date_to
             }]);
-            await this.orm.call(
-                "shahtaj.manufacturer.summary",
-                "action_refresh",
-                [[summaryId]],
-            );
+            const summaryId = summaryIds[0];
 
+            // 2. Trigger the backend Python logic to calculate stats and populate the line items
+            await this.orm.call("shahtaj.manufacturer.summary", "action_refresh", [[summaryId]]);
+
+            // 3. Trigger Odoo's native PDF report, strictly passing the Summary ID (not Product IDs)
             this.action.doAction({
                 type: 'ir.actions.report',
                 report_type: 'qweb-pdf',
@@ -479,7 +654,143 @@ export class FinancialsInvoicing extends Component {
         } catch (error) {
             console.error("Print Error:", error);
             alert("Failed to print Manufacturer Summary.");
+        } finally {
+            this.state.pnl.isLoading = false;
         }
+    }
+
+    setSubTab(tabName) { this.state.activeSubTab = tabName; this.resetDetailViews(); }
+    setInvoiceSubTab(subTabName) { this.state.invoiceSubTab = subTabName; this.resetDetailViews(); }
+    
+    resetDetailViews() {
+        this.state.selectedInvoice = null;
+        this.state.selectedInvoiceLines = [];
+        this.state.isEditingInvoice = false;
+        this.state.selectedOrder = null;
+        this.state.selectedOrderLines = []; 
+        this.state.selectedPayment = null;
+        this.state.selectedShop = null;
+        this.closePaymentModal();
+        this.closeRefundModal();
+    }
+
+    _refreshSelectedInvoiceState(invoiceId) {
+        let updatedInv = this.state.invoices.find(i => i.id === invoiceId);
+        if (!updatedInv) updatedInv = this.state.creditNotes.find(i => i.id === invoiceId);
+        if (updatedInv) this.state.selectedInvoice = updatedInv;
+    }
+  
+
+    async viewOrder(order) { 
+        this.state.selectedOrder = order; 
+        this.state.selectedOrderLines = []; 
+        this.state.isLoadingLines = true; // Block UI while fetching
+
+        try {
+            const lines = await this.orm.searchRead(
+                "sale.order.line",
+                [["order_id", "=", order.odoo_id || order.id]],
+                ["name", "product_uom_qty", "qty_delivered", "qty_invoiced", "price_unit", "price_subtotal", "tax_ids"]
+            );
+            
+            this.state.selectedOrderLines = lines.map(l => {
+                const taxIds = l.tax_ids || [];
+                const taxNames = taxIds.map(id => {
+                    const tax = this.state.availableTaxes.find(t => t.id === id);
+                    return tax ? tax.name : `Tax`;
+                }).join(', ');
+
+                return {
+                    id: l.id,
+                    product: l.name,
+                    qty: l.product_uom_qty,
+                    delivered: l.qty_delivered,
+                    invoiced: l.qty_invoiced,
+                    price: l.price_unit,
+                    taxes: taxNames || 'None', 
+                    subtotal: l.price_subtotal
+                };
+            });
+        } catch (error) {
+            this.notification.add(error.data?.message || error.message, { type: "danger" });
+        } finally {
+            this.state.isLoadingLines = false;
+        }
+    }
+    
+   async viewInvoice(invoice) {
+        this.state.selectedInvoice = invoice;
+        this.state.isEditingInvoice = false;
+        this.state.isLoadingLines = true; 
+
+        try {
+            const invoiceDbId = invoice.odoo_id || invoice.id;
+
+            const lines = await this.orm.searchRead(
+                "account.move.line",
+                [
+                    ["move_id", "=", invoiceDbId],
+                    ["display_type", "=", "product"] 
+                ],
+                ["id", "name", "product_id", "quantity", "price_unit", "tax_ids", "price_subtotal"]
+            );
+
+            const mappedLines = lines.map(l => {
+                const taxIds = l.tax_ids || [];
+                const taxNames = taxIds.map(id => {
+                    const tax = this.state.availableTaxes.find(t => t.id === id);
+                    return tax ? tax.name : `Tax`;
+                }).join(', ');
+
+                return {
+                    id: l.id,
+                    product_id: l.product_id ? l.product_id[0] : null, // Used by credit notes edit view
+                    productId: l.product_id ? l.product_id[0] : null,   // Used by invoices edit view
+                    product: l.name,
+                    qty: l.quantity,
+                    price: l.price_unit,
+                    tax_id: taxIds.length > 0 ? taxIds[0] : "", 
+                    taxes: taxNames || 'None',
+                    subtotal: l.price_subtotal
+                };
+            });
+
+            // FIX: Populate BOTH variables so whichever one your XML table looks at, it finds the data
+            this.state.selectedInvoice.full_lines = mappedLines;
+            this.state.selectedInvoiceLines = mappedLines;
+            
+            const moveData = await this.orm.read(
+                "account.move", 
+                [invoiceDbId], 
+                ["amount_untaxed", "amount_tax", "amount_total"]
+            );
+            
+            if (moveData.length > 0) {
+                this.state.selectedInvoice.amount_untaxed = moveData[0].amount_untaxed;
+                this.state.selectedInvoice.amount_tax = moveData[0].amount_tax;
+                this.state.selectedInvoice.amount_total = moveData[0].amount_total;
+            }
+        } catch (error) {
+            this.notification.add(error.data?.message || error.message, { type: "danger" });
+        } finally {
+            this.state.isLoadingLines = false; 
+        }
+    }
+    viewPayment(payment) { this.state.selectedPayment = payment; }
+    viewShop(shop) { this.state.selectedShop = { ...shop }; }
+
+    async triggerCreateInvoice(order) {
+        this.state.isCreatingInvoice = true;
+        try {
+            const context = { active_model: 'sale.order', active_ids: [order.id] };
+            const wizardIds = await this.orm.create("sale.advance.payment.inv", [{ advance_payment_method: 'delivered' }], { context });
+            await this.orm.call("sale.advance.payment.inv", "create_invoices", [wizardIds], { context });
+            await this.refreshFinancialLists();
+            this.setInvoiceSubTab('customer_invoices');
+        } catch (error) { 
+            alert(`Backend rejected the invoice creation:\n\n${error.data?.message || error.message}`);
+        }
+        this.state.isCreatingInvoice = false;
     }
 
     setSubTab(tabName) {
@@ -490,6 +801,9 @@ export class FinancialsInvoicing extends Component {
         }
         if (tabName === 'cash') {
             this.state.cashDirection = this.state.cashDirection || 'all';
+        }
+        if (tabName === 'pnl') {
+            this.fetchPnlData();
         }
     }
     setInvoiceSubTab(subTabName) { this.state.invoiceSubTab = subTabName; this.resetDetailViews(); }
@@ -548,19 +862,17 @@ export class FinancialsInvoicing extends Component {
         }
     }
 
-    openCashActivity(direction = "all") {
+   openCashActivity(direction = "all") {
         this.state.cashDirection = direction || "all";
-        this.setSubTab("cash");
+        this.requestTabSwitch('financials', 'cash');
     }
 
     openShopBalancesFromMoney() {
-        this.state.activeSubTab = "invoices";
-        this.setInvoiceSubTab("balances");
+        this.requestTabSwitch('financials', 'balances');
     }
 
-    openCreditNotesFromMoney() {
-        this.state.activeSubTab = "invoices";
-        this.setInvoiceSubTab("credit_notes");
+   openCreditNotesFromMoney() {
+        this.requestTabSwitch('financials', 'credit_notes');
     }
     
     resetDetailViews() {
@@ -685,7 +997,7 @@ export class FinancialsInvoicing extends Component {
             const context = { active_model: 'sale.order', active_ids: [order.id] };
             const wizardIds = await this.orm.create("sale.advance.payment.inv", [{ advance_payment_method: 'delivered' }], { context });
             await this.orm.call("sale.advance.payment.inv", "create_invoices", [wizardIds], { context });
-            await this.fetchRealData();
+            await this.refreshFinancialLists();
             this.setInvoiceSubTab('customer_invoices');
         } catch (error) { 
             alert(`Backend rejected the invoice creation:\n\n${error.data?.message || error.message}`);
@@ -697,7 +1009,7 @@ export class FinancialsInvoicing extends Component {
         this.state.isConfirming = true;
         try {
             await this.orm.call("account.move", "action_post", [[invoice.id]]);
-            await this.fetchRealData();
+            await this.refreshFinancialLists();
             this._refreshSelectedInvoiceState(invoice.id);
         } catch (error) { alert(error.data?.message || error.message); }
         this.state.isConfirming = false;
@@ -707,7 +1019,7 @@ export class FinancialsInvoicing extends Component {
         this.state.isResetting = true;
         try {
             await this.orm.call("account.move", "button_draft", [[invoice.id]]);
-            await this.fetchRealData();
+            await this.refreshFinancialLists();
             this._refreshSelectedInvoiceState(invoice.id);
         } catch (error) { alert(error.data?.message || error.message); }
         this.state.isResetting = false;
@@ -718,7 +1030,7 @@ export class FinancialsInvoicing extends Component {
             this.state.isCancelling = true;
             try {
                 await this.orm.call("account.move", "button_cancel", [[invoice.id]]);
-                await this.refreshData();
+                await this.refreshFinancialLists();
                 this._refreshSelectedInvoiceState(invoice.id);
             } catch (error) { 
                 alert("Failed to cancel invoice: " + (error.data?.message || error.message));
@@ -822,7 +1134,7 @@ export class FinancialsInvoicing extends Component {
             });
 
             this.state.isEditingInvoice = false;
-            await this.fetchRealData();
+            await this.refreshFinancialLists();
             this._refreshSelectedInvoiceState(this.state.selectedInvoice.id);
             await this.viewInvoice(this.state.selectedInvoice); 
         } catch (error) {
@@ -1052,7 +1364,7 @@ export class FinancialsInvoicing extends Component {
             }
 
             this.closeRefundModal();
-            await this.fetchRealData();
+            await this.refreshFinancialLists();
             // Open the draft CN for review/confirm — avoid setInvoiceSubTab
             // (it clears selection via resetDetailViews).
             this.state.invoiceSubTab = 'credit_notes';
@@ -1123,7 +1435,7 @@ export class FinancialsInvoicing extends Component {
             
             await this.orm.call("account.payment.register", "action_create_payments", [wizardIds], { context });
             
-            await this.fetchRealData(); 
+            await this.refreshFinancialLists(); 
             this.closePaymentModal();
             this._refreshSelectedInvoiceState(form.invoice_id);
             
@@ -1137,7 +1449,7 @@ export class FinancialsInvoicing extends Component {
         try {
             const shop = this.state.selectedShop;
             await this.orm.write("res.partner", [shop.id], { credit_limit: parseFloat(shop.rawLimit) });
-            await this.fetchRealData();
+            await this.refreshFinancialLists();
             this.state.selectedShop = null;
         } catch (error) { alert("Failed to save limit. Ensure you have distributor rights."); }
     }

@@ -21,9 +21,12 @@
                 </ul>
                 
                 <!-- NEW REFRESH BUTTON -->
-                <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center" t-on-click="refreshData" t-att-disabled="this.state.isLoading.data" title="Refresh Financial Data">
+                 <div class="d-flex flex-column align-items-end">
+                <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center" t-on-click="refreshData" t-att-disabled="this.state.isLoading.data" title="Refresh Bank Transaction Data">
                     <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isLoading.data}"></i> Refresh
                 </button>
+                <span class="small text-muted">Use this Refresh Button to update your cash activity data</span>
+                </div>
             </div>
 
             <!-- Global Loading State -->
@@ -145,7 +148,7 @@
                                                 </span>
                                             </td>
                                             <td class="text-center">
-                                                <span t-attf-class="badge #{t.state === 'posted' or t.state === 'paid' or t.state === 'in_process' ? 'bg-success' : (t.state === 'draft' ? 'bg-warning text-dark' : 'bg-secondary')}">
+                                                <span t-attf-class="badge #{t.state === 'posted' or t.state === 'paid' or t.state === 'in_process' ? 'bg-success text-white' : (t.state === 'draft' ? 'bg-warning text-dark' : 'bg-secondary')}">
                                                     <t t-esc="t.state.toUpperCase()"/>
                                                 </span>
                                             </td>
@@ -190,6 +193,7 @@
                                     <h6 class="fw-bold text-primary mb-3">Payment Details</h6>
                                     <p class="mb-2"><strong>Method:</strong> <span class="text-capitalize"><t t-esc="this.state.selectedTransaction.shahtaj_payment_channel || 'N/A'"/></span></p>
                                     <p class="mb-2" t-if="this.state.selectedTransaction.shahtaj_payer_bank_name"><strong>Bank:</strong> <t t-esc="this.state.selectedTransaction.shahtaj_payer_bank_name"/></p>
+                                    <p class="mb-2" t-if="this.state.selectedTransaction.shahtaj_payer_account_number"><strong>Account No:</strong> <t t-esc="this.state.selectedTransaction.shahtaj_payer_account_number"/></p>
                                     <p class="mb-2" t-if="this.state.selectedTransaction.shahtaj_instrument_reference"><strong>Reference:</strong> <t t-esc="this.state.selectedTransaction.shahtaj_instrument_reference"/></p>
                                     <p class="mb-0" t-if="this.state.selectedTransaction.shahtaj_payment_notes"><strong>Notes:</strong> <t t-esc="this.state.selectedTransaction.shahtaj_payment_notes"/></p>
                                 </div>
@@ -205,7 +209,7 @@
                             <h4 class="fw-bold mb-0">Configured Journals</h4>
                             <small class="text-muted">Manage your physical cash registers and bank accounts.</small>
                         </div>
-                        <button class="btn btn-dark fw-bold  ms-2 shadow-sm d-flex align-items-center" t-on-click="openJournalModal">
+                        <button class="btn btn-dark fw-bold  me-2 shadow-sm d-flex align-items-center" t-on-click="openJournalModal">
                             <i class="fa fa-plus me-2"></i> Create Journal
                         </button>
                     </div>
@@ -282,7 +286,7 @@
                         </div>
                         <div class="modal-footer border-top-0 bg-light">
                             <button type="button" class="btn btn-outline-secondary fw-bold px-4" t-on-click="closeJournalModal" t-att-disabled="this.state.isLoading.saveJournal">Cancel</button>
-                            <button type="button" class="btn btn-dark fw-bold px-4 d-flex align-items-center" t-on-click="saveJournal" t-att-disabled="this.state.isLoading.saveJournal">
+                            <button type="button" class="btn btn-dark ms-2 fw-bold px-4 d-flex align-items-center" t-on-click="saveJournal" t-att-disabled="this.state.isLoading.saveJournal">
                                 <t t-if="this.state.isLoading.saveJournal">
                                     <i class="fa fa-circle-o-notch fa-spin me-2"></i> Saving...
                                 </t>
