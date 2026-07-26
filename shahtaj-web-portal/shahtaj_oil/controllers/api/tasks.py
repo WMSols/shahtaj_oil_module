@@ -7,6 +7,7 @@ from odoo.http import request
 from odoo.addons.shahtaj_oil.api import serializers
 from odoo.addons.shahtaj_oil.controllers.api.base import (
     API_ROUTE,
+    api_activity,
     api_success,
     ensure_order_booker,
     task_for_booker,
@@ -35,6 +36,7 @@ class ShahtajApiTasks(http.Controller):
         })
 
     @http.route('/api/shahtaj/v1/tasks/check-in', **API_ROUTE)
+    @api_activity('visit.check_in', 'Check in to shop')
     def check_in(self, task_id=None, latitude=None, longitude=None, **kwargs):
         task = task_for_booker(task_id)
         if task.visit_id and task.visit_id.state == 'in_progress':
@@ -55,6 +57,7 @@ class ShahtajApiTasks(http.Controller):
         })
 
     @http.route('/api/shahtaj/v1/tasks/skip', **API_ROUTE)
+    @api_activity('task.skip', 'Skip visit task')
     def skip_task(self, task_id=None, **kwargs):
         task = task_for_booker(task_id)
         task.action_skip()

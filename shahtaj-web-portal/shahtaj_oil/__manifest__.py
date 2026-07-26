@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.0.89',
+    'version': '19.0.1.0.92',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -37,6 +37,8 @@
         'views/shahtaj_schedule_views.xml',
         'views/shahtaj_visit_task_views.xml',
         'views/shahtaj_target_views.xml',
+        'views/shahtaj_activity_log_views.xml',
+        'data/shahtaj_activity_log_data.xml',
 
         # ── 4. VISIT VIEWS (before sale_accounting which inherits visit views) ──
         'data/shahtaj_visit_action_cleanup.xml',

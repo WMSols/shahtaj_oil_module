@@ -256,6 +256,14 @@ class ShahtajWeeklySchedule(models.Model):
     def create(self, vals_list):
         records = super().create(vals_list)
         records._sync_future_tasks()
+        Log = self.env['shahtaj.activity.log']
+        for schedule in records:
+            Log.log_business(
+                operation='schedule.create',
+                name='Weekly schedule created',
+                related_record=schedule,
+                message=schedule.display_name,
+            )
         return records
 
     def write(self, vals):
@@ -266,14 +274,31 @@ class ShahtajWeeklySchedule(models.Model):
             self._cancel_pending_forward_tasks()
         res = super().write(vals)
         self._sync_future_tasks()
+        if reschedule_fields.intersection(vals):
+            Log = self.env['shahtaj.activity.log']
+            for schedule in self:
+                Log.log_business(
+                    operation='schedule.update',
+                    name='Weekly schedule updated',
+                    related_record=schedule,
+                    message=', '.join(sorted(reschedule_fields.intersection(vals))),
+                )
         return res
 
     def unlink(self):
         bookers = self.mapped('order_booker_id')
+        snapshot = [(s.id, s.display_name) for s in self]
         for schedule in self:
             if schedule._is_today_occurrence() and schedule._get_blocking_tasks():
                 schedule._raise_blocking_tasks_error()
             schedule._cancel_pending_forward_tasks()
         res = super().unlink()
         self.env['shahtaj.weekly.schedule']._sync_future_tasks(bookers=bookers)
+        Log = self.env['shahtaj.activity.log']
+        for _sid, name in snapshot:
+            Log.log_business(
+                operation='schedule.delete',
+                name='Weekly schedule deleted',
+                message=name,
+            )
         return res

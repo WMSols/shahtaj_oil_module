@@ -451,6 +451,14 @@ class ResPartner(models.Model):
         shop_partners.filtered(
             lambda p: p.shop_approval_state == 'approved'
         )._post_legacy_balance_entry()
+        Log = self.env['shahtaj.activity.log']
+        for shop in shop_partners:
+            Log.log_business(
+                operation='shop.create',
+                name='Shop created',
+                related_record=shop,
+                message=shop.display_name,
+            )
         return partners
 
     def write(self, vals):
@@ -508,6 +516,23 @@ class ResPartner(models.Model):
             )._post_legacy_balance_entry()
         if 'shop_approval_state' in vals:
             self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_approval_change()
+        shops = self.filtered('is_shahtaj_shop')
+        if shops:
+            Log = self.env['shahtaj.activity.log']
+            tracked = {
+                'active', 'name', 'route_id', 'zone_id', 'credit_limit',
+                'shahtaj_shop_category', 'owner_name', 'owner_phone',
+            }
+            if tracked.intersection(vals) and not self.env.context.get(
+                'shahtaj_posting_legacy_move'
+            ):
+                for shop in shops:
+                    Log.log_business(
+                        operation='shop.update',
+                        name='Shop updated',
+                        related_record=shop,
+                        message=', '.join(sorted(tracked.intersection(vals))),
+                    )
         return res
 
     def _sync_visit_tasks_after_approval_change(self):
@@ -555,9 +580,25 @@ class ResPartner(models.Model):
                 partner._get_shop_receivable_account(company)
         pending.write({'shop_approval_state': 'approved', 'is_shahtaj_shop': True})
         pending._post_legacy_balance_entry()
+        Log = self.env['shahtaj.activity.log']
+        for shop in pending:
+            Log.log_business(
+                operation='shop.approve',
+                name='Shop approved',
+                related_record=shop,
+                message=shop.display_name,
+            )
 
     def action_reject_shop(self):
         self.write({'shop_approval_state': 'rejected'})
+        Log = self.env['shahtaj.activity.log']
+        for shop in self.filtered('is_shahtaj_shop'):
+            Log.log_business(
+                operation='shop.reject',
+                name='Shop rejected',
+                related_record=shop,
+                message=shop.display_name,
+            )
 
     def action_view_legacy_balance_move(self):
         self.ensure_one()

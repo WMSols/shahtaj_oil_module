@@ -205,6 +205,14 @@ class ShahtajVisitTask(models.Model):
                     'End the active shop visit before skipping this task.'
                 ))
         self.write({'state': 'skipped'})
+        Log = self.env['shahtaj.activity.log']
+        for task in self:
+            Log.log_business(
+                operation='task.skip',
+                name='Skip visit task',
+                related_record=task,
+                message=task.display_name,
+            )
 
     def action_cancel(self):
         self.write({'state': 'cancelled'})

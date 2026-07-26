@@ -9,6 +9,7 @@ from odoo.http import request
 from odoo.addons.shahtaj_oil.api import serializers
 from odoo.addons.shahtaj_oil.controllers.api.base import (
     API_ROUTE,
+    api_activity,
     api_success,
     ensure_order_booker,
     visit_for_booker,
@@ -67,6 +68,7 @@ class ShahtajApiVisits(http.Controller):
         return api_success({'visit': serializers.visit_dict(visit)})
 
     @http.route('/api/shahtaj/v1/visits/line/add', **API_ROUTE)
+    @api_activity('visit.line.add', 'Add visit line')
     def add_line(self, visit_id=None, product_id=None, quantity=1.0, **kwargs):
         visit = visit_for_booker(visit_id)
         if visit.state != 'in_progress':
@@ -94,6 +96,7 @@ class ShahtajApiVisits(http.Controller):
         })
 
     @http.route('/api/shahtaj/v1/visits/line/update', **API_ROUTE)
+    @api_activity('visit.line.update', 'Update visit line')
     def update_line(self, line_id=None, quantity=None, price_unit=None, **kwargs):
         ensure_order_booker()
         line = request.env['shahtaj.visit.line'].browse(int(line_id))
@@ -118,6 +121,7 @@ class ShahtajApiVisits(http.Controller):
         })
 
     @http.route('/api/shahtaj/v1/visits/line/remove', **API_ROUTE)
+    @api_activity('visit.line.remove', 'Remove visit line')
     def remove_line(self, line_id=None, **kwargs):
         ensure_order_booker()
         line = request.env['shahtaj.visit.line'].browse(int(line_id))
@@ -130,6 +134,7 @@ class ShahtajApiVisits(http.Controller):
         return api_success({'visit': serializers.visit_dict(visit)})
 
     @http.route('/api/shahtaj/v1/visits/place-order', **API_ROUTE)
+    @api_activity('visit.place_order', 'Place order from visit')
     def place_order(self, visit_id=None, latitude=None, longitude=None, **kwargs):
         """Place order — requires current GPS (same 100 m rule as check-in)."""
         visit = visit_for_booker(visit_id)
@@ -149,6 +154,7 @@ class ShahtajApiVisits(http.Controller):
         return api_success({'visit': serializers.visit_dict(visit)})
 
     @http.route('/api/shahtaj/v1/visits/end-without-order', **API_ROUTE)
+    @api_activity('visit.end_without_order', 'End visit without order')
     def end_without_order(self, visit_id=None, notes=None, **kwargs):
         visit = visit_for_booker(visit_id)
         if visit.state != 'in_progress':

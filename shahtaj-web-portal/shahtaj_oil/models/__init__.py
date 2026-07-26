@@ -27,3 +27,4 @@ from . import shahtaj_stock_receipt
 from . import shahtaj_manufacturer_summary
 from . import ir_http
 from . import ir_ui_menu
+from . import shahtaj_activity_log

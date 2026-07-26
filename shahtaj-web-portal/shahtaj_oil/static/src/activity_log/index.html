@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Shahtaj Activity Logs</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --panel-2: #243044;
+      --line: #334155;
+      --text: #e8eef7;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --bad: #ef4444;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1e3a5f 0%, transparent 55%),
+                  radial-gradient(900px 500px at 100% 0%, #1a2f24 0%, transparent 45%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 1.25rem 1.5rem 0.75rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(15, 20, 25, 0.75);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+    }
+    header p {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .wrap { padding: 1rem 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 0.65rem;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .filters label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .filters .span-2 { grid-column: span 2; }
+    input, select, button {
+      font: inherit;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 0.45rem 0.55rem;
+    }
+    input:focus, select:focus {
+      outline: 1px solid var(--accent);
+      border-color: var(--accent);
+    }
+    .actions {
+      display: flex;
+      align-items: end;
+      gap: 0.5rem;
+      grid-column: span 2;
+    }
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      border-color: transparent;
+      font-weight: 600;
+      padding: 0.5rem 0.9rem;
+    }
+    button.secondary {
+      background: transparent;
+      border-color: var(--line);
+      color: var(--muted);
+    }
+    button:disabled { opacity: 0.55; cursor: wait; }
+    .meta-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.65rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 980px;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.55rem 0.7rem;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      font-size: 0.86rem;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #1e293b;
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      z-index: 1;
+    }
+    tr:hover td { background: rgba(59, 130, 246, 0.06); }
+    .pill {
+      display: inline-block;
+      padding: 0.12rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 650;
+      text-transform: uppercase;
+    }
+    .pill.ok { background: rgba(34, 197, 94, 0.15); color: var(--ok); }
+    .pill.bad { background: rgba(239, 68, 68, 0.15); color: var(--bad); }
+    .op { font-family: ui-monospace, Consolas, monospace; font-size: 0.78rem; color: #93c5fd; }
+    .msg { color: var(--muted); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .err {
+      color: #fca5a5;
+      font-size: 0.78rem;
+      max-width: 280px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .empty, .error-banner {
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+    }
+    .error-banner { color: #fecaca; }
+    .pager { display: flex; gap: 0.5rem; align-items: center; }
+    details.row-detail {
+      margin-top: 0.25rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    @media (max-width: 1100px) {
+      .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .filters .span-2, .actions { grid-column: span 2; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Shahtaj Activity Logs</h1>
+    <p>Admin-only · last 2 days retained · filter by user, role, source, status, and operation</p>
+  </header>
+  <div class="wrap">
+    <form class="filters" id="filters" onsubmit="return false;">
+      <label class="span-2">Search
+        <input id="q" type="search" placeholder="Name, message, related record…"/>
+      </label>
+      <label>User
+        <select id="user_id"><option value="">All users</option></select>
+      </label>
+      <label>Role
+        <select id="role"><option value="">All roles</option></select>
+      </label>
+      <label>Source
+        <select id="source"><option value="">All sources</option></select>
+      </label>
+      <label>Status
+        <select id="status"><option value="">All</option></select>
+      </label>
+      <label>Operation
+        <select id="operation"><option value="">All operations</option></select>
+      </label>
+      <label>From
+        <input id="date_from" type="date"/>
+      </label>
+      <label>To
+        <input id="date_to" type="date"/>
+      </label>
+      <div class="actions">
+        <button type="button" id="btnApply">Apply filters</button>
+        <button type="button" class="secondary" id="btnReset">Reset</button>
+      </div>
+    </form>
+
+    <div class="meta-bar">
+      <div id="summary">Loading…</div>
+      <div class="pager">
+        <button type="button" class="secondary" id="btnPrev" disabled>Prev</button>
+        <span id="pageLabel">—</span>
+        <button type="button" class="secondary" id="btnNext" disabled>Next</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Status</th>
+            <th>Source</th>
+            <th>User / Role</th>
+            <th>Operation</th>
+            <th>Summary</th>
+            <th>Related</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="8" class="empty">Loading activity…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const PAGE_SIZE = 100;
+    let offset = 0;
+    let total = 0;
+    let loading = false;
+
+    function esc(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    async function jsonRpc(url, params) {
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'call',
+          params: params || {},
+          id: Date.now(),
+        }),
+      });
+      if (res.status === 401 || res.status === 303) {
+        throw new Error('Session expired — log in as an administrator.');
+      }
+      const data = await res.json();
+      if (data.error) {
+        const msg = (data.error.data && data.error.data.message)
+          || data.error.message
+          || 'Request failed';
+        throw new Error(msg);
+      }
+      return data.result;
+    }
+
+    function fillSelect(id, items, placeholder) {
+      const el = document.getElementById(id);
+      const current = el.value;
+      el.innerHTML = `<option value="">${esc(placeholder)}</option>`;
+      (items || []).forEach((item) => {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = item.name;
+        el.appendChild(opt);
+      });
+      if ([...el.options].some((o) => o.value === current)) {
+        el.value = current;
+      }
+    }
+
+    function filterParams() {
+      return {
+        q: document.getElementById('q').value.trim() || null,
+        user_id: document.getElementById('user_id').value || null,
+        role: document.getElementById('role').value || null,
+        source: document.getElementById('source').value || null,
+        status: document.getElementById('status').value || null,
+        operation: document.getElementById('operation').value || null,
+        date_from: document.getElementById('date_from').value || null,
+        date_to: document.getElementById('date_to').value || null,
+        limit: PAGE_SIZE,
+        offset,
+      };
+    }
+
+    function renderRows(rows) {
+      const tbody = document.getElementById('tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">No activity matches these filters.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map((row) => {
+        const statusClass = row.status === 'failed' ? 'bad' : 'ok';
+        const err = row.error_details
+          ? `<div class="err" title="${esc(row.error_details)}">${esc(row.error_details)}</div>`
+          : '';
+        const detail = (row.request_path || row.request_ip)
+          ? `<details class="row-detail"><summary>request</summary>${esc(row.request_method || '')} ${esc(row.request_path || '')} · IP ${esc(row.request_ip || '—')}</details>`
+          : '';
+        return `<tr>
+          <td>${esc(row.event_at)}<div class="row-detail">${esc(row.timezone)}</div></td>
+          <td><span class="pill ${statusClass}">${esc(row.status)}</span></td>
+          <td>${esc(row.source)}</td>
+          <td>${esc(row.actor || '—')}<div class="row-detail">${esc(row.role || '')}</div></td>
+          <td><span class="op">${esc(row.operation)}</span></td>
+          <td><div>${esc(row.name)}</div><div class="msg" title="${esc(row.message)}">${esc(row.message)}</div>${detail}</td>
+          <td>${esc(row.related || '—')}</td>
+          <td>${err}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function loadMeta() {
+      const meta = await jsonRpc('/shahtaj/activity-logs/meta', {});
+      fillSelect('user_id', meta.users, 'All users');
+      fillSelect('role', meta.roles, 'All roles');
+      fillSelect('source', meta.sources, 'All sources');
+      fillSelect('status', meta.statuses, 'All');
+      fillSelect('operation', meta.operations.map((op) => ({ id: op, name: op })), 'All operations');
+    }
+
+    async function loadData() {
+      if (loading) return;
+      loading = true;
+      document.getElementById('btnApply').disabled = true;
+      try {
+        const result = await jsonRpc('/shahtaj/activity-logs/data', filterParams());
+        total = result.total || 0;
+        offset = result.offset || 0;
+        renderRows(result.rows || []);
+        const from = total ? offset + 1 : 0;
+        const to = Math.min(offset + PAGE_SIZE, total);
+        document.getElementById('summary').textContent =
+          `${total} event${total === 1 ? '' : 's'} · showing ${from}–${to} · auto-deleted after 2 days`;
+        document.getElementById('pageLabel').textContent =
+          total ? `Page ${Math.floor(offset / PAGE_SIZE) + 1}` : '—';
+        document.getElementById('btnPrev').disabled = offset <= 0;
+        document.getElementById('btnNext').disabled = offset + PAGE_SIZE >= total;
+      } catch (err) {
+        document.getElementById('tbody').innerHTML =
+          `<tr><td colspan="8" class="error-banner">${esc(err.message || err)}</td></tr>`;
+        document.getElementById('summary').textContent = 'Unable to load logs';
+      } finally {
+        loading = false;
+        document.getElementById('btnApply').disabled = false;
+      }
+    }
+
+    document.getElementById('btnApply').addEventListener('click', () => {
+      offset = 0;
+      loadData();
+    });
+    document.getElementById('btnReset').addEventListener('click', () => {
+      document.getElementById('filters').reset();
+      offset = 0;
+      loadData();
+    });
+    document.getElementById('btnPrev').addEventListener('click', () => {
+      offset = Math.max(0, offset - PAGE_SIZE);
+      loadData();
+    });
+    document.getElementById('btnNext').addEventListener('click', () => {
+      offset = offset + PAGE_SIZE;
+      loadData();
+    });
+    document.getElementById('q').addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        offset = 0;
+        loadData();
+      }
+    });
+
+    (async function init() {
+      try {
+        await loadMeta();
+      } catch (err) {
+        document.getElementById('summary').textContent = err.message || String(err);
+      }
+      await loadData();
+    })();
+  </script>
+</body>
+</html>

@@ -232,4 +232,18 @@
               sequence="25"
               groups="shahtaj_oil.group_shahtaj_order_booker"/>
 
+    <menuitem id="menu_shahtaj_activity_logs"
+              name="Activity Logs"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_activity_logs_html"
+              sequence="90"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_shahtaj_activity_logs_list"
+              name="Activity Logs (List)"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_activity_logs"
+              sequence="91"
+              groups="base.group_system"/>
+
 </odoo>

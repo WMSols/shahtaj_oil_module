@@ -6,7 +6,7 @@ from odoo.http import request
 
 from odoo.addons.shahtaj_oil.api import serializers
 from odoo.addons.shahtaj_oil.api.image_utils import shop_photo_vals_from_kwargs
-from odoo.addons.shahtaj_oil.controllers.api.base import API_ROUTE, api_success, ensure_order_booker
+from odoo.addons.shahtaj_oil.controllers.api.base import API_ROUTE, api_activity, api_success, ensure_order_booker
 
 
 class ShahtajApiShops(http.Controller):
@@ -21,6 +21,7 @@ class ShahtajApiShops(http.Controller):
         return partner
 
     @http.route('/api/shahtaj/v1/shops/register', **API_ROUTE)
+    @api_activity('shop.register', 'Register shop')
     def register_shop(self, **kwargs):
         ensure_order_booker()
         name = kwargs.get('name')

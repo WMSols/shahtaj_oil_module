@@ -423,6 +423,12 @@ class ShahtajVisit(models.Model):
             'state': 'in_progress',
             'visit_id': visit.id,
         })
+        self.env['shahtaj.activity.log'].log_business(
+            operation='visit.check_in',
+            name='Check in to shop',
+            related_record=visit,
+            message=_('Checked in at %(shop)s', shop=visit.shop_id.display_name),
+        )
         return visit
 
     def action_open_sale_order(self):
@@ -573,6 +579,14 @@ class ShahtajVisit(models.Model):
             'sale_order_id': order.id,
         })
         self._finish_visit('order')
+        self.env['shahtaj.activity.log'].log_business(
+            operation='visit.place_order',
+            name='Place order from visit',
+            related_record=self,
+            message=_('Order %(order)s for %(shop)s',
+                      order=order.display_name,
+                      shop=self.shop_id.display_name),
+        )
         # Bookers see completed visit; distributors can open the sales order form.
         if self._is_booker_only_user():
             return {
@@ -598,6 +612,13 @@ class ShahtajVisit(models.Model):
     def action_end_without_order(self):
         for visit in self:
             visit._finish_visit('no_order')
+            self.env['shahtaj.activity.log'].log_business(
+                operation='visit.end_without_order',
+                name='End visit without order',
+                related_record=visit,
+                message=_('Ended without order at %(shop)s',
+                          shop=visit.shop_id.display_name),
+            )
         return True
 
 

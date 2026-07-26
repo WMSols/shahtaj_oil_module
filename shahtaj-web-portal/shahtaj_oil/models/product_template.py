@@ -509,6 +509,14 @@ class ProductTemplate(models.Model):
         self.with_context(shahtaj_skip_receipt_log=True).action_shahtaj_set_on_hand_qty(
             stock_self.qty_available + quantity,
         )
+        self.env['shahtaj.activity.log'].log_business(
+            operation='stock.add',
+            name='Stock added',
+            related_record=self,
+            message=_('Added %(qty)s to %(product)s',
+                      qty=quantity,
+                      product=self.display_name),
+        )
 
     def _shahtaj_add_on_hand_qty(self, quantity):
         """Backward-compatible alias used by stock wizards."""

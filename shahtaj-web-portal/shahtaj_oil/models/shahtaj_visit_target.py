@@ -282,3 +282,45 @@ class ShahtajVisitTarget(models.Model):
         ])
         if targets:
             targets._recompute_recordset()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        targets = super().create(vals_list)
+        Log = self.env['shahtaj.activity.log']
+        for target in targets:
+            Log.log_business(
+                operation='target.create',
+                name='Target created',
+                related_record=target,
+                message=target.display_name,
+            )
+        return targets
+
+    def write(self, vals):
+        res = super().write(vals)
+        tracked = {
+            'order_booker_id', 'date_start', 'date_end', 'target_type',
+            'target_value', 'product_id', 'active', 'target_weight_uom',
+        }
+        if tracked.intersection(vals):
+            Log = self.env['shahtaj.activity.log']
+            for target in self:
+                Log.log_business(
+                    operation='target.update',
+                    name='Target updated',
+                    related_record=target,
+                    message=', '.join(sorted(tracked.intersection(vals))),
+                )
+        return res
+
+    def unlink(self):
+        snapshot = [(t.id, t.display_name) for t in self]
+        res = super().unlink()
+        Log = self.env['shahtaj.activity.log']
+        for _tid, name in snapshot:
+            Log.log_business(
+                operation='target.delete',
+                name='Target deleted',
+                message=name,
+            )
+        return res

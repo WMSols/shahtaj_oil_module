@@ -123,4 +123,27 @@ class ShahtajRoute(models.Model):
                 )
         elif restoring:
             self._sync_after_territory_restore()
+        if {'name', 'active', 'zone_id'}.intersection(vals):
+            Log = self.env['shahtaj.activity.log']
+            for route in self:
+                op = 'route.archive' if archiving else 'route.update'
+                Log.log_business(
+                    operation=op,
+                    name='Route archived' if archiving else 'Route updated',
+                    related_record=route,
+                    message=route.display_name,
+                )
         return res
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        routes = super().create(vals_list)
+        Log = self.env['shahtaj.activity.log']
+        for route in routes:
+            Log.log_business(
+                operation='route.create',
+                name='Route created',
+                related_record=route,
+                message=route.display_name,
+            )
+        return routes

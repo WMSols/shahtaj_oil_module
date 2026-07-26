@@ -73,6 +73,14 @@ class ResCompany(models.Model):
             vals['shahtaj_max_shop_distance_m'] = float(max_m)
         if vals:
             company.write(vals)
+            self.env['shahtaj.activity.log'].log_business(
+                operation='settings.gps_distance',
+                name='GPS distance settings updated',
+                related_record=company,
+                message=_('min=%(min)s m, max=%(max)s m',
+                          min=company.shahtaj_min_shop_distance_m,
+                          max=company.shahtaj_max_shop_distance_m),
+            )
         return self.shahtaj_get_shop_distance_limits()
 
     @api.model

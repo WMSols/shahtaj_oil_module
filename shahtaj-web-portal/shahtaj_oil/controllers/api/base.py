@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Base helpers for order booker HTTP API controllers."""
+import functools
+
 from odoo import _
 from odoo.exceptions import AccessError
 from odoo.http import request
@@ -58,3 +60,43 @@ def task_for_booker(task_id):
     if task.order_booker_id != request.env.user:
         raise AccessError(_('This task belongs to another order booker.'))
     return task
+
+
+def _activity_log():
+    return request.env['shahtaj.activity.log']
+
+
+def api_activity(operation, name=None, log_success=True):
+    """Log order-booker API mutations (not reads). Never blocks the response path."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            label = name or operation
+            try:
+                result = func(*args, **kwargs)
+                if log_success:
+                    try:
+                        _activity_log().log_event(
+                            name=label,
+                            operation=operation,
+                            source='order_booker_api',
+                            status='success',
+                            message=label,
+                        )
+                    except Exception:
+                        pass
+                return result
+            except Exception as exc:
+                try:
+                    _activity_log().log_exception(
+                        operation=operation,
+                        name=label,
+                        exc=exc,
+                        source='order_booker_api',
+                        message=label,
+                    )
+                except Exception:
+                    pass
+                raise
+        return wrapper
+    return decorator

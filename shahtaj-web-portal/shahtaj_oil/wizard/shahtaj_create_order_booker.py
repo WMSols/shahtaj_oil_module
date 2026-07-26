@@ -44,6 +44,12 @@ class ShahtajCreateOrderBookerWizard(models.TransientModel):
             'shahtaj_custom_frontend': False,
             'shahtaj_distributor_financial_access': False,
         })
+        self.env['shahtaj.activity.log'].log_business(
+            operation='order_booker.create',
+            name='Order booker created',
+            related_record=user,
+            message=_('Created order booker %(login)s', login=user.login),
+        )
         return {
             'type': 'ir.actions.act_window',
             'name': _('Order Booker'),

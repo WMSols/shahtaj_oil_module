@@ -66,4 +66,26 @@ class ShahtajZone(models.Model):
                     date_from=today,
                 )
         res = super().write(vals)
+        if {'name', 'active', 'distributor_id'}.intersection(vals):
+            Log = self.env['shahtaj.activity.log']
+            for zone in self:
+                Log.log_business(
+                    operation='zone.update' if vals.get('active') is not False else 'zone.archive',
+                    name='Zone updated' if vals.get('active') is not False else 'Zone archived',
+                    related_record=zone,
+                    message=zone.display_name,
+                )
         return res
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        zones = super().create(vals_list)
+        Log = self.env['shahtaj.activity.log']
+        for zone in zones:
+            Log.log_business(
+                operation='zone.create',
+                name='Zone created',
+                related_record=zone,
+                message=zone.display_name,
+            )
+        return zones
