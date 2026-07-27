@@ -547,13 +547,17 @@ class ResUsers(models.Model):
             if active_targets:
                 best = active_targets.sorted('progress_percent', reverse=True)[0]
                 user.shahtaj_active_target_progress = best.progress_percent
-                if best.target_type == 'product_weight':
+                if best.target_type == 'collective_weight':
                     uom = dict(
                         best._fields['target_weight_uom'].selection,
                     ).get(best.target_weight_uom, '')
                     user.shahtaj_active_target_summary = (
                         f'Weight: {best.achieved_value:.2f} / {best.target_value:.2f} {uom} '
                         f'({best.remaining_value:.2f} {uom} left)'
+                    )
+                elif best.target_type == 'product_bundle':
+                    user.shahtaj_active_target_summary = (
+                        f'Combined: {best.progress_percent:.0f}% complete'
                     )
                 else:
                     user.shahtaj_active_target_summary = (

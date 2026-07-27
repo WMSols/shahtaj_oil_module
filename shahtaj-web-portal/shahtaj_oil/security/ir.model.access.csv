@@ -4,6 +4,7 @@ access_shahtaj_route_user,shahtaj.route.user,model_shahtaj_route,base.group_user
 access_shahtaj_weekly_schedule_user,shahtaj.weekly.schedule.user,model_shahtaj_weekly_schedule,base.group_user,1,1,1,1
 access_shahtaj_visit_task_user,shahtaj.visit.task.user,model_shahtaj_visit_task,base.group_user,1,1,1,1
 access_shahtaj_visit_target_user,shahtaj.visit.target.user,model_shahtaj_visit_target,base.group_user,1,1,1,1
+access_shahtaj_visit_target_line_user,shahtaj.visit.target.line.user,model_shahtaj_visit_target_line,base.group_user,1,1,1,1
 access_shahtaj_generate_tasks_wizard,shahtaj.generate.tasks.wizard,model_shahtaj_generate_tasks_wizard,base.group_user,1,1,1,1
 access_shahtaj_create_order_booker_wizard,shahtaj.create.order.booker.wizard,model_shahtaj_create_order_booker_wizard,base.group_user,1,1,1,1
 access_res_partner_shahtaj_distributor,res.partner.shahtaj.distributor,base.model_res_partner,group_shahtaj_distributor,1,1,1,0
@@ -13,11 +14,13 @@ access_shahtaj_route_distributor,shahtaj.route.distributor,model_shahtaj_route,g
 access_shahtaj_weekly_schedule_distributor,shahtaj.weekly.schedule.distributor,model_shahtaj_weekly_schedule,group_shahtaj_distributor,1,1,1,1
 access_shahtaj_visit_task_distributor,shahtaj.visit.task.distributor,model_shahtaj_visit_task,group_shahtaj_distributor,1,1,1,1
 access_shahtaj_visit_target_distributor,shahtaj.visit.target.distributor,model_shahtaj_visit_target,group_shahtaj_distributor,1,1,1,1
+access_shahtaj_visit_target_line_distributor,shahtaj.visit.target.line.distributor,model_shahtaj_visit_target_line,group_shahtaj_distributor,1,1,1,1
 access_shahtaj_zone_order_booker,shahtaj.zone.order.booker,model_shahtaj_zone,group_shahtaj_order_booker,1,0,0,0
 access_shahtaj_route_order_booker,shahtaj.route.order.booker,model_shahtaj_route,group_shahtaj_order_booker,1,0,0,0
 access_shahtaj_weekly_schedule_order_booker,shahtaj.weekly.schedule.order.booker,model_shahtaj_weekly_schedule,group_shahtaj_order_booker,1,0,0,0
 access_shahtaj_visit_task_order_booker,shahtaj.visit.task.order.booker,model_shahtaj_visit_task,group_shahtaj_order_booker,1,1,0,0
 access_shahtaj_visit_target_order_booker,shahtaj.visit.target.order.booker,model_shahtaj_visit_target,group_shahtaj_order_booker,1,0,0,0
+access_shahtaj_visit_target_line_order_booker,shahtaj.visit.target.line.order.booker,model_shahtaj_visit_target_line,group_shahtaj_order_booker,1,0,0,0
 access_shahtaj_visit_user,shahtaj.visit.user,model_shahtaj_visit,base.group_user,1,1,1,1
 access_shahtaj_visit_line_user,shahtaj.visit.line.user,model_shahtaj_visit_line,base.group_user,1,1,1,1
 access_shahtaj_visit_checkin_wizard,shahtaj.visit.checkin.wizard,model_shahtaj_visit_checkin_wizard,base.group_user,1,1,1,1

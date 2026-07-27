@@ -5,8 +5,8 @@
         <field name="name">shahtaj.visit.list</field>
         <field name="model">shahtaj.visit</field>
         <field name="arch" type="xml">
-            <list decoration-muted="outcome in ('no_order', 'incomplete')"
-                  decoration-success="outcome == 'order'">
+            <list decoration-muted="outcome in ('no_order', 'incomplete', 'undone') or state == 'cancelled'"
+                  decoration-success="outcome == 'order' and state == 'completed'">
                 <field name="started_at"/>
                 <field name="order_booker_id"/>
                 <field name="shop_id"/>
@@ -15,7 +15,7 @@
                 <field name="outcome" widget="badge"
                        decoration-success="outcome == 'order'"
                        decoration-warning="outcome == 'no_order'"
-                       decoration-danger="outcome == 'incomplete'"/>
+                       decoration-danger="outcome in ('incomplete', 'undone')"/>
                 <field name="duration_minutes" string="Duration (min)"/>
                 <field name="order_amount" optional="show"/>
                 <field name="check_in_distance_m" optional="hide"/>
@@ -29,7 +29,13 @@
         <field name="arch" type="xml">
             <form string="Shop Visit">
                 <header>
-                    <field name="state" widget="statusbar" statusbar_visible="in_progress,completed"/>
+                    <button name="action_shahtaj_undo_completed_visit" type="object"
+                            string="Undo Visit (Redo)"
+                            class="btn-warning"
+                            confirm="Undo this completed visit? The linked sales order will be cancelled (only if not invoiced/delivered), the visit will be marked undone, and the order booker will be asked to check in again."
+                            invisible="state != 'completed'"
+                            groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
+                    <field name="state" widget="statusbar" statusbar_visible="in_progress,completed,cancelled"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -305,6 +311,8 @@
                 <filter string="Order Placed" name="with_order" domain="[('outcome', '=', 'order')]"/>
                 <filter string="No Order" name="no_order" domain="[('outcome', '=', 'no_order')]"/>
                 <filter string="Incomplete" name="incomplete" domain="[('outcome', '=', 'incomplete')]"/>
+                <filter string="Undone" name="undone" domain="[('outcome', '=', 'undone')]"/>
+                <filter string="Cancelled" name="cancelled" domain="[('state', '=', 'cancelled')]"/>
                 <separator/>
                 <filter string="Order Booker" name="group_booker" context="{'group_by': 'order_booker_id'}"/>
                 <filter string="Shop" name="group_shop" context="{'group_by': 'shop_id'}"/>

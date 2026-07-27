@@ -123,7 +123,10 @@ class SaleOrder(models.Model):
 
     def write(self, vals):
         res = super().write(vals)
-        if any(k in vals for k in ('state', 'date_order', 'create_uid', 'amount_total')):
+        if any(k in vals for k in (
+            'state', 'date_order', 'create_uid', 'amount_total',
+            'user_id', 'shahtaj_visit_id',
+        )):
             self._shahtaj_recompute_visit_targets()
         return res
 
@@ -152,15 +155,22 @@ class SaleOrder(models.Model):
         return super()._compute_effective_date()
 
     def unlink(self):
-        bookers = self.mapped('create_uid')
+        booker_ids = set()
+        for order in self:
+            if order.shahtaj_order_booker_id:
+                booker_ids.add(order.shahtaj_order_booker_id.id)
+            if order.user_id:
+                booker_ids.add(order.user_id.id)
+            if order.create_uid:
+                booker_ids.add(order.create_uid.id)
         dates = [
             fields.Date.to_date(order.date_order)
             for order in self if order.date_order
         ]
         res = super().unlink()
-        if bookers and dates:
+        if booker_ids and dates:
             targets = self.env['shahtaj.visit.target'].search([
-                ('order_booker_id', 'in', bookers.ids),
+                ('order_booker_id', 'in', list(booker_ids)),
                 ('date_start', '<=', max(dates)),
                 ('date_end', '>=', min(dates)),
             ])

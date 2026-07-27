@@ -39,24 +39,43 @@
                         </group>
                         <group>
                             <field name="target_type" required="1"/>
-                            <field name="target_value" required="1"/>
-                            <field name="product_id"
-                                   invisible="target_type not in ('product_qty', 'product_weight')"
-                                   required="target_type in ('product_qty', 'product_weight')"/>
+                            <field name="target_value"
+                                   invisible="target_type == 'product_bundle'"
+                                   required="target_type != 'product_bundle'"/>
                             <field name="target_weight_uom"
-                                   invisible="target_type != 'product_weight'"
-                                   required="target_type == 'product_weight'"/>
-                            <field name="currency_id" invisible="target_type != 'sales_amount'"/>
+                                   invisible="target_type != 'collective_weight'"
+                                   required="target_type == 'collective_weight'"/>
                         </group>
                     </group>
-                    <group string="Progress">
+                    <group string="Products">
+                        <field name="line_ids" nolabel="1" colspan="2">
+                            <list editable="bottom">
+                                <field name="product_id" required="1"/>
+                                <field name="measure_type"
+                                       column_invisible="parent.target_type != 'product_bundle'"
+                                       required="parent.target_type == 'product_bundle'"/>
+                                <field name="target_value"
+                                       column_invisible="parent.target_type != 'product_bundle'"
+                                       required="parent.target_type == 'product_bundle'"/>
+                                <field name="target_weight_uom"
+                                       column_invisible="parent.target_type != 'product_bundle'"
+                                       invisible="measure_type != 'weight'"/>
+                                <field name="achieved_value" optional="show" readonly="1"/>
+                                <field name="progress_percent" widget="progressbar" optional="show" readonly="1"/>
+                            </list>
+                        </field>
+                    </group>
+                    <group string="Progress (headline)">
                         <group>
                             <field name="achieved_value" readonly="1"/>
-                            <field name="remaining_value" readonly="1"
-                                   invisible="target_type != 'product_weight'"/>
+                            <field name="remaining_value" readonly="1"/>
                             <field name="progress_percent" widget="progressbar" readonly="1"/>
                         </group>
                     </group>
+                    <div class="alert alert-info" role="alert">
+                        <b>Collective Quantity / Weight:</b> pick products; one shared goal; any of those products add to progress.<br/>
+                        <b>Combined Product Targets:</b> each product has its own qty/weight goal; headline % is the average of line percentages (0–100, 100 = complete).
+                    </div>
                 </sheet>
                 <footer>
                     <button string="Save" special="save" class="btn-primary" data-hotkey="s"/>
@@ -75,9 +94,8 @@
                 Set a target for an order booker
             </p>
             <p>
-                Examples: monthly sales amount, visit count, or product quantity to book.
+                Use Collective Quantity, Collective Weight, or Combined Product Targets.
                 Progress uses confirmed orders (booked qty), not delivery.
-                Cancelled or archived orders are excluded automatically.
             </p>
         </field>
     </record>

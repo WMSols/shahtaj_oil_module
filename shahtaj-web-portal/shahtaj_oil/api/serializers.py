@@ -191,22 +191,52 @@ def schedule_dict(schedule):
     }
 
 
+def target_line_dict(line):
+    parent_type = line.target_id.target_type if line.target_id else False
+    data = {
+        'id': line.id,
+        'product': _m2o(line.product_id) if line.product_id else None,
+        'achieved_value': line.achieved_value,
+        'remaining_value': line.remaining_value,
+        'progress_percent': line.progress_percent,
+    }
+    if parent_type == 'product_bundle':
+        data['measure_type'] = line.measure_type
+        data['target_value'] = line.target_value
+        if line.measure_type == 'weight':
+            data['target_weight_uom'] = line.target_weight_uom
+            data['weight_unit_label'] = dict(
+                line._fields['target_weight_uom'].selection,
+            ).get(line.target_weight_uom, '')
+    return data
+
+
 def target_dict(target):
+    type_labels = dict(target._fields['target_type'].selection or [])
     data = {
         'id': target.id,
         'name': target.name,
         'target_type': target.target_type,
+        'target_type_label': type_labels.get(target.target_type, target.target_type or ''),
         'date_start': str(target.date_start),
         'date_end': str(target.date_end),
         'target_value': target.target_value,
         'achieved_value': target.achieved_value,
         'remaining_value': target.remaining_value,
         'progress_percent': target.progress_percent,
-        'product': _m2o(target.product_id) if target.product_id else None,
+        'lines': [target_line_dict(line) for line in target.line_ids],
+        'is_expandable': True,
+        'headline_progress_percent': target.progress_percent,
     }
-    if target.target_type == 'product_weight':
+    if target.target_type == 'collective_weight':
         data['target_weight_uom'] = target.target_weight_uom
         data['weight_unit_label'] = dict(
             target._fields['target_weight_uom'].selection,
         ).get(target.target_weight_uom, '')
+    if target.target_type == 'product_bundle':
+        # Headline is average of line %; 100 = all lines complete on average.
+        data['target_value'] = 100.0
+        data['combined_progress_mode'] = 'average_line_percent'
+    elif target.target_type in ('collective_qty', 'collective_weight'):
+        data['combined_progress_mode'] = 'shared_goal_sum'
     return data

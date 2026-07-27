@@ -151,7 +151,7 @@
     },
     {
       path: '/api/shahtaj/v1/targets/mine',
-      purpose: 'List sales targets',
+      purpose: 'Collective / Combined targets (lines + headline %)',
       auth: true,
       params: [],
     },
@@ -777,16 +777,36 @@
       el.innerHTML = '<p class="empty-state">No active targets.</p>';
       return;
     }
+    const TYPE_LABELS = {
+      collective_qty: 'Collective Quantity',
+      collective_weight: 'Collective Weight',
+      product_bundle: 'Combined Product Targets',
+    };
     el.innerHTML = rows.map((t) => {
+      const typeLabel = t.target_type_label || TYPE_LABELS[t.target_type] || t.target_type;
       const unit = t.target_weight_uom ? ` ${t.target_weight_uom}` : '';
-      const remaining = t.target_type === 'product_weight' && t.remaining_value != null
-        ? ` · ${t.remaining_value}${unit} left`
-        : '';
+      const headline = t.headline_progress_percent ?? t.progress_percent ?? 0;
+      const modeNote = t.combined_progress_mode === 'average_line_percent'
+        ? 'Headline = average of line %'
+        : 'Shared goal (sum of product lines)';
+      const linesHtml = (t.lines || []).map((line) => {
+        const pname = line.product?.name || 'Product';
+        const measure = line.measure_type
+          ? ` · ${line.measure_type}${line.target_value != null ? ` goal ${line.target_value}` : ''}${line.target_weight_uom ? ` ${line.target_weight_uom}` : ''}`
+          : '';
+        return `<li><strong>${escapeHtml(pname)}</strong>${escapeHtml(measure)}
+          — ${line.achieved_value ?? 0} (${(line.progress_percent ?? 0).toFixed?.(0) || 0}%)</li>`;
+      }).join('');
       return `
       <article class="card">
-        <h4>${escapeHtml(t.name)}</h4>
-        <p>${t.date_start} → ${t.date_end}</p>
-        <p>${t.achieved_value}${unit} / ${t.target_value}${unit} (${t.progress_percent?.toFixed?.(0) || 0}%)${remaining}</p>
+        <h4>${escapeHtml(t.name || typeLabel)}</h4>
+        <p class="meta">${escapeHtml(typeLabel)} · ${t.date_start} → ${t.date_end}</p>
+        <p><strong>Headline:</strong> ${(headline).toFixed?.(0) || 0}%
+          · achieved ${t.achieved_value ?? 0}${unit} / ${t.target_value ?? 0}${unit}
+          · ${t.remaining_value ?? 0}${unit} left</p>
+        <p class="meta">${escapeHtml(modeNote)} · expandable=${t.is_expandable ? 'yes' : 'no'}</p>
+        ${linesHtml ? `<details open><summary>Products (${(t.lines || []).length})</summary><ul>${linesHtml}</ul></details>` : ''}
+        <pre class="log-json" style="max-height:160px;overflow:auto;font-size:11px">${escapeHtml(JSON.stringify(t, null, 2))}</pre>
       </article>`;
     }).join('');
   }

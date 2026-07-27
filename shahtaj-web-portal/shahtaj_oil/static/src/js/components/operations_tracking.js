@@ -281,7 +281,7 @@ export class OperationsTracking extends Component {
             startDate: r.date_start,
             endDate: r.date_end,
             type: r.target_type,
-            displayType: r.target_type ? r.target_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown',
+            displayType: r.target_type ? r.target_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown',
             targetValue: r.target_value,
             achievedValue: r.achieved_value,
             remainingValue: r.remaining_value,
@@ -289,8 +289,42 @@ export class OperationsTracking extends Component {
             product: r.product_id ? r.product_id[1] : null,
             currency: r.currency_id ? r.currency_id[1] : null,
             weightUom: r.target_weight_uom || '',
-            active: r.active
+            active: r.active,
+            lines: [],
+            isExpandable: ['collective_qty', 'collective_weight', 'product_bundle'].includes(r.target_type),
+            expanded: false,
         }));
+
+        const multiIds = this.state.targets.filter(t => t.isExpandable).map(t => t.id);
+        if (multiIds.length) {
+            const lines = await this.orm.searchRead(
+                'shahtaj.visit.target.line',
+                [['target_id', 'in', multiIds]],
+                [
+                    'id', 'target_id', 'product_id', 'measure_type', 'target_value',
+                    'target_weight_uom', 'achieved_value', 'progress_percent',
+                ],
+            );
+            const byTarget = {};
+            lines.forEach((line) => {
+                const tid = line.target_id[0];
+                if (!byTarget[tid]) {
+                    byTarget[tid] = [];
+                }
+                byTarget[tid].push({
+                    id: line.id,
+                    product_name: line.product_id ? line.product_id[1] : '',
+                    measure_type: line.measure_type || 'qty',
+                    target_value: line.target_value,
+                    target_weight_uom: line.target_weight_uom || 'kg',
+                    achieved_value: line.achieved_value,
+                    progress_percent: line.progress_percent || 0,
+                });
+            });
+            this.state.targets.forEach((t) => {
+                t.lines = byTarget[t.id] || [];
+            });
+        }
         this._performanceLoaded = true;
     }
   

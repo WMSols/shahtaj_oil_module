@@ -39,6 +39,8 @@ export class SchedulesTargets extends Component {
                 startDate: '', endDate: '', is_active: true,
                 type: '', target_value: '', product_id: '', currency_id: '',
                 target_weight_uom: 'kg',
+                lines: [],
+                expandedId: null,
             },
 
             // Real data
@@ -192,13 +194,52 @@ export class SchedulesTargets extends Component {
             achievedAmount: r.achieved_value,
             remainingAmount: r.remaining_value,
             weightUom: r.target_weight_uom || null,
+            progress: r.progress_percent || 0,
             progressPercentage: r.progress_percent ? `${r.progress_percent.toFixed(1)}%` : '0%',
+            progressWidth: Math.max(0, Math.min(100, r.progress_percent || 0)),
             product_id_raw: r.product_id ? r.product_id[0] : '',
             product: r.product_id ? r.product_id[1] : null,
             currency_id_raw: r.currency_id ? r.currency_id[0] : '',
             currency: r.currency_id ? r.currency_id[1] : null,
             status: r.active ? 'Active' : 'Inactive',
+            lines: [],
+            isExpandable: ['collective_qty', 'collective_weight', 'product_bundle'].includes(r.target_type),
+            expanded: false,
         }));
+
+        const multiIds = this.state.targets.filter(t => t.isExpandable).map(t => t.id);
+        if (multiIds.length) {
+            const lines = await this.orm.searchRead(
+                'shahtaj.visit.target.line',
+                [['target_id', 'in', multiIds]],
+                [
+                    'id', 'target_id', 'product_id', 'measure_type', 'target_value',
+                    'target_weight_uom', 'achieved_value', 'remaining_value', 'progress_percent',
+                ],
+            );
+            const byTarget = {};
+            lines.forEach((line) => {
+                const tid = line.target_id[0];
+                if (!byTarget[tid]) {
+                    byTarget[tid] = [];
+                }
+                byTarget[tid].push({
+                    id: line.id,
+                    product_id: line.product_id ? String(line.product_id[0]) : '',
+                    product_name: line.product_id ? line.product_id[1] : '',
+                    measure_type: line.measure_type || 'qty',
+                    target_value: line.target_value,
+                    target_weight_uom: line.target_weight_uom || 'kg',
+                    achieved_value: line.achieved_value,
+                    remaining_value: line.remaining_value,
+                    progress_percent: line.progress_percent || 0,
+                    progressWidth: Math.max(0, Math.min(100, line.progress_percent || 0)),
+                });
+            });
+            this.state.targets.forEach((t) => {
+                t.lines = byTarget[t.id] || [];
+            });
+        }
     }
 
     // ─── Navigation ─────────────────────────────────────────────────────────────
@@ -255,6 +296,7 @@ export class SchedulesTargets extends Component {
             startDate: '', endDate: '', is_active: true,
             type: '', target_value: '', product_id: '', currency_id: '',
             target_weight_uom: 'kg',
+            lines: [],
         };
     }
 
@@ -310,10 +352,42 @@ export class SchedulesTargets extends Component {
             product_id: tgt.product_id_raw,
             currency_id: tgt.currency_id_raw,
             target_weight_uom: tgt.weightUom || 'kg',
-            is_active: tgt.status === 'Active'
+            is_active: tgt.status === 'Active',
+            lines: (tgt.lines || []).map((line) => ({
+                product_id: line.product_id,
+                measure_type: line.measure_type || 'qty',
+                target_value: line.target_value || '',
+                target_weight_uom: line.target_weight_uom || 'kg',
+            })),
         };
         this.state.editingTargetId = tgt.id;
         this.state.showForm = true;
+    }
+
+    isMultiProductTargetType(type) {
+        return ['collective_qty', 'collective_weight', 'product_bundle'].includes(type);
+    }
+
+    addTargetLine() {
+        this.state.targetForm.lines.push({
+            product_id: '',
+            measure_type: 'qty',
+            target_value: '',
+            target_weight_uom: 'kg',
+        });
+    }
+
+    removeTargetLine(index) {
+        this.state.targetForm.lines.splice(index, 1);
+    }
+
+    toggleTargetExpand(tgt) {
+        tgt.expanded = !tgt.expanded;
+    }
+
+    progressBarWidth(value) {
+        const n = parseFloat(value) || 0;
+        return `${Math.max(0, Math.min(100, n))}%`;
     }
 
     // ─── Getters ─────────────────────────────────────────────────────────────────
@@ -452,9 +526,11 @@ export class SchedulesTargets extends Component {
 
     async saveTarget() {
         const form = this.state.targetForm;
+        const multiTypes = ['collective_qty', 'collective_weight', 'product_bundle'];
+        const isMulti = multiTypes.includes(form.type);
 
-        if (!form.startDate || !form.endDate || !form.type || !form.target_value) {
-            const msg = 'Start Date, End Date, Target Type, and Target Value are required.';
+        if (!form.startDate || !form.endDate || !form.type) {
+            const msg = 'Start Date, End Date, and Target Type are required.';
             this.state.errorMessage = msg;
             this.notification.add(msg, { type: "warning" });
             return;
@@ -467,25 +543,52 @@ export class SchedulesTargets extends Component {
             return;
         }
 
-        if (form.type === 'product_qty' && !form.product_id) {
-            const msg = 'A product is required for Product Quantity targets.';
+        if (!isMulti) {
+            const msg = 'Choose Collective Quantity, Collective Weight, or Combined Product Targets.';
             this.state.errorMessage = msg;
             this.notification.add(msg, { type: "warning" });
             return;
         }
 
-        if (form.type === 'product_weight' && !form.product_id) {
-            const msg = 'A product is required for Product Weight targets.';
-            this.state.errorMessage = msg;
-            this.notification.add(msg, { type: "warning" });
-            return;
-        }
-
-        if (form.type === 'product_weight' && !form.target_weight_uom) {
+        if (form.type === 'collective_weight' && !form.target_weight_uom) {
             const msg = 'Select kg or ton for the weight target.';
             this.state.errorMessage = msg;
             this.notification.add(msg, { type: "warning" });
             return;
+        }
+
+        if (isMulti) {
+            const lines = (form.lines || []).filter((l) => l.product_id);
+            if (!lines.length) {
+                const msg = 'Add at least one product for this target type.';
+                this.state.errorMessage = msg;
+                this.notification.add(msg, { type: "warning" });
+                return;
+            }
+            if (['collective_qty', 'collective_weight'].includes(form.type)) {
+                if (!form.target_value || parseFloat(form.target_value) <= 0) {
+                    const msg = 'Enter a shared target value greater than zero.';
+                    this.state.errorMessage = msg;
+                    this.notification.add(msg, { type: "warning" });
+                    return;
+                }
+            }
+            if (form.type === 'product_bundle') {
+                for (const line of lines) {
+                    if (!line.target_value || parseFloat(line.target_value) <= 0) {
+                        const msg = 'Each product in a Combined target needs its own target value.';
+                        this.state.errorMessage = msg;
+                        this.notification.add(msg, { type: "warning" });
+                        return;
+                    }
+                    if (line.measure_type === 'weight' && !line.target_weight_uom) {
+                        const msg = 'Select kg or ton for each weight line.';
+                        this.state.errorMessage = msg;
+                        this.notification.add(msg, { type: "warning" });
+                        return;
+                    }
+                }
+            }
         }
 
         this.state.isLoading = true;
@@ -497,18 +600,36 @@ export class SchedulesTargets extends Component {
                 date_start: form.startDate,
                 date_end: form.endDate,
                 target_type: form.type,
-                target_value: parseFloat(form.target_value),
                 active: form.is_active,
+                product_id: false,
+                line_ids: [[5, 0, 0]],
             };
 
-            if (['product_qty', 'product_weight'].includes(form.type) && form.product_id) {
-                payload.product_id = parseInt(form.product_id);
+            if (form.type === 'product_bundle') {
+                payload.target_value = 100.0;
+            } else {
+                payload.target_value = parseFloat(form.target_value);
             }
-            if (form.type === 'product_weight') {
+
+            if (form.type === 'collective_weight') {
                 payload.target_weight_uom = form.target_weight_uom || 'kg';
             }
-            if (form.type === 'sales_amount' && form.currency_id) {
-                payload.currency_id = parseInt(form.currency_id);
+
+            if (isMulti) {
+                const lines = (form.lines || []).filter((l) => l.product_id);
+                payload.line_ids = [
+                    [5, 0, 0],
+                    ...lines.map((line) => [0, 0, {
+                        product_id: parseInt(line.product_id, 10),
+                        measure_type: form.type === 'product_bundle'
+                            ? (line.measure_type || 'qty')
+                            : (form.type === 'collective_weight' ? 'weight' : 'qty'),
+                        target_value: form.type === 'product_bundle'
+                            ? parseFloat(line.target_value)
+                            : 0.0,
+                        target_weight_uom: line.target_weight_uom || form.target_weight_uom || 'kg',
+                    }]),
+                ];
             }
 
             if (this.state.editingTargetId) {
