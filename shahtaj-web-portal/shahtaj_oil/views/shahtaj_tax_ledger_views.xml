@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_tax_ledger_form" model="ir.ui.view">
+        <field name="name">shahtaj.tax.ledger.form</field>
+        <field name="model">shahtaj.tax.ledger</field>
+        <field name="arch" type="xml">
+            <form string="Tax Ledger" create="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"
+                            class="oe_highlight" icon="fa-refresh"/>
+                    <button name="action_open_sale_taxes" type="object"
+                            string="Manage / Create Taxes"
+                            icon="fa-percent"/>
+                    <button name="action_open_taxed_invoices" type="object"
+                            string="Open Taxed Documents"
+                            icon="fa-file-text-o"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Tax Ledger</h1>
+                        <p class="text-muted">
+                            Sales tax collected on <b>posted shop invoices</b>,
+                            reduced by tax on <b>posted credit notes</b>.
+                            Use <b>Manage / Create Taxes</b> to add or edit tax types.
+                        </p>
+                    </div>
+                    <group string="Period">
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="tax_type_count" readonly="1"/>
+                            <field name="invoice_tax_line_count" readonly="1"/>
+                            <field name="credit_tax_line_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Totals">
+                        <group>
+                            <field name="amount_tax_invoiced" readonly="1"/>
+                            <field name="amount_tax_credited" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="amount_tax_net" readonly="1"
+                                   decoration-bf="1"
+                                   decoration-success="amount_tax_net &gt; 0"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <b>How to read this</b>
+                        <ul class="mb-0 mt-2">
+                            <li><b>Tax on Invoices</b> = tax charged to shops in the period.</li>
+                            <li><b>Tax on Credit Notes</b> = tax reversed on returns / corrections.</li>
+                            <li><b>Net Tax Collected</b> = invoices − credit notes (overall tax given).</li>
+                            <li>Opening / legacy balance invoices are excluded.</li>
+                            <li>Change dates and click <b>Refresh</b>.</li>
+                        </ul>
+                    </div>
+                    <notebook>
+                        <page string="By Tax Type" name="summary">
+                            <field name="summary_ids" readonly="1" nolabel="1">
+                                <list create="false" delete="false" edit="false">
+                                    <field name="tax_id" optional="hide"/>
+                                    <field name="tax_name"/>
+                                    <field name="tax_rate"/>
+                                    <field name="amount_type" optional="show"/>
+                                    <field name="base_invoiced" sum="Total"/>
+                                    <field name="tax_invoiced" sum="Total"/>
+                                    <field name="base_credited" sum="Total" optional="show"/>
+                                    <field name="tax_credited" sum="Total"/>
+                                    <field name="tax_net" sum="Total"
+                                           decoration-success="tax_net &gt; 0"
+                                           decoration-danger="tax_net &lt; 0"/>
+                                    <field name="line_count"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Tax History" name="history">
+                            <field name="history_ids" readonly="1" nolabel="1">
+                                <list create="false" delete="false" edit="false">
+                                    <field name="date"/>
+                                    <field name="document_type"/>
+                                    <field name="move_id"/>
+                                    <field name="move_name" optional="hide"/>
+                                    <field name="partner_id"/>
+                                    <field name="tax_id"/>
+                                    <field name="base_amount" sum="Total"/>
+                                    <field name="tax_amount" sum="Total"
+                                           decoration-success="tax_amount &gt; 0"
+                                           decoration-danger="tax_amount &lt; 0"/>
+                                    <field name="tax_amount_abs" optional="hide" sum="Total"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_tax_ledger" model="ir.actions.server">
+        <field name="name">Tax Ledger</field>
+        <field name="model_id" ref="model_shahtaj_tax_ledger"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_tax_ledger()</field>
+    </record>
+
+</odoo>

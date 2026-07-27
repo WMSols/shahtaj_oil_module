@@ -23,6 +23,7 @@ from . import res_company
 from . import res_config_settings
 from . import shahtaj_accounting_hub
 from . import shahtaj_pnl_dashboard
+from . import shahtaj_tax_ledger
 from . import shahtaj_stock_receipt
 from . import shahtaj_manufacturer_summary
 from . import ir_http

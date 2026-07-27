@@ -59,3 +59,9 @@ access_product_template_shahtaj_distributor_financial,product.template.shahtaj.d
 access_product_product_shahtaj_distributor_financial,product.product.shahtaj.distributor.financial,product.model_product_product,group_shahtaj_distributor_financial,1,1,1,0
 access_account_tax_shahtaj_distributor,account.tax.shahtaj.distributor,account.model_account_tax,group_shahtaj_distributor_financial,1,1,1,0
 access_shahtaj_activity_log_admin,shahtaj.activity.log.admin,model_shahtaj_activity_log,base.group_system,1,0,0,1
+access_shahtaj_tax_ledger_distributor,shahtaj.tax.ledger.distributor,model_shahtaj_tax_ledger,group_shahtaj_distributor_financial,1,1,1,1
+access_shahtaj_tax_ledger_summary_distributor,shahtaj.tax.ledger.summary.distributor,model_shahtaj_tax_ledger_summary,group_shahtaj_distributor_financial,1,1,1,1
+access_shahtaj_tax_ledger_history_distributor,shahtaj.tax.ledger.history.distributor,model_shahtaj_tax_ledger_history,group_shahtaj_distributor_financial,1,1,1,1
+access_shahtaj_tax_ledger_user,shahtaj.tax.ledger.user,model_shahtaj_tax_ledger,base.group_user,1,1,1,1
+access_shahtaj_tax_ledger_summary_user,shahtaj.tax.ledger.summary.user,model_shahtaj_tax_ledger_summary,base.group_user,1,1,1,1
+access_shahtaj_tax_ledger_history_user,shahtaj.tax.ledger.history.user,model_shahtaj_tax_ledger_history,base.group_user,1,1,1,1

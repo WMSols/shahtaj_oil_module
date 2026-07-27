@@ -77,7 +77,11 @@
                                     class="btn btn-primary mb-2"
                                     icon="fa-balance-scale"/>
                         </group>
-                        <group string="Step 4 — Profit">
+                        <group string="Step 4 — Tax &amp; Profit">
+                            <button name="action_open_tax_ledger" type="object"
+                                    string="Tax Ledger"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-percent"/>
                             <button name="action_open_pnl_dashboard" type="object"
                                     string="Profit &amp; Loss Dashboard"
                                     class="btn btn-primary"

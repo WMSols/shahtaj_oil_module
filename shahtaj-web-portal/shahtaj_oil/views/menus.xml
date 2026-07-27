@@ -123,6 +123,13 @@
               sequence="30"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_tax_ledger"
+              name="Tax Ledger"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_tax_ledger"
+              sequence="35"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_pnl_dashboard"
               name="8. Profit &amp; Loss"
               parent="menu_shahtaj_root"

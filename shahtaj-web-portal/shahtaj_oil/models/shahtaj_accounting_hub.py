@@ -126,3 +126,6 @@ class ShahtajAccountingHub(models.TransientModel):
 
     def action_open_pnl_dashboard(self):
         return self.env['shahtaj.pnl.dashboard'].action_open_pnl_dashboard()
+
+    def action_open_tax_ledger(self):
+        return self.env['shahtaj.tax.ledger'].action_open_tax_ledger()
