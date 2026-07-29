@@ -130,6 +130,20 @@
               sequence="35"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_expenses"
+              name="Expenses"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_expense"
+              sequence="40"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_expense_categories"
+              name="Expense Categories"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_expense_category"
+              sequence="45"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_pnl_dashboard"
               name="8. Profit &amp; Loss"
               parent="menu_shahtaj_root"

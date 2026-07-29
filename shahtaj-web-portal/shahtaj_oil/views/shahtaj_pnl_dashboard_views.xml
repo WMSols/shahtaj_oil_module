@@ -17,6 +17,8 @@
                             string="Opening Balance Invoices"/>
                     <button name="action_open_manufacturer_summary" type="object"
                             string="Manufacturer Summary"/>
+                    <button name="action_open_expenses" type="object"
+                            string="Operating Expenses"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -24,6 +26,7 @@
                         <p class="text-muted">
                             Product trading profit from <b>posted invoices</b>
                             (sales price) vs <b>frozen cost at invoice post</b>, after credit notes.
+                            Operating expenses (posted) reduce <b>Net Profit</b>.
                             Stock purchased shows receipts in the selected period.
                         </p>
                     </div>
@@ -37,6 +40,7 @@
                             <field name="invoice_count" readonly="1"/>
                             <field name="credit_note_count" readonly="1"/>
                             <field name="legacy_invoice_count" readonly="1"/>
+                            <field name="expense_count" readonly="1"/>
                         </group>
                     </group>
                     <group string="Trading (products)">
@@ -50,6 +54,16 @@
                             <field name="amount_gross_profit" readonly="1"
                                    decoration-success="amount_gross_profit &gt; 0"
                                    decoration-danger="amount_gross_profit &lt; 0"/>
+                        </group>
+                    </group>
+                    <group string="Operating expenses &amp; net">
+                        <group>
+                            <field name="amount_operating_expense" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="amount_net_profit" readonly="1"
+                                   decoration-success="amount_net_profit &gt; 0"
+                                   decoration-danger="amount_net_profit &lt; 0"/>
                         </group>
                     </group>
                     <group string="Manufacturer &amp; Collections">
@@ -66,6 +80,8 @@
                         <b>How to read this</b>
                         <ul class="mb-0 mt-2">
                             <li><b>Gross Profit</b> = Net Sales − Cost (cost frozen when each invoice was posted).</li>
+                            <li><b>Operating Expenses</b> = posted expenses in the period (Fuel, Salary, …).</li>
+                            <li><b>Net Profit</b> = Gross Profit − Operating Expenses.</li>
                             <li><b>Stock Purchased (period)</b> = stock received in the date range at frozen receipt cost.</li>
                             <li><b>Opening Balance Invoices</b> = old shop debt (legacy) — not included in product profit.</li>
                             <li>Change dates and click <b>Refresh</b> to recalculate.</li>

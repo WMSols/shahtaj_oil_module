@@ -68,3 +68,8 @@ access_shahtaj_tax_ledger_history_distributor,shahtaj.tax.ledger.history.distrib
 access_shahtaj_tax_ledger_user,shahtaj.tax.ledger.user,model_shahtaj_tax_ledger,base.group_user,1,1,1,1
 access_shahtaj_tax_ledger_summary_user,shahtaj.tax.ledger.summary.user,model_shahtaj_tax_ledger_summary,base.group_user,1,1,1,1
 access_shahtaj_tax_ledger_history_user,shahtaj.tax.ledger.history.user,model_shahtaj_tax_ledger_history,base.group_user,1,1,1,1
+access_shahtaj_expense_category_financial,shahtaj.expense.category.financial,model_shahtaj_expense_category,group_shahtaj_distributor_financial,1,1,1,1
+access_shahtaj_expense_financial,shahtaj.expense.financial,model_shahtaj_expense,group_shahtaj_distributor_financial,1,1,1,1
+access_shahtaj_expense_category_user,shahtaj.expense.category.user,model_shahtaj_expense_category,base.group_user,1,1,1,1
+access_shahtaj_expense_user,shahtaj.expense.user,model_shahtaj_expense,base.group_user,1,1,1,1
+access_account_account_shahtaj_distributor_financial,account.account.shahtaj.distributor.financial,account.model_account_account,group_shahtaj_distributor_financial,1,0,0,0

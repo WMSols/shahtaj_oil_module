@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Company-level Shahtaj GPS / field-ops settings."""
 from odoo import _, api, fields, models
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 from .shahtaj_gps import DEFAULT_MAX_SHOP_DISTANCE_M, DEFAULT_MIN_SHOP_DISTANCE_M
 
@@ -82,6 +82,27 @@ class ResCompany(models.Model):
                           max=company.shahtaj_max_shop_distance_m),
             )
         return self.shahtaj_get_shop_distance_limits()
+
+    def _shahtaj_get_default_expense_account(self):
+        """Pick any active Expense account for operating expense posts."""
+        self.ensure_one()
+        Account = self.env['account.account'].with_company(self).sudo()
+        account = Account.search([
+            ('account_type', '=', 'expense'),
+            ('company_ids', 'in', [self.id]),
+        ], limit=1)
+        if not account:
+            account = Account.search([
+                ('account_type', '=', 'expense'),
+            ], limit=1)
+        if not account:
+            raise UserError(_(
+                'No expense account found for %(company)s. '
+                'Create an account with type Expense, or set an expense account '
+                'on the expense category.',
+                company=self.display_name,
+            ))
+        return account
 
     @api.model
     def shahtaj_get_company_profile(self):

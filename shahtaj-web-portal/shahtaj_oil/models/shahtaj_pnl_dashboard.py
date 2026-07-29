@@ -55,6 +55,18 @@ class ShahtajPnlDashboard(models.TransientModel):
         currency_field='currency_id',
         help='Net sales − cost of goods.',
     )
+    amount_operating_expense = fields.Monetary(
+        string='Operating Expenses',
+        currency_field='currency_id',
+        help='Posted distributor expenses in the selected period '
+             '(fuel, salary, rent, etc.). Does not include COGS.',
+    )
+    amount_net_profit = fields.Monetary(
+        string='Net Profit',
+        currency_field='currency_id',
+        help='Gross profit − operating expenses.',
+    )
+    expense_count = fields.Integer(string='Posted Expenses')
     amount_manufacturer_payable = fields.Monetary(
         string='Stock Purchased (period)',
         currency_field='currency_id',
@@ -198,6 +210,13 @@ class ShahtajPnlDashboard(models.TransientModel):
         amount_net = amount_invoiced - amount_credit
         amount_profit = amount_net - amount_cogs
 
+        Expense = self.env['shahtaj.expense'].sudo()
+        expenses = Expense.search(
+            Expense._shahtaj_posted_domain(date_from, date_to)
+        )
+        amount_expense = sum(expenses.mapped('amount'))
+        amount_net_profit = amount_profit - amount_expense
+
         amount_legacy = sum(legacy_invoices.mapped('amount_untaxed'))
 
         Receipt = self.env['shahtaj.stock.receipt'].sudo()
@@ -246,6 +265,9 @@ class ShahtajPnlDashboard(models.TransientModel):
             'amount_legacy_invoiced': amount_legacy,
             'amount_cogs': amount_cogs,
             'amount_gross_profit': amount_profit,
+            'amount_operating_expense': amount_expense,
+            'amount_net_profit': amount_net_profit,
+            'expense_count': len(expenses),
             'amount_manufacturer_payable': amount_mfr,
             'amount_payments_received': amount_payments,
             'amount_shop_outstanding': amount_outstanding,
@@ -306,6 +328,20 @@ class ShahtajPnlDashboard(models.TransientModel):
             'date_to': self.date_to,
         })
         return summary.action_refresh()
+
+    def action_open_expenses(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Operating Expenses'),
+            'res_model': 'shahtaj.expense',
+            'view_mode': 'list,form',
+            'domain': [
+                ('state', '=', 'posted'),
+                ('date', '>=', self.date_from),
+                ('date', '<=', self.date_to),
+            ],
+            'context': {'search_default_posted': 1},
+        }
 
 
 class ShahtajPnlDashboardLine(models.TransientModel):

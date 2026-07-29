@@ -129,3 +129,13 @@ class ShahtajAccountingHub(models.TransientModel):
 
     def action_open_tax_ledger(self):
         return self.env['shahtaj.tax.ledger'].action_open_tax_ledger()
+
+    def action_open_expenses(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_expense',
+        )
+
+    def action_open_expense_categories(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_expense_category',
+        )

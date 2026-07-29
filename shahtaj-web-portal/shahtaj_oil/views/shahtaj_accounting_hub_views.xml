@@ -84,8 +84,16 @@
                                     icon="fa-percent"/>
                             <button name="action_open_pnl_dashboard" type="object"
                                     string="Profit &amp; Loss Dashboard"
-                                    class="btn btn-primary"
+                                    class="btn btn-primary mb-2"
                                     icon="fa-line-chart"/>
+                            <button name="action_open_expenses" type="object"
+                                    string="Expenses"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-credit-card"/>
+                            <button name="action_open_expense_categories" type="object"
+                                    string="Expense Categories"
+                                    class="btn btn-secondary"
+                                    icon="fa-tags"/>
                         </group>
                     </group>
                 </sheet>
