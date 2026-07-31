@@ -27,6 +27,11 @@ class ShahtajAccountingHub(models.TransientModel):
         string='Credit Notes',
         compute='_compute_counts',
     )
+    expense_invoice_count = fields.Integer(
+        string='Expense Invoices',
+        compute='_compute_counts',
+        help='Draft + posted operating expense invoices.',
+    )
     shop_count = fields.Integer(
         string='Approved Shops',
         compute='_compute_counts',
@@ -60,6 +65,9 @@ class ShahtajAccountingHub(models.TransientModel):
                 ('move_type', '=', 'out_refund'),
                 ('partner_id.is_shahtaj_shop', '=', True),
                 ('state', '=', 'posted'),
+            ])
+            hub.expense_invoice_count = self.env['shahtaj.expense'].sudo().search_count([
+                ('state', 'in', ('draft', 'posted')),
             ])
             hub.shop_count = Partner.search_count([
                 ('is_shahtaj_shop', '=', True),

@@ -70,8 +70,9 @@
         <b>Required on verify:</b> GPS (captured with exterior photo) +
         <code>shop_exterior_photo</code> + <code>owner_cnic_number</code>.
         <br/>
-        <b>Optional:</b> owner photo, CNIC images, owner name/phone, shop_category if empty —
-        same <code>missing_fields</code> list with <code>required: false</code>; send answers on
+        <b>Optional:</b> owner photo, CNIC images, owner name/phone, shop_category,
+        <code>legacy_balance</code> if empty — same <code>missing_fields</code> list with
+        <code>required: false</code>; send answers on
         <code>shops/verify-on-site</code>. Exterior photo is booker-only (distributor view-only).
       </div>
       <div id="task-cards" class="card-grid"></div>
@@ -273,6 +274,6 @@
     </section>
   </div>
 
-  <script src="./app.js?v=12"></script>
+  <script src="./app.js?v=13"></script>
 </body>
 </html>

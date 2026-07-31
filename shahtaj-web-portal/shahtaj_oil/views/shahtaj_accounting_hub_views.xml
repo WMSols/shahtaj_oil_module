@@ -22,6 +22,7 @@
                         <group>
                             <field name="open_invoice_count" readonly="1"/>
                             <field name="credit_note_count" readonly="1"/>
+                            <field name="expense_invoice_count" readonly="1"/>
                             <field name="shop_count" readonly="1"/>
                         </group>
                     </group>
@@ -33,6 +34,7 @@
                             <li>Create a <b>Regular invoice</b> for delivered quantities.</li>
                             <li>Record payments on the invoice (partial payments are allowed).</li>
                             <li>For returns, open a posted invoice → <b>Credit Note</b> → post the credit note.</li>
+                            <li>Record operating costs as <b>Expense Invoices</b> (fuel, salary, rent) paid from Cash/Bank.</li>
                             <li>Review each shop's balance under Shop Balances.</li>
                         </ol>
                     </div>
@@ -53,7 +55,7 @@
                         </group>
                         <group string="Step 2 — Billing &amp; Returns">
                             <button name="action_open_customer_invoices" type="object"
-                                    string="Invoices &amp; Credit Notes"
+                                    string="Customer Invoices &amp; Credit Notes"
                                     class="btn btn-primary mb-2"
                                     icon="fa-pencil-square-o"/>
                             <button name="action_open_credit_notes" type="object"
@@ -68,6 +70,10 @@
                                     string="Customer Payments"
                                     class="btn btn-secondary mb-2"
                                     icon="fa-money"/>
+                            <button name="action_open_expenses" type="object"
+                                    string="Expense Invoices"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-credit-card"/>
                         </group>
                     </group>
                     <group>
@@ -86,10 +92,6 @@
                                     string="Profit &amp; Loss Dashboard"
                                     class="btn btn-primary mb-2"
                                     icon="fa-line-chart"/>
-                            <button name="action_open_expenses" type="object"
-                                    string="Expenses"
-                                    class="btn btn-secondary mb-2"
-                                    icon="fa-credit-card"/>
                             <button name="action_open_expense_categories" type="object"
                                     string="Expense Categories"
                                     class="btn btn-secondary"

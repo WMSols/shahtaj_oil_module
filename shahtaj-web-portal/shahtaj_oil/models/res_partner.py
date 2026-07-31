@@ -343,14 +343,14 @@ class ResPartner(models.Model):
         return 2 * radius * math.asin(math.sqrt(a))
 
     def _validate_shop_required_fields(self):
-        """Core shop identity. GPS is optional until field verification."""
+        """Shop name is the only create/write hard requirement.
+
+        Owner name/phone/CNIC and GPS stay optional for distributors until
+        first-visit verification (or booker on-site register) fills them in.
+        """
         for partner in self.filtered('is_shahtaj_shop'):
             if not partner.name:
                 raise ValidationError(_('Shop name is required.'))
-            if not partner.owner_name:
-                raise ValidationError(_('Owner name is required.'))
-            if not partner.owner_phone:
-                raise ValidationError(_('Owner phone is required.'))
             # GPS only mandatory once the shop is field-verified (or being verified).
             if partner.shahtaj_field_verified:
                 if not partner.partner_latitude or not partner.partner_longitude:
@@ -580,8 +580,8 @@ class ResPartner(models.Model):
                     'use_partner_credit_limit': True,
                 })
         if any(k in vals for k in (
-            'is_shahtaj_shop', 'name', 'owner_name', 'owner_phone',
-            'partner_latitude', 'partner_longitude', 'shahtaj_field_verified',
+            'is_shahtaj_shop', 'name', 'partner_latitude', 'partner_longitude',
+            'shahtaj_field_verified',
         )):
             self.filtered('is_shahtaj_shop')._validate_shop_required_fields()
         if 'legacy_balance' in vals:
@@ -867,6 +867,22 @@ class ResPartner(models.Model):
                 'type': 'string',
                 'source': 'form',
             })
+        # Opening / previous debt — only if distributor left it empty and nothing posted yet.
+        currency = self.currency_id or self.env.company.currency_id
+        if (
+            not self.legacy_balance_move_id
+            and float_is_zero(
+                self.legacy_balance or 0.0,
+                precision_rounding=currency.rounding,
+            )
+        ):
+            missing.append({
+                'key': 'legacy_balance',
+                'label': 'Legacy / Opening Balance (Rs)',
+                'required': False,
+                'type': 'float',
+                'source': 'form',
+            })
         return missing
 
     def _shahtaj_first_visit_setup_payload(self):
@@ -942,6 +958,26 @@ class ResPartner(models.Model):
             if shop_category not in ('credit', 'cash'):
                 raise UserError(_('shop_category must be "credit" or "cash".'))
             write_vals['shahtaj_shop_category'] = shop_category
+
+        # Optional opening balance from booker (only if never posted).
+        if (
+            'legacy_balance' in vals
+            and vals.get('legacy_balance') is not None
+            and not self.legacy_balance_move_id
+        ):
+            try:
+                legacy_amount = float(vals['legacy_balance'])
+            except (TypeError, ValueError) as err:
+                raise UserError(_('legacy_balance must be a number.')) from err
+            if legacy_amount < 0:
+                raise UserError(_('Legacy balance cannot be negative.'))
+            currency = self.currency_id or self.env.company.currency_id
+            # Only write when distributor left it empty — do not overwrite a set amount.
+            if float_is_zero(
+                self.legacy_balance or 0.0,
+                precision_rounding=currency.rounding,
+            ):
+                write_vals['legacy_balance'] = legacy_amount
 
         self.with_context(shahtaj_field_verifying=True).write(write_vals)
         self.env['shahtaj.activity.log'].log_business(

@@ -124,8 +124,8 @@
                     </div>
                     <group>
                         <group string="Owner">
-                            <field name="owner_name" required="1"/>
-                            <field name="owner_phone" required="1" widget="phone"/>
+                            <field name="owner_name" placeholder="Optional"/>
+                            <field name="owner_phone" widget="phone" placeholder="Optional"/>
                             <field name="owner_cnic_number" placeholder="Optional"/>
                         </group>
                         <group string="Registration">

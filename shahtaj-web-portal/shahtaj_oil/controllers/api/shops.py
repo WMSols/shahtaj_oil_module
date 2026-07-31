@@ -145,7 +145,7 @@ class ShahtajApiShops(http.Controller):
         Required: shop_id, task_id, latitude, longitude, shop_exterior_photo,
                   owner_cnic_number (unless already on the shop)
         Optional: owner_photo, owner_cnic_front/back, owner_name, owner_phone,
-                  shop_category
+                  shop_category, legacy_balance (if distributor left empty)
         """
         shop_id = kwargs.get('shop_id')
         task_id = kwargs.get('task_id')
@@ -196,6 +196,8 @@ class ShahtajApiShops(http.Controller):
                 kwargs.get('shop_category')
                 or kwargs.get('shahtaj_shop_category')
             )
+        if kwargs.get('legacy_balance') is not None and kwargs.get('legacy_balance') != '':
+            verify_vals['legacy_balance'] = kwargs.get('legacy_balance')
 
         shop.action_shahtaj_apply_field_verification(
             verify_vals, verified_by=request.env.user,

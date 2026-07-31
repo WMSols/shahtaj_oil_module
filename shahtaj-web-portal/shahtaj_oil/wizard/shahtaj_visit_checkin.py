@@ -2,6 +2,7 @@
 """Popup: booker GPS check-in, or first-visit verify (photo + CNIC + GPS)."""
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.tools import float_is_zero
 
 
 class ShahtajVisitCheckinWizard(models.TransientModel):
@@ -30,8 +31,16 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
         string='Needs First-Visit Setup',
         compute='_compute_needs_shop_setup',
     )
+    show_legacy_balance = fields.Boolean(
+        string='Show Legacy Balance',
+        compute='_compute_show_legacy_balance',
+    )
     visit_tag = fields.Selection(
         related='visit_task_id.shop_id.shahtaj_visit_tag',
+        readonly=True,
+    )
+    currency_id = fields.Many2one(
+        related='visit_task_id.shop_id.currency_id',
         readonly=True,
     )
     booker_latitude = fields.Float(
@@ -65,6 +74,10 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
         max_width=1920,
         max_height=1920,
     )
+    legacy_balance = fields.Monetary(
+        string='Legacy / Opening Balance (optional)',
+        currency_field='currency_id',
+    )
 
     @api.depends('shop_id', 'shop_id.shahtaj_field_verified')
     def _compute_needs_shop_setup(self):
@@ -72,6 +85,28 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
             shop = wiz.shop_id
             wiz.needs_shop_setup = bool(
                 shop and shop.is_shahtaj_shop and not shop.shahtaj_field_verified
+            )
+
+    @api.depends(
+        'shop_id',
+        'shop_id.legacy_balance',
+        'shop_id.legacy_balance_move_id',
+        'shop_id.currency_id',
+        'needs_shop_setup',
+    )
+    def _compute_show_legacy_balance(self):
+        for wiz in self:
+            shop = wiz.shop_id
+            if not wiz.needs_shop_setup or not shop:
+                wiz.show_legacy_balance = False
+                continue
+            currency = shop.currency_id or wiz.env.company.currency_id
+            wiz.show_legacy_balance = (
+                not shop.legacy_balance_move_id
+                and float_is_zero(
+                    shop.legacy_balance or 0.0,
+                    precision_rounding=currency.rounding,
+                )
             )
 
     @api.model
@@ -116,6 +151,15 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
                 verify_vals['owner_cnic_front'] = self.owner_cnic_front
             if self.owner_cnic_back:
                 verify_vals['owner_cnic_back'] = self.owner_cnic_back
+            currency = shop.currency_id or self.env.company.currency_id
+            if (
+                self.show_legacy_balance
+                and not float_is_zero(
+                    self.legacy_balance or 0.0,
+                    precision_rounding=currency.rounding,
+                )
+            ):
+                verify_vals['legacy_balance'] = self.legacy_balance
             shop.action_shahtaj_apply_field_verification(
                 verify_vals, verified_by=self.env.user,
             )

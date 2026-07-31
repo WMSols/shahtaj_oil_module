@@ -58,6 +58,7 @@
         { name: 'owner_name', required: false, type: 'string' },
         { name: 'owner_phone', required: false, type: 'string' },
         { name: 'shop_category', required: false, type: 'string', note: 'cash|credit if missing' },
+        { name: 'legacy_balance', required: false, type: 'float', note: 'Opening debt if distributor left empty; posts accounting entry' },
       ],
     },
     {
