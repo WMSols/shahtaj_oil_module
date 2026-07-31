@@ -6,25 +6,54 @@
         <field name="model">shahtaj.visit.checkin.wizard</field>
         <field name="arch" type="xml">
             <form string="Check in at Shop">
+                <field name="needs_shop_setup" invisible="1"/>
                 <group>
                     <field name="visit_task_id" invisible="1"/>
                     <field name="shop_id" readonly="1"/>
-                    <field name="shop_latitude" readonly="1"/>
-                    <field name="shop_longitude" readonly="1"/>
+                    <field name="visit_tag" widget="badge" readonly="1"/>
+                    <field name="shop_latitude" readonly="1"
+                           invisible="needs_shop_setup"/>
+                    <field name="shop_longitude" readonly="1"
+                           invisible="needs_shop_setup"/>
                 </group>
+                <div class="alert alert-warning" role="alert"
+                     invisible="not needs_shop_setup">
+                    This shop is <b>Not Visited</b>. Capture GPS with the exterior photo,
+                    enter the owner CNIC number, then confirm. That verifies the shop
+                    and starts the visit (same as Flutter <code>shops/verify-on-site</code>).
+                </div>
+                <div class="alert alert-info" role="alert"
+                     invisible="needs_shop_setup">
+                    You must be within the company GPS distance of the shop to start
+                    the visit. For desktop testing, copy the shop coordinates above.
+                </div>
                 <group string="Your GPS Location">
                     <field name="booker_latitude" required="1"
                            placeholder="e.g. 31.5204"/>
                     <field name="booker_longitude" required="1"
                            placeholder="e.g. 74.3587"/>
                 </group>
-                <div class="alert alert-info" role="alert">
-                    You must be within 100 m of the shop to start the visit timer.
-                    For testing on desktop, copy the shop coordinates shown above.
-                </div>
+                <group string="First-Visit Verification" invisible="not needs_shop_setup">
+                    <group>
+                        <field name="owner_cnic_number" required="needs_shop_setup"
+                               placeholder="e.g. 35202-1234567-1"/>
+                        <field name="shop_exterior_photo" widget="image"
+                               required="needs_shop_setup"/>
+                    </group>
+                    <group>
+                        <field name="owner_photo" widget="image"/>
+                        <field name="owner_cnic_front" widget="image"/>
+                        <field name="owner_cnic_back" widget="image"/>
+                    </group>
+                </group>
                 <footer>
+                    <button name="action_check_in" type="object"
+                            string="Verify &amp; Start Visit"
+                            class="btn-primary"
+                            invisible="not needs_shop_setup"/>
                     <button name="action_check_in" type="object" string="I'm at Shop"
-                            class="btn-primary"/>
+                            class="btn-primary"
+                            invisible="needs_shop_setup"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>
             </form>

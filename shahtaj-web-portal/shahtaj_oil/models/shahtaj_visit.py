@@ -341,7 +341,8 @@ class ShahtajVisit(models.Model):
         if not shop.partner_latitude or not shop.partner_longitude:
             raise UserError(_(
                 'Shop "%(shop)s" has no GPS coordinates. '
-                'Ask your distributor to set shop latitude and longitude.',
+                'Complete first-visit verification (shops/verify-on-site) '
+                'or ask the distributor to set latitude and longitude.',
                 shop=shop.name,
             ))
         if latitude is None or longitude is None:
@@ -392,6 +393,13 @@ class ShahtajVisit(models.Model):
             raise UserError(_(
                 'Shop "%(shop)s" is not approved yet. '
                 'You cannot visit until the distributor approves it.',
+                shop=task.shop_id.name,
+            ))
+        if not task.shop_id.shahtaj_field_verified:
+            raise UserError(_(
+                'Shop "%(shop)s" is tagged Not Visited. '
+                'Complete first-visit setup (exterior photo + GPS) via '
+                'shops/verify-on-site before normal check-in.',
                 shop=task.shop_id.name,
             ))
         if not task._shahtaj_is_operational_for_booker():

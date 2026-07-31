@@ -17,6 +17,10 @@
                        decoration-success="shop_approval_state == 'approved'"
                        decoration-warning="shop_approval_state == 'pending'"
                        decoration-danger="shop_approval_state == 'rejected'"/>
+                <field name="shahtaj_visit_tag" string="Visit" widget="badge"
+                       decoration-warning="shahtaj_visit_tag == 'not_visited'"
+                       decoration-success="shahtaj_visit_tag == 'visited'"/>
+                <field name="shahtaj_field_verified" optional="hide"/>
                 <field name="zone_id" optional="show"/>
                 <field name="route_id" optional="show"/>
                 <field name="shahtaj_shop_category" widget="badge"
@@ -53,6 +57,9 @@
                             string="Legacy Balance Invoice"
                             invisible="not legacy_balance_move_id"
                             groups="shahtaj_oil.group_shahtaj_distributor_financial,account.group_account_readonly,account.group_account_invoice"/>
+                    <field name="shahtaj_visit_tag" widget="badge"
+                           decoration-warning="shahtaj_visit_tag == 'not_visited'"
+                           decoration-success="shahtaj_visit_tag == 'visited'"/>
                     <field name="shop_approval_state" widget="statusbar"
                            statusbar_visible="pending,approved,rejected"/>
                 </header>
@@ -137,12 +144,23 @@
                     </group>
                     <group string="GPS Location">
                         <group>
-                            <field name="partner_latitude" string="GPS Latitude" required="1"/>
-                            <field name="partner_longitude" string="GPS Longitude" required="1"/>
+                            <field name="shahtaj_visit_tag" widget="badge" readonly="1"/>
+                            <field name="shahtaj_field_verified" readonly="1"/>
+                            <field name="shahtaj_field_verified_at" readonly="1"
+                                   invisible="not shahtaj_field_verified"/>
+                            <field name="shahtaj_field_verified_by_id" readonly="1"
+                                   invisible="not shahtaj_field_verified"/>
+                            <field name="partner_latitude" string="GPS Latitude"
+                                   required="shahtaj_field_verified"/>
+                            <field name="partner_longitude" string="GPS Longitude"
+                                   required="shahtaj_field_verified"/>
                         </group>
                         <group>
                             <div class="text-muted">
-                                Shop GPS is used to validate visits (order booker must be within 100 m).
+                                GPS is optional when creating a shop. Until an order booker
+                                completes <b>first-visit verification</b> (photo + GPS on site),
+                                the shop stays tagged <b>Not Visited</b> and cannot use normal
+                                distance check-in.
                             </div>
                         </group>
                     </group>
@@ -177,7 +195,12 @@
                         </group>
                         <group>
                             <field name="owner_photo" widget="image" class="oe_avatar"/>
-                            <field name="shop_exterior_photo" widget="image" class="oe_avatar"/>
+                            <field name="shop_exterior_photo" widget="image" class="oe_avatar"
+                                   readonly="1"/>
+                            <div class="text-muted">
+                                Shop exterior photo is captured by the order booker on the
+                                first visit (with GPS). Distributors can view it only.
+                            </div>
                         </group>
                     </group>
                 </sheet>
@@ -204,6 +227,9 @@
                        decoration-success="shop_approval_state == 'approved'"
                        decoration-warning="shop_approval_state == 'pending'"
                        decoration-danger="shop_approval_state == 'rejected'"/>
+                <field name="shahtaj_visit_tag" string="Visit" widget="badge"
+                       decoration-warning="shahtaj_visit_tag == 'not_visited'"
+                       decoration-success="shahtaj_visit_tag == 'visited'"/>
                 <field name="zone_id" optional="show"/>
                 <field name="route_id" optional="show"/>
                 <field name="create_date" string="Registered On" optional="show"/>
@@ -266,7 +292,8 @@
                                    placeholder="03xx xxxxxxx"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                             <field name="owner_cnic_number"
-                                   placeholder="Optional"
+                                   required="1"
+                                   placeholder="Required for on-site register"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                         </group>
                         <group>
@@ -282,14 +309,24 @@
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                         </group>
                     </group>
-                    <group string="Shop GPS">
+                    <group string="Shop GPS (required — marks Visited)">
                         <group>
-                            <field name="partner_latitude" string="GPS Latitude" required="1"
+                            <field name="shahtaj_visit_tag" widget="badge" readonly="1"/>
+                            <field name="shahtaj_field_verified" invisible="1"/>
+                            <field name="partner_latitude" string="GPS Latitude"
+                                   required="1"
                                    placeholder="e.g. 31.5204"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
-                            <field name="partner_longitude" string="GPS Longitude" required="1"
+                            <field name="partner_longitude" string="GPS Longitude"
+                                   required="1"
                                    placeholder="e.g. 74.3587"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
+                        </group>
+                        <group>
+                            <div class="alert alert-info" role="alert">
+                                On-site register requires GPS, exterior photo, and CNIC number.
+                                The shop is marked <b>Visited</b> immediately.
+                            </div>
                         </group>
                     </group>
                     <group string="Credit and Balance (Optional)"
@@ -301,7 +338,7 @@
                                    placeholder="Optional"/>
                         </group>
                     </group>
-                    <group string="Photos (Optional)">
+                    <group string="Photos">
                         <group>
                             <field name="owner_cnic_front" widget="image" class="oe_avatar"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
@@ -312,7 +349,11 @@
                             <field name="owner_photo" widget="image" class="oe_avatar"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                             <field name="shop_exterior_photo" widget="image" class="oe_avatar"
+                                   required="1"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
+                            <div class="text-muted">
+                                Exterior photo is required with GPS for on-site registration.
+                            </div>
                         </group>
                     </group>
                 </sheet>

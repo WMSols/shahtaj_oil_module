@@ -52,6 +52,7 @@ def shop_brief(partner):
         credit_remaining = False
     else:
         credit_remaining = max(credit_limit - outstanding, 0.0)
+    setup = shop._shahtaj_first_visit_setup_payload()
     return {
         'id': partner.id,
         'shop_id': partner.id,
@@ -69,6 +70,10 @@ def shop_brief(partner):
         'outstanding_balance': outstanding,
         'credit_remaining': credit_remaining,
         'photos': shop_photo_flags(partner),
+        'field_verified': setup['field_verified'],
+        'visit_tag': setup['visit_tag'],
+        'needs_shop_setup': setup['needs_shop_setup'],
+        'missing_fields': setup['missing_fields'],
     }
 
 

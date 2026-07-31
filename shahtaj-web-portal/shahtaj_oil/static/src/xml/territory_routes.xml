@@ -730,7 +730,9 @@
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="small fw-bold">Shop Exterior Photo</label>
-                        <input type="file" class="form-control form-control-sm" accept="image/*" t-on-change="(ev) => this.onFileChange(ev, 'shop_exterior_photo')"/>
+                        <div class="form-control form-control-sm bg-light text-muted" style="min-height: 38px;">
+                            View only — captured by order booker on first visit (with GPS).
+                        </div>
                         <t t-if="this.state.shopForm.preview_shop_exterior_photo">
                             <img t-att-src="this.state.shopForm.preview_shop_exterior_photo" class="img-thumbnail mt-2 shadow-sm" style="max-height: 120px;"/>
                         </t>

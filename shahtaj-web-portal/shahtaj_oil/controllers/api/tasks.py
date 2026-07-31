@@ -43,6 +43,24 @@ class ShahtajApiTasks(http.Controller):
             return api_success({
                 'visit': serializers.visit_dict(task.visit_id),
                 'resumed': True,
+                'needs_shop_setup': False,
+            })
+        shop = task.shop_id
+        if not shop.shahtaj_field_verified:
+            setup = shop._shahtaj_first_visit_setup_payload()
+            return api_success({
+                'needs_shop_setup': True,
+                'field_verified': False,
+                'visit_tag': setup['visit_tag'],
+                'missing_fields': setup['missing_fields'],
+                'shop': serializers.shop_brief(shop),
+                'task': serializers.task_dict(task),
+                'visit': None,
+                'message': _(
+                    'Shop has not been field-verified yet. '
+                    'Capture shop exterior photo and GPS, then call '
+                    '/api/shahtaj/v1/shops/verify-on-site.'
+                ),
             })
         visit = request.env['shahtaj.visit'].create_from_task_checkin(
             task,
@@ -54,6 +72,7 @@ class ShahtajApiTasks(http.Controller):
         return api_success({
             'visit': serializers.visit_dict(visit),
             'resumed': False,
+            'needs_shop_setup': False,
         })
 
     @http.route('/api/shahtaj/v1/tasks/skip', **API_ROUTE)

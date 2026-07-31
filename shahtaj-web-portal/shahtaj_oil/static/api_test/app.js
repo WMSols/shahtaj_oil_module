@@ -33,12 +33,31 @@
     },
     {
       path: '/api/shahtaj/v1/tasks/check-in',
-      purpose: 'GPS start visit',
+      purpose: 'GPS start visit (or needs_shop_setup if Not Visited)',
       auth: true,
       params: [
         { name: 'task_id', required: true, type: 'int' },
         { name: 'latitude', required: true, type: 'float' },
         { name: 'longitude', required: true, type: 'float' },
+      ],
+    },
+    {
+      path: '/api/shahtaj/v1/shops/verify-on-site',
+      purpose: 'First-visit: GPS + exterior + CNIC# → verify + start visit',
+      auth: true,
+      params: [
+        { name: 'shop_id', required: true, type: 'int' },
+        { name: 'task_id', required: true, type: 'int' },
+        { name: 'latitude', required: true, type: 'float' },
+        { name: 'longitude', required: true, type: 'float' },
+        { name: 'shop_exterior_photo', required: true, type: 'base64', note: 'Booker-only; captured with GPS' },
+        { name: 'owner_cnic_number', required: true, type: 'string', note: 'Required unless already on shop' },
+        { name: 'owner_photo', required: false, type: 'base64' },
+        { name: 'owner_cnic_front', required: false, type: 'base64' },
+        { name: 'owner_cnic_back', required: false, type: 'base64' },
+        { name: 'owner_name', required: false, type: 'string' },
+        { name: 'owner_phone', required: false, type: 'string' },
+        { name: 'shop_category', required: false, type: 'string', note: 'cash|credit if missing' },
       ],
     },
     {
@@ -171,15 +190,16 @@
     },
     {
       path: '/api/shahtaj/v1/shops/register',
-      purpose: 'Register new shop',
+      purpose: 'Register shop on-site (GPS + exterior + CNIC# → Visited)',
       auth: true,
       params: [
         { name: 'name', required: true, type: 'string' },
         { name: 'owner_name', required: true, type: 'string' },
         { name: 'owner_phone', required: true, type: 'string' },
-        { name: 'owner_cnic_number', required: false, type: 'string' },
-        { name: 'latitude', required: true, type: 'float' },
+        { name: 'owner_cnic_number', required: true, type: 'string' },
+        { name: 'latitude', required: true, type: 'float', note: 'On-site GPS → field-verified (Visited)' },
         { name: 'longitude', required: true, type: 'float' },
+        { name: 'shop_exterior_photo', required: true, type: 'base64' },
         { name: 'zone_id', required: false, type: 'int' },
         { name: 'route_id', required: false, type: 'int' },
         { name: 'credit_limit', required: false, type: 'float' },
@@ -188,7 +208,6 @@
         { name: 'owner_cnic_front', required: false, type: 'base64' },
         { name: 'owner_cnic_back', required: false, type: 'base64' },
         { name: 'owner_photo', required: false, type: 'base64' },
-        { name: 'shop_exterior_photo', required: false, type: 'base64' },
       ],
     },
     {
@@ -557,12 +576,22 @@
       `${shop.name} (Shop ID: ${shop.shop_id || shop.id}) — ${state.selectedTask.state}`;
     $('inp-task-notes').value = state.selectedTask.notes || '';
     const gpsBox = $('shop-gps-box');
-    gpsBox.innerHTML = shop.latitude && shop.longitude
-      ? `Shop GPS: ${shop.latitude}, ${shop.longitude} · approval: ${shop.approval_state}`
-      : '<span class="warn">Shop has no GPS — check-in will fail.</span>';
+    const tag = shop.visit_tag || (shop.field_verified ? 'visited' : 'not_visited');
+    const gpsLine = shop.latitude && shop.longitude
+      ? `Shop GPS: ${shop.latitude}, ${shop.longitude}`
+      : 'Shop GPS: (empty — needs first-visit capture)';
+    gpsBox.innerHTML = `${gpsLine} · approval: ${shop.approval_state}`
+      + ` · visit tag: <b>${tag}</b>`
+      + (shop.needs_shop_setup
+        ? ' <span class="warn">→ first-visit setup required</span>'
+        : '');
     const hasVisit = !!state.selectedTask.visit_id;
     $('btn-checkin').classList.toggle('hidden', hasVisit);
     $('btn-continue-visit').classList.toggle('hidden', !hasVisit);
+    const verifyBtn = $('btn-verify-onsite');
+    if (verifyBtn) {
+      verifyBtn.classList.toggle('hidden', hasVisit || !shop.needs_shop_setup);
+    }
   }
 
   $('btn-refresh-tasks').onclick = () => loadTasks().catch(alertErr);
@@ -584,6 +613,9 @@
     }, (err) => alert(err.message));
   };
 
+  // 1x1 PNG for API-test first-visit exterior photo
+  const TINY_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
   $('btn-checkin').onclick = async () => {
     if (!state.selectedTask) return;
     try {
@@ -592,6 +624,17 @@
         latitude: parseFloat($('inp-lat').value),
         longitude: parseFloat($('inp-lng').value),
       });
+      if (data.needs_shop_setup) {
+        alert(
+          'Shop needs first-visit setup.\n'
+          + 'Use "Verify on site" (sends GPS + exterior photo), then order UI opens.\n\n'
+          + (data.message || ''),
+        );
+        const verifyBtn = $('btn-verify-onsite');
+        if (verifyBtn) verifyBtn.classList.remove('hidden');
+        await loadTasks();
+        return;
+      }
       state.visit = data.visit;
       if (data.resumed) alert('Resumed existing visit for this task.');
       switchTab('visit');
@@ -601,6 +644,36 @@
       alert(e.message);
     }
   };
+
+  async function verifyOnSite() {
+    if (!state.selectedTask?.shop) return;
+    const shop = state.selectedTask.shop;
+    const lat = parseFloat($('inp-lat').value);
+    const lng = parseFloat($('inp-lng').value);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      alert('Enter latitude/longitude first (device GPS or typed).');
+      return;
+    }
+    const data = await api('/api/shahtaj/v1/shops/verify-on-site', {
+      shop_id: shop.shop_id || shop.id,
+      task_id: state.selectedTask.id,
+      latitude: lat,
+      longitude: lng,
+      shop_exterior_photo: TINY_PNG_B64,
+      owner_cnic_number: ($('inp-verify-cnic') && $('inp-verify-cnic').value.trim())
+        || '35202-1234567-1',
+    });
+    state.visit = data.visit;
+    alert(data.message || 'Shop verified. Visit started.');
+    switchTab('visit');
+    renderVisit();
+    await loadTasks();
+  }
+
+  const verifyBtnEl = $('btn-verify-onsite');
+  if (verifyBtnEl) {
+    verifyBtnEl.onclick = () => verifyOnSite().catch(alertErr);
+  }
 
   $('btn-continue-visit').onclick = async () => {
     if (!state.selectedTask?.visit_id) return;
@@ -992,15 +1065,19 @@
   });
 
   $('btn-register-shop').onclick = async () => {
+    const ownerCnicNumber = $('reg-owner-cnic-number').value.trim();
+    if (!ownerCnicNumber) {
+      alert('Owner CNIC number is required for on-site register.');
+      return;
+    }
     const body = {
       name: $('reg-name').value.trim(),
       owner_name: $('reg-owner').value.trim(),
       owner_phone: $('reg-phone').value.trim(),
+      owner_cnic_number: ownerCnicNumber,
       latitude: parseFloat($('reg-lat').value),
       longitude: parseFloat($('reg-lng').value),
     };
-    const ownerCnicNumber = $('reg-owner-cnic-number').value.trim();
-    if (ownerCnicNumber) body.owner_cnic_number = ownerCnicNumber;
     const credit = $('reg-credit').value;
     const legacy = $('reg-legacy').value;
     const zone = $('reg-zone').value;
@@ -1019,9 +1096,12 @@
       const file = $(inputId).files?.[0];
       if (file) body[field] = await fileToBase64(file);
     }
+    if (!body.shop_exterior_photo) {
+      body.shop_exterior_photo = TINY_PNG_B64;
+    }
     try {
       await api('/api/shahtaj/v1/shops/register', body);
-      alert('Shop submitted for approval.');
+      alert('Shop submitted for approval (Visited if GPS + exterior + CNIC sent).');
       await loadMyShops();
     } catch (e) {
       alert(e.message);

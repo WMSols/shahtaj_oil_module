@@ -60,6 +60,20 @@
         <button id="btn-refresh-tasks" class="secondary sm">Refresh</button>
       </div>
       <p id="tasks-date" class="meta"></p>
+      <div class="alert alert-warn">
+        <strong>First visit / Not Visited shops:</strong>
+        Task cards include <code>visit_tag</code>, <code>field_verified</code>, <code>needs_shop_setup</code>, and
+        <code>missing_fields</code>. If the shop is <b>Not Visited</b>,
+        <code>tasks/check-in</code> does <em>not</em> start a visit — it returns
+        <code>needs_shop_setup: true</code>.
+        <br/><br/>
+        <b>Required on verify:</b> GPS (captured with exterior photo) +
+        <code>shop_exterior_photo</code> + <code>owner_cnic_number</code>.
+        <br/>
+        <b>Optional:</b> owner photo, CNIC images, owner name/phone, shop_category if empty —
+        same <code>missing_fields</code> list with <code>required: false</code>; send answers on
+        <code>shops/verify-on-site</code>. Exterior photo is booker-only (distributor view-only).
+      </div>
       <div id="task-cards" class="card-grid"></div>
 
       <div id="checkin-panel" class="card sub-card hidden">
@@ -69,6 +83,9 @@
         <div class="grid-2">
           <label>Your latitude<input id="inp-lat" type="number" step="any"/></label>
           <label>Your longitude<input id="inp-lng" type="number" step="any"/></label>
+          <label>Owner CNIC number (required on verify)
+            <input id="inp-verify-cnic" type="text" placeholder="e.g. 35202-1234567-1" value="35202-1234567-1"/>
+          </label>
         </div>
         <div class="actions-row">
           <button id="btn-use-shop-gps" class="ghost sm">Copy shop GPS</button>
@@ -82,10 +99,15 @@
         </div>
         <div class="actions-row">
           <button id="btn-checkin" class="primary">I'm at shop (check in)</button>
+          <button id="btn-verify-onsite" class="primary hidden">Verify on site (photo + GPS)</button>
           <button id="btn-continue-visit" class="primary hidden">Continue visit</button>
           <button id="btn-skip-task" class="ghost sm">Skip task</button>
         </div>
-        <p class="endpoint-tag">check-in body: task_id, latitude, longitude</p>
+        <p class="endpoint-tag">
+          check-in → if needs_shop_setup → shops/verify-on-site
+          (required: task_id, shop_id, lat/lng, shop_exterior_photo, owner_cnic_number;
+          optional: owner_photo, CNIC images, owner_name, owner_phone, shop_category)
+        </p>
       </div>
     </section>
 
@@ -186,12 +208,22 @@
         </div>
         <button id="btn-refresh-shops" class="secondary sm">Refresh my shops</button>
       </div>
+      <div class="alert alert-warn">
+        <strong>Field verification:</strong>
+        Booker <code>shops/register</code> requires <b>GPS + exterior photo + CNIC number</b>
+        and marks the shop <b>Visited</b> immediately.
+        Distributor-created shops can omit GPS and stay <b>Not Visited</b> until
+        <code>shops/verify-on-site</code> (or native booker check-in verify).
+        Distributor GPS alone does <em>not</em> verify the shop. Custom portal unchanged.
+      </div>
       <div class="card sub-card">
         <div class="grid-2">
           <label>Shop name<input id="reg-name" type="text"/></label>
           <label>Owner name<input id="reg-owner" type="text"/></label>
           <label>Owner phone<input id="reg-phone" type="text"/></label>
-          <label>Owner ID card no. (optional)<input id="reg-owner-cnic-number" type="text" placeholder="e.g. 35202-1234567-1"/></label>
+          <label>Owner ID card no. (required)
+            <input id="reg-owner-cnic-number" type="text" placeholder="e.g. 35202-1234567-1" value="35202-1234567-1"/>
+          </label>
           <label>Credit limit (Rs)<input id="reg-credit" type="number" step="any"/></label>
           <label>Legacy balance (Rs)<input id="reg-legacy" type="number" step="any"/></label>
           <label>Zone (optional)
@@ -200,10 +232,10 @@
           <label>Route (optional)
             <select id="reg-route" disabled><option value="">— Select route —</option></select>
           </label>
-          <label>Latitude<input id="reg-lat" type="number" step="any"/></label>
-          <label>Longitude<input id="reg-lng" type="number" step="any"/></label>
+          <label>Latitude (required)<input id="reg-lat" type="number" step="any"/></label>
+          <label>Longitude (required)<input id="reg-lng" type="number" step="any"/></label>
         </div>
-        <h3>Photos (optional — base64 in JSON)</h3>
+        <h3>Photos — exterior required; others optional</h3>
         <div class="photo-grid">
           <label>Owner CNIC front<input id="reg-cnic-front" type="file" accept="image/*" data-preview="prev-cnic-front"/></label>
           <img id="prev-cnic-front" class="photo-preview hidden" alt=""/>
@@ -211,9 +243,10 @@
           <img id="prev-cnic-back" class="photo-preview hidden" alt=""/>
           <label>Owner photo<input id="reg-owner-photo" type="file" accept="image/*" data-preview="prev-owner-photo"/></label>
           <img id="prev-owner-photo" class="photo-preview hidden" alt=""/>
-          <label>Shop exterior<input id="reg-shop-exterior" type="file" accept="image/*" data-preview="prev-shop-exterior"/></label>
+          <label>Shop exterior (required)<input id="reg-shop-exterior" type="file" accept="image/*" data-preview="prev-shop-exterior"/></label>
           <img id="prev-shop-exterior" class="photo-preview hidden" alt=""/>
         </div>
+        <p class="hint">If no exterior file is chosen, API-test sends a tiny PNG placeholder.</p>
         <button id="btn-register-shop" class="primary">Submit for approval</button>
       </div>
       <h3>My registered shops</h3>
@@ -240,6 +273,6 @@
     </section>
   </div>
 
-  <script src="./app.js?v=9"></script>
+  <script src="./app.js?v=12"></script>
 </body>
 </html>

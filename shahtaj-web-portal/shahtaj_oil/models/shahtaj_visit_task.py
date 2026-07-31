@@ -65,6 +65,11 @@ class ShahtajVisitTask(models.Model):
         ],
         ondelete='restrict',
     )
+    shop_visit_tag = fields.Selection(
+        related='shop_id.shahtaj_visit_tag',
+        string='Shop Visit',
+        readonly=True,
+    )
     scheduled_date = fields.Date(
         string='Scheduled Date',
         required=True,
@@ -161,7 +166,11 @@ class ShahtajVisitTask(models.Model):
             return self.action_open_visit()
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Check in at Shop'),
+            'name': (
+                _('First-Visit Verify & Check-in')
+                if not self.shop_id.shahtaj_field_verified
+                else _('Check in at Shop')
+            ),
             'res_model': 'shahtaj.visit.checkin.wizard',
             'view_mode': 'form',
             'target': 'new',
