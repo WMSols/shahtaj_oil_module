@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """Daily visit tasks: one row per shop per booker per date.
 
-Tasks are built from weekly schedules (cron, login, or manual wizard).
+Tasks are built from weekly schedules (cron, login, API today, or schedule sync).
+A pending task is valid only while an active weekly schedule covers the same
+order booker + route + weekday. Orphan pending tasks are cancelled on generate.
+Completed / in_progress / skipped are never auto-cancelled (history).
 Bookers check in via GPS; distributors can skip or cancel tasks.
 """
 from datetime import timedelta
@@ -296,11 +299,99 @@ class ShahtajVisitTask(models.Model):
             and shop._shahtaj_is_operational_for_booker()
         )
 
+    def _shahtaj_matches_active_weekly_schedule(self):
+        """True when an active weekly schedule covers this task's booker/route/weekday.
+
+        Pending work is only valid while such a schedule exists. Multiple routes
+        on the same weekday are allowed (unique is booker+route+day).
+        """
+        self.ensure_one()
+        if not self.scheduled_date or not self.order_booker_id or not self.route_id:
+            return False
+        weekday = str(self.scheduled_date.weekday())
+        Schedule = self.env['shahtaj.weekly.schedule'].sudo()
+        schedule = Schedule.search([
+            ('active', '=', True),
+            ('order_booker_id', '=', self.order_booker_id.id),
+            ('route_id', '=', self.route_id.id),
+            ('day_of_week', '=', weekday),
+        ], limit=1)
+        return bool(
+            schedule
+            and schedule.route_id._shahtaj_is_operational_for_booker()
+        )
+
+    def _shahtaj_belongs_on_booker_day_list(self):
+        """Whether this task should appear on My Tasks Today / tasks/today.
+
+        - Cancelled: never
+        - Territory must be operational
+        - Pending: must still match an active weekly schedule for that weekday
+        - Completed / in_progress / skipped: keep (history of work that day)
+        """
+        self.ensure_one()
+        if self.state == 'cancelled':
+            return False
+        if not self._shahtaj_is_operational_for_booker():
+            return False
+        if self.state == 'pending':
+            return self._shahtaj_matches_active_weekly_schedule()
+        return True
+
+    @api.model
+    def _cancel_orphan_pending_tasks(
+        self, date_from=None, date_to=None, order_booker=None,
+    ):
+        """Cancel pending tasks that no longer match any active weekly schedule.
+
+        Does not touch completed, in_progress, or skipped tasks.
+        """
+        domain = [('state', '=', 'pending')]
+        if order_booker:
+            domain.append(('order_booker_id', '=', order_booker.id))
+        if date_from:
+            domain.append(('scheduled_date', '>=', date_from))
+        if date_to:
+            domain.append(('scheduled_date', '<=', date_to))
+        pending = self.search(domain)
+        if not pending:
+            return self.browse()
+
+        Schedule = self.env['shahtaj.weekly.schedule']
+        schedule_domain = [
+            ('active', '=', True),
+            ('order_booker_id', 'in', pending.mapped('order_booker_id').ids),
+        ]
+        schedules = Schedule.search(schedule_domain).filtered(
+            lambda s: s.route_id._shahtaj_is_operational_for_booker(),
+        )
+        valid_keys = {
+            (s.order_booker_id.id, s.route_id.id, s.day_of_week)
+            for s in schedules
+        }
+        orphans = pending.filtered(
+            lambda t: (
+                t.order_booker_id.id,
+                t.route_id.id,
+                str(t.scheduled_date.weekday()) if t.scheduled_date else None,
+            ) not in valid_keys
+        )
+        if orphans:
+            orphans.with_context(shahtaj_system_visit_write=True).write({
+                'state': 'cancelled',
+            })
+        return orphans
+
     @api.model
     def _generate_from_schedules(self, date_from, date_to, order_booker=None):
         """For each day in range: match weekday schedules → one task per shop on route."""
         self._cancel_pending_tasks_for_unapproved_shops(date_from, date_to)
         self._cancel_pending_tasks_for_non_operational(date_from, date_to)
+        # Drop pending leftovers for routes/days no longer on the booker's plan
+        # (e.g. schedule deleted earlier without a clean cancel).
+        self._cancel_orphan_pending_tasks(
+            date_from, date_to, order_booker=order_booker,
+        )
 
         Schedule = self.env['shahtaj.weekly.schedule']
         schedule_domain = [('active', '=', True)]
@@ -370,3 +461,40 @@ class ShahtajVisitTask(models.Model):
         today = fields.Date.context_today(self)
         end = fields.Date.add(today, days=AUTO_GENERATE_DAYS_AHEAD)
         return self._generate_from_schedules(today, end, order_booker=order_booker)
+
+    @api.model
+    def action_shahtaj_open_my_tasks_today(self):
+        """Booker menu: refresh plan, drop orphan pending, then open today's list."""
+        user = self.env.user
+        self.sudo()._auto_generate_window(order_booker=user)
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('My Tasks Today'),
+            'res_model': 'shahtaj.visit.task',
+            'view_mode': 'list,form',
+            'search_view_id': self.env.ref(
+                'shahtaj_oil.view_shahtaj_visit_task_search'
+            ).id,
+            'domain': [
+                ('order_booker_id', '=', user.id),
+                ('state', 'not in', ['cancelled']),
+            ],
+            'context': {
+                'search_default_today': 1,
+                'search_default_group_route': 1,
+            },
+            'views': [
+                (
+                    self.env.ref(
+                        'shahtaj_oil.view_shahtaj_visit_task_list_booker'
+                    ).id,
+                    'list',
+                ),
+                (
+                    self.env.ref(
+                        'shahtaj_oil.view_shahtaj_visit_task_form_booker'
+                    ).id,
+                    'form',
+                ),
+            ],
+        }

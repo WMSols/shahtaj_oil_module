@@ -228,7 +228,7 @@
     <menuitem id="menu_shahtaj_visit_task_today"
               name="My Tasks Today"
               parent="menu_shahtaj_root"
-              action="action_shahtaj_visit_task_today"
+              action="action_shahtaj_my_tasks_today_menu"
               sequence="20"
               groups="shahtaj_oil.group_shahtaj_order_booker"/>
 

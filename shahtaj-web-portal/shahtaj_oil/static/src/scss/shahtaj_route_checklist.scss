@@ -1,0 +1,33 @@
+/* Keep route shop checklist checkboxes visible when shop names are long. */
+.o_shahtaj_route_shop_checklist.o_field_many2many_checkboxes,
+.o_field_many2many_checkboxes.o_shahtaj_route_shop_checklist {
+    max-width: 100%;
+}
+
+.o_shahtaj_route_shop_checklist .form-check,
+.o_field_many2many_checkboxes .o_checkbox,
+.o_field_many2many_checkboxes .form-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    max-width: 100%;
+    margin-bottom: 0.35rem;
+}
+
+.o_shahtaj_route_shop_checklist input[type="checkbox"],
+.o_field_many2many_checkboxes input[type="checkbox"] {
+    flex: 0 0 auto;
+    margin-top: 0.2rem;
+}
+
+.o_shahtaj_route_shop_checklist .form-check-label,
+.o_shahtaj_route_shop_checklist label,
+.o_field_many2many_checkboxes .form-check-label,
+.o_field_many2many_checkboxes label {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

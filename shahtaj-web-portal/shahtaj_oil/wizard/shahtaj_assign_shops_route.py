@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Distributor: assign existing shops to a route (or move between routes)."""
+"""Distributor: checkbox picker to set which shops belong on a route."""
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -19,78 +19,85 @@ class ShahtajAssignShopsRouteWizard(models.TransientModel):
         string='Zone',
         readonly=True,
     )
+    # Real M2M table — many2many_checkboxes works reliably here.
     shop_ids = fields.Many2many(
         'res.partner',
         'shahtaj_assign_shops_route_rel',
         'wizard_id',
         'shop_id',
-        string='Shops',
-        required=True,
-        domain=[
-            ('is_shahtaj_shop', '=', True),
-            ('active', '=', True),
-        ],
+        string='Shops on this route',
+        help='Checked shops stay/get assigned. Uncheck to remove from the route.',
     )
-    only_unassigned = fields.Boolean(
-        string='Show unassigned shops only',
-        default=True,
-        help='When enabled, the shop picker prefers shops with no route yet.',
+    candidate_shop_ids = fields.Many2many(
+        'res.partner',
+        compute='_compute_candidate_shop_ids',
+        string='Candidates',
     )
+
+    @api.depends('route_id')
+    def _compute_candidate_shop_ids(self):
+        Partner = self.env['res.partner']
+        for wiz in self:
+            if not wiz.route_id:
+                wiz.candidate_shop_ids = Partner
+                continue
+            wiz.candidate_shop_ids = Partner.search(
+                wiz.route_id._shahtaj_candidate_shop_domain(),
+            )
 
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
         ctx = self.env.context
-        active_model = ctx.get('active_model')
-        active_ids = ctx.get('active_ids') or (
-            [ctx['active_id']] if ctx.get('active_id') else []
-        )
-        if active_model == 'shahtaj.route' and active_ids:
-            res.setdefault('route_id', active_ids[0])
-        if active_model == 'res.partner' and active_ids:
-            shops = self.env['res.partner'].browse(active_ids).filtered(
+        route = False
+        if ctx.get('default_route_id'):
+            route = self.env['shahtaj.route'].browse(ctx['default_route_id'])
+        elif ctx.get('active_model') == 'shahtaj.route' and ctx.get('active_id'):
+            route = self.env['shahtaj.route'].browse(ctx['active_id'])
+            res.setdefault('route_id', route.id)
+        if route and route.exists():
+            # Pre-check shops already on the route.
+            res['shop_ids'] = [(6, 0, route.shop_ids.filtered(
+                lambda s: s.active and s.shop_approval_state == 'approved'
+            ).ids)]
+        elif ctx.get('active_model') == 'res.partner' and ctx.get('active_ids'):
+            shops = self.env['res.partner'].browse(ctx['active_ids']).filtered(
                 lambda p: p.is_shahtaj_shop and p.active,
             )
             if shops:
                 res.setdefault('shop_ids', [(6, 0, shops.ids)])
-                res['only_unassigned'] = False
         return res
 
-    @api.onchange('only_unassigned', 'route_id')
-    def _onchange_only_unassigned(self):
-        domain = [
-            ('is_shahtaj_shop', '=', True),
-            ('active', '=', True),
-        ]
-        if self.only_unassigned:
-            domain.append(('route_id', '=', False))
+    @api.onchange('route_id')
+    def _onchange_route_id(self):
+        if not self.route_id:
+            return {'domain': {'shop_ids': [('id', '=', False)]}}
+        # Keep current selection if still valid; otherwise load route shops.
+        domain = self.route_id._shahtaj_candidate_shop_domain()
+        if not self.shop_ids:
+            self.shop_ids = self.route_id.shop_ids.filtered(
+                lambda s: s.active and s.shop_approval_state == 'approved',
+            )
         return {'domain': {'shop_ids': domain}}
 
     def action_assign(self):
+        """Apply checkbox selection as the full shop set for the route."""
         self.ensure_one()
         if not self.route_id:
             raise UserError(_('Select a route.'))
-        if not self.shop_ids:
-            raise UserError(_('Select at least one shop.'))
-        if not self.route_id.active or not self.route_id.zone_id.active:
-            raise UserError(_(
-                'Route "%(route)s" (or its zone) is archived.',
-                route=self.route_id.display_name,
-            ))
-        shops = self.shop_ids.filtered('is_shahtaj_shop')
-        shops.write({
-            'route_id': self.route_id.id,
-            'zone_id': self.route_id.zone_id.id,
-        })
+        added, removed = self.route_id._shahtaj_sync_assigned_shops(self.shop_ids)
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Shops assigned'),
+                'title': _('Route shops updated'),
                 'message': _(
-                    '%(count)s shop(s) assigned to %(route)s.',
-                    count=len(shops),
+                    '%(route)s: %(added)s added, %(removed)s removed. '
+                    'Now %(total)s shop(s) on this route.',
                     route=self.route_id.display_name,
+                    added=added,
+                    removed=removed,
+                    total=len(self.route_id.shop_ids),
                 ),
                 'type': 'success',
                 'sticky': False,

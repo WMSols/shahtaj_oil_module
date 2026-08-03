@@ -24,6 +24,18 @@ class ResPartner(models.Model):
     _name = 'res.partner'
     _inherit = ['res.partner', 'shahtaj.territory.sync.mixin']
 
+    def name_get(self):
+        """Short labels in route shop checklists so long names do not hide checkboxes."""
+        if self.env.context.get('shahtaj_route_checklist'):
+            result = []
+            for partner in self:
+                label = partner.name or partner.display_name or ''
+                if len(label) > 48:
+                    label = label[:45].rstrip() + '...'
+                result.append((partner.id, label))
+            return result
+        return super().name_get()
+
     def _check_access(self, operation):
         """Let distributors read company partners required by accounting screens."""
         result = super()._check_access(operation)
@@ -169,6 +181,17 @@ class ResPartner(models.Model):
         store=True,
         index=True,
     )
+    shahtaj_route_tag = fields.Selection(
+        [
+            ('unassigned', 'Unassigned'),
+            ('assigned', 'Assigned'),
+        ],
+        string='Route Tag',
+        compute='_compute_shahtaj_route_tag',
+        store=True,
+        index=True,
+        help='Unassigned = no route; Assigned = linked to a sales route.',
+    )
     allowed_zone_ids = fields.Many2many(
         'shahtaj.zone',
         compute='_compute_allowed_zones_routes',
@@ -187,6 +210,16 @@ class ResPartner(models.Model):
                 partner.shahtaj_visit_tag = 'not_visited'
             else:
                 partner.shahtaj_visit_tag = False
+
+    @api.depends('is_shahtaj_shop', 'route_id')
+    def _compute_shahtaj_route_tag(self):
+        for partner in self:
+            if not partner.is_shahtaj_shop:
+                partner.shahtaj_route_tag = False
+            elif partner.route_id:
+                partner.shahtaj_route_tag = 'assigned'
+            else:
+                partner.shahtaj_route_tag = 'unassigned'
 
     # --- Zone/route dropdowns on shop forms (all active records for bookers) ---
     @api.model
@@ -563,6 +596,8 @@ class ResPartner(models.Model):
             route = self.env['shahtaj.route'].browse(vals['route_id']).exists()
             if route:
                 vals['zone_id'] = route.zone_id.id
+        if 'route_id' in vals:
+            self._shahtaj_assert_can_change_route(vals.get('route_id'))
         if vals.get('legacy_balance_move_id') and not self.env.context.get(
             'shahtaj_posting_legacy_move'
         ):
@@ -661,6 +696,32 @@ class ResPartner(models.Model):
                 'default_only_unassigned': False,
             },
         }
+
+    def _shahtaj_shops_with_open_visit(self):
+        """Shops that currently have an in-progress field visit."""
+        shops = self.filtered('is_shahtaj_shop')
+        if not shops:
+            return shops
+        return self.env['shahtaj.visit'].search([
+            ('shop_id', 'in', shops.ids),
+            ('state', '=', 'in_progress'),
+        ]).mapped('shop_id')
+
+    def _shahtaj_assert_can_change_route(self, new_route_id):
+        """Block route changes while a visit is in progress on the shop."""
+        shops = self.filtered('is_shahtaj_shop')
+        if not shops:
+            return
+        changing = shops.filtered(
+            lambda s: (s.route_id.id or False) != (new_route_id or False),
+        )
+        blocked = changing._shahtaj_shops_with_open_visit()
+        if blocked:
+            raise UserError(_(
+                'Cannot change route for shop(s) with an in-progress visit: %(shops)s. '
+                'Finish or cancel the visit first.',
+                shops=', '.join(blocked.mapped('display_name')),
+            ))
 
     def action_shahtaj_unassign_route(self):
         """Clear route assignment (shop stays; no visit tasks until reassigned)."""

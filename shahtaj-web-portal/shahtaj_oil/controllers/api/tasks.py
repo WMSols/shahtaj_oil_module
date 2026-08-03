@@ -19,17 +19,16 @@ class ShahtajApiTasks(http.Controller):
     @http.route('/api/shahtaj/v1/tasks/today', **API_ROUTE)
     def tasks_today(self, **kwargs):
         ensure_order_booker()
-        # Expire leftover visits from previous days before listing today's work.
-        request.env['shahtaj.visit']._close_stale_in_progress_visits(
-            order_booker=request.env.user,
-        )
-        today = fields.Date.context_today(request.env['shahtaj.visit.task'])
-        tasks = request.env['shahtaj.visit.task'].search([
+        Task = request.env['shahtaj.visit.task']
+        # Sync rolling window + cancel orphan pending (routes not on plan).
+        Task.sudo()._auto_generate_window(order_booker=request.env.user)
+        today = fields.Date.context_today(Task)
+        tasks = Task.search([
             ('order_booker_id', '=', request.env.user.id),
             ('scheduled_date', '=', today),
             ('state', 'not in', ['cancelled']),
         ], order='route_id, shop_id')
-        tasks = tasks.filtered(lambda t: t._shahtaj_is_operational_for_booker())
+        tasks = tasks.filtered(lambda t: t._shahtaj_belongs_on_booker_day_list())
         return api_success({
             'date': str(today),
             'tasks': [serializers.task_dict(task) for task in tasks],

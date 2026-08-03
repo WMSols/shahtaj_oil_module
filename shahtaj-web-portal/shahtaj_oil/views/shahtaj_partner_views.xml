@@ -31,6 +31,9 @@
                 <field name="shahtaj_visit_tag" string="Visit" widget="badge"
                        decoration-warning="shahtaj_visit_tag == 'not_visited'"
                        decoration-success="shahtaj_visit_tag == 'visited'"/>
+                <field name="shahtaj_route_tag" string="Route" widget="badge"
+                       decoration-warning="shahtaj_route_tag == 'unassigned'"
+                       decoration-success="shahtaj_route_tag == 'assigned'"/>
                 <field name="shahtaj_field_verified" optional="hide"/>
                 <field name="zone_id" optional="show"/>
                 <field name="route_id" optional="show"/>
@@ -63,6 +66,10 @@
                         domain="[('route_id', '=', False)]"/>
                 <filter string="Assigned to a route" name="assigned_route"
                         domain="[('route_id', '!=', False)]"/>
+                <filter string="Route tag: Unassigned" name="tag_unassigned"
+                        domain="[('shahtaj_route_tag', '=', 'unassigned')]"/>
+                <filter string="Route tag: Assigned" name="tag_assigned"
+                        domain="[('shahtaj_route_tag', '=', 'assigned')]"/>
                 <filter string="Not Visited" name="not_visited"
                         domain="[('shahtaj_visit_tag', '=', 'not_visited')]"/>
                 <filter string="Visited" name="visited"
@@ -72,12 +79,13 @@
                         domain="[('shop_approval_state', '=', 'approved')]"/>
                 <filter string="Pending" name="pending"
                         domain="[('shop_approval_state', '=', 'pending')]"/>
-                <group expand="0" string="Group By">
-                    <filter string="Route" name="groupby_route" context="{'group_by': 'route_id'}"/>
-                    <filter string="Zone" name="groupby_zone" context="{'group_by': 'zone_id'}"/>
-                    <filter string="Visit Tag" name="groupby_visit"
-                            context="{'group_by': 'shahtaj_visit_tag'}"/>
-                </group>
+                <separator/>
+                <filter string="Route" name="groupby_route" context="{'group_by': 'route_id'}"/>
+                <filter string="Zone" name="groupby_zone" context="{'group_by': 'zone_id'}"/>
+                <filter string="Route Tag" name="groupby_route_tag"
+                        context="{'group_by': 'shahtaj_route_tag'}"/>
+                <filter string="Visit Tag" name="groupby_visit"
+                        context="{'group_by': 'shahtaj_visit_tag'}"/>
             </search>
         </field>
     </record>
@@ -112,6 +120,9 @@
                     <field name="shahtaj_visit_tag" widget="badge"
                            decoration-warning="shahtaj_visit_tag == 'not_visited'"
                            decoration-success="shahtaj_visit_tag == 'visited'"/>
+                    <field name="shahtaj_route_tag" widget="badge"
+                           decoration-warning="shahtaj_route_tag == 'unassigned'"
+                           decoration-success="shahtaj_route_tag == 'assigned'"/>
                     <field name="shop_approval_state" widget="statusbar"
                            statusbar_visible="pending,approved,rejected"/>
                 </header>

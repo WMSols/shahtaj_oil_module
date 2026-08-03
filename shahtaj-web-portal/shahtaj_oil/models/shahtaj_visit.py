@@ -329,9 +329,7 @@ class ShahtajVisit(models.Model):
         active = self._get_active_visit_for_user()
         if active:
             return active.action_open_booker_form()
-        return self.env['ir.actions.act_window']._for_xml_id(
-            'shahtaj_oil.action_shahtaj_visit_task_today',
-        )
+        return self.env['shahtaj.visit.task'].action_shahtaj_open_my_tasks_today()
 
     @api.model
     def _validate_check_in_coordinates(

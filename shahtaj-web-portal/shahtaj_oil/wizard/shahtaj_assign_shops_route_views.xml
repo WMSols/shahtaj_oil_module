@@ -5,34 +5,33 @@
         <field name="name">shahtaj.assign.shops.route.wizard.form</field>
         <field name="model">shahtaj.assign.shops.route.wizard</field>
         <field name="arch" type="xml">
-            <form string="Assign Shops to Route">
+            <form string="Pick shops for route">
                 <div class="alert alert-info" role="alert">
-                    Create shops and routes separately, then assign shops here.
-                    Unassigned shops do not get visit tasks until they are on a route.
+                    <b>Checked</b> = on this route.
+                    <b>Unchecked</b> = Unassigned (removed from this route).
+                    Only Unassigned shops and shops already on this route are listed.
+                    Shop name-only shops appear here once Approved.
+                    Long names are shortened in this list so checkboxes stay visible.
                 </div>
                 <group>
                     <group>
-                        <field name="route_id" options="{'no_create': True}"/>
+                        <field name="route_id" options="{'no_create': True}"
+                               readonly="context.get('active_model') == 'shahtaj.route'"/>
                         <field name="zone_id"/>
-                        <field name="only_unassigned"/>
+                        <field name="candidate_shop_ids" invisible="1"/>
                     </group>
                 </group>
-                <group string="Shops">
+                <group string="Shops (check to assign / uncheck to remove)">
                     <field name="shop_ids" nolabel="1"
-                           options="{'no_create': True}"
-                           context="{'shahtaj_shop_form': True}">
-                        <list>
-                            <field name="name"/>
-                            <field name="owner_name" optional="show"/>
-                            <field name="route_id" string="Current Route"/>
-                            <field name="shop_approval_state" widget="badge"/>
-                            <field name="shahtaj_visit_tag" widget="badge" optional="show"/>
-                        </list>
-                    </field>
+                           widget="many2many_checkboxes"
+                           class="o_shahtaj_route_shop_checklist"
+                           context="{'shahtaj_route_checklist': True}"
+                           domain="[('id', 'in', candidate_shop_ids)]"
+                           options="{'no_create': True}"/>
                 </group>
                 <footer>
                     <button name="action_assign" type="object"
-                            string="Assign to Route"
+                            string="Save shop assignment"
                             class="btn-primary"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>
@@ -41,7 +40,7 @@
     </record>
 
     <record id="action_shahtaj_assign_shops_route_wizard" model="ir.actions.act_window">
-        <field name="name">Assign Shops to Route</field>
+        <field name="name">Pick shops for route</field>
         <field name="res_model">shahtaj.assign.shops.route.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>

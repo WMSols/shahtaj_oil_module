@@ -571,7 +571,7 @@ class ResUsers(models.Model):
                 ('order_booker_id', '=', user.id),
                 ('scheduled_date', '=', today),
                 ('state', '!=', 'cancelled'),
-            ])
+            ]).filtered(lambda t: t._shahtaj_belongs_on_booker_day_list())
             user.shahtaj_task_today_total = len(today_tasks)
             user.shahtaj_task_today_pending = len(
                 today_tasks.filtered(lambda t: t.state in ('pending', 'in_progress'))
@@ -658,6 +658,8 @@ class ResUsers(models.Model):
 
     def action_shahtaj_view_tasks_today(self):
         self.ensure_one()
+        Task = self.env['shahtaj.visit.task']
+        Task.sudo()._auto_generate_window(order_booker=self)
         today = fields.Date.context_today(self)
         return {
             'type': 'ir.actions.act_window',
@@ -667,6 +669,7 @@ class ResUsers(models.Model):
             'domain': [
                 ('order_booker_id', '=', self.id),
                 ('scheduled_date', '=', today),
+                ('state', 'not in', ['cancelled']),
             ],
         }
 

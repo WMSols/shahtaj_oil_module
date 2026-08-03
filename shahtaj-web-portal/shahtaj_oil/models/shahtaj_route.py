@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Sales route inside a zone. Shops link via res.partner.route_id (one route per shop)."""
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class ShahtajRoute(models.Model):
@@ -12,14 +12,27 @@ class ShahtajRoute(models.Model):
 
     name = fields.Char(required=True)
     zone_id = fields.Many2one('shahtaj.zone', string='Zone', required=True, ondelete='restrict')
-    # Shops on this route (inverse of res.partner.route_id).
+    # Truth for operations / tasks: shops with route_id = this route.
     shop_ids = fields.One2many(
         'res.partner',
         'route_id',
         string='Shops',
         domain=[('is_shahtaj_shop', '=', True)],
     )
+    # UI checklist (real M2M so many2many_checkboxes works). Kept aligned with shop_ids.
+    assign_shop_ids = fields.Many2many(
+        'res.partner',
+        'shahtaj_route_checklist_rel',
+        'route_id',
+        'shop_id',
+        string='Shop assignment',
+        help='Checked = assigned to this route. Unchecked = Unassigned.',
+    )
     shop_count = fields.Integer(compute='_compute_shop_count')
+    unassigned_shop_count = fields.Integer(
+        compute='_compute_unassigned_shop_count',
+        string='Unassigned shops',
+    )
     active = fields.Boolean(default=True)
     weekly_schedule_ids = fields.One2many(
         'shahtaj.weekly.schedule',
@@ -32,6 +45,103 @@ class ShahtajRoute(models.Model):
             route.shop_count = len(route.shop_ids.filtered(
                 lambda s: s.shop_approval_state == 'approved'
             ))
+
+    def _compute_unassigned_shop_count(self):
+        Partner = self.env['res.partner']
+        count = Partner.search_count([
+            ('is_shahtaj_shop', '=', True),
+            ('active', '=', True),
+            ('shop_approval_state', '=', 'approved'),
+            ('route_id', '=', False),
+        ])
+        for route in self:
+            route.unassigned_shop_count = count
+
+    def _shahtaj_candidate_shop_domain(self):
+        """Approved active shops that are unassigned or already on this route."""
+        self.ensure_one()
+        return [
+            ('is_shahtaj_shop', '=', True),
+            ('active', '=', True),
+            ('shop_approval_state', '=', 'approved'),
+            '|',
+            ('route_id', '=', False),
+            ('route_id', '=', self.id),
+        ]
+
+    def _shahtaj_align_checklist_to_shops(self):
+        """Make checklist checked set match shops that actually have this route_id."""
+        for route in self:
+            wanted_ids = set(route.shop_ids.filtered(
+                lambda s: s.active and s.shop_approval_state == 'approved',
+            ).ids)
+            current_ids = set(route.assign_shop_ids.ids)
+            if wanted_ids != current_ids:
+                route.with_context(shahtaj_skip_shop_sync=True).write({
+                    'assign_shop_ids': [(6, 0, list(wanted_ids))],
+                })
+
+    def _shahtaj_sync_assigned_shops(self, wanted_shops):
+        """Set this route's shops to exactly wanted_shops (add/remove safely)."""
+        self.ensure_one()
+        if not self.active or not self.zone_id.active:
+            raise UserError(_(
+                'Route "%(route)s" (or its zone) is archived. '
+                'Restore it before assigning shops.',
+                route=self.display_name,
+            ))
+        wanted = wanted_shops.filtered(lambda s: s.is_shahtaj_shop and s.active)
+        current = self.shop_ids
+        to_add = wanted - current
+        to_remove = current - wanted
+
+        foreign = wanted.filtered(lambda s: s.route_id and s.route_id != self)
+        if foreign:
+            raise UserError(_(
+                'These shops are already on another route: %(shops)s. '
+                'Unassign them there first.',
+                shops=', '.join(foreign.mapped('display_name')),
+            ))
+        pending = to_add.filtered(lambda s: s.shop_approval_state != 'approved')
+        if pending:
+            raise UserError(_(
+                'Approve these shops before assigning to a route: %(shops)s.',
+                shops=', '.join(pending.mapped('display_name')),
+            ))
+        if to_remove:
+            blocked = to_remove._shahtaj_shops_with_open_visit()
+            if blocked:
+                raise UserError(_(
+                    'Cannot remove shop(s) with an in-progress visit: %(shops)s. '
+                    'Finish or cancel the visit first.',
+                    shops=', '.join(blocked.mapped('display_name')),
+                ))
+            to_remove.with_context(shahtaj_checklist_sync=True).write({
+                'route_id': False,
+            })
+        if to_add:
+            to_add.with_context(shahtaj_checklist_sync=True).write({
+                'route_id': self.id,
+                'zone_id': self.zone_id.id,
+            })
+        return len(to_add), len(to_remove)
+
+    def read(self, fields=None, load='_classic_read'):
+        if self and (
+            fields is None
+            or 'assign_shop_ids' in fields
+            or not fields
+        ):
+            self._shahtaj_align_checklist_to_shops()
+        return super().read(fields=fields, load=load)
+
+    def web_read(self, specification):
+        if self and (
+            not specification
+            or 'assign_shop_ids' in specification
+        ):
+            self._shahtaj_align_checklist_to_shops()
+        return super().web_read(specification)
 
     @api.constrains('name', 'zone_id')
     def _check_required_fields(self):
@@ -104,6 +214,12 @@ class ShahtajRoute(models.Model):
                         zone.display_name,
                     )
         res = super().write(vals)
+        if (
+            'assign_shop_ids' in vals
+            and not self.env.context.get('shahtaj_skip_shop_sync')
+        ):
+            for route in self:
+                route._shahtaj_sync_assigned_shops(route.assign_shop_ids)
         if archiving:
             today = fields.Date.context_today(self)
             for route in self:
@@ -146,24 +262,26 @@ class ShahtajRoute(models.Model):
                 related_record=route,
                 message=route.display_name,
             )
+            if route.assign_shop_ids and not self.env.context.get(
+                'shahtaj_skip_shop_sync'
+            ):
+                route._shahtaj_sync_assigned_shops(route.assign_shop_ids)
         return routes
 
     def action_open_assign_shops_wizard(self):
-        """Native distributor: pick shops and assign them to a route."""
-        context = {
-            'active_model': 'shahtaj.route',
-        }
-        if len(self) == 1:
-            context.update({
-                'default_route_id': self.id,
-                'active_id': self.id,
-                'active_ids': self.ids,
-            })
+        """Optional popup checklist (same behavior as on-form checklist)."""
+        self.ensure_one()
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Assign Shops to Route'),
+            'name': _('Pick shops for %s') % self.display_name,
             'res_model': 'shahtaj.assign.shops.route.wizard',
             'view_mode': 'form',
             'target': 'new',
-            'context': context,
+            'context': {
+                'default_route_id': self.id,
+                'active_model': 'shahtaj.route',
+                'active_id': self.id,
+                'active_ids': self.ids,
+                'shahtaj_route_checklist': True,
+            },
         }

@@ -210,8 +210,16 @@
             <p class="o_view_nocontent_smiling_face">
                 No visits scheduled for today
             </p>
-            <p>Your distributor assigns weekly routes. Tasks appear here automatically.</p>
+            <p>Only shops on your active weekly routes for today appear here.</p>
         </field>
+    </record>
+
+    <!-- Menu entry: refresh schedules + cancel orphan pending, then open the window. -->
+    <record id="action_shahtaj_my_tasks_today_menu" model="ir.actions.server">
+        <field name="name">My Tasks Today</field>
+        <field name="model_id" ref="model_shahtaj_visit_task"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_shahtaj_open_my_tasks_today()</field>
     </record>
 
     <record id="action_shahtaj_visit_task_today_list_booker" model="ir.actions.act_window.view">
