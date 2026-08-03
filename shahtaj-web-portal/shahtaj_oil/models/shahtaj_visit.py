@@ -389,24 +389,27 @@ class ShahtajVisit(models.Model):
         task.ensure_one()
         if task.order_booker_id != self.env.user and not self.env.su:
             raise UserError(_('You can only check in to your own visit tasks.'))
-        if task.shop_id.shop_approval_state != 'approved':
+        # sudo for shop flag reads: booker is authorized by owning the visit task;
+        # partner record rules can lag when schedules change mid-day.
+        shop = task.shop_id.sudo()
+        if shop.shop_approval_state != 'approved':
             raise UserError(_(
                 'Shop "%(shop)s" is not approved yet. '
                 'You cannot visit until the distributor approves it.',
-                shop=task.shop_id.name,
+                shop=shop.name,
             ))
-        if not task.shop_id.shahtaj_field_verified:
+        if not shop.shahtaj_field_verified:
             raise UserError(_(
                 'Shop "%(shop)s" is tagged Not Visited. '
                 'Complete first-visit setup (exterior photo + GPS) via '
                 'shops/verify-on-site before normal check-in.',
-                shop=task.shop_id.name,
+                shop=shop.name,
             ))
         if not task._shahtaj_is_operational_for_booker():
             raise UserError(_(
                 'Shop "%(shop)s" is no longer active on an operational route/zone. '
                 'Ask your distributor to review the territory setup.',
-                shop=task.shop_id.name,
+                shop=shop.name,
             ))
         if task.state in ('completed', 'cancelled', 'skipped'):
             raise UserError(_('This visit task is already closed.'))
@@ -425,16 +428,16 @@ class ShahtajVisit(models.Model):
             raise UserError(_(
                 'You have an active visit at "%(shop)s". '
                 'Finish that visit before checking in here.',
-                shop=active.shop_id.name,
+                shop=active.sudo().shop_id.name,
             ))
-        distance = self._validate_check_in_coordinates(task.shop_id, latitude, longitude)
+        distance = self._validate_check_in_coordinates(shop, latitude, longitude)
         now = fields.Datetime.now()
         visit = self.create({
             'visit_task_id': task.id,
             'order_booker_id': task.order_booker_id.id,
-            'shop_id': task.shop_id.id,
+            'shop_id': shop.id,
             'route_id': task.route_id.id,
-            **self._snapshot_visit_labels(task.shop_id, task.route_id),
+            **self._snapshot_visit_labels(shop, task.route_id),
             'started_at': now,
             'check_in_latitude': latitude,
             'check_in_longitude': longitude,
@@ -450,7 +453,7 @@ class ShahtajVisit(models.Model):
             operation='visit.check_in',
             name='Check in to shop',
             related_record=visit,
-            message=_('Checked in at %(shop)s', shop=visit.shop_id.display_name),
+            message=_('Checked in at %(shop)s', shop=shop.display_name),
         )
         return visit
 

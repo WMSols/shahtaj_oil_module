@@ -7,6 +7,8 @@ access_shahtaj_visit_target_user,shahtaj.visit.target.user,model_shahtaj_visit_t
 access_shahtaj_visit_target_line_user,shahtaj.visit.target.line.user,model_shahtaj_visit_target_line,base.group_user,1,1,1,1
 access_shahtaj_generate_tasks_wizard,shahtaj.generate.tasks.wizard,model_shahtaj_generate_tasks_wizard,base.group_user,1,1,1,1
 access_shahtaj_create_order_booker_wizard,shahtaj.create.order.booker.wizard,model_shahtaj_create_order_booker_wizard,base.group_user,1,1,1,1
+access_shahtaj_assign_shops_route_wizard,shahtaj.assign.shops.route.wizard,model_shahtaj_assign_shops_route_wizard,group_shahtaj_distributor,1,1,1,1
+access_shahtaj_assign_shops_route_wizard_user,shahtaj.assign.shops.route.wizard.user,model_shahtaj_assign_shops_route_wizard,base.group_user,1,1,1,1
 access_res_partner_shahtaj_distributor,res.partner.shahtaj.distributor,base.model_res_partner,group_shahtaj_distributor,1,1,1,0
 access_res_partner_shahtaj_order_booker,res.partner.shahtaj.order.booker,base.model_res_partner,group_shahtaj_order_booker,1,1,1,0
 access_shahtaj_zone_distributor,shahtaj.zone.distributor,model_shahtaj_zone,group_shahtaj_distributor,1,1,1,1

@@ -93,6 +93,14 @@ class ResPartner(models.Model):
         readonly=True,
         copy=False,
     )
+    # Inverse of visit tasks — used by booker partner record rules so assigned
+    # shops stay readable even if the weekly schedule row was later removed.
+    shahtaj_visit_task_ids = fields.One2many(
+        'shahtaj.visit.task',
+        'shop_id',
+        string='Visit Tasks',
+        copy=False,
+    )
     registered_by_name = fields.Char(
         related='registered_by_id.name',
         string='Registered By',
@@ -551,6 +559,10 @@ class ResPartner(models.Model):
         vals = self._shahtaj_strip_distributor_exterior_photo(vals)
         if vals.get('owner_phone'):
             vals.setdefault('phone', vals['owner_phone'])
+        if vals.get('route_id'):
+            route = self.env['shahtaj.route'].browse(vals['route_id']).exists()
+            if route:
+                vals['zone_id'] = route.zone_id.id
         if vals.get('legacy_balance_move_id') and not self.env.context.get(
             'shahtaj_posting_legacy_move'
         ):
@@ -568,6 +580,8 @@ class ResPartner(models.Model):
             self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_territory_restore()
         if any(k in vals for k in ('route_id', 'zone_id')):
             self.filtered('is_shahtaj_shop')._validate_operational_territory_assignment()
+        if 'route_id' in vals:
+            self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_route_assignment()
         if 'shahtaj_shop_category' in vals:
             credit_shops = self.filtered(
                 lambda p: p.is_shahtaj_shop
@@ -608,6 +622,53 @@ class ResPartner(models.Model):
                         message=', '.join(sorted(tracked.intersection(vals))),
                     )
         return res
+
+    def _sync_visit_tasks_after_route_assignment(self):
+        """Rebuild pending visit tasks after shops move to/from a route."""
+        Task = self.env['shahtaj.visit.task']
+        shops = self.filtered('is_shahtaj_shop')
+        if not shops:
+            return
+        today = fields.Date.context_today(self)
+        self._shahtaj_cancel_pending_tasks_for_shops(shops.ids, date_from=today)
+        bookers = self.env['res.users']
+        for partner in shops:
+            if not partner._shahtaj_is_operational_for_booker():
+                continue
+            bookers |= partner.route_id.mapped('weekly_schedule_ids.order_booker_id')
+        if bookers:
+            for booker in bookers:
+                Task._auto_generate_window(order_booker=booker)
+        elif shops.filtered(lambda s: s._shahtaj_is_operational_for_booker()):
+            Task._auto_generate_window()
+
+    def action_shahtaj_open_assign_to_route(self):
+        """List/form action: assign selected shops to a route."""
+        shops = self.filtered(lambda p: p.is_shahtaj_shop and p.active)
+        if not shops:
+            raise UserError(_('Select one or more shops to assign.'))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Assign Shops to Route'),
+            'res_model': 'shahtaj.assign.shops.route.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'active_model': 'res.partner',
+                'active_ids': shops.ids,
+                'active_id': shops[0].id,
+                'default_shop_ids': [(6, 0, shops.ids)],
+                'default_only_unassigned': False,
+            },
+        }
+
+    def action_shahtaj_unassign_route(self):
+        """Clear route assignment (shop stays; no visit tasks until reassigned)."""
+        shops = self.filtered(lambda p: p.is_shahtaj_shop and p.route_id)
+        if not shops:
+            raise UserError(_('No route to remove on the selected shop(s).'))
+        shops.write({'route_id': False})
+        return True
 
     def _sync_visit_tasks_after_approval_change(self):
         """Cancel tasks for unapproved shops; generate tasks when a shop is approved."""

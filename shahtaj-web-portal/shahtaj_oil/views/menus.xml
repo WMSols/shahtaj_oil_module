@@ -53,6 +53,13 @@
               sequence="30"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_shops_unassigned"
+              name="3b. Unassigned Shops"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_shop_unassigned"
+              sequence="31"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_weekly_schedule"
               name="4. Weekly Schedules"
               parent="menu_shahtaj_root"

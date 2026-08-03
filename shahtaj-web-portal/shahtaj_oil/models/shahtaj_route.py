@@ -147,3 +147,23 @@ class ShahtajRoute(models.Model):
                 message=route.display_name,
             )
         return routes
+
+    def action_open_assign_shops_wizard(self):
+        """Native distributor: pick shops and assign them to a route."""
+        context = {
+            'active_model': 'shahtaj.route',
+        }
+        if len(self) == 1:
+            context.update({
+                'default_route_id': self.id,
+                'active_id': self.id,
+                'active_ids': self.ids,
+            })
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Assign Shops to Route'),
+            'res_model': 'shahtaj.assign.shops.route.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': context,
+        }

@@ -6,6 +6,11 @@
         <field name="model">shahtaj.route</field>
         <field name="arch" type="xml">
             <list>
+                <header>
+                    <button name="action_open_assign_shops_wizard" type="object"
+                            string="Assign Shops"
+                            display="always"/>
+                </header>
                 <field name="name"/>
                 <field name="zone_id"/>
                 <field name="shop_count"/>
@@ -22,12 +27,17 @@
                 <header>
                     <button string="Save" special="save" class="oe_highlight" data-hotkey="s"/>
                     <button string="Discard" special="cancel" data-hotkey="j"/>
+                    <button name="action_open_assign_shops_wizard" type="object"
+                            string="Assign Shops"
+                            class="oe_highlight"/>
                 </header>
                 <sheet>
                     <div class="alert alert-info" role="alert">
-                        <strong>Setup order:</strong>
-                        1) Pick a zone → 2) Add shops below.
-                        Assign order bookers to this route under <b>Weekly Schedules</b>.
+                        <strong>Recommended flow:</strong>
+                        1) Create the route → 2) Create shops (name only is enough) →
+                        3) Click <b>Assign Shops</b> to link them →
+                        4) Set Weekly Schedules for order bookers.
+                        Unassigned shops do not get visit tasks.
                     </div>
                     <div class="oe_title">
                         <label for="name" string="Route Name"/>
@@ -66,12 +76,14 @@
                                     <field name="shop_approval_state" widget="badge"
                                            decoration-success="shop_approval_state == 'approved'"
                                            decoration-warning="shop_approval_state == 'pending'"/>
-                                    <field name="partner_latitude"/>
-                                    <field name="partner_longitude"/>
+                                    <field name="shahtaj_visit_tag" widget="badge" optional="show"/>
+                                    <field name="partner_latitude" optional="hide"/>
+                                    <field name="partner_longitude" optional="hide"/>
                                 </list>
                             </field>
                             <p class="text-muted">
-                                Click <b>Add a line</b> to pick an existing shop, or <b>Create</b> to register a new one.
+                                Prefer <b>Assign Shops</b> for bulk linking.
+                                You can still add/create a shop here if needed.
                             </p>
                         </page>
                     </notebook>
@@ -93,8 +105,9 @@
                 Create a sales route
             </p>
             <p>
-                Each route belongs to one zone and lists the shops visited on that route.
-                Order bookers are assigned per weekday under Weekly Schedules.
+                Routes and shops are separate. Create the route, create shops,
+                then use <b>Assign Shops</b> to link them. Order bookers are
+                assigned per weekday under Weekly Schedules.
             </p>
         </field>
     </record>

@@ -2,12 +2,13 @@
 <odoo>
     <data noupdate="0">
         <record id="rule_shahtaj_shop_booker_own" model="ir.rule">
+            <field name="name">Order Booker: assigned and own shops</field>
             <field name="domain_force">[
-                '|',
+                '|', '|', '|',
                 ('is_shahtaj_shop', '=', False),
-                '|',
                 ('registered_by_id', '=', user.id),
                 ('route_id.weekly_schedule_ids.order_booker_id', '=', user.id),
+                ('shahtaj_visit_task_ids.order_booker_id', '=', user.id),
             ]</field>
         </record>
         <!-- Order bookers may pick any zone/route when registering shops -->

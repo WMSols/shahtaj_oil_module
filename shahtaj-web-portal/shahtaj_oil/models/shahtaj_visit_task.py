@@ -280,10 +280,20 @@ class ShahtajVisitTask(models.Model):
             })
 
     def _shahtaj_is_operational_for_booker(self):
+        """True when route+shop territory chain is active for field work.
+
+        Shop/route flags are read with sudo so booker partner ACL edge-cases
+        (e.g. schedule removed while today's task still exists) do not raise
+        AccessError. Callers must already scope tasks to the current booker.
+        """
         self.ensure_one()
+        route = self.route_id.sudo()
+        shop = self.shop_id.sudo()
+        if not route or not shop:
+            return False
         return (
-            self.route_id._shahtaj_is_operational_for_booker()
-            and self.shop_id._shahtaj_is_operational_for_booker()
+            route._shahtaj_is_operational_for_booker()
+            and shop._shahtaj_is_operational_for_booker()
         )
 
     @api.model

@@ -45,7 +45,7 @@ class ShahtajApiTasks(http.Controller):
                 'resumed': True,
                 'needs_shop_setup': False,
             })
-        shop = task.shop_id
+        shop = task.shop_id.sudo()
         if not shop.shahtaj_field_verified:
             setup = shop._shahtaj_first_visit_setup_payload()
             return api_success({

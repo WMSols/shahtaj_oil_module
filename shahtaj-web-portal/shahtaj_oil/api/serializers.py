@@ -43,7 +43,9 @@ def task_dict(task):
 def shop_brief(partner):
     if not partner:
         return None
-    # Bookers are in the Shahtaj credit groups; sudo covers receivable read safely.
+    # Always read shop fields via sudo: bookers may lack partner ACL in edge
+    # cases (schedule removed, distributor-created shop) while still owning
+    # the visit task. Callers must already authorize the shop/task context.
     shop = partner.sudo()
     category = shop.shahtaj_shop_category or 'credit'
     credit_limit = float(shop.credit_limit or 0.0)
@@ -54,22 +56,22 @@ def shop_brief(partner):
         credit_remaining = max(credit_limit - outstanding, 0.0)
     setup = shop._shahtaj_first_visit_setup_payload()
     return {
-        'id': partner.id,
-        'shop_id': partner.id,
-        'name': partner.name,
-        'owner_name': partner.owner_name or '',
-        'owner_phone': partner.owner_phone or '',
-        'owner_cnic_number': partner.owner_cnic_number or '',
-        'latitude': partner.partner_latitude,
-        'longitude': partner.partner_longitude,
-        'approval_state': partner.shop_approval_state,
-        'is_operational': partner._shahtaj_is_operational_for_booker(),
-        'is_active': partner.active,
+        'id': shop.id,
+        'shop_id': shop.id,
+        'name': shop.name,
+        'owner_name': shop.owner_name or '',
+        'owner_phone': shop.owner_phone or '',
+        'owner_cnic_number': shop.owner_cnic_number or '',
+        'latitude': shop.partner_latitude,
+        'longitude': shop.partner_longitude,
+        'approval_state': shop.shop_approval_state,
+        'is_operational': shop._shahtaj_is_operational_for_booker(),
+        'is_active': shop.active,
         'shop_category': category,
         'credit_limit': credit_limit,
         'outstanding_balance': outstanding,
         'credit_remaining': credit_remaining,
-        'photos': shop_photo_flags(partner),
+        'photos': shop_photo_flags(shop),
         'field_verified': setup['field_verified'],
         'visit_tag': setup['visit_tag'],
         'needs_shop_setup': setup['needs_shop_setup'],
@@ -79,8 +81,8 @@ def shop_brief(partner):
 
 def shop_detail(partner, include_photos=False):
     data = shop_brief(partner)
-    if include_photos:
-        data['photo_data'] = shop_photo_data(partner)
+    if include_photos and partner:
+        data['photo_data'] = shop_photo_data(partner.sudo())
     return data
 
 
