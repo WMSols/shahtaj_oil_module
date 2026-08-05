@@ -198,6 +198,9 @@
       <label>Status
         <select id="status"><option value="">All</option></select>
       </label>
+      <label>Category
+        <select id="operation_group"><option value="">All categories</option></select>
+      </label>
       <label>Operation
         <select id="operation"><option value="">All operations</option></select>
       </label>
@@ -305,6 +308,7 @@
         source: document.getElementById('source').value || null,
         status: document.getElementById('status').value || null,
         operation: document.getElementById('operation').value || null,
+        operation_group: document.getElementById('operation_group').value || null,
         date_from: document.getElementById('date_from').value || null,
         date_to: document.getElementById('date_to').value || null,
         limit: PAGE_SIZE,
@@ -345,6 +349,7 @@
       fillSelect('role', meta.roles, 'All roles');
       fillSelect('source', meta.sources, 'All sources');
       fillSelect('status', meta.statuses, 'All');
+      fillSelect('operation_group', meta.operation_groups || [], 'All categories');
       fillSelect('operation', meta.operations.map((op) => ({ id: op, name: op })), 'All operations');
     }
 

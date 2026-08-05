@@ -599,6 +599,9 @@ class ShahtajVisit(models.Model):
             'order_line': order_lines,
         })
         order.sudo().action_confirm()
+        # Confirm path refreshes targets; call again so place-order always
+        # leaves stored progress current for API/UI reads in this request.
+        order.sudo()._shahtaj_recompute_visit_targets()
         self.with_context(shahtaj_system_visit_write=True).write({
             'sale_order_id': order.id,
         })

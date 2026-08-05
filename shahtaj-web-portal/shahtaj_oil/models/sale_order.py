@@ -173,7 +173,10 @@ class SaleOrder(models.Model):
                 ('order_booker_id', 'in', list(booker_ids)),
                 ('date_start', '<=', max(dates)),
                 ('date_end', '>=', min(dates)),
+                ('target_type', 'in', [
+                    'collective_qty', 'collective_weight', 'product_bundle',
+                ]),
             ])
             if targets:
-                targets._recompute_recordset()
+                targets._force_recompute_progress()
         return res

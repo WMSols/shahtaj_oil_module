@@ -62,7 +62,7 @@ class ShahtajActivityLogController(http.Controller):
             order='event_at desc',
         )
         users = {}
-        operations = set()
+        operations = set(Log.known_operations_list())
         for row in rows:
             if row.get('actor_user_id'):
                 users[row['actor_user_id'][0]] = row['actor_user_id'][1]
@@ -74,6 +74,7 @@ class ShahtajActivityLogController(http.Controller):
                 for uid, name in sorted(users.items(), key=lambda item: item[1].lower())
             ],
             'operations': sorted(operations),
+            'operation_groups': Log.operation_groups_list(),
             'sources': [
                 {'id': 'order_booker_api', 'name': 'Order Booker API'},
                 {'id': 'order_booker_ui', 'name': 'Order Booker UI'},
@@ -125,6 +126,7 @@ class ShahtajActivityLogController(http.Controller):
         source=None,
         status=None,
         operation=None,
+        operation_group=None,
         date_from=None,
         date_to=None,
         limit=100,
@@ -153,6 +155,10 @@ class ShahtajActivityLogController(http.Controller):
             domain.append(('status', '=', status))
         if operation:
             domain.append(('operation', '=', operation))
+        elif operation_group:
+            group = str(operation_group).strip().rstrip('.')
+            if group:
+                domain.append(('operation', '=like', f'{group}.%'))
         start = self._parse_dt(date_from)
         end = self._parse_dt(date_to, end_of_day=True)
         if start:

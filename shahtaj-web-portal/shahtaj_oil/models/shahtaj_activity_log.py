@@ -9,6 +9,65 @@ _logger = logging.getLogger(__name__)
 
 RETENTION_DAYS = 2
 
+# Known operation codes for filters / HTML meta (even before any rows exist).
+KNOWN_OPERATIONS = (
+    'auth.login',
+    'expense.cancel',
+    'expense.create',
+    'expense.delete',
+    'expense.post',
+    'expense.update',
+    'order_booker.create',
+    'route.archive',
+    'route.create',
+    'route.update',
+    'schedule.create',
+    'schedule.delete',
+    'schedule.update',
+    'settings.gps_distance',
+    'shop.approve',
+    'shop.create',
+    'shop.field_verify',
+    'shop.register',
+    'shop.reject',
+    'shop.update',
+    'stock.add',
+    'target.create',
+    'target.delete',
+    'target.update',
+    'task.cancel',
+    'task.cancel_forward',
+    'task.cancel_non_operational',
+    'task.cancel_orphan',
+    'task.cancel_shop_pending',
+    'task.cancel_unapproved',
+    'task.generate',
+    'task.reset_pending',
+    'task.skip',
+    'visit.check_in',
+    'visit.end_without_order',
+    'visit.line.add',
+    'visit.line.remove',
+    'visit.line.update',
+    'visit.place_order',
+    'visit.undo',
+    'zone.archive',
+    'zone.create',
+    'zone.update',
+)
+
+OPERATION_GROUPS = (
+    ('task', 'Visit Tasks'),
+    ('schedule', 'Schedules'),
+    ('shop', 'Shops'),
+    ('visit', 'Visits'),
+    ('route', 'Routes'),
+    ('zone', 'Zones'),
+    ('expense', 'Expenses'),
+    ('target', 'Targets'),
+    ('auth', 'Auth'),
+)
+
 
 def _as_date(value):
     """Convert datetime/date/string to date without relying on Datetime.to_date."""
@@ -311,6 +370,54 @@ class ShahtajActivityLog(models.Model):
         except Exception:
             _logger.exception('shahtaj.activity.log log_business failed')
             return self.browse()
+
+    @api.model
+    def log_system(
+        self,
+        operation,
+        name,
+        message=None,
+        status='success',
+        error_details=None,
+        related_record=None,
+        source=None,
+    ):
+        """Log system/cron/sync work (never skipped for API source detection)."""
+        try:
+            resolved = source
+            if not resolved:
+                if self.env.context.get('shahtaj_cron'):
+                    resolved = 'cron'
+                else:
+                    detected = self._detect_source()
+                    resolved = detected if detected in (
+                        'order_booker_api', 'order_booker_ui',
+                        'distributor_ui', 'admin_ui', 'cron',
+                    ) else 'system'
+            return self.log_event(
+                name=name,
+                operation=operation,
+                source=resolved,
+                status=status,
+                related_record=related_record,
+                message=message,
+                error_details=error_details,
+            )
+        except Exception:
+            _logger.exception('shahtaj.activity.log log_system failed')
+            return self.browse()
+
+    @api.model
+    def known_operations_list(self):
+        """Stable operation codes for admin filters."""
+        return list(KNOWN_OPERATIONS)
+
+    @api.model
+    def operation_groups_list(self):
+        return [
+            {'id': code, 'name': label}
+            for code, label in OPERATION_GROUPS
+        ]
 
     @api.model
     def _cron_purge_old_logs(self):

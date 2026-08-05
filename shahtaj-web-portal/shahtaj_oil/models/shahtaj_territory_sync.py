@@ -11,7 +11,7 @@ class ShahtajTerritorySyncMixin(models.AbstractModel):
     @api.model
     def _shahtaj_cancel_pending_tasks_for_shops(self, shop_ids, date_from=None):
         if not shop_ids:
-            return
+            return self.env['shahtaj.visit.task']
         Task = self.env['shahtaj.visit.task']
         domain = [
             ('shop_id', 'in', list(shop_ids)),
@@ -24,6 +24,13 @@ class ShahtajTerritorySyncMixin(models.AbstractModel):
             pending.with_context(shahtaj_system_visit_write=True).write({
                 'state': 'cancelled',
             })
+            Task._shahtaj_log_cancelled_tasks(
+                'task.cancel_shop_pending',
+                'Cancel pending tasks (shop/route/zone change)',
+                pending,
+                extra_message=f'shops={len(shop_ids)}',
+            )
+        return pending
 
     @api.model
     def _shahtaj_cancel_pending_tasks_for_routes(self, route_ids, date_from=None):

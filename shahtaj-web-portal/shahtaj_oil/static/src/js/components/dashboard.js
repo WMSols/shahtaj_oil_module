@@ -38,41 +38,7 @@ export class ShahtajDashboard extends Component {
     }
 
     // NEW: Async switchTab with loading delay
-    async switchTab(tabName, subTabName = '') {
-        if (!this.hasFinancialAccess && (tabName === 'financials' || tabName === 'transactions')) {
-            tabName = 'operations';
-            subTabName = 'checkins';
-        }
-        if (!this.hasFinancialAccess && tabName === 'warehouse' && ['inventory', 'taxes'].includes(subTabName)) {
-            subTabName = 'management';
-        }
-
-        // 1. Trigger the loading screen
-        this.state.isSwitchingTab = true;
-
-        // 2. Yield to the browser so the loading screen renders before component mounting freezes the thread
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        try {
-            this.state.activeTab = tabName;
-            this.state.activeSubTab = subTabName;
-            
-            // Close all menus
-            for (let key in this.state.expandedMenus) {
-                this.state.expandedMenus[key] = false;
-            }
-            // Ensure the parent menu of the clicked tab stays open
-            if (this.state.expandedMenus[tabName] !== undefined) {
-                this.state.expandedMenus[tabName] = true;
-            }
-
-            // Auto-close sidebar on mobile after navigating
-            this.state.isSidebarOpen = false;
-        } finally {
-            // 3. Remove the loading screen
-            this.state.isSwitchingTab = false;
-        }
-    }
+   
     get hasFinancialAccess() {
         return hasFinancialAccess();
     }
@@ -94,7 +60,6 @@ export class ShahtajDashboard extends Component {
             await this.switchTab(menuName, defaultSubTab); 
         }
     }
-
     async switchTab(tabName, subTabName = '') {
         if (!this.hasFinancialAccess && (tabName === 'financials' || tabName === 'transactions')) {
             tabName = 'operations';
@@ -104,35 +69,46 @@ export class ShahtajDashboard extends Component {
             subTabName = 'management';
         }
 
-        // 1. Unmount the heavy components and show the loading screen
-        this.state.isSwitchingTab = true;
-
-        // 2. CRITICAL FIX: Force the browser to paint the UI (button clicks, accordion drops, loading spinner) BEFORE locking the thread
-        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 10)));
-
-        try {
-            this.state.activeTab = tabName;
+        // SMART FIX: If we are already on this main tab, don't unmount! Just change the sub-tab gracefully.
+        if (this.state.activeTab === tabName) {
             this.state.activeSubTab = subTabName;
             
-            // Manage accordion states during direct sub-tab clicks
+            // Manage accordion highlighting
             for (let key in this.state.expandedMenus) {
                 this.state.expandedMenus[key] = false;
             }
             if (this.state.expandedMenus[tabName] !== undefined) {
                 this.state.expandedMenus[tabName] = true;
             }
+            this.state.isSidebarOpen = false;
+            return; // Exit early, no unmounting needed!
+        }
 
+        // 1. Unmount the heavy components and show the loading screen
+        this.state.isSwitchingTab = true;
+
+        // 2. Force the browser to paint the UI before locking the thread
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 10)));
+
+        try {
+            this.state.activeTab = tabName;
+            this.state.activeSubTab = subTabName;
+            
+            for (let key in this.state.expandedMenus) {
+                this.state.expandedMenus[key] = false;
+            }
+            if (this.state.expandedMenus[tabName] !== undefined) {
+                this.state.expandedMenus[tabName] = true;
+            }
             this.state.isSidebarOpen = false;
 
-            // 3. Yield once more so Owl can begin mounting the new heavy component in the background
+            // 3. Yield once more so Owl can begin mounting the new component
             await new Promise(resolve => setTimeout(resolve, 10));
-
         } finally {
-            // 4. Remove the loading screen once the component is safely in the DOM
+            // 4. Remove the loading screen
             this.state.isSwitchingTab = false;
         }
     }
-
     toggleSidebar() {
         this.state.isSidebarOpen = !this.state.isSidebarOpen;
     }

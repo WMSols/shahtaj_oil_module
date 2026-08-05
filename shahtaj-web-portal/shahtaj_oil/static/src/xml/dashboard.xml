@@ -47,7 +47,7 @@
                                         <path d="M9 3.236v15"/>
                                     </svg>
                                 </span>
-                                Entity Registrations
+                                Territory &amp; Routes
                             </div>
                             <span class="d-flex align-items-center transition-all" t-att-style="this.state.expandedMenus.territory ? 'transform: rotate(180deg);' : ''">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down">
@@ -147,7 +147,10 @@
                                 <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
                                     <button t-on-click="() => this.switchTab('financials', 'money')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'money' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Money Overview</button>
                                     <button t-on-click="() => this.switchTab('financials', 'cash')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'cash' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Cash Activity</button>
-<button t-on-click="() => this.switchTab('financials', 'invoices')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and ['invoices', 'all_orders', 'orders', 'customer_invoices', 'payments', 'credit_notes', 'balances'].includes(this.state.activeSubTab) ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Invoice Management</button>                                    <button t-on-click="() => this.switchTab('financials', 'credit')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'credit' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Credit Risk Control</button>
+                                    <button t-on-click="() => this.switchTab('financials', 'invoices')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and ['invoices', 'all_orders', 'orders', 'customer_invoices', 'payments', 'credit_notes', 'balances'].includes(this.state.activeSubTab) ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Invoice Management</button>
+                                    <button t-on-click="() => this.switchTab('financials', 'credit')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'credit' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Credit Risk Control</button>
+                                    <button t-on-click="() => this.switchTab('financials', 'tax_ledger')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'tax_ledger' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Tax Ledger</button>
+                                    <button t-on-click="() => this.switchTab('financials', 'expenses')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'expenses' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Expense Management</button>
                                     <button t-on-click="() => this.switchTab('financials', 'pnl')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'pnl' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Profit &amp; Loss</button>
                                 </div>
                             </div>
@@ -188,22 +191,6 @@
                             </div>
                         </div>
                     </div>
-
-
-<!-- This tab is moved under Financials -->
-                    <!-- <button t-if="this.hasFinancialAccess" t-on-click="() => this.switchTab('transactions')" class="list-group-item list-group-item-action border-0 rounded mb-2 text-start d-flex align-items-center transition-all" t-att-style="this.state.activeTab === 'transactions' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
-                        <span class="me-3 d-flex align-items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-landmark-icon lucide-landmark">
-                                <path d="M10 18v-7"/>
-                                <path d="M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z"/>
-                                <path d="M14 18v-7"/>
-                                <path d="M18 18v-7"/>
-                                <path d="M3 22h18"/>
-                                <path d="M6 18v-7"/>
-                            </svg>
-                        </span>
-                        Bank Transactions
-                    </button> -->
                     <hr class="my-2"/>
                     <button t-on-click="() => this.switchTab('staff')" class="list-group-item list-group-item-action border-0 rounded mb-2 text-start d-flex align-items-center transition-all" t-att-style="this.state.activeTab === 'staff' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                         <span class="me-3 d-flex align-items-center">
@@ -250,24 +237,15 @@
 
                     <!-- THE LOGO LOADING OVERLAY -->
                     <t t-if="this.state.isSwitchingTab">
-                        <!-- <style>
-                            @keyframes logo-bounce {
-                                0%, 100% { transform: translateY(0); }
-                                50% { transform: translateY(-15px); }
-                            }
-                            @keyframes shadow-pulse {
-                                0%, 100% { transform: scale(1); opacity: 0.15; }
-                                50% { transform: scale(0.7); opacity: 0.05; }
-                            }
-                        </style> -->
+
                         <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center" style="background-color: rgba(248, 250, 252, 0.85); z-index: 1000; backdrop-filter: blur(3px);">
-                            
+
                             <!-- Bouncing Logo -->
-                            <div style="animation: logo-bounce 1s infinite ease-in-out;">
+                            <div>
                                 <!-- Replace the src path with your exact webp image path -->
                                 <img src="/shahtaj_oil/static/src/img/logo-img.webp" alt="Loading..." style="height: 142px; width: auto; object-fit: contain;"/>
                             </div>
-                            
+
                             <!-- Animated Shadow -->
                             <!-- <div style="width: 50px; height: 6px; background-color: #000; border-radius: 50%; animation: shadow-pulse 1s infinite ease-in-out; margin-top: 10px; margin-bottom: 20px;"></div> -->
 
@@ -308,7 +286,7 @@
                         <BankTransactions />
                     </div>
 
-                    <div t-if="this.state.activeTab === 'settings'" class="h-100">
+                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'settings'" class="h-100">
                         <PortalSettings />
                     </div>
 

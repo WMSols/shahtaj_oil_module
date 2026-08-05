@@ -15,67 +15,132 @@
                 </div>
             </div>
 
+            <!-- ========================================== -->
+            <!-- BOOKERS LIST VIEW (PAGINATED)              -->
+            <!-- ========================================== -->
             <t t-if="this.state.viewMode === 'list'">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="bg-light text-uppercase small fw-bold text-muted">
-                            <tr>
-                                <th class="border-top-0 ps-4">Order Booker</th>
-                                <th class="border-top-0 text-end pe-4">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <t t-foreach="this.state.bookers" t-as="booker" t-key="booker.id">
+                <div class="p-4 border-bottom d-flex align-items-center" 
+                     t-attf-style="#{this.state.activeMainTab === 'schedules' ? 'background-color: rgba(26, 115, 232, 0.08);' : 'background-color: rgba(25, 135, 84, 0.1);'}">
+                    <div class="p-3 rounded-circle me-3 shadow-sm text-white" 
+                         t-attf-style="#{this.state.activeMainTab === 'schedules' ? 'background-color: #1a73e8;' : 'background-color: #198754;'}">
+                        <t t-if="this.state.activeMainTab === 'schedules'">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+                        </t>
+                        <t t-else="">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        </t>
+                    </div>
+                    <div>
+                        <h3 class="fw-bold mb-1" 
+                            t-attf-style="#{this.state.activeMainTab === 'schedules' ? 'color: #1a73e8;' : 'color: #198754;'}">
+                            <t t-esc="this.state.activeMainTab === 'schedules' ? 'Weekly Schedules Management' : 'Performance Targets Management'"/>
+                        </h3>
+                        <p class="mb-0 text-dark fw-bold opacity-75">
+                            <t t-esc="this.state.activeMainTab === 'schedules' ? 'Select an order booker below to assign and monitor their weekly operational routes.' : 'Select an order booker below to set, track, and evaluate their sales and volume goals.'"/>
+                        </p>
+                    </div>
+                </div>
+
+
+                <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                    <div class="input-group input-group-sm w-50 shadow-sm">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="fa fa-search text-muted"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search bookers by name or code..." 
+                               t-att-value="this.state.filters.bookers.search" 
+                               t-on-input="onSearchInput"/>
+                    </div>
+                </div>
+                
+                <div class="position-relative">
+                    <t t-if="this.state.isLoadingList">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted">
                                 <tr>
-                                    <td class="ps-4 align-middle fw-bold text-dark">
-                                        <t t-esc="booker.name"/>
-                                        <small class="d-block text-muted fw-normal">Booker ID: <t t-esc="booker.id"/></small>
-                                    </td>
-                                    
-                                    <td class="align-middle text-end pe-4">
-                                        <button class="btn btn-sm btn-outline-dark fw-bold d-inline-flex align-items-center" t-on-click="() => this.openBookerDetails(booker)">
-                                            <t t-if="this.state.activeMainTab === 'schedules'">View Schedules</t>
-                                            <t t-else="">View Targets</t>
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right ms-2">
-                                                <path d="M5 12h14"/>
-                                                <path d="m12 5 7 7-7 7"/>
-                                            </svg>
-                                        </button>
-                                    </td>
+                                    <th class="border-top-0 ps-4">Order Booker</th>
+                                    <th class="border-top-0">Login Info</th>
+                                    <th class="border-top-0 text-end pe-4">Action</th>
                                 </tr>
-                            </t>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <t t-if="this.state.tableBookers.length === 0 and !this.state.isLoadingList">
+                                    <tr>
+                                        <td colspan="3" class="text-center py-5 text-muted">
+                                            <i class="fa fa-users fs-1 mb-3 opacity-50"></i>
+                                            <p class="mb-0 fw-bold">No order bookers found.</p>
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="this.state.tableBookers" t-as="booker" t-key="booker.id">
+                                    <tr style="cursor: pointer;" class="transition-all" t-on-click="() => this.openBookerDetails(booker)">
+                                        <td class="ps-4 align-middle fw-bold text-dark">
+                                            <t t-esc="booker.name"/>
+                                            <small class="d-block text-muted fw-normal">
+                                                ID: <t t-esc="booker.id"/> <t t-if="booker.employee_code"> | Code: <t t-esc="booker.employee_code"/></t>
+                                            </small>
+                                        </td>
+                                        <td class="align-middle">
+                                            <div class="fw-bold text-dark"><t t-esc="booker.login"/></div>
+                                        </td>
+                                        <td class="align-middle text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-dark fw-bold d-inline-flex align-items-center" t-on-click.stop="() => this.openBookerDetails(booker)">
+                                                <t t-if="this.state.activeMainTab === 'schedules'">View Schedules</t>
+                                                <t t-else="">View Targets</t>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right ms-2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.bookers.total === 0 ? 0 : ((this.state.pagination.bookers.page - 1) * this.state.pagination.bookers.limit) + 1"/>
+                            to <t t-esc="Math.min(this.state.pagination.bookers.page * this.state.pagination.bookers.limit, this.state.pagination.bookers.total)"/>
+                            of <t t-esc="this.state.pagination.bookers.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage(-1)" t-att-disabled="this.state.pagination.bookers.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                <t t-esc="this.state.pagination.bookers.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.bookers.total / this.state.pagination.bookers.limit))"/>
+                            </button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage(1)" t-att-disabled="this.state.pagination.bookers.page &gt;= Math.ceil(this.state.pagination.bookers.total / this.state.pagination.bookers.limit)">Next</button>
+                        </div>
+                    </div>
                 </div>
             </t>
 
 
+            <!-- ========================================== -->
+            <!-- DETAIL VIEW (SCHEDULES & TARGETS)          -->
+            <!-- ========================================== -->
             <t t-if="this.state.viewMode === 'detail'">
 
                 <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
                     <div>
                         <button class="btn btn-sm btn-link text-muted fw-bold px-0 text-decoration-none d-flex align-items-center" t-on-click="goBackToList">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
-                                <path d="m12 19-7-7 7-7"/>
-                                <path d="M19 12H5"/>
-                            </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
                             Back to List
                         </button>
                         <h5 class="fw-bold text-dark mb-0 mt-1">
                             <t t-if="this.state.activeMainTab === 'schedules'">Weekly Schedules: </t>
                             <t t-else="">Performance Targets: </t>
-                            <span class="text-primary">
-                                <t t-esc="this.state.selectedBooker.name"/>
-                            </span>
+                            <span class="text-primary"><t t-esc="this.state.selectedBooker.name"/></span>
                             <small class="text-muted ms-2">(Booker ID: <t t-esc="this.state.selectedBooker.id"/>)</small>
                         </h5>
                     </div>
                     <t t-if="!this.state.showForm">
                         <button class="btn btn-dark shadow-sm fw-bold d-flex align-items-center text-white" t-on-click="openForm">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
-                                <path d="M5 12h14"/>
-                                <path d="M12 5v14"/>
-                            </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                             <t t-if="this.state.activeMainTab === 'schedules'">Add Schedule</t>
                             <t t-else="">Add Target</t>
                         </button>
@@ -84,16 +149,12 @@
 
                 <t t-if="this.state.errorMessage">
                     <div class="alert alert-danger m-3 py-2 small fw-bold d-flex align-items-center rounded-3" role="alert">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-triangle me-2">
-                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-                            <line x1="12" x2="12" y1="9" y2="13"/>
-                            <line x1="12" x2="12.01" y1="17" y2="17"/>
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-triangle me-2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
                         <t t-esc="this.state.errorMessage"/>
                     </div>
                 </t>
 
-
+                <!-- Schedule Form -->
                 <t t-if="this.state.showForm and this.state.activeMainTab === 'schedules'">
                     <div class="p-4 bg-white border-bottom">
                         <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">
@@ -119,9 +180,7 @@
                                 <select class="form-select form-control" t-model="this.state.scheduleForm.zone_name">
                                     <option value="">-- Select Zone --</option>
                                     <t t-foreach="this.uniqueZones" t-as="z" t-key="z">
-                                        <option t-att-value="z">
-                                            <t t-esc="z"/>
-                                        </option>
+                                        <option t-att-value="z"><t t-esc="z"/></option>
                                     </t>
                                 </select>
                             </div>
@@ -132,21 +191,17 @@
                                            (No active approved shops on this route — order booker will see no visits.)
                                         </t>
                                         <t t-else="">
-                                            (<t t-esc="this.state.scheduleForm.operational_shop_count"/> active approved shop(s) on this route.)
+                                            ( <span class="fw-bold fs-4 text-black"><t t-esc="this.state.scheduleForm.operational_shop_count"/></span> active approved shop(s) on this route.)
                                         </t>
                                     </small>
                                 </t>
                                 <label class="small fw-bold">Route</label>
-                               
                                 <select class="form-select form-control" t-model="this.state.scheduleForm.route_id" t-on-change="onScheduleRouteChange">
                                     <option value="">-- Select Route --</option>
                                     <t t-foreach="this.filteredRoutes" t-as="r" t-key="r.id">
-                                        <option t-att-value="r.id">
-                                            <t t-esc="r.name"/>
-                                        </option>
+                                        <option t-att-value="r.id"><t t-esc="r.name"/></option>
                                     </t>
                                 </select>
-                                
                             </div>
                             <div class="col-md-2 pb-2">
                                 <div class="form-check form-switch">
@@ -165,18 +220,14 @@
                         <div class="d-flex justify-content-end mt-3">
                             <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
                             <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveSchedule" t-att-disabled="this.state.isLoading">
-                                <t t-if="this.state.isLoading">
-                                    <i class="fa fa-spinner fa-spin me-1"></i> Saving...
-                                </t>
-                                <t t-else="">
-                                    <t t-esc="this.state.editingScheduleId ? 'Update Schedule' : 'Save Schedule'"/>
-                                </t>
+                                <t t-if="this.state.isLoading"><i class="fa fa-spinner fa-spin me-1"></i> Saving...</t>
+                                <t t-else=""><t t-esc="this.state.editingScheduleId ? 'Update Schedule' : 'Save Schedule'"/></t>
                             </button>
                         </div>
                     </div>
                 </t>
 
-
+                <!-- Target Form -->
                 <t t-if="this.state.showForm and this.state.activeMainTab === 'targets'">
                     <div class="p-4 bg-white border-bottom">
                         <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">
@@ -291,17 +342,14 @@
                         <div class="d-flex justify-content-end mt-3">
                             <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
                             <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveTarget" t-att-disabled="this.state.isLoading">
-                                <t t-if="this.state.isLoading">
-                                    <i class="fa fa-spinner fa-spin me-1"></i> Saving...
-                                </t>
-                                <t t-else="">
-                                    <t t-esc="this.state.editingTargetId ? 'Update Target' : 'Save Target'"/>
-                                </t>
+                                <t t-if="this.state.isLoading"><i class="fa fa-spinner fa-spin me-1"></i> Saving...</t>
+                                <t t-else=""><t t-esc="this.state.editingTargetId ? 'Update Target' : 'Save Target'"/></t>
                             </button>
                         </div>
                     </div>
                 </t>
 
+                <!-- Inner Detail Views -->
                 <t t-if="!this.state.showForm and this.state.activeMainTab === 'schedules'">
                     <div class="px-4 pt-3">
                         <div class="alert alert-light border small text-muted mb-0">
@@ -331,29 +379,19 @@
                                     <tr>
                                         <td class="ps-4 align-middle fw-bold">
                                             <t t-esc="sched.day"/>
-                                            <t t-if="sched.isLocked">
-                                                <span class="badge bg-warning text-dark ms-2">Locked today</span>
-                                            </t>
+                                            <t t-if="sched.isLocked"><span class="badge bg-warning text-dark ms-2">Locked today</span></t>
                                         </td>
                                         <td class="align-middle">
-                                            <div class="text-dark">
-                                                <t t-esc="sched.route"/>
-                                            </div>
-                                            <small class="text-muted">
-                                                <t t-esc="sched.zone"/>
-                                            </small>
+                                            <div class="text-dark"><t t-esc="sched.route"/></div>
+                                            <small class="text-muted"><t t-esc="sched.zone"/></small>
                                         </td>
-                                        <td class="align-middle text-center">
-                                            <t t-esc="sched.shops"/>
-                                        </td>
+                                        <td class="align-middle text-center"><t t-esc="sched.shops"/></td>
                                         <td class="align-middle">
-                                            <span t-attf-class="badge #{sched.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
-                                                <t t-esc="sched.status"/>
-                                            </span>
+                                            <span t-attf-class="badge #{sched.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm"><t t-esc="sched.status"/></span>
                                         </td>
                                         <td class="align-middle text-end pe-4">
-                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editSchedule(sched)" t-att-disabled="sched.isLocked" title="Edit schedule (locked only while today has visits in progress or completed)">Edit</button>
-                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.promptDeleteSchedule(sched)" t-att-disabled="sched.isLocked" title="Delete schedule (locked only while today has visits in progress or completed)">Delete</button>
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editSchedule(sched)" t-att-disabled="sched.isLocked" title="Edit schedule">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.promptDeleteSchedule(sched)" t-att-disabled="sched.isLocked" title="Delete schedule">Delete</button>
                                         </td>
                                     </tr>
                                 </t>
@@ -376,52 +414,36 @@
                             </thead>
                             <tbody>
                                 <t t-if="currentBookerTargets.length === 0">
-                                    <tr>
-                                        <td colspan="5" class="text-center py-4 text-muted">No targets configured for this booker.</td>
-                                    </tr>
+                                    <tr><td colspan="5" class="text-center py-4 text-muted">No targets configured for this booker.</td></tr>
                                 </t>
                                 <t t-foreach="currentBookerTargets" t-as="tgt" t-key="tgt.id">
                                     <tr>
                                         <td class="ps-4 align-middle">
-                                            <div class="fw-bold small">
-                                                <t t-esc="tgt.startDate"/>
-                                            </div>
-                                            <div class="text-muted small">to <t t-esc="tgt.endDate"/>
-                                            </div>
+                                            <div class="fw-bold small"><t t-esc="tgt.startDate"/></div>
+                                            <div class="text-muted small">to <t t-esc="tgt.endDate"/></div>
                                         </td>
-                                        
-                                        <!-- TARGET GOAL COLUMN -->
                                         <td class="align-middle">
                                             <div class="text-dark fw-bold text-capitalize">
                                                 <t t-if="tgt.isExpandable">
-                                                    <button type="button" class="btn btn-link p-0 text-decoration-none fw-bold text-dark text-capitalize"
-                                                            t-on-click="() => this.toggleTargetExpand(tgt)">
+                                                    <button type="button" class="btn btn-link p-0 text-decoration-none fw-bold text-dark text-capitalize" t-on-click="() => this.toggleTargetExpand(tgt)">
                                                         <i t-attf-class="fa #{tgt.expanded ? 'fa-chevron-down' : 'fa-chevron-right'} me-1"/>
                                                         <t t-esc="tgt.type.replace('_', ' ')"/>
                                                     </button>
                                                 </t>
-                                                <t t-else="">
-                                                    <t t-esc="tgt.type.replace('_', ' ')"/>
-                                                </t>
+                                                <t t-else=""><t t-esc="tgt.type.replace('_', ' ')"/></t>
                                             </div>
                                             <small class="text-muted">
                                                 <t t-if="tgt.type === 'product_bundle'">
-                                                    Combined progress <t t-esc="tgt.progressPercentage"/>
-                                                    · <t t-esc="tgt.lines.length"/> products
+                                                    Combined progress <t t-esc="tgt.progressPercentage"/> · <t t-esc="tgt.lines.length"/> products
                                                 </t>
                                                 <t t-else="">
                                                     <t t-esc="tgt.amount"/>
                                                     <t t-if="tgt.type === 'collective_weight' and tgt.weightUom"> <t t-esc="tgt.weightUom"/></t>
-                                                    <t t-if="tgt.type === 'collective_qty' or tgt.type === 'collective_weight'">
-                                                        · <t t-esc="tgt.lines.length"/> products
-                                                    </t>
+                                                    <t t-if="tgt.type === 'collective_qty' or tgt.type === 'collective_weight'"> · <t t-esc="tgt.lines.length"/> products</t>
                                                 </t>
                                             </small>
                                             <div class="progress mt-1" style="height: 6px; max-width: 220px;">
-                                                <div class="progress-bar" role="progressbar"
-                                                     t-attf-style="width: #{tgt.progressWidth}%"
-                                                     t-att-aria-valuenow="tgt.progress"
-                                                     aria-valuemin="0" aria-valuemax="100"/>
+                                                <div class="progress-bar" role="progressbar" t-attf-style="width: #{tgt.progressWidth}%"/>
                                             </div>
                                             <t t-if="tgt.expanded and tgt.lines.length">
                                                 <div class="mt-2 ps-2 border-start border-2">
@@ -431,8 +453,7 @@
                                                             <div class="text-muted">
                                                                 <t t-if="tgt.type === 'product_bundle'">
                                                                     Goal <t t-esc="line.target_value"/>
-                                                                    <t t-if="line.measure_type === 'weight'"> <t t-esc="line.target_weight_uom"/></t>
-                                                                    <t t-else=""> units</t>
+                                                                    <t t-if="line.measure_type === 'weight'"> <t t-esc="line.target_weight_uom"/></t><t t-else=""> units</t>
                                                                     · achieved <t t-esc="line.achieved_value"/>
                                                                 </t>
                                                                 <t t-else="">
@@ -441,40 +462,27 @@
                                                                 · <t t-esc="line.progress_percent"/>%
                                                             </div>
                                                             <div class="progress mt-1" style="height: 4px; max-width: 200px;">
-                                                                <div class="progress-bar bg-info" role="progressbar"
-                                                                     t-attf-style="width: #{line.progressWidth}%"/>
+                                                                <div class="progress-bar bg-info" role="progressbar" t-attf-style="width: #{line.progressWidth}%"/>
                                                             </div>
                                                         </div>
                                                     </t>
                                                 </div>
                                             </t>
                                         </td>
-                                        
-                                        <!-- ACHIEVED COLUMN -->
                                         <td class="align-middle fw-bold">
                                             <t t-esc="tgt.achievedAmount"/>
-                                            
                                             <t t-if="tgt.type === 'collective_weight' and tgt.weightUom">
-                                                <small class="d-block text-muted fw-normal">
-                                                    <t t-esc="tgt.remainingAmount"/> <t t-esc="tgt.weightUom"/> left
-                                                </small>
+                                                <small class="d-block text-muted fw-normal"><t t-esc="tgt.remainingAmount"/> <t t-esc="tgt.weightUom"/> left</small>
                                             </t>
                                             <t t-elif="tgt.type === 'product_bundle'">
-                                                <small class="d-block text-muted fw-normal">
-                                                    <t t-esc="tgt.progressPercentage"/> complete
-                                                </small>
+                                                <small class="d-block text-muted fw-normal"><t t-esc="tgt.progressPercentage"/> complete</small>
                                             </t>
                                             <t t-else="">
-                                                <small class="d-block text-muted fw-normal">
-                                                    <t t-esc="tgt.remainingAmount"/> left
-                                                </small>
+                                                <small class="d-block text-muted fw-normal"><t t-esc="tgt.remainingAmount"/> left</small>
                                             </t>
                                         </td>
-                                        
                                         <td class="align-middle">
-                                            <span t-attf-class="badge #{tgt.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
-                                                <t t-esc="tgt.status"/>
-                                            </span>
+                                            <span t-attf-class="badge #{tgt.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm"><t t-esc="tgt.status"/></span>
                                         </td>
                                         <td class="align-middle text-end pe-4">
                                             <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editTarget(tgt)">Edit</button>
@@ -509,16 +517,10 @@
                             <p class="text-muted small mb-4">This action cannot be undone and will permanently remove this record from Odoo.</p>
                             
                             <div class="d-flex justify-content-end gap-2">
-                                <button class="btn btn-light border fw-bold px-4" t-on-click="closeDeleteModal" t-att-disabled="this.state.isLoading">
-                                    Cancel
-                                </button>
+                                <button class="btn btn-light border fw-bold px-4" t-on-click="closeDeleteModal" t-att-disabled="this.state.isLoading">Cancel</button>
                                 <button class="btn btn-danger fw-bold px-4 text-white d-flex align-items-center" t-on-click="confirmDelete" t-att-disabled="this.state.isLoading">
-                                    <t t-if="this.state.isLoading">
-                                        <i class="fa fa-spinner fa-spin me-2"></i> Deleting...
-                                    </t>
-                                    <t t-else="">
-                                        <i class="fa fa-trash me-2"></i> Confirm Delete
-                                    </t>
+                                    <t t-if="this.state.isLoading"><i class="fa fa-spinner fa-spin me-2"></i> Deleting...</t>
+                                    <t t-else=""><i class="fa fa-trash me-2"></i> Confirm Delete</t>
                                 </button>
                             </div>
                         </div>

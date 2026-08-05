@@ -13,24 +13,6 @@
                     <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center " t-on-click="refreshData" t-att-disabled="this.state.isLoading" title="Refresh Inventory Data">
                         <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isLoading}"></i> Refresh
                     </button>
-                    <!-- Removed Non-Functional Elements -->
-                    <!-- <span class="badge bg-dark px-3 py-2 text-white d-inline-flex align-items-center shadow-sm" title="Real-time stock calculations are currently active">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-boxes me-2">
-                            <path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"/>
-                            <path d="m7 16.5-4.74-2.85"/>
-                            <path d="m7 16.5 5-3"/>
-                            <path d="M7 16.5v5.17"/>
-                            <path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"/>
-                            <path d="m17 16.5-5-3"/>
-                            <path d="m17 16.5 4.74-2.85"/>
-                            <path d="M17 16.5v5.17"/>
-                            <path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"/>
-                            <path d="M12 8 7.26 5.15"/>
-                            <path d="m12 8 4.74-2.85"/>
-                            <path d="M12 13.5V8"/>
-                        </svg>
-                    Inventory Engine Active
-                    </span> -->
                     <button t-if="this.hasFinancialAccess" class="btn btn-outline-danger ms-3 fw-bold shadow-sm d-inline-flex align-items-center" t-on-click="() => this.setSubTab('archive')" title="View Archived Items">
                         <i class="fa fa-archive me-2"></i> View Archive
                     </button>
@@ -38,7 +20,7 @@
 
             </div>
 
-
+<!-- INVENTORY TAB -->
             <t t-if="this.hasFinancialAccess and this.state.activeSubTab === 'inventory'">
 
                 <div class="p-4 bg-white border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
@@ -53,14 +35,12 @@
                                 <span class="input-group-text bg-white text-muted border-end-0">
                                     <i class="fa fa-search"></i>
                                 </span>
-                                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search product name..." t-model="this.state.productSearchQuery" />
+                                <input t-att-value="this.state.filters.inventory.search" t-on-input="(ev) => this.onSearchInput(ev, 'inventory')" type="text" class="form-control border-start-0 ps-0" placeholder="Search product name..." t-model="this.state.productSearchQuery" />
                             </div>
-                            <select class="form-select form-select-sm shadow-sm" style="width: 170px;" t-model="this.state.productSortFilter" title="Reorder the list based on specific values">
+                            <select  class="form-select form-select-sm shadow-sm" style="width: 170px;" t-model="this.state.filters.inventory.sort" t-on-change="() => this.onFilterChange('inventory')" title="Reorder the list based on specific values">
                                 <option value="default">Default Sorting</option>
                                 <option value="price_asc">Price: Low to High</option>
                                 <option value="price_desc">Price: High to Low</option>
-                                <option value="qty_desc">Qty: High to Low</option>
-                                <option value="qty_asc">Qty: Low to High</option>
                             </select>
                             <button class="btn btn-sm btn-dark fw-bold d-flex align-items-center text-white ms-2 shadow-sm text-nowrap" t-on-click="() => { this.resetForms(); this.state.showProductAddForm = true; }" title="Add a brand new product to your catalog">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
@@ -132,8 +112,14 @@
                         </div>
 
                         <div class="mt-4 d-flex justify-content-end">
-                            <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showProductAddForm = false">Cancel</button>
-                            <button class="btn btn-success fw-bold text-white px-4" t-on-click="saveProduct">Save Product</button>
+                            <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showProductAddForm = false" t-att-disabled="this.state.isLoading">Cancel</button>
+                            <button class="btn btn-success fw-bold text-white px-4 d-flex align-items-center" t-on-click="saveProduct" t-att-disabled="this.state.isLoading">
+                                <t t-if="this.state.isLoading">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Saving...
+                                </t>
+                                <t t-else="">Save Product</t>
+                            </button>
                         </div>
                     </div>
                 </t>
@@ -171,7 +157,9 @@
                                 </label>
                                 <input type="number" class="form-control" t-model="this.state.currentProduct.shahtaj_kg_per_unit" min="0.0001" step="0.0001"/>
                             </div>
-
+                            <div>
+                                Current Tax: <t t-esc="this.state.currentProduct.tax_label || 'None'"/>
+                            </div>
                             <div class="col-md-6">
                                 <label class="small fw-bold">Customer Taxes</label>
                                 <select class="form-select" t-model="this.state.currentProduct.tax_id">
@@ -189,82 +177,80 @@
                         </div>
 
                         <div class="mt-4 text-end">
-                            <button class="btn btn-primary fw-bold px-4" t-on-click="updateProduct">Save Changes</button>
+                            <button class="btn btn-primary fw-bold px-4 d-inline-flex align-items-center" t-on-click="updateProduct" t-att-disabled="this.state.isLoading">
+                                <t t-if="this.state.isLoading">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Saving...
+                                </t>
+                                <t t-else="">Save Changes</t>
+                            </button>
                         </div>
                     </div>
                 </t>
 
-                <t t-if="!this.state.showProductDetails and !this.state.showProductAddForm">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
-                            <thead class="bg-light text-uppercase small fw-bold text-muted">
-                                <tr>
-                                    <th class="border-top-0 ps-4">Product Details</th>
-                                    <th class="border-top-0 text-end">Price </th>
-                                    <th class="border-top-0 text-end" title="Current physical items in the warehouse">On-Hand Qty</th>
-                                    <th class="border-top-0 text-center pe-4">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-if="this.state.inventory.length === 0">
-                                    <tr>
-                                        <td colspan="4" class="text-center py-5 text-muted fw-bold">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-package-open mb-2 opacity-50">
-                                                <path d="M12 22v-9"/>
-                                                <path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 1 1.74v8.36a1.93 1.93 0 0 1-1 1.74l-4.2 2.36-6.52 3.66a1.73 1.73 0 0 1-1.63 0L2.9 20a1.93 1.93 0 0 1-1-1.74v-8.36a1.93 1.93 0 0 1 1-1.74l4.2-2.36"/>
-                                                <path d="M20 7l-8-4-8 4"/>
-                                                <path d="M12 22V13l8-4"/>
-                                                <path d="M4 7l8 4"/>
-                                            </svg>
-                                            <p class="mb-0">Your catalog is empty. Click 'New Product' to begin.</p>
-                                        </td>
-                                    </tr>
-                                </t>
-                                <t t-elif="this.displayProducts.length === 0">
-                                    <tr>
-                                        <td colspan="4" class="text-center py-4 text-muted fw-bold">No products match your search. Try adjusting your query.</td>
-                                    </tr>
-                                </t>
-                                <t t-foreach="this.displayProducts" t-as="item" t-key="item.id">
-                                    <tr>
-                                        <td class="ps-4 d-flex align-items-center">
-                                            <div>
-                                                <div class="text-dark fw-bold">
-                                                    <t t-esc="item.name"/>
-                                                </div>
-                                                <small class="text-muted">Unit: <t t-esc="item.shahtaj_sale_uom || item.uom_name"/>
- · Tax: <t t-esc="item.tax_label"/>
-                                            </small>
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="fw-bold text-success">Rs. <t t-esc="item.list_price"/>
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="h6 fw-bold text-dark mb-0">
-                                            <t t-esc="item.qty_available"/>
-                                        </span>
-                                        <span class="text-muted ms-1 small">
-                                            <t t-esc="item.uom_name"/>
-                                        </span>
-                                    </td>
-                                    <td class="text-center pe-4">
-                                        <button class="btn btn-sm btn-light border fw-bold text-primary" t-on-click="() => this.viewProductDetails(item)" title="Edit pricing, taxes, and basic info">
-                                                Edit Details
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger ms-2 fw-bold" t-on-click="() => this.toggleArchive('product.template', item.id, false)">
-                                            Archive
-                                        </button>
-                                    </td>
-                                </tr>
-                            </t>
-                        </tbody>
-                    </table>
-                </div>
-            </t>
-        </t>
+               <t t-if="!this.state.showProductDetails and !this.state.showProductAddForm">
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
 
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="border-top-0 ps-4">Product Details</th>
+                                        <th class="border-top-0 text-end">Price </th>
+                                        <th class="border-top-0 text-end">On-Hand Qty</th>
+                                        <th class="border-top-0 text-center pe-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="this.state.tableInventory.length === 0 and !this.state.isLoadingList">
+                                        <tr>
+                                            <td colspan="4" class="text-center py-5 text-muted fw-bold">
+                                                <i class="fa fa-cubes fs-1 mb-3 opacity-50"></i>
+                                                <p class="mb-0">No products match your search or catalog is empty.</p>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableInventory" t-as="item" t-key="item.id">
+                                        <tr>
+                                            <td class="ps-4 d-flex align-items-center">
+                                                <div>
+                                                    <div class="text-dark fw-bold"><t t-esc="item.name"/></div>
+                                                    <small class="text-muted">Unit: <t t-esc="item.shahtaj_sale_uom || item.uom_name"/> · Tax: <t t-esc="item.tax_label"/></small>
+                                                </div>
+                                            </td>
+                                            <td class="text-end"><div class="fw-bold text-success">Rs. <t t-esc="item.list_price"/></div></td>
+                                            <td class="text-end"><span class="h6 fw-bold text-dark mb-0"><t t-esc="item.qty_available"/></span> <span class="text-muted ms-1 small"><t t-esc="item.uom_name"/></span></td>
+                                            <td class="text-center pe-4">
+                                                <button class="btn btn-sm btn-light border fw-bold text-primary" t-on-click="() => this.viewProductDetails(item)">Edit</button>
+                                                <button class="btn btn-sm btn-outline-danger ms-2 fw-bold" t-on-click="() => this.toggleArchive('product.template', item.id, false)">Archive</button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.inventory.total === 0 ? 0 : ((this.state.pagination.inventory.page - 1) * this.state.pagination.inventory.limit) + 1"/>
+                                to <t t-esc="Math.min(this.state.pagination.inventory.page * this.state.pagination.inventory.limit, this.state.pagination.inventory.total)"/>
+                                of <t t-esc="this.state.pagination.inventory.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('inventory', -1)" t-att-disabled="this.state.pagination.inventory.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.inventory.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.inventory.total / this.state.pagination.inventory.limit))"/></button>
+                                <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('inventory', 1)" t-att-disabled="this.state.pagination.inventory.page &gt;= Math.ceil(this.state.pagination.inventory.total / this.state.pagination.inventory.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+        </t>
+<!-- Stock Mangement Tab -->
         <t t-if="this.state.activeSubTab === 'management'">
             <div class="p-4 bg-white border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
@@ -278,9 +264,9 @@
                             <span class="input-group-text bg-white text-muted border-end-0">
                                 <i class="fa fa-search"></i>
                             </span>
-                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search product name..." t-model="this.state.stockSearchQuery" />
+                            <input t-att-value="this.state.filters.management.search" t-on-input="(ev) => this.onSearchInput(ev, 'management')" type="text" class="form-control border-start-0 ps-0" placeholder="Search product name..." t-model="this.state.stockSearchQuery" />
                         </div>
-                        <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.stockFilterStatus" title="Filter to see only available or depleted items">
+                        <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.filters.management.status" t-on-change="() => this.onFilterChange('management')" title="Filter to see only available or depleted items">
                             <option value="all">All Stock Levels</option>
                             <option value="in_stock">In Stock (&gt; 0)</option>
                             <option value="out_of_stock">Out of Stock (0)</option>
@@ -305,7 +291,7 @@
                             <label class="small fw-bold">Select Product</label>
                             <select class="form-select shadow-sm" t-model="this.state.adjustmentForm.product_id">
                                 <option value="">-- Choose an item --</option>
-                                <t t-foreach="this.activeInventory" t-as="inv" t-key="inv.id">
+                                <t t-foreach="this.state.allActiveProducts" t-as="inv" t-key="inv.id">
                                     <option t-att-value="inv.id">
                                         <t t-esc="inv.name"/>
                                     </option>
@@ -327,9 +313,14 @@
                     </div>
                 </div>
             </t>
-
+<div class="position-relative">
+                <t t-if="this.state.isLoadingList">
+                    <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                </t>
             <div class="table-responsive p-0 bg-white">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table align-middle mb-0">
                     <thead class="bg-light text-uppercase small fw-bold text-muted">
                         <tr>
                             <th class="border-top-0 ps-4 py-3">Product Name</th>
@@ -340,23 +331,12 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <t t-if="this.state.inventory.length === 0">
-                            <tr>
-                                <td colspan="4" class="text-center py-5 text-muted">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search mb-2 opacity-50">
-                                        <circle cx="11" cy="11" r="8"/>
-                                        <path d="m21 21-4.3-4.3"/>
-                                    </svg>
-                                    <p class="mb-0">No products found in inventory. Head to the Product List tab to add some.</p>
-                                </td>
-                            </tr>
-                        </t>
-                        <t t-elif="this.displayStock.length === 0">
-                            <tr>
-                                <td t-att-colspan="this.hasFinancialAccess ? 5 : 4" class="text-center py-4 text-muted fw-bold">No stock matches your search or filter criteria.</td>
-                            </tr>
-                        </t>
-                        <t t-foreach="this.displayStock" t-as="item" t-key="item.id">
+                        <t t-if="this.state.tableStock.length === 0 and !this.state.isLoadingList">
+                                <tr>
+                                    <td t-att-colspan="this.hasFinancialAccess ? 5 : 4" class="text-center py-5 text-muted fw-bold">No stock matches your search or filter criteria.</td>
+                                </tr>
+                            </t>
+                        <t t-foreach="this.state.tableStock" t-as="item" t-key="item.id">
                             <tr>
                                 <td class="ps-4 fw-bold text-dark">
                                     <t t-esc="item.name"/>
@@ -392,8 +372,21 @@
                     </tbody>
                 </table>
             </div>
+            <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                    <small class="text-muted fw-bold">
+                        Showing <t t-esc="this.state.pagination.management.total === 0 ? 0 : ((this.state.pagination.management.page - 1) * this.state.pagination.management.limit) + 1"/>
+                        to <t t-esc="Math.min(this.state.pagination.management.page * this.state.pagination.management.limit, this.state.pagination.management.total)"/>
+                        of <t t-esc="this.state.pagination.management.total"/>
+                    </small>
+                    <div class="btn-group shadow-sm">
+                        <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('management', -1)" t-att-disabled="this.state.pagination.management.page === 1">Prev</button>
+                        <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.management.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.management.total / this.state.pagination.management.limit))"/></button>
+                        <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('management', 1)" t-att-disabled="this.state.pagination.management.page &gt;= Math.ceil(this.state.pagination.management.total / this.state.pagination.management.limit)">Next</button>
+                    </div>
+                </div>
+            </div>
         </t>
-
+<!-- Sales Taxes Tab -->
         <t t-if="this.hasFinancialAccess and this.state.activeSubTab === 'taxes'">
             <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center">
                 <div>
@@ -438,51 +431,88 @@
                 </div>
             </t>
 
-            <t t-else="">
-                <div class="table-responsive bg-white">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="bg-light text-uppercase small fw-bold text-muted">
-                            <tr>
-                                <th class="border-top-0 ps-4 py-3">Tax Name</th>
-                                <th class="border-top-0 py-3 text-center">Rate (%)</th>
-                                <th class="border-top-0 py-3 text-center">Status</th>
-                                <th class="border-top-0 py-3 text-end pe-4">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <t t-if="this.state.taxesList.length === 0">
+                        <t t-else="">
+                <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom border-top">
+                    <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
+                        <span class="input-group-text bg-white text-muted border-end-0">
+                            <i class="fa fa-search"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search tax name..." 
+                               t-att-value="this.state.filters.taxes.search" 
+                               t-on-input="(ev) => this.onSearchInput(ev, 'taxes')"/>
+                    </div>
+                </div>
+
+                <div class="position-relative">
+                    <t t-if="this.state.isLoadingList">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>
+
+                    <div class="table-responsive bg-white">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted">
                                 <tr>
-                                    <td colspan="4" class="text-center py-5 text-muted">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-percent mb-2 opacity-50">
-                                            <line x1="19" x2="5" y1="5" y2="19"/>
-                                            <circle cx="6.5" cy="6.5" r="2.5"/>
-                                            <circle cx="17.5" cy="17.5" r="2.5"/>
-                                        </svg>
-                                        <p class="mb-0">No sales taxes found. Click 'New Tax' to create one.</p>
-                                    </td>
+                                    <th class="border-top-0 ps-4 py-3">Tax Name</th>
+                                    <th class="border-top-0 py-3 text-center">Rate (%)</th>
+                                    <th class="border-top-0 py-3 text-center">Status</th>
+                                    <th class="border-top-0 py-3 text-end pe-4">Actions</th>
                                 </tr>
-                            </t>
-                           <t t-foreach="this.activeTaxes" t-as="tax" t-key="tax.id">
-                                <tr>
-                                    <td class="ps-4 fw-bold text-dark">
-                                        <t t-esc="tax.name"/>
-                                    </td>
-                                    <td class="text-center fw-bold text-primary">
-                                        <t t-esc="tax.amount"/>%
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-success text-white px-2 py-1 shadow-sm">Active</span>
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <button class="btn btn-sm btn-outline-primary fw-bold me-2" t-on-click="() => this.openTaxForm(tax)" title="Edit this tax">Edit</button>
-                                        <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.toggleArchive('account.tax', tax.id, false)">Archive</button>
-                                    </td>
-                                </tr>
-                            </t>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <t t-if="this.state.tableTaxes.length === 0 and !this.state.isLoadingList">
+                                    <tr>
+                                        <td colspan="4" class="text-center py-5 text-muted">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-percent mb-2 opacity-50">
+                                                <line x1="19" x2="5" y1="5" y2="19"/>
+                                                <circle cx="6.5" cy="6.5" r="2.5"/>
+                                                <circle cx="17.5" cy="17.5" r="2.5"/>
+                                            </svg>
+                                            <p class="mb-0">No sales taxes found. Click 'New Tax' to create one.</p>
+                                        </td>
+                                    </tr>
+                                </t>
+                                <!-- FIXED: Changed from this.activeTaxes to this.state.tableTaxes -->
+                                <t t-foreach="this.state.tableTaxes" t-as="tax" t-key="tax.id">
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-dark">
+                                            <t t-esc="tax.name"/>
+                                        </td>
+                                        <td class="text-center fw-bold text-primary">
+                                            <t t-esc="tax.amount"/>%
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-success text-white px-2 py-1 shadow-sm">Active</span>
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary fw-bold me-2" t-on-click="() => this.openTaxForm(tax)" title="Edit this tax">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.toggleArchive('account.tax', tax.id, false)">Archive</button>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- UNIVERSAL PAGINATION FOOTER -->
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.taxes.total === 0 ? 0 : ((this.state.pagination.taxes.page - 1) * this.state.pagination.taxes.limit) + 1"/>
+                            to <t t-esc="Math.min(this.state.pagination.taxes.page * this.state.pagination.taxes.limit, this.state.pagination.taxes.total)"/>
+                            of <t t-esc="this.state.pagination.taxes.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('taxes', -1)" t-att-disabled="this.state.pagination.taxes.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                <t t-esc="this.state.pagination.taxes.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.taxes.total / this.state.pagination.taxes.limit))"/>
+                            </button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('taxes', 1)" t-att-disabled="this.state.pagination.taxes.page &gt;= Math.ceil(this.state.pagination.taxes.total / this.state.pagination.taxes.limit)">Next</button>
+                        </div>
+                    </div>
                 </div>
             </t>
+
         </t>
                 <t t-if="this.state.activeSubTab === 'archive'">
             <div class="p-4 bg-white border-bottom">

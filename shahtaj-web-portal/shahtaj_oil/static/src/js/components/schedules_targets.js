@@ -10,8 +10,8 @@ export class SchedulesTargets extends Component {
 
     setup() {
         this.orm = useService("orm");
+        const ITEMS_PER_PAGE = 10;
         this.notification = useService("notification");
-
         this.state = useState({
             activeMainTab: this.props.requestedSubTab || 'schedules',
             viewMode: 'list',
@@ -44,7 +44,6 @@ export class SchedulesTargets extends Component {
             },
 
             // Real data
-            bookers: [],
             schedules: [],
             targets: [],
 
@@ -52,6 +51,17 @@ export class SchedulesTargets extends Component {
             routes: [],       
             products: [],     
             currencies: [],   
+            // --- BACKEND PAGINATION ---
+            itemsPerPage: ITEMS_PER_PAGE,
+            isLoadingList: false,
+            searchTimeout: null,
+            tableBookers: [],
+            pagination: {
+                bookers: { page: 1, limit: ITEMS_PER_PAGE, total: 0 }
+            },
+            filters: {
+                bookers: { search: '' }
+            },
         });
 
         onWillUpdateProps((nextProps) => {
@@ -60,17 +70,79 @@ export class SchedulesTargets extends Component {
             }
         });
 
+       this.debounceSearch = (func, wait) => {
+            return (...args) => {
+                clearTimeout(this.state.searchTimeout);
+                this.state.searchTimeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        };
+        this.debouncedFetchBookers = this.debounceSearch(() => this.fetchBookersList(), 400);
+
         onWillStart(async () => {
             await this._loadDropdownOptions();
-            await this._loadBookers();
+            await this.fetchBookersList();
         });
+    }
+    onSearchInput(ev) {
+        this.state.filters.bookers.search = ev.target.value;
+        this.state.pagination.bookers.page = 1; 
+        this.debouncedFetchBookers();
+    }
+
+    changePage(direction) {
+        const pag = this.state.pagination.bookers;
+        const newPage = pag.page + direction;
+        const maxPage = Math.max(1, Math.ceil(pag.total / pag.limit));
+        
+        if (newPage >= 1 && newPage <= maxPage) {
+            pag.page = newPage;
+            this.fetchBookersList();
+        }
+    }
+
+    async fetchBookersList() {
+        this.state.isLoadingList = true;
+        try {
+            const pag = this.state.pagination.bookers;
+            let domain = [['shahtaj_is_order_booker', '=', true]];
+            
+            if (this.state.filters.bookers.search) {
+                domain.push('|', 
+                    ['name', 'ilike', this.state.filters.bookers.search], 
+                    ['shahtaj_employee_code', 'ilike', this.state.filters.bookers.search]
+                );
+            }
+
+            const [total, users] = await Promise.all([
+                this.orm.searchCount('res.users', domain),
+                // Swapped zone/route for standard login and phone fields
+                this.orm.searchRead('res.users', domain, ['id', 'name', 'shahtaj_employee_code', 'login', 'phone'], {
+                    limit: pag.limit,
+                    offset: (pag.page - 1) * pag.limit,
+                    order: "name asc"
+                })
+            ]);
+
+            this.state.pagination.bookers.total = total;
+            this.state.tableBookers = users.map(u => ({
+                id: u.id,
+                name: u.name,
+                employee_code: u.shahtaj_employee_code || '',
+                login: u.login || 'No Login ID',
+                phone: u.phone || 'No Phone Recorded',
+            }));
+        } catch (error) {
+            this.notification.add("Failed to fetch bookers: " + (error.data?.message || error.message), { type: "danger" });
+        } finally {
+            this.state.isLoadingList = false;
+        }
     }
 
     async refreshData() {
         this.state.isRefreshing = true;
         try {
             await this._loadDropdownOptions();
-            await this._loadBookers();
+            await this.fetchBookersList();
             
             if (this.state.viewMode === 'detail' && this.state.selectedBooker) {
                 await Promise.all([
@@ -95,22 +167,7 @@ export class SchedulesTargets extends Component {
         this.state.editingTargetId = null;
     }
 
-    // ─── Loaders ────────────────────────────────────────────────────────────────
 
-    async _loadBookers() {
-        const users = await this.orm.searchRead(
-            'res.users',
-            [['shahtaj_is_order_booker', '=', true]],
-            ['id', 'name', 'shahtaj_employee_code', 'zone_id', 'route_id']
-        );
-        this.state.bookers = users.map(u => ({
-            id: u.id,
-            name: u.name,
-            employee_code: u.shahtaj_employee_code || '',
-            zone: u.zone_id ? u.zone_id[1] : 'Unassigned',
-            route: u.route_id ? u.route_id[1] : 'Unassigned',
-        }));
-    }
 
     async _loadDropdownOptions() {
         const [routes, zones, products, currencies] = await Promise.all([

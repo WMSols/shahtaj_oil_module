@@ -11,6 +11,7 @@ export class FinancialsInvoicing extends Component {
     static props = {
         requestedSubTab: { type: String, optional: true },
     };
+    
     setup() {
         this.notification = useService("notification");
         this.orm = useService("orm");
@@ -28,16 +29,22 @@ export class FinancialsInvoicing extends Component {
         };
         this.todayStr = formatDate(today);
         // 2. SMART INITIALIZATION
-        const target = this.props.requestedSubTab || 'invoices';
-        const topLevelTabs = ['credit', 'pnl', 'money', 'cash'];
+       const target = this.props.requestedSubTab || 'invoices';
+        const topLevelTabs = ['credit', 'pnl', 'money', 'cash', 'tax_ledger', 'expenses'];
         const initActive = topLevelTabs.includes(target) ? target : 'invoices';
-        const initInvoice = (target === 'credit' || target === 'pnl' || target === 'money' || target === 'cash' || target === 'invoices')
+        const initInvoice = (target === 'credit' || target === 'pnl' || target === 'money' || target === 'cash' || target === 'tax_ledger' || target === 'invoices')
             ? 'all_orders'
             : target;
+        const ITEMS_PER_PAGE = 10;
+        
         this.state = useState({
             activeSubTab: initActive,
             invoiceSubTab: initInvoice,
             cashDirection: 'all',
+            
+            // --- CREDIT & BALANCES MERGED STATE ---
+            creditSubView: 'risk', // 'risk' | 'balances'
+            selectedShopBalance: null, // For editing shop credit limit details
             
             selectedOrder: null, 
             selectedOrderLines: [], 
@@ -45,7 +52,6 @@ export class FinancialsInvoicing extends Component {
             selectedInvoiceLines: [],
             isEditingInvoice: false,
             
-            // --- Loading States ---
             isSavingInvoice: false,
             isCreatingInvoice: false,
             isConfirming: false,
@@ -57,20 +63,13 @@ export class FinancialsInvoicing extends Component {
 
             selectedPayment: null,
             selectedShop: null,
-            
             showPaymentModal: false,
-
             showRefundModal: false,
-            refundForm: {
-                date: '',
-                reason: '',
-                mode: 'full', // 'full' | 'partial'
-                lines: [],
-            },
+            refundForm: { date: '', reason: '', mode: 'full', lines: [] },
 
             journals: [], 
-            products: [], // Loaded for the edit dropdown
-            removedLineIds: [], // Tracks deleted invoice lines during edit
+            products: [], 
+            removedLineIds: [], 
             availableTaxes: [],
             
             allOrders: [],
@@ -78,28 +77,23 @@ export class FinancialsInvoicing extends Component {
             invoices: [],
             creditNotes: [], 
             payments: [],
-            balances: [],
-            credits: [],
-            //  NEW: Profit & Loss Dashboard State
+            credits: [], // Backed by backend pagination now
+            
             pnl: {
-                date_from: formatDate(firstDay), // Defaults to 1st of current month
-                date_to: formatDate(today),      // Defaults to today
+                date_from: formatDate(firstDay),
+                date_to: formatDate(today),
                 stats: {},
                 lines: [],
                 isLoading: false,
-                selectedProductLineId: ''
+                selectedProductLineId: '',
+                page: 1, limit: 15
             },
             money: {
                 date_from: formatDate(firstDay),
                 date_to: formatDate(today),
                 isLoading: false,
-                collected: 0,
-                paidOut: 0,
-                netCash: 0,
-                stillOwed: 0,
-                openInvoiceAmount: 0,
-                paymentCountIn: 0,
-                paymentCountOut: 0,
+                collected: 0, paidOut: 0, netCash: 0, stillOwed: 0,
+                openInvoiceAmount: 0, paymentCountIn: 0, paymentCountOut: 0,
             },
             
             stats: { totalOrders: 0, toInvoice: 0, openInvoices: 0, creditNotes: 0, approvedShops: 0 },
@@ -110,45 +104,79 @@ export class FinancialsInvoicing extends Component {
                 invoices: { search: '', status: 'all' },
                 creditNotes: { search: '', status: 'all' },
                 payments: { search: '' },
-                balances: { search: '' },
-                credits: { search: '', status: 'all' }
+                credits: { search: '', status: 'all' }, // Used for both risk monitor & balances
+                expenses: { search: '', status: 'all' },
+                expenseCategories: { search: '' },
             },
-            // --- Payment Form Fields ---
+            
             paymentForm: { 
-                journal_id: '', 
-                amount: 0, 
-                date: '', 
-                invoice_id: null, 
-                invoice_name: '',
-                method: 'cash',
-                bank_name: '',
-                account_number: '',
-                reference: '',
-                notes: '' 
+                journal_id: '', amount: 0, date: '', invoice_id: null, invoice_name: '',
+                method: 'cash', bank_name: '', account_number: '', reference: '', notes: '' 
+            },
+            taxLedger: {
+                date_from: formatDate(firstDay),
+                date_to: formatDate(today),
+                stats: { amount_tax_invoiced: 0, amount_tax_credited: 0, amount_tax_net: 0 },
+                summaries: [], history: [], isLoading: false,
+                page: 1, limit: 15
             },
             isRefreshing: false,
             confirmModal: { isOpen: false, title: '', message: '', onConfirm: null },
+            
+            itemsPerPage: ITEMS_PER_PAGE,
+            isLoadingList: false,
+            searchTimeout: null,
+            pagination: {
+                allOrders: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                orders: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                invoices: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                creditNotes: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                payments: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                credits: { page: 1, limit: ITEMS_PER_PAGE, total: 0 }, // Paginated Credit & Balances
+                expenses: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                expenseCategories: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+            },
+            
+            expenseSubTab: 'expenses',
+            showExpenseForm: false,
+            showCategoryForm: false,
+            tableExpenses: [],
+            tableExpenseCategories: [],
+            showExpenseMoveModal: false,
+            selectedExpenseMove: null,
+            
+            expenseForm: { id: null, date: formatDate(today), category_id: '', description: '', amount: '', journal_id: '', partner_id: '', notes: '' },
+            categoryForm: { id: null, name: '', sequence: 10, active: true, note: '' },
+            expenseLookups: { categories: [], journals: [], partners: [] },
         });
+        // Universal Debouncer to protect the server from rapid keystrokes
+        this.debounceSearch = (func, wait) => {
+            return (...args) => {
+                clearTimeout(this.state.searchTimeout);
+                this.state.searchTimeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        };
+        // Bind the fetch method to the debouncer
+        this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
         
      // 3. SMART PROP LISTENER FOR 2-LEVEL TABS
         onWillUpdateProps((nextProps) => {
             if (nextProps.requestedSubTab) {
                 const req = nextProps.requestedSubTab;
                 
-                if (['credit', 'pnl', 'money', 'cash'].includes(req)) {
+                if (['credit', 'pnl', 'money', 'cash', 'tax_ledger', 'expenses'].includes(req)) {
                     this.state.activeSubTab = req;
-                    if (req === 'money') {
-                        this.loadMoneyOverview();
+                    if (req === 'credit') {
+                        this.state.creditSubView = 'risk';
+                        this.state.selectedShopBalance = null;
                     }
-                    if (req === 'cash') {
-                        this.state.cashDirection = 'all';
-                    }
-                    if (req === 'pnl') {
-                        this.fetchPnlData();
-                    }
-                } 
-                // Everything else belongs inside the Invoice Management parent
-                else {
+                    if (req === 'money') this.loadMoneyOverview();
+                    if (req === 'cash') this.state.cashDirection = 'all';
+                    if (req === 'pnl') this.fetchPnlData();
+                    if (req === 'tax_ledger') this.fetchTaxLedgerData();
+                    if (req === 'expenses') this.setExpenseSubTab('expenses');
+                    this.fetchActiveList();
+                } else {
                     this.state.activeSubTab = 'invoices';
                     const childTab = (req === 'invoices') ? 'all_orders' : req;
                     this.setInvoiceSubTab(childTab);
@@ -164,7 +192,258 @@ export class FinancialsInvoicing extends Component {
             if (this.state.activeSubTab === 'money') {
                 await this.loadMoneyOverview();
             }
+            if (this.state.activeSubTab === 'tax_ledger') {
+                await this.fetchTaxLedgerData();
+            }
+            if (this.state.activeSubTab === 'expenses') {
+                await this.loadExpenseLookups();
+            }
+            await this.fetchActiveList();
         });
+    }
+    get paginatedPnlLines() {
+        const lines = this.displayPnlLines; // Respects the product filter dropdown
+        const start = (this.state.pnl.page - 1) * this.state.pnl.limit;
+        return lines.slice(start, start + this.state.pnl.limit);
+    }
+
+    get paginatedTaxHistory() {
+        const start = (this.state.taxLedger.page - 1) * this.state.taxLedger.limit;
+        return this.state.taxLedger.history.slice(start, start + this.state.taxLedger.limit);
+    }
+
+    changeTransientPage(tab, direction) {
+        const obj = this.state[tab];
+        const total = tab === 'pnl' ? this.displayPnlLines.length : obj.history.length;
+        const newPage = obj.page + direction;
+        const maxPage = Math.max(1, Math.ceil(total / obj.limit));
+        
+        if (newPage >= 1 && newPage <= maxPage) {
+            obj.page = newPage;
+        }
+    }
+    // --- UNIVERSAL LIST HANDLERS ---
+    onSearchInput(ev, listKey) {
+        this.state.filters[listKey].search = ev.target.value;
+        this.state.pagination[listKey].page = 1; // Reset to page 1 on new search
+        this.debouncedFetchActiveList();
+    }
+
+    onFilterChange(listKey) {
+        this.state.pagination[listKey].page = 1;
+        this.fetchActiveList(); // Dropdowns don't need debouncing, fetch immediately
+    }
+
+    changePage(listKey, direction) {
+        const pag = this.state.pagination[listKey];
+        const newPage = pag.page + direction;
+        const maxPage = Math.max(1, Math.ceil(pag.total / pag.limit));
+        
+        if (newPage >= 1 && newPage <= maxPage) {
+            pag.page = newPage;
+            this.fetchActiveList();
+        }
+    }
+
+    setInvoiceSubTab(subTabName) { 
+        this.state.invoiceSubTab = subTabName; 
+        this.resetDetailViews(); 
+        
+        const stateKeyMap = {
+            'all_orders': 'allOrders', 
+            'orders': 'orders', 
+            'customer_invoices': 'invoices',
+            'credit_notes': 'creditNotes', 
+            'payments': 'payments'
+        };
+        
+        const key = stateKeyMap[subTabName];
+        if (key && this.state.pagination[key]) {
+            this.state.pagination[key].page = 1;
+        }
+        this.fetchActiveList(); 
+    }
+
+    async fetchActiveList() {
+        if (!['invoices', 'expenses', 'credit'].includes(this.state.activeSubTab)) return;
+        
+        const tabMap = {
+            'all_orders': { stateKey: 'allOrders', model: 'sale.order', fields: ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"] },
+            'orders': { stateKey: 'orders', model: 'sale.order', fields: ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"] },
+            'customer_invoices': { stateKey: 'invoices', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"] },
+            'credit_notes': { stateKey: 'creditNotes', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"] },
+            'payments': { stateKey: 'payments', model: 'account.payment', fields: ["name", "partner_id", "date", "amount", "journal_id", "memo", "state", "shahtaj_payment_channel", "shahtaj_payer_bank_name", "shahtaj_payer_account_number", "shahtaj_instrument_reference", "shahtaj_payment_notes"] },
+            'credit': { stateKey: 'credits', model: 'res.partner', fields: ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "outstanding_balance"] },
+            'expenses': { stateKey: 'expenses', model: 'shahtaj.expense', fields: ['name', 'date', 'category_id', 'description', 'amount', 'journal_id', 'partner_id', 'state', 'move_name'] },
+            'categories': { stateKey: 'expenseCategories', model: 'shahtaj.expense.category', fields: ['name', 'sequence', 'active', 'note'] }
+        };
+
+        const config = this.state.activeSubTab === 'credit' 
+            ? tabMap['credit'] 
+            : (this.state.activeSubTab === 'expenses' ? tabMap[this.state.expenseSubTab] : tabMap[this.state.invoiceSubTab]);
+        if (!config) return;
+
+        this.state.isLoadingList = true;
+        try {
+            const { stateKey, model, fields } = config;
+            const pag = this.state.pagination[stateKey];
+            const filters = this.state.filters[stateKey];
+            let domain = [];
+            
+            if (stateKey === 'allOrders') domain.push(["shahtaj_visit_id", "!=", false]);
+            if (stateKey === 'orders') domain.push(["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]);
+            if (stateKey === 'invoices') domain.push(["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]);
+            if (stateKey === 'creditNotes') domain.push(["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]);
+            if (stateKey === 'payments') domain.push(["partner_id.is_shahtaj_shop", "=", true]);
+            if (stateKey === 'credits') domain.push(["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]);
+
+            if (filters.search) {
+                if (stateKey === 'credits') {
+                    domain.push('|', ['name', 'ilike', filters.search], ['owner_name', 'ilike', filters.search]);
+                } else {
+                    domain.push('|', ['name', 'ilike', filters.search], ['partner_id.name', 'ilike', filters.search]);
+                }
+            }
+
+            if (filters.status && filters.status !== 'all') {
+                if (stateKey === 'credits') {
+                    if (filters.status === 'Cash') domain.push(['shahtaj_shop_category', '=', 'cash']);
+                }
+                if (stateKey === 'invoices' || stateKey === 'creditNotes') {
+                    if (filters.status === 'Posted') domain.push(['state', '=', 'posted'], ['payment_state', 'in', ['not_paid']]);
+                    if (filters.status === 'Paid' || filters.status === 'Paid/Reconciled') domain.push(['payment_state', 'in', ['paid', 'in_payment', 'reversed']]);
+                    if (filters.status === 'Partial') domain.push(['payment_state', '=', 'partial']);
+                    if (filters.status === 'Draft') domain.push(['state', '=', 'draft']);
+                    if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancel']);
+                }
+                if (stateKey === 'allOrders') {
+                    if (filters.status === 'Confirmed') domain.push(['state', 'not in', ['draft', 'cancel']]);
+                    if (filters.status === 'Draft') domain.push(['state', '=', 'draft']);
+                    if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancel']);
+                }
+            }
+
+            // 4. FIRE DUAL QUERIES (Total Count + Paged Records)
+            const [total, records] = await Promise.all([
+                this.orm.searchCount(model, domain),
+                this.orm.searchRead(model, domain, fields, { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: "id desc" })
+            ]);
+            this.state.pagination[stateKey].total = total;
+            // 5. MAP DATA TO UI
+            if (stateKey === 'credits') {
+                this.state.credits = records.map((shop) => {
+                    const limit = shop.credit_limit || 0;
+                    const utilized = shop.outstanding_balance || 0;
+                    let status = "Healthy";
+                    if (shop.shahtaj_shop_category === "cash") status = "Cash";
+                    else if (limit > 0) {
+                        if (utilized > limit) status = "Exceeded";
+                        else if (utilized >= limit * 0.85) status = "Critical";
+                    }
+                    return {
+                        id: shop.id, shopId: shop.id, shop: shop.name, owner: shop.owner_name || "N/A",
+                        route: shop.route_id ? shop.route_id[1] : "Unassigned",
+                        limit: shop.shahtaj_shop_category === "cash" ? "N/A" : limit.toLocaleString(),
+                        rawLimit: limit, utilized: utilized.toLocaleString(), rawUtilized: utilized,
+                        available: Math.max(0, limit - utilized).toLocaleString(), status,
+                        outstanding: utilized.toLocaleString(), rawOutstanding: utilized,
+                    };
+                });
+            }
+            if (stateKey === 'invoices' || stateKey === 'creditNotes') {
+                this.state[stateKey] = records.map((inv) => {
+                    let status = "Draft";
+                    if (inv.state === "cancel") status = "Cancelled";
+                    else if (inv.state === "posted") {
+                        if (["paid", "in_payment", "reversed"].includes(inv.payment_state)) status = stateKey === 'creditNotes' ? "Paid/Reconciled" : "Paid";
+                        else if (inv.payment_state === "partial") status = "Partial";
+                        else status = "Posted";
+                    }
+                    return {
+                        id: inv.id, display_name: inv.name && inv.name !== "/" ? inv.name : `Draft Document (*${inv.id})`,
+                        shop: inv.partner_id ? inv.partner_id[1] : "Unknown",
+                        date: inv.invoice_date || "Not set", amount: (inv.amount_total || 0).toLocaleString(),
+                        residual: (inv.amount_residual || 0).toLocaleString(), rawResidual: inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total,
+                        status, journal_id: inv.journal_id ? inv.journal_id[0] : false,
+                    };
+                });
+            }
+            else if (stateKey === 'allOrders' || stateKey === 'orders') {
+                this.state[stateKey] = records.map((o) => ({
+                    id: o.id, display_name: o.name,
+                    shop: o.partner_id ? o.partner_id[1] : "Unknown", shopId: o.partner_id ? o.partner_id[0] : false,
+                    booker: o.user_id ? o.user_id[1] : "Unassigned", bookerId: o.user_id ? o.user_id[0] : false,
+                    date: o.date_order ? o.date_order.split(" ")[0] : "N/A",
+                    amount: (o.amount_total || 0).toLocaleString(), rawAmount: o.amount_total || 0,
+                    untaxedAmount: (o.amount_untaxed || 0).toLocaleString(),
+                    paymentTerms: o.payment_term_id ? o.payment_term_id[1] : "Immediate",
+                    pricelist: o.pricelist_id ? o.pricelist_id[1] : "Default (PKR)",
+                    visit: o.shahtaj_visit_id ? o.shahtaj_visit_id[1] : "N/A",
+                    status: o.state === "cancel" ? "Cancelled" : (o.state === "draft" ? "Draft" : "Confirmed"),
+                    invoice_status: o.invoice_status,
+                }));
+            }
+            else if (stateKey === 'payments') {
+                this.state.payments = records.map((pay) => ({
+                    id: pay.id, display_name: pay.name ? pay.name : `Processing... (#${pay.id})`,
+                    shop: pay.partner_id ? pay.partner_id[1] : "Unknown",
+                    date: pay.date || "N/A", amount: (pay.amount || 0).toLocaleString(),
+                    method: pay.journal_id ? pay.journal_id[1] : "Manual", ref: pay.memo || "N/A",
+                    status: ["paid", "in_process", "posted", "reconciled"].includes(pay.state) ? "Paid" : (pay.state === "cancel" ? "Cancelled" : "Draft"),
+                    channel: pay.shahtaj_payment_channel || "cash", bank: pay.shahtaj_payer_bank_name || "N/A",
+                    account: pay.shahtaj_payer_account_number || "N/A", reference: pay.shahtaj_instrument_reference || "N/A",
+                    notes: pay.shahtaj_payment_notes || "N/A",
+                }));
+            }
+            else if (stateKey === 'balances') {
+                this.state.balances = records.map((shop) => ({
+                    id: shop.id, shopId: shop.id, shop: shop.name, owner: shop.owner_name || "N/A",
+                    route: shop.route_id ? shop.route_id[1] : "Unassigned", category: shop.shahtaj_shop_category === "cash" ? "Cash" : "Credit",
+                    limit: shop.shahtaj_shop_category === "cash" ? "N/A" : (shop.credit_limit || 0).toLocaleString(),
+                    rawLimit: shop.credit_limit || 0, outstanding: (shop.outstanding_balance || 0).toLocaleString(),
+                    rawOutstanding: shop.outstanding_balance || 0,
+                }));
+            }
+            if (stateKey === 'expenses') {
+                this.state.tableExpenses = records.map(e => ({
+                    id: e.id, name: e.name, date: e.date,
+                    category: e.category_id ? e.category_id[1] : 'Unknown',
+                    description: e.description,
+                    amount: (e.amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2}),
+                    journal: e.journal_id ? e.journal_id[1] : 'Unknown',
+                    partner: e.partner_id ? e.partner_id[1] : 'None',
+                    state: e.state, move_name: e.move_name || ''
+                }));
+            } else if (stateKey === 'expenseCategories') {
+                this.state.tableExpenseCategories = records;
+            }
+        } catch (error) {
+            this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
+        } finally {
+            this.state.isLoadingList = false;
+        }
+    }
+    setCreditSubView(viewName) {
+        this.state.creditSubView = viewName;
+        this.state.selectedShopBalance = null;
+        this.state.pagination.credits.page = 1;
+        this.fetchActiveList();
+    }
+
+    viewShopBalance(bal) {
+        this.state.selectedShopBalance = { ...bal };
+    }
+
+    async saveShopBalanceLimit() {
+        try {
+            const shop = this.state.selectedShopBalance;
+            await this.orm.write("res.partner", [shop.id], { credit_limit: parseFloat(shop.rawLimit) });
+            await this.refreshFinancialLists();
+            this.state.selectedShopBalance = null;
+            this.notification.add("Credit limit saved successfully.", { type: "success" });
+        } catch (error) { 
+            this.notification.add("Failed to save limit: " + (error.data?.message || error.message), { type: "danger" }); 
+        }
     }
     //  NEW HELPER METHOD FOR GLOBAL SUBTAB SWITCHING ---
     requestTabSwitch(tabName, subTabName) {
@@ -175,7 +454,7 @@ export class FinancialsInvoicing extends Component {
         
         // Also update local state instantly for a snappy UI transition
         if (tabName === 'financials') {
-            if (['credit', 'pnl', 'money', 'cash'].includes(subTabName)) {
+            if (['credit', 'pnl', 'money', 'cash', 'tax_ledger'].includes(subTabName)) {
                 this.setSubTab(subTabName);
             } else {
                 this.state.activeSubTab = 'invoices';
@@ -183,19 +462,7 @@ export class FinancialsInvoicing extends Component {
             }
         }
     }
-    // --- NEW: Core Methods ---
-    async refreshData() {
-        this.state.isRefreshing = true;
-        try {
-            await this.fetchRealData({ includeLookups: true, includePnl: this.state.activeSubTab === 'pnl' });
-            if (this.state.activeSubTab === 'money') {
-                await this.loadMoneyOverview();
-            }
-        } finally {
-            this.state.isRefreshing = false;
-        }
-    }
-
+   
     showConfirm(title, message, onConfirmCallback) {
         this.state.confirmModal = {
             isOpen: true,
@@ -211,18 +478,22 @@ export class FinancialsInvoicing extends Component {
     closeConfirm() {
         this.state.confirmModal.isOpen = false;
     }
-
-    // --- DYNAMIC FILTER GETTERS ---
-    get filteredAllOrders() {
-        const query = this.state.filters.allOrders.search.toLowerCase();
-        const status = this.state.filters.allOrders.status;
-        return this.state.allOrders.filter(o => {
-            const matchesSearch = !query || o.display_name.toLowerCase().includes(query) || o.shop.toLowerCase().includes(query);
-            const matchesStatus = status === 'all' || o.status === status;
-            return matchesSearch && matchesStatus;
-        });
+   
+    showConfirm(title, message, onConfirmCallback) {
+        this.state.confirmModal = {
+            isOpen: true,
+            title: title,
+            message: message,
+            onConfirm: async () => {
+                this.state.confirmModal.isOpen = false;
+                if (onConfirmCallback) await onConfirmCallback();
+            }
+        };
     }
-    // --- NEW: Core Methods ---
+
+    closeConfirm() {
+        this.state.confirmModal.isOpen = false;
+    }
     async refreshData() {
         this.state.isRefreshing = true;
         try {
@@ -230,6 +501,8 @@ export class FinancialsInvoicing extends Component {
             if (this.state.activeSubTab === 'money') {
                 await this.loadMoneyOverview();
             }
+            // NEW: Instantly refresh the paginated data table
+            await this.fetchActiveList(); 
         } finally {
             this.state.isRefreshing = false;
         }
@@ -313,205 +586,40 @@ export class FinancialsInvoicing extends Component {
         return this.state.pnl.lines.filter(l => String(l.id) === String(this.state.pnl.selectedProductLineId));
     }
 
-    // --- GLOBAL DATA FETCHER (parallel; lookups optional; P&L only when needed) ---
+   // --- GLOBAL DATA FETCHER (Stripped down for Performance) ---
     async fetchRealData(options = {}) {
         const includeLookups = options.includeLookups !== false;
-        const includePnl = options.includePnl === true
-            || (options.includePnl !== false && this.state.activeSubTab === 'pnl');
+        const includePnl = options.includePnl === true || (options.includePnl !== false && this.state.activeSubTab === 'pnl');
 
-        const safeSearch = async (label, ...args) => {
-            try {
-                return await this.orm.searchRead(...args);
-            } catch (error) {
-                console.error(`${label} Fetch Error:`, error);
-                return null;
-            }
-        };
+        // 1. Fetch only necessary Lookups for dropdowns
+        if (includeLookups) {
+            const productDomain = [["sale_ok", "=", true], ["active", "=", true], ["product_tmpl_id.active", "=", true]];
+            const [taxesData, prodData, journalsData] = await Promise.all([
+                this.orm.searchRead("account.tax", [["type_tax_use", "=", "sale"], ["active", "=", true]], ["id", "name", "amount"]),
+                this.orm.searchRead("product.product", productDomain, ["id", "name", "display_name"]),
+                this.orm.searchRead("account.journal", [["type", "in", ["bank", "cash"]]], ["name", "type"])
+            ]);
+            this.state.availableTaxes = taxesData || [];
+            this.state.allProducts = prodData || [];
+            this.state.products = (prodData || []).map((p) => ({ id: p.id, name: p.display_name || p.name }));
+            this.state.journals = journalsData || [];
+        }
 
-        const productDomain = [
-            ["sale_ok", "=", true],
-            ["active", "=", true],
-            ["product_tmpl_id.active", "=", true],
-        ];
-
-        const [
-            allOrdersData,
-            invoicesData,
-            creditNotesData,
-            paymentsData,
-            shopsData,
-            taxesData,
-            prodData,
-            journalsData,
-        ] = await Promise.all([
-            safeSearch(
-                "All Orders",
-                "sale.order",
-                [["shahtaj_visit_id", "!=", false]],
-                ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"]
-            ),
-            safeSearch(
-                "Invoices",
-                "account.move",
-                [["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]],
-                ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"]
-            ),
-            safeSearch(
-                "Credit Notes",
-                "account.move",
-                [["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]],
-                ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"]
-            ),
-            safeSearch(
-                "Payments",
-                "account.payment",
-                [["partner_id.is_shahtaj_shop", "=", true]],
-                [
-                    "name", "partner_id", "date", "amount", "journal_id", "memo", "state",
-                    "shahtaj_payment_channel", "shahtaj_payer_bank_name", "shahtaj_payer_account_number",
-                    "shahtaj_instrument_reference", "shahtaj_payment_notes",
-                ]
-            ),
-            safeSearch(
-                "Shop Balances",
-                "res.partner",
-                [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]],
-                ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "outstanding_balance"]
-            ),
-            includeLookups
-                ? safeSearch(
-                    "Taxes",
-                    "account.tax",
-                    [["type_tax_use", "=", "sale"], ["active", "=", true]],
-                    ["id", "name", "amount"]
-                )
-                : Promise.resolve(null),
-            includeLookups
-                ? safeSearch(
-                    "Products",
-                    "product.product",
-                    productDomain,
-                    ["id", "name", "display_name"]
-                )
-                : Promise.resolve(null),
-            includeLookups
-                ? safeSearch(
-                    "Journals",
-                    "account.journal",
-                    [["type", "in", ["bank", "cash"]]],
-                    ["name", "type"]
-                )
-                : Promise.resolve(null),
+        // 2. Fetch lightning-fast counts for the 5 KPI Cards
+        const [totalOrders, toInvoice, openInvoices, creditNotes, approvedShops] = await Promise.all([
+            this.orm.searchCount("sale.order", [["shahtaj_visit_id", "!=", false]]),
+            this.orm.searchCount("sale.order", [["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]]),
+            this.orm.searchCount("account.move", [["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true], ["state", "=", "posted"], ["payment_state", "in", ["not_paid", "partial"]]]),
+            this.orm.searchCount("account.move", [["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]]),
+            this.orm.searchCount("res.partner", [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]])
         ]);
 
-        if (allOrdersData) {
-            this.state.allOrders = allOrdersData.map((o) => ({
-                id: o.id,
-                display_name: o.name,
-                shop: o.partner_id ? o.partner_id[1] : "Unknown",
-                shopId: o.partner_id ? o.partner_id[0] : false,
-                booker: o.user_id ? o.user_id[1] : "Unassigned",
-                bookerId: o.user_id ? o.user_id[0] : false,
-                date: o.date_order ? o.date_order.split(" ")[0] : "N/A",
-                amount: (o.amount_total || 0).toLocaleString(),
-                rawAmount: o.amount_total || 0,
-                untaxedAmount: (o.amount_untaxed || 0).toLocaleString(),
-                paymentTerms: o.payment_term_id ? o.payment_term_id[1] : "Immediate",
-                pricelist: o.pricelist_id ? o.pricelist_id[1] : "Default (PKR)",
-                visit: o.shahtaj_visit_id ? o.shahtaj_visit_id[1] : "N/A",
-                status: o.state === "cancel" ? "Cancelled" : (o.state === "draft" ? "Draft" : "Confirmed"),
-                invoice_status: o.invoice_status,
-            }));
-            this.state.orders = this.state.allOrders.filter((o) => o.invoice_status === "to invoice");
-        }
+        this.state.stats = { totalOrders, toInvoice, openInvoices, creditNotes, approvedShops };
 
-        if (invoicesData) {
-            this.state.invoices = invoicesData.map((inv) => {
-                let status = "Draft";
-                if (inv.state === "cancel") status = "Cancelled";
-                else if (inv.state === "posted") {
-                    if (["paid", "in_payment", "reversed"].includes(inv.payment_state)) status = "Paid";
-                    else if (inv.payment_state === "partial") status = "Partial";
-                    else status = "Posted";
-                }
-                return {
-                    id: inv.id,
-                    display_name: (inv.name && inv.name !== "/") ? inv.name : `Draft Invoice (*${inv.id})`,
-                    shop: inv.partner_id ? inv.partner_id[1] : "Unknown",
-                    untaxedAmount: (inv.amount_untaxed || 0).toLocaleString(),
-                    taxAmount: (inv.amount_tax || 0).toLocaleString(),
-                    date: inv.invoice_date || "Not set",
-                    amount: (inv.amount_total || 0).toLocaleString(),
-                    rawAmount: inv.amount_total || 0,
-                    residual: (inv.amount_residual || 0).toLocaleString(),
-                    rawResidual: inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total,
-                    status,
-                    journal_id: inv.journal_id ? inv.journal_id[0] : false,
-                };
-            });
-        }
-
-        if (creditNotesData) {
-            this.state.creditNotes = creditNotesData.map((cn) => {
-                let status = "Draft";
-                if (cn.state === "cancel") status = "Cancelled";
-                else if (cn.state === "posted") {
-                    if (["paid", "in_payment", "reversed"].includes(cn.payment_state)) status = "Paid/Reconciled";
-                    else if (cn.payment_state === "partial") status = "Partial";
-                    else status = "Posted";
-                }
-                return {
-                    id: cn.id,
-                    display_name: (cn.name && cn.name !== "/") ? cn.name : `Draft Refund (*${cn.id})`,
-                    shop: cn.partner_id ? cn.partner_id[1] : "Unknown",
-                    untaxedAmount: (cn.amount_untaxed || 0).toLocaleString(),
-                    taxAmount: (cn.amount_tax || 0).toLocaleString(),
-                    date: cn.invoice_date || "Not set",
-                    amount: (cn.amount_total || 0).toLocaleString(),
-                    rawAmount: cn.amount_total || 0,
-                    residual: (cn.amount_residual || 0).toLocaleString(),
-                    rawResidual: cn.amount_residual !== undefined ? cn.amount_residual : cn.amount_total,
-                    status,
-                    journal_id: cn.journal_id ? cn.journal_id[0] : false,
-                };
-            });
-        }
-
-        if (paymentsData) {
-            this.state.payments = paymentsData.map((pay) => ({
-                id: pay.id,
-                display_name: pay.name ? pay.name : `Processing... (#${pay.id})`,
-                shop: pay.partner_id ? pay.partner_id[1] : "Unknown",
-                date: pay.date || "N/A",
-                amount: (pay.amount || 0).toLocaleString(),
-                method: pay.journal_id ? pay.journal_id[1] : "Manual",
-                ref: pay.memo || "N/A",
-                status: ["paid", "in_process", "posted", "reconciled"].includes(pay.state)
-                    ? "Paid"
-                    : (pay.state === "cancel" ? "Cancelled" : "Draft"),
-                channel: pay.shahtaj_payment_channel || "cash",
-                bank: pay.shahtaj_payer_bank_name || "N/A",
-                account: pay.shahtaj_payer_account_number || "N/A",
-                reference: pay.shahtaj_instrument_reference || "N/A",
-                notes: pay.shahtaj_payment_notes || "N/A",
-            }));
-        }
-
-        if (shopsData) {
-            this.state.balances = shopsData.map((shop) => ({
-                id: shop.id,
-                shopId: shop.id,
-                shop: shop.name,
-                owner: shop.owner_name || "N/A",
-                route: shop.route_id ? shop.route_id[1] : "Unassigned",
-                category: shop.shahtaj_shop_category === "cash" ? "Cash" : "Credit",
-                limit: shop.shahtaj_shop_category === "cash" ? "N/A" : (shop.credit_limit || 0).toLocaleString(),
-                rawLimit: shop.credit_limit || 0,
-                outstanding: (shop.outstanding_balance || 0).toLocaleString(),
-                rawOutstanding: shop.outstanding_balance || 0,
-            }));
-
-            this.state.credits = shopsData.map((shop) => {
+        // 3. Temporarily fetch Credit Risk data (until we migrate this tab to pagination too)
+        if (this.state.activeSubTab === 'credit' || !this.state.credits.length) {
+            const shopsData = await this.orm.searchRead("res.partner", [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]], ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "outstanding_balance"]);
+            this.state.credits = (shopsData || []).map((shop) => {
                 const limit = shop.credit_limit || 0;
                 const utilized = shop.outstanding_balance || 0;
                 let status = "Healthy";
@@ -521,40 +629,12 @@ export class FinancialsInvoicing extends Component {
                     else if (utilized >= limit * 0.85) status = "Critical";
                 }
                 return {
-                    id: shop.id,
-                    shopId: shop.id,
-                    shop: shop.name,
-                    limit: limit.toLocaleString(),
-                    rawLimit: limit,
-                    utilized: utilized.toLocaleString(),
-                    rawUtilized: utilized,
-                    available: Math.max(0, limit - utilized).toLocaleString(),
-                    status,
+                    id: shop.id, shopId: shop.id, shop: shop.name, limit: limit.toLocaleString(),
+                    rawLimit: limit, utilized: utilized.toLocaleString(), rawUtilized: utilized,
+                    available: Math.max(0, limit - utilized).toLocaleString(), status,
                 };
             });
         }
-
-        if (taxesData) {
-            this.state.availableTaxes = taxesData;
-        }
-        if (prodData) {
-            this.state.allProducts = prodData;
-            this.state.products = prodData.map((p) => ({
-                id: p.id,
-                name: p.display_name || p.name,
-            }));
-        }
-        if (journalsData) {
-            this.state.journals = journalsData;
-        }
-
-        this.state.stats = {
-            totalOrders: this.state.allOrders.length,
-            toInvoice: this.state.orders.length,
-            openInvoices: this.state.invoices.filter((i) => i.status === "Posted" || i.status === "Partial").length,
-            creditNotes: this.state.creditNotes.length,
-            approvedShops: this.state.balances.length,
-        };
 
         if (includePnl) {
             await this.fetchPnlData();
@@ -567,6 +647,8 @@ export class FinancialsInvoicing extends Component {
         if (this.state.activeSubTab === "money") {
             await this.loadMoneyOverview();
         }
+        // NEW: Instantly refresh the UI after confirming, drafting, or paying an invoice
+        await this.fetchActiveList(); 
     }
   
 
@@ -594,6 +676,7 @@ export class FinancialsInvoicing extends Component {
                 "amount_invoiced", "amount_credit_notes", "amount_net_sales", 
                 "amount_legacy_invoiced", "amount_cogs", "amount_gross_profit", 
                 "amount_manufacturer_payable", "amount_payments_received", "amount_shop_outstanding",
+                "amount_operating_expense", "amount_net_profit", "expense_count",
                 "line_ids"
             ]);
 
@@ -623,7 +706,7 @@ export class FinancialsInvoicing extends Component {
             }
         } catch (error) {
             console.error("P&L Fetch Error:", error);
-            alert("Failed to load Profit & Loss data.");
+            this.notification.add("Failed to load Profit & Loss data.", { type: "danger" });
         }
         this.state.pnl.isLoading = false;
     }
@@ -653,14 +736,13 @@ export class FinancialsInvoicing extends Component {
             });
         } catch (error) {
             console.error("Print Error:", error);
-            alert("Failed to print Manufacturer Summary.");
+            this.notification.add("Failed to print Manufacturer Summary.", { type: "danger" });
         } finally {
             this.state.pnl.isLoading = false;
         }
     }
 
     setSubTab(tabName) { this.state.activeSubTab = tabName; this.resetDetailViews(); }
-    setInvoiceSubTab(subTabName) { this.state.invoiceSubTab = subTabName; this.resetDetailViews(); }
     
     resetDetailViews() {
         this.state.selectedInvoice = null;
@@ -670,14 +752,130 @@ export class FinancialsInvoicing extends Component {
         this.state.selectedOrderLines = []; 
         this.state.selectedPayment = null;
         this.state.selectedShop = null;
+        this.state.selectedExpense = null; // NEW
         this.closePaymentModal();
         this.closeRefundModal();
+        this.closeExpenseMoveModal();
+    }
+    async viewExpense(exp) {
+        this.state.isLoadingLines = true;
+        try {
+            const data = await this.orm.read("shahtaj.expense", [exp.id], [
+                "name", "date", "category_id", "description", "amount", 
+                "journal_id", "partner_id", "state", "move_name", "notes", "move_id"
+            ]);
+            
+            if (data.length > 0) {
+                const e = data[0];
+                this.state.selectedExpense = {
+                    id: e.id,
+                    name: e.name,
+                    date: e.date,
+                    category: e.category_id ? e.category_id[1] : 'Unknown',
+                    description: e.description,
+                    amount: (e.amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2}),
+                    journal: e.journal_id ? e.journal_id[1] : 'Unknown',
+                    partner: e.partner_id ? e.partner_id[1] : 'None',
+                    state: e.state,
+                    notes: e.notes || 'No notes provided.',
+                    move_name: e.move_name || '',
+                    has_move: !!e.move_id
+                };
+            }
+        } catch (error) {
+            this.notification.add("Failed to load expense details.", { type: "danger" });
+        } finally {
+            this.state.isLoadingLines = false;
+        }
     }
 
-    _refreshSelectedInvoiceState(invoiceId) {
-        let updatedInv = this.state.invoices.find(i => i.id === invoiceId);
-        if (!updatedInv) updatedInv = this.state.creditNotes.find(i => i.id === invoiceId);
-        if (updatedInv) this.state.selectedInvoice = updatedInv;
+    async viewExpenseJournalEntry(expenseId) {
+        this.state.isLoadingLines = true;
+        try {
+            // 1. Fetch the expense to get the exact Journal Entry ID
+            const expData = await this.orm.read("shahtaj.expense", [expenseId], ["move_id"]);
+            if (!expData[0].move_id) return;
+            const moveId = expData[0].move_id[0];
+
+            // 2. Fetch the Journal Entry details
+            const moves = await this.orm.read("account.move", [moveId], ["name", "ref", "date", "journal_id", "state"]);
+            const move = moves[0];
+
+            // 3. Fetch the individual Journal Items (Debits & Credits)
+            const lines = await this.orm.searchRead(
+                "account.move.line", 
+                [["move_id", "=", moveId]], 
+                ["account_id", "name", "debit", "credit"]
+            );
+
+            // 4. Map it to the state for the modal
+            this.state.selectedExpenseMove = {
+                name: move.name,
+                ref: move.ref,
+                date: move.date,
+                journal: move.journal_id ? move.journal_id[1] : '',
+                state: move.state === 'posted' ? 'Posted' : 'Draft',
+                lines: lines.map(l => ({
+                    id: l.id,
+                    account: l.account_id ? l.account_id[1] : '',
+                    label: l.name,
+                    debit: l.debit || 0,
+                    credit: l.credit || 0
+                }))
+            };
+            this.state.showExpenseMoveModal = true;
+        } catch(error) {
+            this.notification.add("Failed to load journal entry details.", {type: "danger"});
+        } finally {
+            this.state.isLoadingLines = false;
+        }
+    }
+
+    closeExpenseMoveModal() {
+        this.state.showExpenseMoveModal = false;
+        this.state.selectedExpenseMove = null;
+    }
+
+    async _refreshSelectedInvoiceState(invoiceId) {
+        try {
+            // Fetch the exact invoice from the database
+            const records = await this.orm.searchRead(
+                "account.move", 
+                [["id", "=", invoiceId]], 
+                ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"]
+            );
+            
+            if (records.length > 0) {
+                const inv = records[0];
+                let status = "Draft";
+                if (inv.state === "cancel") status = "Cancelled";
+                else if (inv.state === "posted") {
+                    if (["paid", "in_payment", "reversed"].includes(inv.payment_state)) {
+                        status = this.state.invoiceSubTab === 'credit_notes' ? "Paid/Reconciled" : "Paid";
+                    }
+                    else if (inv.payment_state === "partial") status = "Partial";
+                    else status = "Posted";
+                }
+                
+                // Build the master object (preserves header info)
+                const mappedInv = {
+                    id: inv.id, 
+                    display_name: inv.name && inv.name !== "/" ? inv.name : `Draft Document (*${inv.id})`,
+                    shop: inv.partner_id ? inv.partner_id[1] : "Unknown",
+                    date: inv.invoice_date || "Not set", 
+                    amount: (inv.amount_total || 0).toLocaleString(),
+                    residual: (inv.amount_residual || 0).toLocaleString(), 
+                    rawResidual: inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total,
+                    status: status, 
+                    journal_id: inv.journal_id ? inv.journal_id[0] : false,
+                };
+                
+                // Automatically pipe it into viewInvoice to fetch the lines and restore the UI
+                await this.viewInvoice(mappedInv);
+            }
+        } catch (error) {
+            console.error("Failed to refresh invoice state:", error);
+        }
     }
   
 
@@ -788,7 +986,7 @@ export class FinancialsInvoicing extends Component {
             await this.refreshFinancialLists();
             this.setInvoiceSubTab('customer_invoices');
         } catch (error) { 
-            alert(`Backend rejected the invoice creation:\n\n${error.data?.message || error.message}`);
+            this.notification.add(`Backend rejected the invoice creation:\n\n${error.data?.message || error.message}`, { type: "danger" });
         }
         this.state.isCreatingInvoice = false;
     }
@@ -805,9 +1003,65 @@ export class FinancialsInvoicing extends Component {
         if (tabName === 'pnl') {
             this.fetchPnlData();
         }
+        if (tabName === 'tax_ledger') {
+            this.fetchTaxLedgerData();
+        }
     }
-    setInvoiceSubTab(subTabName) { this.state.invoiceSubTab = subTabName; this.resetDetailViews(); }
 
+    // --- TAX LEDGER DATA FETCHER ---
+    async fetchTaxLedgerData() {
+        this.state.taxLedger.isLoading = true;
+        try {
+            // 1. Create a temporary backend Tax Ledger record with our chosen dates
+            const ledgerIds = await this.orm.create("shahtaj.tax.ledger", [{
+                date_from: this.state.taxLedger.date_from,
+                date_to: this.state.taxLedger.date_to
+            }]);
+            const ledgerId = ledgerIds[0];
+
+            // 2. Trigger the Python _gather_stats() math
+            await this.orm.call("shahtaj.tax.ledger", "action_refresh", [[ledgerId]]);
+
+            // 3. Read the freshly calculated totals
+            const ledgerData = await this.orm.read("shahtaj.tax.ledger", [ledgerId], [
+                "amount_tax_invoiced", "amount_tax_credited", "amount_tax_net", 
+                "summary_ids", "history_ids"
+            ]);
+
+            if (ledgerData.length > 0) {
+                this.state.taxLedger.stats = ledgerData[0];
+
+                // 4. Read Summaries
+                if (ledgerData[0].summary_ids && ledgerData[0].summary_ids.length > 0) {
+                    this.state.taxLedger.summaries = await this.orm.read("shahtaj.tax.ledger.summary", ledgerData[0].summary_ids, [
+                        "tax_name", "tax_rate", "base_invoiced", "tax_invoiced", 
+                        "base_credited", "tax_credited", "tax_net", "line_count"
+                    ]);
+                } else {
+                    this.state.taxLedger.summaries = [];
+                }
+
+                // 5. Read Detailed History
+                if (ledgerData[0].history_ids && ledgerData[0].history_ids.length > 0) {
+                    const history = await this.orm.read("shahtaj.tax.ledger.history", ledgerData[0].history_ids, [
+                        "date", "document_type", "move_name", "partner_id", "tax_id", "base_amount", "tax_amount"
+                    ]);
+                    this.state.taxLedger.history = history.map(h => ({
+                        ...h,
+                        partner_name: h.partner_id ? h.partner_id[1] : 'Unknown Shop',
+                        tax_name: h.tax_id ? h.tax_id[1] : 'Unknown Tax'
+                    }));
+                } else {
+                    this.state.taxLedger.history = [];
+                }
+            }
+        } catch (error) {
+            console.error("Tax Ledger Fetch Error:", error);
+            this.notification.add("Failed to load Tax Ledger data.", { type: "danger" });
+        } finally {
+            this.state.taxLedger.isLoading = false;
+        }
+    }
     async loadMoneyOverview() {
         this.state.money.isLoading = true;
         try {
@@ -839,13 +1093,24 @@ export class FinancialsInvoicing extends Component {
                 }
             }
 
-            const stillOwed = this.state.balances.reduce(
-                (sum, shop) => sum + (shop.rawOutstanding || 0),
-                0
+            const shopsData = await this.orm.searchRead(
+                "res.partner", 
+                [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]], 
+                ["outstanding_balance"]
             );
-            const openInvoiceAmount = this.state.invoices
-                .filter((inv) => inv.status === "Posted" || inv.status === "Partial")
-                .reduce((sum, inv) => sum + (inv.rawResidual || 0), 0);
+            const stillOwed = shopsData.reduce((sum, shop) => sum + (shop.outstanding_balance || 0), 0);
+
+            const invoicesData = await this.orm.searchRead(
+                "account.move", 
+                [
+                    ["move_type", "=", "out_invoice"], 
+                    ["partner_id.is_shahtaj_shop", "=", true], 
+                    ["state", "=", "posted"], 
+                    ["payment_state", "in", ["not_paid", "partial"]]
+                ], 
+                ["amount_residual"]
+            );
+            const openInvoiceAmount = invoicesData.reduce((sum, inv) => sum + (inv.amount_residual || 0), 0);
 
             this.state.money.collected = collected;
             this.state.money.paidOut = paidOut;
@@ -856,7 +1121,7 @@ export class FinancialsInvoicing extends Component {
             this.state.money.paymentCountOut = paymentCountOut;
         } catch (error) {
             console.error("Money Overview Fetch Error:", error);
-            alert("Failed to load money overview: " + (error.data?.message || error.message));
+            this.notification.add("Failed to load money overview: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
             this.state.money.isLoading = false;
         }
@@ -887,11 +1152,6 @@ export class FinancialsInvoicing extends Component {
         this.closeRefundModal();
     }
 
-    _refreshSelectedInvoiceState(invoiceId) {
-        let updatedInv = this.state.invoices.find(i => i.id === invoiceId);
-        if (!updatedInv) updatedInv = this.state.creditNotes.find(i => i.id === invoiceId);
-        if (updatedInv) this.state.selectedInvoice = updatedInv;
-    }
 
     async viewOrder(order) { 
         this.state.selectedOrder = order; 
@@ -1000,7 +1260,7 @@ export class FinancialsInvoicing extends Component {
             await this.refreshFinancialLists();
             this.setInvoiceSubTab('customer_invoices');
         } catch (error) { 
-            alert(`Backend rejected the invoice creation:\n\n${error.data?.message || error.message}`);
+            this.notification.add(`Backend rejected the invoice creation:\n\n${error.data?.message || error.message}`, { type: "danger" });
         }
         this.state.isCreatingInvoice = false;
     }
@@ -1010,8 +1270,8 @@ export class FinancialsInvoicing extends Component {
         try {
             await this.orm.call("account.move", "action_post", [[invoice.id]]);
             await this.refreshFinancialLists();
-            this._refreshSelectedInvoiceState(invoice.id);
-        } catch (error) { alert(error.data?.message || error.message); }
+            await this._refreshSelectedInvoiceState(invoice.id); // ADDED AWAIT
+        } catch (error) { this.notification.add(error.data?.message || error.message, { type: "danger" }); }
         this.state.isConfirming = false;
     }
 
@@ -1020,8 +1280,8 @@ export class FinancialsInvoicing extends Component {
         try {
             await this.orm.call("account.move", "button_draft", [[invoice.id]]);
             await this.refreshFinancialLists();
-            this._refreshSelectedInvoiceState(invoice.id);
-        } catch (error) { alert(error.data?.message || error.message); }
+            await this._refreshSelectedInvoiceState(invoice.id);
+        } catch (error) { this.notification.add(error.data?.message || error.message, { type: "danger" }); }
         this.state.isResetting = false;
     }
 
@@ -1031,9 +1291,9 @@ export class FinancialsInvoicing extends Component {
             try {
                 await this.orm.call("account.move", "button_cancel", [[invoice.id]]);
                 await this.refreshFinancialLists();
-                this._refreshSelectedInvoiceState(invoice.id);
+                await this._refreshSelectedInvoiceState(invoice.id);
             } catch (error) { 
-                alert("Failed to cancel invoice: " + (error.data?.message || error.message));
+                this.notification.add("Failed to cancel invoice: " + (error.data?.message || error.message), { type: "danger" });
             }
             this.state.isCancelling = false;
         });
@@ -1080,7 +1340,7 @@ export class FinancialsInvoicing extends Component {
             : this.state.selectedInvoice.full_lines;
             
         if (linesArray.length <= 1) {
-            alert("An invoice must have at least one product line.");
+            this.notification.add("An invoice must have at least one product line.", { type: "danger" });
             return;
         }
 
@@ -1112,7 +1372,7 @@ export class FinancialsInvoicing extends Component {
             for (const line of linesToSave) {
                 const prodId = line.productId || line.product_id;
                 if (!prodId) {
-                    alert("Please select a product for all lines.");
+                    this.notification.add("Please select a product for all lines.", { type: "danger" });
                     this.state.isSavingInvoice = false;
                     return;
                 }
@@ -1135,10 +1395,10 @@ export class FinancialsInvoicing extends Component {
 
             this.state.isEditingInvoice = false;
             await this.refreshFinancialLists();
-            this._refreshSelectedInvoiceState(this.state.selectedInvoice.id);
+            await this._refreshSelectedInvoiceState(this.state.selectedInvoice.id);
             await this.viewInvoice(this.state.selectedInvoice); 
         } catch (error) {
-            alert("Failed to save invoice edits: " + (error.data?.message || error.message));
+            this.notification.add("Failed to save invoice edits: " + (error.data?.message || error.message), { type: "danger" });
         }
         this.state.isSavingInvoice = false;
     }
@@ -1215,26 +1475,27 @@ export class FinancialsInvoicing extends Component {
     _validateRefundForm() {
         const form = this.state.refundForm;
         if (!form.date) {
-            alert('Please select a refund date.');
+            this.notification.add('Please select a refund date.', { type: "danger" });
             return false;
         }
         if (form.mode !== 'partial') {
             return true;
         }
         if (!form.lines.length) {
-            alert('This invoice has no product lines to credit.');
+            this.notification.add('This invoice has no product lines to credit.', { type: "danger" });
             return false;
         }
         let hasReturn = false;
         for (const line of form.lines) {
             const qty = parseFloat(line.qty);
             if (Number.isNaN(qty) || qty < 0) {
-                alert(`Invalid return quantity for "${line.product}".`);
+                this.notification.add(`Invalid return quantity for "${line.product}".`, { type: "danger" });
                 return false;
             }
             if (qty > line.maxQty) {
-                alert(
-                    `Return quantity for "${line.product}" cannot exceed invoiced qty (${line.maxQty}).`
+                this.notification.add(
+                    `Return quantity for "${line.product}" cannot exceed invoiced qty (${line.maxQty}).`,
+                    { type: "danger" }
                 );
                 return false;
             }
@@ -1243,7 +1504,7 @@ export class FinancialsInvoicing extends Component {
             }
         }
         if (!hasReturn) {
-            alert('Set at least one product return quantity greater than zero.');
+            this.notification.add('Set at least one product return quantity greater than zero.', { type: "danger" });
             return false;
         }
         const isFullSelection = form.lines.every(
@@ -1332,49 +1593,36 @@ export class FinancialsInvoicing extends Component {
         const refundMode = this.state.refundForm.mode;
         try {
             const invoiceId = this.state.selectedInvoice.id;
-            const context = {
-                active_model: 'account.move',
-                active_ids: [invoiceId],
-            };
+            const context = { active_model: 'account.move', active_ids: [invoiceId] };
             const wizardIds = await this.orm.create('account.move.reversal', [{
                 reason: this.state.refundForm.reason,
                 date: this.state.refundForm.date,
                 journal_id: this.state.selectedInvoice.journal_id,
             }], { context });
 
-            const action = await this.orm.call(
-                'account.move.reversal',
-                'reverse_moves',
-                [wizardIds],
-                { context }
-            );
+            const action = await this.orm.call('account.move.reversal', 'reverse_moves', [wizardIds], { context });
             const creditNoteId = action?.res_id;
-            if (!creditNoteId) {
-                throw new Error('Credit note was created but could not be opened.');
-            }
+            if (!creditNoteId) throw new Error('Credit note was created but could not be opened.');
 
-            // Ensure draft before trimming lines (future-dated reverses may auto-post).
             const [cnState] = await this.orm.read('account.move', [creditNoteId], ['state']);
             if (cnState?.state === 'posted' && refundMode === 'partial') {
                 await this.orm.call('account.move', 'button_draft', [[creditNoteId]]);
             }
 
-            if (refundMode === 'partial') {
-                await this._applyPartialCreditNoteLines(creditNoteId);
-            }
+            if (refundMode === 'partial') await this._applyPartialCreditNoteLines(creditNoteId);
 
             this.closeRefundModal();
-            await this.refreshFinancialLists();
-            // Open the draft CN for review/confirm — avoid setInvoiceSubTab
-            // (it clears selection via resetDetailViews).
+            
+            // FIX: Change the tabs to Credit Notes BEFORE executing the refresh
             this.state.invoiceSubTab = 'credit_notes';
             this.state.activeSubTab = 'invoices';
-            const created = this.state.creditNotes.find((cn) => cn.id === creditNoteId);
-            if (created) {
-                await this.viewInvoice(created);
-            } else {
-                this.state.selectedInvoice = null;
-            }
+            this.state.pagination.creditNotes.page = 1;
+
+            await this.refreshFinancialLists();
+            
+            // Automatically open the detailed view using the newly generated Credit Note ID
+            await this._refreshSelectedInvoiceState(creditNoteId);
+            
             this.notification.add(
                 refundMode === 'partial'
                     ? 'Partial credit note created as draft. Review lines, then Confirm Refund.'
@@ -1382,7 +1630,7 @@ export class FinancialsInvoicing extends Component {
                 { type: 'success' }
             );
         } catch (error) {
-            alert(`Refund failed:\n\n${error.data?.message || error.message}`);
+            this.notification.add(`Refund failed:\n\n${error.data?.message || error.message}`, { type: "danger" });
         }
         this.state.isRefunding = false;
     }
@@ -1437,10 +1685,10 @@ export class FinancialsInvoicing extends Component {
             
             await this.refreshFinancialLists(); 
             this.closePaymentModal();
-            this._refreshSelectedInvoiceState(form.invoice_id);
+            await this._refreshSelectedInvoiceState(form.invoice_id);
             
         } catch (error) {
-            alert(`Payment failed:\n\n${error.data?.message || error.message}`);
+            this.notification.add(`Payment failed:\n\n${error.data?.message || error.message}`, { type: "danger" });
         }
         this.state.isPaying = false;
     }
@@ -1451,8 +1699,116 @@ export class FinancialsInvoicing extends Component {
             await this.orm.write("res.partner", [shop.id], { credit_limit: parseFloat(shop.rawLimit) });
             await this.refreshFinancialLists();
             this.state.selectedShop = null;
-        } catch (error) { alert("Failed to save limit. Ensure you have distributor rights."); }
+        } catch (error) { this.notification.add("Failed to save limit. Ensure you have distributor rights.", { type: "danger" }); }
+    }
+    // --- EXPENSES LOGIC ---
+    async setExpenseSubTab(subTabName) {
+        this.state.expenseSubTab = subTabName;
+        this.state.showExpenseForm = false;
+        this.state.showCategoryForm = false;
+        this.state.selectedExpense = null; // NEW
+        
+        const key = subTabName === 'categories' ? 'expenseCategories' : 'expenses';
+        this.state.pagination[key].page = 1;
+        
+        if (subTabName === 'expenses' && this.state.expenseLookups.categories.length === 0) {
+            await this.loadExpenseLookups();
+        }
+        this.fetchActiveList();
+    }
+
+    async loadExpenseLookups() {
+        const [categories, journals, shops, bookers] = await Promise.all([
+            this.orm.searchRead('shahtaj.expense.category', [['active', '=', true]], ['id', 'name']),
+            this.orm.searchRead('account.journal', [['type', 'in', ['cash', 'bank']]], ['id', 'name']),
+            this.orm.searchRead('res.partner', [['is_shahtaj_shop','=',true]], ['id', 'name']),
+            this.orm.searchRead('res.users', [['shahtaj_is_order_booker','=',true]], ['partner_id', 'name'])
+        ]);
+        
+        const combinedPartners = [
+            ...shops.map(s => ({id: s.id, name: `Shop: ${s.name}`})), 
+            ...bookers.filter(b => b.partner_id).map(b => ({id: b.partner_id[0], name: `Booker: ${b.name}`}))
+        ];
+        
+        this.state.expenseLookups.categories = categories || [];
+        this.state.expenseLookups.journals = journals || [];
+        this.state.expenseLookups.partners = combinedPartners;
+    }
+
+    openExpenseForm() {
+        const today = new Date().toISOString().split('T')[0];
+        this.state.expenseForm = { id: null, date: today, category_id: '', description: '', amount: '', journal_id: '', partner_id: '', notes: '' };
+        this.state.showExpenseForm = true;
+    }
+
+    async saveExpense() {
+        try {
+            const f = this.state.expenseForm;
+            if (!f.category_id || !f.description || !f.amount || !f.journal_id) {
+                this.notification.add("Category, Description, Amount, and Journal are required.", { type: "warning" });
+                return;
+            }
+            const vals = {
+                date: f.date, category_id: parseInt(f.category_id), description: f.description,
+                amount: parseFloat(f.amount), journal_id: parseInt(f.journal_id),
+                partner_id: f.partner_id ? parseInt(f.partner_id) : false, notes: f.notes
+            };
+            
+            if (f.id) await this.orm.write("shahtaj.expense", [f.id], vals);
+            else await this.orm.create("shahtaj.expense", [vals]);
+            
+            this.state.showExpenseForm = false;
+            this.fetchActiveList();
+            this.notification.add("Expense saved.", { type: "success" });
+        } catch (error) { this.notification.add(error.data?.message || error.message, { type: "danger" }); }
+    }
+
+    async actionPostExpense(id) {
+        try {
+            await this.orm.call("shahtaj.expense", "action_post", [[id]]);
+            if (this.state.selectedExpense && this.state.selectedExpense.id === id) {
+                await this.viewExpense({ id }); // Refresh detail view
+            }
+            this.fetchActiveList();
+            this.notification.add("Expense posted successfully to the ledger.", { type: "success" });
+        } catch (error) { this.notification.add(error.data?.message || error.message, { type: "danger" }); }
+    }
+
+    async actionCancelExpense(id) {
+        this.showConfirm("Cancel Expense", "Are you sure you want to cancel this expense? If posted, the journal entry will be reversed.", async () => {
+            try {
+                await this.orm.call("shahtaj.expense", "action_cancel", [[id]]);
+                if (this.state.selectedExpense && this.state.selectedExpense.id === id) {
+                    await this.viewExpense({ id }); // Refresh detail view
+                }
+                this.fetchActiveList();
+            } catch (error) { this.notification.add(error.data?.message || error.message, { type: "danger" }); }
+        });
+    }
+
+    // --- EXPENSE CATEGORIES LOGIC ---
+    openCategoryForm(cat = null) {
+        if (cat) this.state.categoryForm = { id: cat.id, name: cat.name, sequence: cat.sequence, active: cat.active, note: cat.note || '' };
+        else this.state.categoryForm = { id: null, name: '', sequence: 10, active: true, note: '' };
+        this.state.showCategoryForm = true;
+    }
+
+    async saveCategory() {
+        try {
+            const f = this.state.categoryForm;
+            if (!f.name) { this.notification.add("Category name required.", { type: "warning" }); return; }
+            const vals = { name: f.name, sequence: parseInt(f.sequence), active: f.active, note: f.note };
+            
+            if (f.id) await this.orm.write("shahtaj.expense.category", [f.id], vals);
+            else await this.orm.create("shahtaj.expense.category", [vals]);
+            
+            this.state.showCategoryForm = false;
+            // NEW: Instantly reload the dropdown options so the new category appears
+            await this.loadExpenseLookups(); 
+            this.fetchActiveList();
+        } catch (error) { this.notification.add(error.data?.message || error.message, { type: "danger" }); }
     }
 }
+
 
 FinancialsInvoicing.template = "shahtaj_oil.FinancialsInvoicing";

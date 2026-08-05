@@ -176,6 +176,11 @@ class ShahtajWeeklySchedule(models.Model):
             pending.with_context(shahtaj_system_visit_write=True).write({
                 'state': 'cancelled',
             })
+            self.env['shahtaj.visit.task']._shahtaj_log_cancelled_tasks(
+                'task.cancel_forward',
+                'Cancel pending tasks (schedule occurrence)',
+                pending,
+            )
 
     def _cancel_pending_forward_tasks(self):
         """Cancel pending tasks from today forward for this weekday/route/schedule.
@@ -185,6 +190,7 @@ class ShahtajWeeklySchedule(models.Model):
         """
         Task = self.env['shahtaj.visit.task']
         today = fields.Date.context_today(self)
+        cancelled = Task.browse()
         for schedule in self:
             if not schedule.order_booker_id or not schedule.route_id:
                 continue
@@ -210,6 +216,14 @@ class ShahtajWeeklySchedule(models.Model):
                 to_cancel.with_context(shahtaj_system_visit_write=True).write({
                     'state': 'cancelled',
                 })
+                cancelled |= to_cancel
+        if cancelled:
+            Task._shahtaj_log_cancelled_tasks(
+                'task.cancel_forward',
+                'Cancel pending tasks (schedule change)',
+                cancelled,
+            )
+        return cancelled
 
     @api.depends('order_booker_id', 'route_id', 'day_of_week')
     def _compute_is_day_locked(self):

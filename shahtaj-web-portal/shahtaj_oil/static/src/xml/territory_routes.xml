@@ -9,12 +9,7 @@
                     <small class="text-muted">Create areas, define routes, map shops, and manage the geographical hierarchy for your order bookers.</small>
                 </div>
                             <div>
-                
-                <!--Removed Non-Functional Elements  -->
-                <!-- <span class="badge bg-info px-3 py-2 text-white d-inline-flex align-items-center shadow-sm" title="Live mapping is enabled for shop coordinates">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin me-2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                    Mapping Engine Active
-                </span> -->
+            
                 <!-- NEW REFRESH BUTTON -->
                 <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center ms-3" t-on-click="refreshData" t-att-disabled="this.state.isLoading" title="Refresh Territory Data">
                     <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isLoading}"></i> Refresh
@@ -27,7 +22,7 @@
 
             </div>
 
-
+<!-- Zones Tab -->
             <t t-if="this.state.activeSubTab === 'areas'">
                 <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div>
@@ -36,10 +31,9 @@
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
-                            <span class="input-group-text bg-white text-muted border-end-0">
-                                <i class="fa fa-search"></i>
-                            </span>
-                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search zone name..." t-model="this.state.areaSearchQuery" />
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="fa fa-search"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search zone name..." 
+                                   t-model="this.state.areaSearchQuery" t-on-input="() => this.onSearchInput('areas')" />
                         </div>
                         <button class="btn btn-sm btn-dark d-flex align-items-center text-white ms-2 shadow-sm" t-on-click="() => this.state.showAreaForm = true" title="Create a new overarching zone">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
@@ -73,7 +67,12 @@
                         </div>
                     </div>
                 </t>
-
+                <div class="position-relative">
+                    <t t-if="this.state.isLoadingList">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="bg-light text-uppercase small fw-bold text-muted">
@@ -86,22 +85,15 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <t t-if="this.state.areas.length === 0">
+                            <!-- 1. Show 'No zones found' ONLY if the array is completely empty -->
+                            <t t-if="this.state.tableAreas.length === 0 and !this.state.isLoadingList">
                                 <tr>
-                                    <td colspan="5" class="text-center py-5 text-muted fw-bold">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map mb-2 opacity-50">
-                                            <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/>
-                                        </svg>
-                                        <p class="mb-0">No zones configured yet. Click 'Add New Zone' to define your first territory.</p>
-                                    </td>
+                                    <td colspan="5" class="text-center py-5 text-muted fw-bold">No zones match your search or filter criteria.</td>
                                 </tr>
                             </t>
-                            <t t-elif="this.displayAreas.length === 0">
-                                <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted fw-bold">No zones match your search or filter criteria.</td>
-                                </tr>
-                            </t>
-                            <t t-foreach="this.displayAreas" t-as="area" t-key="area.id">
+                            
+                            <!-- 2. Loop through the backend-paginated array -->
+                            <t t-foreach="this.state.tableAreas" t-as="area" t-key="area.id">
                                 <tr>
                                     <td class="ps-4 fw-bold align-middle">
                                         <t t-esc="area.id"/>
@@ -129,9 +121,22 @@
                             </t>
                         </tbody>
                     </table>
+                  </div>
+                  <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.areas.total === 0 ? 0 : ((this.state.pagination.areas.page - 1) * this.state.pagination.areas.limit) + 1"/>
+                            to <t t-esc="Math.min(this.state.pagination.areas.page * this.state.pagination.areas.limit, this.state.pagination.areas.total)"/>
+                            of <t t-esc="this.state.pagination.areas.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('areas', -1)" t-att-disabled="this.state.pagination.areas.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.areas.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.areas.total / this.state.pagination.areas.limit))"/></button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('areas', 1)" t-att-disabled="this.state.pagination.areas.page &gt;= Math.ceil(this.state.pagination.areas.total / this.state.pagination.areas.limit)">Next</button>
+                        </div>
+                    </div>
                 </div>
             </t>
-
+<!-- Routes Tab -->
             <t t-if="this.state.activeSubTab === 'routes'">
                 <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div>
@@ -139,12 +144,21 @@
                         <small class="text-muted">Routes are specific paths within a Zone.</small>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
-                            <span class="input-group-text bg-white text-muted border-end-0">
-                                <i class="fa fa-search"></i>
-                            </span>
-                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search route name..." t-model="this.state.routeSearchQuery" />
+                       <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="fa fa-search"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search route name..." 
+                                   t-model="this.state.routeSearchQuery" t-on-input="() => this.onSearchInput('routes')" />
                         </div>
+                        <div class="d-flex gap-2">
+                            Filter by Zones :
+                            <select class="form-select form-select-sm shadow-sm" style="width: 150px;" t-model="this.state.routeFilterZone" t-on-change="() => this.onFilterChange('routes')">
+                            <option value="all">All Zones</option>
+                            <t t-foreach="this.state.areas" t-as="area" t-key="area.id">
+                                <option t-att-value="area.id"><t t-esc="area.name"/></option>
+                            </t>
+                        </select>
+                        </div>
+                        
                         <button class="btn btn-sm btn-dark d-flex align-items-center text-white ms-2 shadow-sm" t-on-click="() => this.state.showRouteForm = true" title="Create a new travel route">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
                                 <path d="M5 12h14"/>
@@ -188,7 +202,12 @@
                         </div>
                     </div>
                 </t>
-
+                <div class="position-relative">
+                    <t t-if="this.state.isLoadingList">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="bg-light text-uppercase small fw-bold text-muted">
@@ -201,7 +220,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <t t-if="this.state.routes.length === 0">
+                            <t t-if="this.state.tableRoutes.length === 0">
                                 <tr>
                                     <td colspan="4" class="text-center py-5 text-muted fw-bold">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route mb-2 opacity-50">
@@ -213,12 +232,12 @@
                                     </td>
                                 </tr>
                             </t>
-                            <t t-elif="this.displayRoutes.length === 0">
+                            <t t-elif="this.state.tableRoutes.length === 0">
                                 <tr>
                                     <td colspan="4" class="text-center py-4 text-muted fw-bold">No routes match your search or filter criteria.</td>
                                 </tr>
                             </t>
-                            <t t-foreach="this.displayRoutes" t-as="route" t-key="route.id">
+                            <t t-foreach="this.state.tableRoutes" t-as="route" t-key="route.id">
                                 <tr>
                                     <td class="ps-4 align-middle">
                                         <div class="text-dark fw-bold">
@@ -256,8 +275,22 @@
                         </tbody>
                     </table>
                 </div>
+                  <!-- PAGINATION FOOTER -->
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.routes.total === 0 ? 0 : ((this.state.pagination.routes.page - 1) * this.state.pagination.routes.limit) + 1"/>
+                            to <t t-esc="Math.min(this.state.pagination.routes.page * this.state.pagination.routes.limit, this.state.pagination.routes.total)"/>
+                            of <t t-esc="this.state.pagination.routes.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('routes', -1)" t-att-disabled="this.state.pagination.routes.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.routes.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.routes.total / this.state.pagination.routes.limit))"/></button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('routes', 1)" t-att-disabled="this.state.pagination.routes.page &gt;= Math.ceil(this.state.pagination.routes.total / this.state.pagination.routes.limit)">Next</button>
+                        </div>
+                    </div>
+                    </div>
             </t>
-
+<!-- Shops Tab -->
             <t t-if="this.state.activeSubTab === 'shops'">
                 <t t-if="this.state.selectedShopDetails">
                     <div class="p-4 bg-light border-bottom d-flex justify-content-between align-items-center">
@@ -416,17 +449,20 @@
                         <small class="text-danger fw-bold">This shop was rejected. You can approve it if the application should proceed.</small>
                     </t>
                 </div>
-                <div class="d-flex gap-2 flex-wrap justify-content-md-end">
+               <div class="d-flex gap-2 flex-wrap justify-content-md-end">
                     <t t-if="this.state.selectedShopDetails.shop_approval_state === 'pending'">
-                        <button class="btn btn-outline-danger fw-bold" t-on-click="rejectSelectedShop" title="Reject this shop application">
+                        <button class="btn btn-outline-danger fw-bold d-flex align-items-center" t-on-click="rejectSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Reject this shop application">
+                            <span t-if="this.state.isRejectingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             Reject
                         </button>
-                        <button class="btn btn-success fw-bold text-white" t-on-click="approveSelectedShop" title="Approve and activate this shop">
+                        <button class="btn btn-success fw-bold text-white d-flex align-items-center" t-on-click="approveSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Approve and activate this shop">
+                            <span t-if="this.state.isApprovingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             Approve Shop
                         </button>
                     </t>
                     <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'rejected'">
-                        <button class="btn btn-success fw-bold text-white" t-on-click="approveSelectedShop" title="Approve this previously rejected shop">
+                        <button class="btn btn-success fw-bold text-white d-flex align-items-center" t-on-click="approveSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Approve this previously rejected shop">
+                            <span t-if="this.state.isApprovingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             Approve Shop
                         </button>
                     </t>
@@ -443,22 +479,28 @@
             </div>
 
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <div class="input-group input-group-sm shadow-sm" style="min-width: 250px; flex-grow: 1;">
-                    <span class="input-group-text bg-white text-muted border-end-0">
-                        <i class="fa fa-search"></i>
-                    </span>
-                    <input type="text" class="form-control border-start-0 ps-0" placeholder="Search by shop or owner..." t-model="this.state.shopSearchQuery" />
+              <div class="input-group input-group-sm shadow-sm" style="min-width: 250px; flex-grow: 1;">
+                    <span class="input-group-text bg-white text-muted border-end-0"><i class="fa fa-search"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0" placeholder="Search by shop or owner..." 
+                           t-model="this.state.shopSearchQuery" t-on-input="() => this.onSearchInput('shops')" />
                 </div>
-                <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.shopFilterCategory" title="Filter by payment category">
+                <small class="fw-bold text-muted">Filters</small>
+                <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.shopFilterCategory" t-on-change="() => this.onFilterChange('shops')">
                     <option value="all">All Types</option>
                     <option value="cash">Cash Only</option>
                     <option value="credit">Credit Only</option>
                 </select>
-                <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.shopFilterStatus" title="Filter by approval status">
+                <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.shopFilterStatus" t-on-change="() => this.onFilterChange('shops')">
                     <option value="all">All Statuses</option>
                     <option value="approved">Approved</option>
                     <option value="pending">Pending Review</option>
                     <option value="rejected">Rejected</option>
+                </select>
+                <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.shopFilterBooker" t-on-change="() => this.onFilterChange('shops')">
+                    <option value="all">All Order Bookers</option>
+                    <t t-foreach="this.state.bookers" t-as="booker" t-key="booker.id">
+                        <option t-att-value="booker.id"><t t-esc="booker.name"/></option>
+                    </t>
                 </select>
                 <button class="btn btn-sm btn-dark d-flex align-items-center text-white ms-2 shadow-sm" t-on-click="() => this.state.showShopForm = true" title="Manually register a new shop to the database">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
@@ -470,7 +512,12 @@
             </div>
         </div>
 
-               <!-- Added min-height to prevent dropdown clipping on single-row tables -->
+        <div class="position-relative">
+                    <t t-if="this.state.isLoadingList">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>       <!-- Added min-height to prevent dropdown clipping on single-row tables -->
         <div class="table-responsive" style="min-height: 250px;">
             <table class="table table-hover mb-0">
                 <thead class="bg-light text-uppercase small fw-bold text-muted">
@@ -484,7 +531,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <t t-if="this.state.shops.length === 0">
+                    <t t-if="this.state.tableShops.length === 0">
                         <tr>
                             <td colspan="6" class="text-center py-5 text-muted fw-bold">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store mb-2 opacity-50">
@@ -496,12 +543,12 @@
                             </td>
                         </tr>
                     </t>
-                    <t t-elif="this.displayShops.length === 0">
+                    <t t-elif="this.state.tableShops.length === 0">
                         <tr>
                             <td colspan="6" class="text-center py-4 text-muted fw-bold">No shops match your search or filter criteria.</td>
                         </tr>
                     </t>
-                    <t t-foreach="this.displayShops" t-as="shop" t-key="shop.id">
+                    <t t-foreach="this.state.tableShops" t-as="shop" t-key="shop.id">
                         <tr>
                             <td class="ps-4 align-middle">
                                 <div class="text-dark fw-bold">
@@ -585,6 +632,20 @@
             </tbody>
         </table>
     </div>
+    <!-- PAGINATION FOOTER -->
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.shops.total === 0 ? 0 : ((this.state.pagination.shops.page - 1) * this.state.pagination.shops.limit) + 1"/>
+                            to <t t-esc="Math.min(this.state.pagination.shops.page * this.state.pagination.shops.limit, this.state.pagination.shops.total)"/>
+                            of <t t-esc="this.state.pagination.shops.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('shops', -1)" t-att-disabled="this.state.pagination.shops.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.shops.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.shops.total / this.state.pagination.shops.limit))"/></button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('shops', 1)" t-att-disabled="this.state.pagination.shops.page &gt;= Math.ceil(this.state.pagination.shops.total / this.state.pagination.shops.limit)">Next</button>
+                        </div>
+                    </div>
+                    </div>
 
 </t>
 
@@ -635,6 +696,7 @@
             <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
                 <h6 class="fw-bold text-success mb-0">2. Geographical Mapping</h6>
                 <small class="text-muted d-block mt-1">Assign the shop to a route and provide exact GPS coordinates for the map view. You can find these by right-clicking a location in Google Maps.</small>
+                <small class="text-warning fw-bold d-block mt-1">(Optional : Can be added later by editing the shop details)</small>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -661,11 +723,11 @@
                         </select>
                         <small class="text-muted" t-if="!this.state.shopForm.zone_id">Select a zone first.</small>
                     </div>
-                    <div class="col-md-2 mb-3">
+                    <div class="col-md-2  mb-3">
                         <label class="small fw-bold text-muted">GPS Latitude</label>
                         <input type="number" step="any" class="form-control" t-model="this.state.shopForm.lat" placeholder="e.g. 31.5204"/>
                     </div>
-                    <div class="col-md-2 mb-3">
+                    <div class="col-md-2  mb-3">
                         <label class="small fw-bold text-muted">GPS Longitude</label>
                         <input type="number" step="any" class="form-control" t-model="this.state.shopForm.lng" placeholder="e.g. 74.3587"/>
                     </div>
@@ -742,9 +804,15 @@
         </div>
 
         <div class="d-flex justify-content-end pb-4 mt-3">
-            <button class="btn btn-outline-secondary px-4 me-2 fw-bold" t-on-click="cancelForms">Discard Changes</button>
-            <button class="btn btn-dark px-5 text-white fw-bold" t-on-click="saveShop">
-                <t t-esc="this.state.editingShopId ? 'Update Shop Information' : 'Register Shop &amp; Submit for Review'"/>
+            <button class="btn btn-outline-secondary px-4 me-2 fw-bold" t-on-click="cancelForms" t-att-disabled="this.state.isLoading">Discard Changes</button>
+            <button class="btn btn-dark px-5 text-white fw-bold d-flex align-items-center" t-on-click="saveShop" t-att-disabled="this.state.isLoading">
+                <t t-if="this.state.isLoading">
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Processing...
+                </t>
+                <t t-else="">
+                    <t t-esc="this.state.editingShopId ? 'Update Shop Information' : 'Register Shop &amp; Submit for Review'"/>
+                </t>
             </button>
         </div>
     </div>

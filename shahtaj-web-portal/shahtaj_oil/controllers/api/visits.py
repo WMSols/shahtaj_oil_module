@@ -151,7 +151,16 @@ class ShahtajApiVisits(http.Controller):
             latitude=lat,
             longitude=lng,
         )
-        return api_success({'visit': serializers.visit_dict(visit)})
+        # Progress was force-recomputed on confirm; return fresh target stats
+        # so the client can update UI without a separate round-trip.
+        targets = request.env['shahtaj.visit.target'].search([
+            ('order_booker_id', '=', request.env.user.id),
+            ('active', '=', True),
+        ], order='date_start desc')
+        return api_success({
+            'visit': serializers.visit_dict(visit),
+            'targets': [serializers.target_dict(target) for target in targets],
+        })
 
     @http.route('/api/shahtaj/v1/visits/end-without-order', **API_ROUTE)
     @api_activity('visit.end_without_order', 'End visit without order')

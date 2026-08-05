@@ -211,26 +211,72 @@ class ShahtajVisitTask(models.Model):
         self.write({'state': 'completed'})
 
     def action_skip(self):
-        for task in self:
-            if task.visit_id and task.visit_id.state == 'in_progress':
-                raise ValidationError(_(
-                    'End the active shop visit before skipping this task.'
-                ))
-        self.write({'state': 'skipped'})
         Log = self.env['shahtaj.activity.log']
-        for task in self:
-            Log.log_business(
+        try:
+            for task in self:
+                if task.visit_id and task.visit_id.state == 'in_progress':
+                    raise ValidationError(_(
+                        'End the active shop visit before skipping this task.'
+                    ))
+            self.write({'state': 'skipped'})
+            for task in self:
+                Log.log_business(
+                    operation='task.skip',
+                    name='Skip visit task',
+                    related_record=task,
+                    message=task.display_name,
+                    status='success',
+                )
+        except Exception as exc:
+            Log.log_exception(
                 operation='task.skip',
-                name='Skip visit task',
-                related_record=task,
-                message=task.display_name,
+                name='Skip visit task failed',
+                exc=exc,
+                message=', '.join(self.mapped('display_name')),
             )
+            raise
 
     def action_cancel(self):
-        self.write({'state': 'cancelled'})
+        Log = self.env['shahtaj.activity.log']
+        try:
+            self.write({'state': 'cancelled'})
+            for task in self:
+                Log.log_business(
+                    operation='task.cancel',
+                    name='Cancel visit task',
+                    related_record=task,
+                    message=task.display_name,
+                    status='success',
+                )
+        except Exception as exc:
+            Log.log_exception(
+                operation='task.cancel',
+                name='Cancel visit task failed',
+                exc=exc,
+                message=', '.join(self.mapped('display_name')),
+            )
+            raise
 
     def action_reset_pending(self):
-        self.write({'state': 'pending'})
+        Log = self.env['shahtaj.activity.log']
+        try:
+            self.write({'state': 'pending'})
+            for task in self:
+                Log.log_business(
+                    operation='task.reset_pending',
+                    name='Reset visit task to pending',
+                    related_record=task,
+                    message=task.display_name,
+                    status='success',
+                )
+        except Exception as exc:
+            Log.log_exception(
+                operation='task.reset_pending',
+                name='Reset visit task failed',
+                exc=exc,
+                message=', '.join(self.mapped('display_name')),
+            )
+            raise
 
     def _is_booker_only_user(self):
         user = self.env.user
@@ -251,6 +297,26 @@ class ShahtajVisitTask(models.Model):
         return super().write(vals)
 
     @api.model
+    def _shahtaj_log_cancelled_tasks(self, operation, name, tasks, extra_message=None):
+        """One success row summarizing a batch cancel (avoid N logs per task)."""
+        if not tasks:
+            return
+        sample = ', '.join(tasks[:8].mapped('display_name'))
+        if len(tasks) > 8:
+            sample = f'{sample}, …'
+        message = f'cancelled={len(tasks)}'
+        if extra_message:
+            message = f'{message}; {extra_message}'
+        message = f'{message}; {sample}'
+        self.env['shahtaj.activity.log'].log_system(
+            operation=operation,
+            name=name,
+            message=message,
+            status='success',
+            related_record=tasks[:1],
+        )
+
+    @api.model
     def _cancel_pending_tasks_for_unapproved_shops(self, date_from=None, date_to=None):
         """Remove pending visit tasks for shops that are not approved."""
         domain = [
@@ -264,6 +330,12 @@ class ShahtajVisitTask(models.Model):
         pending = self.search(domain)
         if pending:
             pending.with_context(shahtaj_system_visit_write=True).write({'state': 'cancelled'})
+            self._shahtaj_log_cancelled_tasks(
+                'task.cancel_unapproved',
+                'Cancel pending tasks (unapproved shops)',
+                pending,
+            )
+        return pending
 
     @api.model
     def _cancel_pending_tasks_for_non_operational(self, date_from=None, date_to=None):
@@ -281,6 +353,12 @@ class ShahtajVisitTask(models.Model):
             invalid.with_context(shahtaj_system_visit_write=True).write({
                 'state': 'cancelled',
             })
+            self._shahtaj_log_cancelled_tasks(
+                'task.cancel_non_operational',
+                'Cancel pending tasks (non-operational territory)',
+                invalid,
+            )
+        return invalid
 
     def _shahtaj_is_operational_for_booker(self):
         """True when route+shop territory chain is active for field work.
@@ -380,76 +458,137 @@ class ShahtajVisitTask(models.Model):
             orphans.with_context(shahtaj_system_visit_write=True).write({
                 'state': 'cancelled',
             })
+            booker_msg = (
+                f'booker={order_booker.display_name}'
+                if order_booker else 'booker=all'
+            )
+            self._shahtaj_log_cancelled_tasks(
+                'task.cancel_orphan',
+                'Cancel orphan pending tasks (no matching schedule)',
+                orphans,
+                extra_message=booker_msg,
+            )
         return orphans
 
     @api.model
     def _generate_from_schedules(self, date_from, date_to, order_booker=None):
         """For each day in range: match weekday schedules → one task per shop on route."""
-        self._cancel_pending_tasks_for_unapproved_shops(date_from, date_to)
-        self._cancel_pending_tasks_for_non_operational(date_from, date_to)
-        # Drop pending leftovers for routes/days no longer on the booker's plan
-        # (e.g. schedule deleted earlier without a clean cancel).
-        self._cancel_orphan_pending_tasks(
-            date_from, date_to, order_booker=order_booker,
-        )
+        Log = self.env['shahtaj.activity.log']
+        booker_label = order_booker.display_name if order_booker else 'all bookers'
+        try:
+            unapproved = self._cancel_pending_tasks_for_unapproved_shops(
+                date_from, date_to,
+            )
+            non_op = self._cancel_pending_tasks_for_non_operational(
+                date_from, date_to,
+            )
+            # Drop pending leftovers for routes/days no longer on the booker's plan
+            # (e.g. schedule deleted earlier without a clean cancel).
+            orphans = self._cancel_orphan_pending_tasks(
+                date_from, date_to, order_booker=order_booker,
+            )
 
-        Schedule = self.env['shahtaj.weekly.schedule']
-        schedule_domain = [('active', '=', True)]
-        if order_booker:
-            schedule_domain.append(('order_booker_id', '=', order_booker.id))
-        schedules = Schedule.search(schedule_domain).filtered(
-            lambda s: s.route_id._shahtaj_is_operational_for_booker(),
-        )
+            Schedule = self.env['shahtaj.weekly.schedule']
+            schedule_domain = [('active', '=', True)]
+            if order_booker:
+                schedule_domain.append(('order_booker_id', '=', order_booker.id))
+            schedules = Schedule.search(schedule_domain).filtered(
+                lambda s: s.route_id._shahtaj_is_operational_for_booker(),
+            )
 
-        created = self.env['shahtaj.visit.task']
-        skipped = 0
-        day = date_from
-        while day <= date_to:
-            weekday = str(day.weekday())
-            day_schedules = schedules.filtered(lambda s: s.day_of_week == weekday)
-            for schedule in day_schedules:
-                approved_shops = schedule.route_id.shop_ids.filtered(
-                    lambda s: s._shahtaj_is_operational_for_booker(),
+            created = self.env['shahtaj.visit.task']
+            reactivated = self.env['shahtaj.visit.task']
+            skipped = 0
+            day = date_from
+            while day <= date_to:
+                weekday = str(day.weekday())
+                day_schedules = schedules.filtered(lambda s: s.day_of_week == weekday)
+                for schedule in day_schedules:
+                    approved_shops = schedule.route_id.shop_ids.filtered(
+                        lambda s: s._shahtaj_is_operational_for_booker(),
+                    )
+                    for shop in approved_shops:
+                        existing = self.search([
+                            ('shop_id', '=', shop.id),
+                            ('scheduled_date', '=', day),
+                            ('order_booker_id', '=', schedule.order_booker_id.id),
+                        ], limit=1)
+                        if existing:
+                            if (
+                                existing.state == 'cancelled'
+                                and shop._shahtaj_is_operational_for_booker()
+                            ):
+                                existing.with_context(
+                                    shahtaj_system_visit_write=True,
+                                ).write({
+                                    'state': 'pending',
+                                    'route_id': schedule.route_id.id,
+                                    'weekly_schedule_id': schedule.id,
+                                })
+                                reactivated |= existing
+                            else:
+                                skipped += 1
+                            continue
+                        created |= self.create({
+                            'order_booker_id': schedule.order_booker_id.id,
+                            'route_id': schedule.route_id.id,
+                            'shop_id': shop.id,
+                            'scheduled_date': day,
+                            'weekly_schedule_id': schedule.id,
+                            'state': 'pending',
+                        })
+                day = fields.Date.add(day, days=1)
+
+            changed = bool(
+                created or reactivated or unapproved or non_op or orphans
+            )
+            if changed or self.env.context.get('shahtaj_force_task_generate_log'):
+                Log.log_system(
+                    operation='task.generate',
+                    name='Generate visit tasks',
+                    message=(
+                        f'{booker_label}; {date_from}→{date_to}; '
+                        f'created={len(created)} reactivated={len(reactivated)} '
+                        f'skipped={skipped}; '
+                        f'cancelled_unapproved={len(unapproved)} '
+                        f'cancelled_non_op={len(non_op)} '
+                        f'cancelled_orphan={len(orphans)}'
+                    ),
+                    status='success',
+                    related_record=(created[:1] or reactivated[:1] or None),
                 )
-                for shop in approved_shops:
-                    existing = self.search([
-                        ('shop_id', '=', shop.id),
-                        ('scheduled_date', '=', day),
-                        ('order_booker_id', '=', schedule.order_booker_id.id),
-                    ], limit=1)
-                    if existing:
-                        if (
-                            existing.state == 'cancelled'
-                            and shop._shahtaj_is_operational_for_booker()
-                        ):
-                            existing.with_context(
-                                shahtaj_system_visit_write=True,
-                            ).write({
-                                'state': 'pending',
-                                'route_id': schedule.route_id.id,
-                                'weekly_schedule_id': schedule.id,
-                            })
-                        else:
-                            skipped += 1
-                        continue
-                    created |= self.create({
-                        'order_booker_id': schedule.order_booker_id.id,
-                        'route_id': schedule.route_id.id,
-                        'shop_id': shop.id,
-                        'scheduled_date': day,
-                        'weekly_schedule_id': schedule.id,
-                        'state': 'pending',
-                    })
-            day = fields.Date.add(day, days=1)
-
-        return created, skipped
+            return created, skipped
+        except Exception as exc:
+            Log.log_exception(
+                operation='task.generate',
+                name='Generate visit tasks failed',
+                exc=exc,
+                message=f'{booker_label}; {date_from}→{date_to}',
+                source=(
+                    'cron' if self.env.context.get('shahtaj_cron') else None
+                ),
+            )
+            raise
 
     @api.model
     def _cron_auto_generate_visit_tasks(self):
         """Called daily by scheduled action for all bookers."""
         # Close abandoned visits first so leftover check-ins cannot block today.
-        self.env['shahtaj.visit']._cron_close_stale_visits()
-        self._auto_generate_window()
+        self = self.with_context(
+            shahtaj_cron=True,
+            shahtaj_force_task_generate_log=True,
+        )
+        try:
+            self.env['shahtaj.visit']._cron_close_stale_visits()
+            self._auto_generate_window()
+        except Exception as exc:
+            self.env['shahtaj.activity.log'].log_exception(
+                operation='task.generate',
+                name='Cron visit task generate failed',
+                exc=exc,
+                source='cron',
+            )
+            raise
 
     @api.model
     def _auto_generate_window(self, order_booker=None):

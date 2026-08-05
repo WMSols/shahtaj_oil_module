@@ -77,9 +77,21 @@
                 <separator/>
                 <filter name="failed" string="Failed Only" domain="[('status', '=', 'failed')]"/>
                 <filter name="success" string="Success Only" domain="[('status', '=', 'success')]"/>
+                <separator/>
                 <filter name="order_booker_api" string="Order Booker API" domain="[('source', '=', 'order_booker_api')]"/>
                 <filter name="order_booker_ui" string="Order Booker UI" domain="[('source', '=', 'order_booker_ui')]"/>
                 <filter name="distributor_ui" string="Distributor UI" domain="[('source', '=', 'distributor_ui')]"/>
+                <filter name="admin_ui" string="Admin UI" domain="[('source', '=', 'admin_ui')]"/>
+                <filter name="system_cron" string="System / Cron" domain="[('source', 'in', ['system', 'cron'])]"/>
+                <separator/>
+                <filter name="op_task" string="Visit Tasks" domain="[('operation', '=like', 'task.%')]"/>
+                <filter name="op_task_orphan" string="Task Orphan Cancel" domain="[('operation', '=', 'task.cancel_orphan')]"/>
+                <filter name="op_task_generate" string="Task Generate" domain="[('operation', '=', 'task.generate')]"/>
+                <filter name="op_schedule" string="Schedules" domain="[('operation', '=like', 'schedule.%')]"/>
+                <filter name="op_shop" string="Shops" domain="[('operation', '=like', 'shop.%')]"/>
+                <filter name="op_visit" string="Visits" domain="[('operation', '=like', 'visit.%')]"/>
+                <filter name="op_route" string="Routes" domain="[('operation', '=like', 'route.%')]"/>
+                <filter name="op_zone" string="Zones" domain="[('operation', '=like', 'zone.%')]"/>
                 <filter name="event_at" string="Event Time" date="event_at"/>
                 <separator/>
                 <filter name="group_status" string="Group by Status" context="{'group_by': 'status'}"/>

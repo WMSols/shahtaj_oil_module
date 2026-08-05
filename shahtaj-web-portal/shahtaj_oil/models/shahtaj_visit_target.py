@@ -328,6 +328,29 @@ class ShahtajVisitTarget(models.Model):
             if target.target_type in MULTI_PRODUCT_TYPES and target.line_ids:
                 target.line_ids._compute_line_progress()
 
+    def _force_recompute_progress(self):
+        """Force stored progress fields to refresh from current sale orders.
+
+        Progress depends on sale.order / sale.order.line data that is outside
+        ``@api.depends``. Calling ``_recompute_recordset()`` alone is a no-op
+        unless records are already in ``tocompute`` — so we mark + flush.
+        """
+        targets = self.exists()
+        if not targets:
+            return
+        fnames = ['achieved_value', 'remaining_value', 'progress_percent']
+        lines = targets.mapped('line_ids')
+        targets.invalidate_recordset(fnames, flush=False)
+        if lines:
+            lines.invalidate_recordset(fnames, flush=False)
+            for fname in fnames:
+                self.env.add_to_compute(lines._fields[fname], lines)
+            # Lines first so Combined (product_bundle) parent reads fresh %.
+            lines.flush_recordset(fnames)
+        for fname in fnames:
+            self.env.add_to_compute(targets._fields[fname], targets)
+        targets.flush_recordset(fnames)
+
     @api.model
     def _recompute_for_orders(self, orders):
         """Refresh stored progress when sale orders change."""
@@ -353,7 +376,7 @@ class ShahtajVisitTarget(models.Model):
             ('target_type', 'in', ORDER_BASED_TYPES),
         ])
         if targets:
-            targets._recompute_recordset()
+            targets._force_recompute_progress()
 
     @api.model_create_multi
     def create(self, vals_list):

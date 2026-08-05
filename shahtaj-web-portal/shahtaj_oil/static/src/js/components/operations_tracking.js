@@ -12,6 +12,7 @@ export class OperationsTracking extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         this.action = useService("action");
+        const ITEMS_PER_PAGE = 10;
         this.state = useState({
             // Main Tab Navigation
             activeSubTab: this.props.requestedSubTab || 'orders', // 'checkins', 'orders', 'performance'
@@ -21,20 +22,9 @@ export class OperationsTracking extends Component {
             
             itemsPerPage: 5,
             
-            deliveryFilters: { search: '', status: '' },
-            deliveryPage: 1,
-            
-            checkinFilters: { search: '', status: '' },
-            checkinPage: 1,
-            
-            orderFilters: { search: '', status: '' },
-            orderPage: 1,
 
-            deliveries: [],
             selectedDelivery: null,
 
-            checkins: [],
-            orders: [],
             isCreatingInvoice: false,
             isEditingDelivery: false,
             allProducts: [], // To list all products in a dropdown
@@ -47,21 +37,29 @@ export class OperationsTracking extends Component {
             perfSubTab: 'schedules', // 'schedules', 'targets'
             selectedSchedule: null,
             selectedTarget: null,
-            
-            // Filters for Schedules
-            schedFilterBooker: 'all',
-            schedFilterDay: 'all',
-            schedFilterDateFrom: '',
-            schedFilterDateTo: '',
-            
-            // Filters for Targets
-            targetFilterBooker: 'all',
-            targetFilterType: 'all',
-            
-            bookers: [],
-            schedules: [],
-            targets: [],
             isRefreshing: false,
+            // --- BACKEND PAGINATION & FILTERS ---
+            itemsPerPage: ITEMS_PER_PAGE,
+            isLoadingList: false,
+            searchTimeout: null,
+            
+            tableDeliveries: [], tableCheckins: [], tableOrders: [], tableSchedules: [], tableTargets: [],
+            lookupBookers: [], lookupTargetTypes: [],
+            
+            pagination: {
+                deliveries: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                checkins: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                orders: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                schedules: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                targets: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+            },
+            filters: {
+                deliveries: { search: '', status: '' },
+                checkins: { search: '', status: '' },
+                orders: { search: '', status: '' },
+                schedules: { booker: 'all', day: 'all', dateFrom: '', dateTo: '' },
+                targets: { booker: 'all', type: 'all' },
+            },
         });
          // ADD THIS NEW BLOCK RIGHT AFTER THE STATE CLOSING BRACKET:
         onWillUpdateProps((nextProps) => {
@@ -70,11 +68,192 @@ export class OperationsTracking extends Component {
             }
         })
 
+        this.debounceSearch = (func, wait) => {
+            return (...args) => {
+                clearTimeout(this.state.searchTimeout);
+                this.state.searchTimeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        };
+        this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
+
         onWillStart(async () => {
-            // Load only the tab the user opened — same queries/values as before when that tab is shown.
-            await this.ensureTabData(this.state.activeSubTab);
+            await this.loadDropdownData();
+            if (hasFinancialAccess()) await this.loadTaxAndProductData();
+            await this.fetchActiveList();
         });
     }
+    // --- UNIVERSAL PAGINATION HANDLERS ---
+    onSearchInput(ev, tabName) {
+        this.state.filters[tabName].search = ev.target.value;
+        this.state.pagination[tabName].page = 1; 
+        this.debouncedFetchActiveList();
+    }
+
+    onFilterChange(tabName) {
+        this.state.pagination[tabName].page = 1;
+        this.fetchActiveList(); 
+    }
+
+    changePage(tabName, direction) {
+        const pag = this.state.pagination[tabName];
+        const newPage = pag.page + direction;
+        const maxPage = Math.max(1, Math.ceil(pag.total / pag.limit));
+        
+        if (newPage >= 1 && newPage <= maxPage) {
+            pag.page = newPage;
+            this.fetchActiveList();
+        }
+    }
+
+   async loadDropdownData() {
+        this.state.lookupBookers = await this.orm.searchRead('res.users', [['shahtaj_is_order_booker', '=', true]], ['id', 'name']);
+        
+        // FIXED: Using .call() to safely execute read_group
+        const types = await this.orm.call('shahtaj.visit.target', 'read_group', [[], ['target_type'], ['target_type']]);
+        this.state.lookupTargetTypes = types.map(t => ({
+            value: t.target_type, 
+            label: t.target_type ? t.target_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown'
+        })).filter(t => t.value);
+    }
+
+    // --- THE MASTER DATA ENGINE ---
+    async fetchActiveList() {
+        let tab = this.state.activeSubTab;
+        if (tab === 'performance') tab = this.state.perfSubTab;
+        
+        this.state.isLoadingList = true;
+        try {
+            const pag = this.state.pagination[tab];
+            const filters = this.state.filters[tab];
+            let domain = []; let model = ''; let fields = []; let targetState = '';
+
+            // 1. DOMAIN MAPPINGS
+            if (tab === 'deliveries' || tab === 'orders') {
+                model = 'sale.order'; targetState = tab === 'deliveries' ? 'tableDeliveries' : 'tableOrders';
+                fields = ["name", "partner_id", "user_id", "date_order", "amount_total","amount_tax", "state", "order_line", "invoice_status"];
+                domain.push(['shahtaj_visit_id', '!=', false]);
+                
+                if (tab === 'deliveries') domain.push(['state', 'in', ['sale', 'done']]);
+                if (filters.search) domain.push('|', '|', ['name', 'ilike', filters.search], ['partner_id.name', 'ilike', filters.search], ['user_id.name', 'ilike', filters.search]);
+                if (filters.status) {
+                    if (filters.status === 'Draft') domain.push(['state', '=', 'draft']);
+                    else if (filters.status === 'Delivered') domain.push(['state', '=', 'done']);
+                    else if (filters.status === 'To Invoice') domain.push(['state', '=', 'sale'], ['invoice_status', '!=', 'invoiced']);
+                    else if (filters.status === 'Invoiced') domain.push(['invoice_status', '=', 'invoiced']);
+                }
+            } 
+            else if (tab === 'checkins') {
+                model = 'shahtaj.visit'; targetState = 'tableCheckins';
+                fields = ["id", "shop_id", "order_booker_id", "started_at", "ended_at", "state", "outcome", "visit_task_id", "sale_order_id", "notes"];
+                if (filters.search) domain.push('|', ['shop_id.name', 'ilike', filters.search], ['order_booker_id.name', 'ilike', filters.search]);
+                if (filters.status === 'Checked In') domain.push(['state', '=', 'in_progress']);
+                if (filters.status === 'Checked Out') domain.push(['state', '=', 'completed'], ['outcome', '!=', 'incomplete']);
+                if (filters.status === 'Skipped') domain.push(['outcome', '=', 'incomplete']);
+                if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancelled']);
+            }
+            else if (tab === 'schedules') {
+                model = 'shahtaj.weekly.schedule'; targetState = 'tableSchedules';
+                fields = ['id', 'name', 'day_of_week', 'route_id', 'zone_id', 'active', 'shop_count', 'week_tasks_planned', 'week_tasks_completed', 'week_tasks_skipped', 'week_tasks_progress', 'week_occurrence_date', 'order_booker_id'];
+                if (filters.booker !== 'all') domain.push(['order_booker_id', '=', parseInt(filters.booker)]);
+                if (filters.day !== 'all') domain.push(['day_of_week', '=', filters.day]);
+                if (filters.dateFrom) domain.push(['week_occurrence_date', '>=', filters.dateFrom]);
+                if (filters.dateTo) domain.push(['week_occurrence_date', '<=', filters.dateTo]);
+            }
+            else if (tab === 'targets') {
+                model = 'shahtaj.visit.target'; targetState = 'tableTargets';
+                fields = ['id', 'name', 'date_start', 'date_end', 'target_type', 'target_value', 'achieved_value', 'remaining_value', 'progress_percent', 'product_id', 'currency_id', 'target_weight_uom', 'active', 'order_booker_id'];
+                if (filters.booker !== 'all') domain.push(['order_booker_id', '=', parseInt(filters.booker)]);
+                if (filters.type !== 'all') domain.push(['target_type', '=', filters.type]);
+            }
+
+            // 2. EXECUTE QUERY
+            const [total, records] = await Promise.all([
+                this.orm.searchCount(model, domain),
+                this.orm.searchRead(model, domain, fields, { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: "id desc" })
+            ]);
+
+            this.state.pagination[tab].total = total;
+
+            // 3. MAP RESULTS
+            if (tab === 'deliveries' || tab === 'orders') {
+                const orderIds = records.map(o => o.id);
+                const lines = orderIds.length ? await this.orm.searchRead("sale.order.line", [["order_id", "in", orderIds]], ["order_id", "product_uom_qty", "qty_delivered"]) : [];
+                this.state[targetState] = records.map(o => {
+                    const myLines = lines.filter(l => l.order_id[0] === o.id);
+                    const totalOrd = myLines.reduce((sum, l) => sum + l.product_uom_qty, 0);
+                    const totalDel = myLines.reduce((sum, l) => sum + l.qty_delivered, 0);
+                    let status = 'Draft';
+                    if (o.state === 'sale') status = o.invoice_status === 'invoiced' ? 'Invoiced' : 'To Invoice';
+                    else if (o.state === 'done') status = 'Delivered';
+                    return {
+                        odoo_id: o.id, id: o.name, shop: o.partner_id ? o.partner_id[1] : 'Unknown', partner_id: o.partner_id,
+                        booker: o.user_id ? o.user_id[1] : 'Unknown', date: o.date_order || 'Unknown', items: o.order_line.length,
+                        total: `Rs. ${o.amount_total.toLocaleString(undefined, {minimumFractionDigits: 2})}`,
+                        tax: `Rs. ${(o.amount_tax || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`,
+                        status: status, invoice_status: o.invoice_status,
+                        is_fully_delivered: totalOrd > 0 && totalDel >= totalOrd, line_ids: o.order_line, lines: [] 
+                    };
+                });
+            }
+            else if (tab === 'checkins') {
+                this.state.tableCheckins = records.map(v => {
+                    let durationStr = "Active Now";
+                    if (v.started_at && v.ended_at) durationStr = `${Math.round((new Date(v.ended_at.replace(' ', 'T') + "Z") - new Date(v.started_at.replace(' ', 'T') + "Z")) / 60000)} mins`;
+                    let status = 'Unknown'; let outcome = v.outcome;
+                    if (v.state === 'in_progress') { status = 'Checked In'; outcome = 'In Progress'; }
+                    else if (v.state === 'completed' && v.outcome === 'incomplete') { status = 'Skipped'; outcome = 'Incomplete / Auto-Skipped'; }
+                    else if (v.state === 'completed') { status = 'Checked Out'; outcome = outcome === 'order' ? 'Order Placed' : 'No Order'; }
+                    else if (v.state === 'cancelled') { status = 'Cancelled'; }
+                    return { id: v.id, shop: v.shop_id ? v.shop_id[1] : 'Unknown', shopId: v.shop_id ? v.shop_id[0] : false, booker: v.order_booker_id ? v.order_booker_id[1] : 'Unknown', bookerId: v.order_booker_id ? v.order_booker_id[0] : false, time: v.started_at || 'Pending', endTime: v.ended_at || 'In Progress', status, duration: durationStr, outcome, taskRef: v.visit_task_id ? v.visit_task_id[1] : 'Direct Visit', sale_order_id: v.sale_order_id, notes: v.notes || '' };
+                });
+            }
+            else if (tab === 'schedules') {
+                const dayMap = { '0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday', '6': 'Sunday' };
+                this.state.tableSchedules = records.map(r => ({
+                    id: r.id, name: r.name, bookerId: r.order_booker_id ? r.order_booker_id[0] : null, bookerName: r.order_booker_id ? r.order_booker_id[1] : 'Unknown',
+                    day_raw: r.day_of_week, day: dayMap[r.day_of_week] || r.day_of_week, route: r.route_id ? r.route_id[1] : 'Unassigned', zone: r.zone_id ? r.zone_id[1] : 'Unassigned',
+                    shops: r.shop_count, active: r.active, planned: r.week_tasks_planned, done: r.week_tasks_completed, skipped: r.week_tasks_skipped || 0,
+                    progress: r.week_tasks_progress || 0, occurrenceDate: r.week_occurrence_date || ''
+                }));
+            }
+            else if (tab === 'targets') {
+                this.state.tableTargets = records.map(r => ({
+                    id: r.id, name: r.name, bookerId: r.order_booker_id ? r.order_booker_id[0] : null, bookerName: r.order_booker_id ? r.order_booker_id[1] : 'Unknown',
+                    startDate: r.date_start, endDate: r.date_end, type: r.target_type, displayType: r.target_type ? r.target_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown',
+                    targetValue: r.target_value, achievedValue: r.achieved_value, remainingValue: r.remaining_value, progress: r.progress_percent || 0,
+                    product: r.product_id ? r.product_id[1] : null, currency: r.currency_id ? r.currency_id[1] : null, weightUom: r.target_weight_uom || '', active: r.active
+                }));
+            }
+        } catch (error) {
+            this.notification.add("Failed to fetch data: " + (error.data?.message || error.message), { type: "danger" });
+        } finally {
+            this.state.isLoadingList = false;
+        }
+    }
+    setSubTab(tabName) {
+        this.state.activeSubTab = tabName;
+        this.state.selectedOrder = null;
+        this.state.selectedCheckin = null;
+        this.state.selectedSchedule = null;
+        this.state.selectedTarget = null;
+        this.fetchActiveList(); // Trigger fetch on switch
+    }
+    setPerfSubTab(tabName) {
+        this.state.perfSubTab = tabName;
+        this.state.selectedSchedule = null;
+        this.state.selectedTarget = null;
+        this.fetchActiveList(); // Trigger fetch on switch
+    }
+   async refreshData() {
+        this.state.isRefreshing = true;
+        try {
+            await this.loadDropdownData();
+            await this.fetchActiveList();
+        } finally {
+            this.state.isRefreshing = false;
+        }
+    }
+    // --- DATA FETCHING (EXISTING) ---
 
     get hasFinancialAccess() {
         return hasFinancialAccess();
@@ -84,28 +263,6 @@ export class OperationsTracking extends Component {
      * Load datasets for one Operations sub-tab.
      * Domains, fields, and mapping stay identical; we only skip work for tabs not open yet.
      */
-    async ensureTabData(tabName, { force = false } = {}) {
-        if (tabName === 'orders' || tabName === 'deliveries') {
-            if (force || !this._ordersLoaded) {
-                await this.fetchLiveOrders();
-                this._ordersLoaded = true;
-            }
-            return;
-        }
-        if (tabName === 'checkins') {
-            if (force || !this._visitsLoaded) {
-                await this.fetchLiveVisits();
-                this._visitsLoaded = true;
-            }
-            return;
-        }
-        if (tabName === 'performance') {
-            if (force || !this._performanceLoaded) {
-                await this.fetchPerformanceData();
-                this._performanceLoaded = true;
-            }
-        }
-    }
 
     /** Taxes/products are only needed for delivery line tax labels and edit dropdowns. */
     async ensureCatalogData({ force = false } = {}) {
@@ -118,216 +275,7 @@ export class OperationsTracking extends Component {
         }
     }
 
-    async refreshData() {
-        this.state.isRefreshing = true;
-        try {
-            await this.ensureTabData(this.state.activeSubTab, { force: true });
-            // Refresh catalogs only if they were already used (keeps edit dropdowns in sync).
-            if (this._catalogsLoaded) {
-                await this.ensureCatalogData({ force: true });
-            }
-        } finally {
-            this.state.isRefreshing = false;
-        }
-    }
-    // --- DATA FETCHING (EXISTING) ---
-
-   async fetchLiveVisits() {
-        const visits = await this.orm.searchRead(
-            "shahtaj.visit",
-            [],
-            ["id", "shop_id", "order_booker_id", "started_at", "ended_at", "state", "outcome", "visit_task_id", "sale_order_id", "notes"]
-        );
-
-        this.state.checkins = visits.map(v => {
-            let durationStr = "Active Now";
-            if (v.started_at && v.ended_at) {
-                const start = new Date(v.started_at.replace(' ', 'T') + "Z");
-                const end = new Date(v.ended_at.replace(' ', 'T') + "Z");
-                const diffMs = end - start;
-                const diffMins = Math.round(diffMs / 60000);
-                durationStr = `${diffMins} mins`;
-            }
-
-            let displayStatus = 'Unknown';
-            if (v.state === 'in_progress') displayStatus = 'Checked In';
-            else if (v.state === 'completed') displayStatus = 'Checked Out';
-            else if (v.state === 'cancelled') displayStatus = 'Cancelled';
-
-            let displayOutcome = v.outcome;
-            if (v.outcome === 'none') displayOutcome = 'In Progress';
-            else if (v.outcome === 'order') displayOutcome = 'Order Placed';
-            else if (v.outcome === 'no_order') displayOutcome = 'No Order';
-
-            return {
-                id: v.id,
-                shop: v.shop_id ? v.shop_id[1] : 'Unknown Shop',
-                shopId: v.shop_id ? v.shop_id[0] : false,
-                booker: v.order_booker_id ? v.order_booker_id[1] : 'Unknown Booker',
-                bookerId: v.order_booker_id ? v.order_booker_id[0] : false,
-                time: v.started_at || 'Pending',
-                endTime: v.ended_at || 'In Progress',
-                status: displayStatus,
-                duration: durationStr,
-                outcome: displayOutcome,
-                taskRef: v.visit_task_id ? v.visit_task_id[1] : 'Direct Visit',
-                sale_order_id: v.sale_order_id ,
-                notes: v.notes || ''
-            };
-        });
-        this._visitsLoaded = true;
-    }
-
-    async fetchLiveOrders() {
-        const orders = await this.orm.searchRead(
-            "sale.order",
-            [["shahtaj_visit_id", "!=", false]], 
-            ["name", "partner_id", "user_id", "date_order", "amount_total", "state", "order_line", "invoice_status"] 
-        );
-
-        // Fetch exact line quantities to accurately determine Delivery Status
-        const orderIds = orders.map(o => o.id);
-        let lines = [];
-        if (orderIds.length > 0) {
-            lines = await this.orm.searchRead(
-                "sale.order.line", 
-                [["order_id", "in", orderIds]], 
-                ["order_id", "product_uom_qty", "qty_delivered"]
-            );
-        }
-
-        this.state.orders = orders.map(o => {
-            // Calculate delivery math for this specific order
-            const myLines = lines.filter(l => l.order_id[0] === o.id);
-            const totalOrdered = myLines.reduce((sum, l) => sum + l.product_uom_qty, 0);
-            const totalDelivered = myLines.reduce((sum, l) => sum + l.qty_delivered, 0);
-            const is_fully_delivered = totalOrdered > 0 && totalDelivered >= totalOrdered;
-
-            let status = 'Unknown';
-            if (o.state === 'draft') {
-                status = 'Draft';
-            } else if (o.state === 'sale') {
-                if (o.invoice_status === 'invoiced') status = 'Invoiced';
-                else status = 'To Invoice'; // Default for live orders
-            } else if (o.state === 'done') {
-                status = 'Delivered'; 
-            }
-
-            return {
-                odoo_id: o.id,
-                id: o.name,
-                shop: o.partner_id ? o.partner_id[1] : 'Unknown Shop',
-                partner_id: o.partner_id,
-                booker: o.user_id ? o.user_id[1] : 'Unknown Booker',
-                address: "Loading...", 
-                phone: "Loading...",
-                email: "Loading...",
-                date: o.date_order || 'Unknown',
-                items: o.order_line.length,
-                total: `Rs. ${o.amount_total.toLocaleString(undefined, {minimumFractionDigits: 2})}`,
-                status: status, 
-                invoice_status: o.invoice_status,
-                is_fully_delivered: is_fully_delivered, // New property!
-                line_ids: o.order_line,
-                lines: [] 
-            };
-        });
-        
-        // Only show orders that are confirmed/to-invoice in the deliveries tab
-        this.state.deliveries = this.state.orders.filter(o => o.status === 'To Invoice' || o.status === 'Delivered');
-        this._ordersLoaded = true;
-    }
-
-    // --- NEW: PERFORMANCE DATA FETCHING ---
-    async fetchPerformanceData() {
-        const [bookers, scheds, tgts] = await Promise.all([
-            this.orm.searchRead('res.users', [['shahtaj_is_order_booker', '=', true]], ['id', 'name']),
-            this.orm.searchRead('shahtaj.weekly.schedule', [], [
-                'id', 'name', 'day_of_week', 'route_id', 'zone_id', 'active', 'shop_count',
-                'week_tasks_planned', 'week_tasks_completed', 'week_tasks_progress',
-                'week_occurrence_date', 'order_booker_id'
-            ]),
-            this.orm.searchRead('shahtaj.visit.target', [], [
-                'id', 'name', 'date_start', 'date_end', 'target_type', 'target_value',
-                'achieved_value', 'remaining_value', 'progress_percent', 'product_id',
-                'currency_id', 'target_weight_uom', 'active', 'order_booker_id'
-            ]),
-        ]);
-        this.state.bookers = bookers;
-
-        const dayMap = { '0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday', '6': 'Sunday' };
-        this.state.schedules = scheds.map(r => ({
-            id: r.id,
-            name: r.name,
-            bookerId: r.order_booker_id ? r.order_booker_id[0] : null,
-            bookerName: r.order_booker_id ? r.order_booker_id[1] : 'Unknown Booker',
-            day_raw: r.day_of_week,
-            day: dayMap[r.day_of_week] || r.day_of_week,
-            route: r.route_id ? r.route_id[1] : 'Unassigned',
-            zone: r.zone_id ? r.zone_id[1] : 'Unassigned',
-            shops: r.shop_count,
-            active: r.active,
-            planned: r.week_tasks_planned,
-            done: r.week_tasks_completed,
-            progress: r.week_tasks_progress || 0,
-            occurrenceDate: r.week_occurrence_date || ''
-        }));
-
-        this.state.targets = tgts.map(r => ({
-            id: r.id,
-            name: r.name,
-            bookerId: r.order_booker_id ? r.order_booker_id[0] : null,
-            bookerName: r.order_booker_id ? r.order_booker_id[1] : 'Unknown Booker',
-            startDate: r.date_start,
-            endDate: r.date_end,
-            type: r.target_type,
-            displayType: r.target_type ? r.target_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown',
-            targetValue: r.target_value,
-            achievedValue: r.achieved_value,
-            remainingValue: r.remaining_value,
-            progress: r.progress_percent || 0,
-            product: r.product_id ? r.product_id[1] : null,
-            currency: r.currency_id ? r.currency_id[1] : null,
-            weightUom: r.target_weight_uom || '',
-            active: r.active,
-            lines: [],
-            isExpandable: ['collective_qty', 'collective_weight', 'product_bundle'].includes(r.target_type),
-            expanded: false,
-        }));
-
-        const multiIds = this.state.targets.filter(t => t.isExpandable).map(t => t.id);
-        if (multiIds.length) {
-            const lines = await this.orm.searchRead(
-                'shahtaj.visit.target.line',
-                [['target_id', 'in', multiIds]],
-                [
-                    'id', 'target_id', 'product_id', 'measure_type', 'target_value',
-                    'target_weight_uom', 'achieved_value', 'progress_percent',
-                ],
-            );
-            const byTarget = {};
-            lines.forEach((line) => {
-                const tid = line.target_id[0];
-                if (!byTarget[tid]) {
-                    byTarget[tid] = [];
-                }
-                byTarget[tid].push({
-                    id: line.id,
-                    product_name: line.product_id ? line.product_id[1] : '',
-                    measure_type: line.measure_type || 'qty',
-                    target_value: line.target_value,
-                    target_weight_uom: line.target_weight_uom || 'kg',
-                    achieved_value: line.achieved_value,
-                    progress_percent: line.progress_percent || 0,
-                });
-            });
-            this.state.targets.forEach((t) => {
-                t.lines = byTarget[t.id] || [];
-            });
-        }
-        this._performanceLoaded = true;
-    }
-  
+    
     closeDelivery() { 
         this.state.selectedDelivery = null; 
     }
@@ -386,7 +334,7 @@ export class OperationsTracking extends Component {
             this.state.isEditingDelivery = false;
             this.notification.add("Order saved successfully.", { type: "success" });
         } catch (error) {
-            alert("Failed to save: " + (error.data?.message || error.message));
+            this.notification.add("Failed to save: " + (error.data?.message || error.message), { type: "danger" });
         }
     }
 
@@ -590,7 +538,6 @@ export class OperationsTracking extends Component {
             line.toDeliver = Math.max(0, line.ordered - line.delivered);
         });
     }
-    // Custom delivery confirmation logic that writes back to Odoo and triggers the native validation
    async confirmDeliveryCustom() {
         try {
             // 1. Write the user's updated quantities back to the hidden Odoo wizard
@@ -608,14 +555,19 @@ export class OperationsTracking extends Component {
             this.closeDeliveryModal();
             
             // 3. Refresh the UI
-            await this.fetchLiveOrders();
+            await this.fetchActiveList();
             if (this.state.selectedDelivery) {
-                const updatedOrder = this.state.orders.find(o => o.odoo_id === this.state.selectedDelivery.odoo_id);
-                if (updatedOrder) {
-                    // --- CHANGED: Forcefully update the status so the UI immediately reflects the delivery ---
-                    updatedOrder.status = 'Delivered';
-                    await this.viewDelivery(updatedOrder);
+                // FIX: Look in the new paginated arrays instead of the deleted 'orders' array
+                let updatedOrder = this.state.tableDeliveries.find(o => o.odoo_id === this.state.selectedDelivery.odoo_id) || 
+                                   this.state.tableOrders.find(o => o.odoo_id === this.state.selectedDelivery.odoo_id);
+                
+                if (!updatedOrder) {
+                    updatedOrder = this.state.selectedDelivery; // Fallback
                 }
+                
+                // Forcefully update the status so the UI immediately reflects the delivery
+                updatedOrder.status = 'Delivered';
+                await this.viewDelivery(updatedOrder);
             }
             
         } catch(error) {
@@ -624,49 +576,27 @@ export class OperationsTracking extends Component {
     }
     // --- NAVIGATION & FILTERS ---
 
-    setSubTab(tabName) {
+  setSubTab(tabName) {
         this.state.activeSubTab = tabName;
-        this.state.selectedOrder = null;
-        this.state.selectedCheckin = null;
-        this.state.selectedSchedule = null;
-        this.state.selectedTarget = null;
-        // First visit to a tab loads its data; already-loaded tabs keep current values.
-        this.ensureTabData(tabName);
+        
+        // If we are programmatically jumping to a record, protect the view from being cleared
+        if (this._preserveDetailsOnSwitch) {
+            this._preserveDetailsOnSwitch = false; // Consume the flag
+        } else {
+            // Otherwise, clear the views normally (standard sidebar click)
+            this.state.selectedOrder = null;
+            this.state.selectedCheckin = null;
+            this.state.selectedSchedule = null;
+            this.state.selectedTarget = null;
+        }
+        
+        this.fetchActiveList(); 
     }
-
     setPerfSubTab(tabName) {
         this.state.perfSubTab = tabName;
         this.state.selectedSchedule = null;
         this.state.selectedTarget = null;
-    }
-
-    // Performance Getters
-    get filteredSchedules() {
-        return this.state.schedules.filter(s => {
-            const matchBooker = this.state.schedFilterBooker === 'all' || s.bookerId == this.state.schedFilterBooker;
-            const matchDay = this.state.schedFilterDay === 'all' || String(s.day_raw) === this.state.schedFilterDay;
-            const matchDateFrom = !this.state.schedFilterDateFrom || s.occurrenceDate >= this.state.schedFilterDateFrom;
-            const matchDateTo = !this.state.schedFilterDateTo || s.occurrenceDate <= this.state.schedFilterDateTo;
-            return matchBooker && matchDay && matchDateFrom && matchDateTo;
-        });
-    }
-
-    get filteredTargets() {
-        return this.state.targets.filter(t => {
-            const matchBooker = this.state.targetFilterBooker === 'all' || t.bookerId == this.state.targetFilterBooker;
-            const matchType = this.state.targetFilterType === 'all' || t.type === this.state.targetFilterType;
-            return matchBooker && matchType;
-        });
-    }
-
-    get uniqueTargetTypes() {
-        const types = new Set(this.state.targets.map(t => t.type));
-        return Array.from(types).map(type => {
-            return {
-                value: type,
-                label: type ? type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown'
-            };
-        });
+        this.fetchActiveList(); 
     }
 
     viewSchedule(sched) { this.state.selectedSchedule = sched; }
@@ -675,86 +605,30 @@ export class OperationsTracking extends Component {
     viewTarget(tgt) { this.state.selectedTarget = tgt; }
     closeTarget() { this.state.selectedTarget = null; }
 
-
-    // --- ORDERS & CHECK-INS PAGINATION GETTERS (EXISTING) ---
-    get filteredDeliveries() {
-        return this.state.deliveries.filter(d => {
-            const searchStr = this.state.deliveryFilters.search.toLowerCase();
-            const matchSearch = d.shop.toLowerCase().includes(searchStr) || 
-                                d.id.toLowerCase().includes(searchStr) ||
-                                d.booker.toLowerCase().includes(searchStr);
-            const matchStatus = this.state.deliveryFilters.status ? d.status === this.state.deliveryFilters.status : true;
-            return matchSearch && matchStatus;
-        });
-    }
-    get paginatedDeliveries() {
-        const start = (this.state.deliveryPage - 1) * this.state.itemsPerPage;
-        return this.filteredDeliveries.slice(start, start + this.state.itemsPerPage);
-    }
-    get deliveryTotalPages() { return Math.max(1, Math.ceil(this.filteredDeliveries.length / this.state.itemsPerPage)); }
-
-    get filteredCheckins() {
-        return this.state.checkins.filter(c => {
-            const matchSearch = c.shop.toLowerCase().includes(this.state.checkinFilters.search.toLowerCase()) || 
-                                c.booker.toLowerCase().includes(this.state.checkinFilters.search.toLowerCase()) ||
-                                String(c.shopId || '').includes(this.state.checkinFilters.search) ||
-                                String(c.bookerId || '').includes(this.state.checkinFilters.search);
-            const matchStatus = this.state.checkinFilters.status ? c.status === this.state.checkinFilters.status : true;
-            return matchSearch && matchStatus;
-        });
-    }
-    get paginatedCheckins() {
-        const start = (this.state.checkinPage - 1) * this.state.itemsPerPage;
-        return this.filteredCheckins.slice(start, start + this.state.itemsPerPage);
-    }
-    get checkinTotalPages() { return Math.max(1, Math.ceil(this.filteredCheckins.length / this.state.itemsPerPage)); }
-
-    get filteredOrders() {
-        return this.state.orders.filter(o => {
-            const matchSearch = o.shop.toLowerCase().includes(this.state.orderFilters.search.toLowerCase()) || 
-                                o.id.toLowerCase().includes(this.state.orderFilters.search.toLowerCase()) ||
-                                o.booker.toLowerCase().includes(this.state.orderFilters.search.toLowerCase()) ||
-                                String(o.shopId || '').includes(this.state.orderFilters.search) ||
-                                String(o.bookerId || '').includes(this.state.orderFilters.search);
-            const matchStatus = this.state.orderFilters.status ? o.status === this.state.orderFilters.status : true;
-            return matchSearch && matchStatus;
-        });
-    }
-    get paginatedOrders() {
-        const start = (this.state.orderPage - 1) * this.state.itemsPerPage;
-        return this.filteredOrders.slice(start, start + this.state.itemsPerPage);
-    }
-    get orderTotalPages() { return Math.max(1, Math.ceil(this.filteredOrders.length / this.state.itemsPerPage)); }
-
-    changePage(type, direction) {
-        if (type === 'delivery') {
-            const newPage = this.state.deliveryPage + direction;
-            if (newPage >= 1 && newPage <= this.deliveryTotalPages) this.state.deliveryPage = newPage;
-        } else if (type === 'checkin') {
-            const newPage = this.state.checkinPage + direction;
-            if (newPage >= 1 && newPage <= this.checkinTotalPages) this.state.checkinPage = newPage;
-        } else if (type === 'order') {
-            const newPage = this.state.orderPage + direction;
-            if (newPage >= 1 && newPage <= this.orderTotalPages) this.state.orderPage = newPage;
-        }
-    }
-
     // --- ORDER ACTIONS (EXISTING) ---
     async viewOrder(order) { 
+        // 1. Assign to state FIRST to wrap it in Owl's reactive proxy
         this.state.selectedOrder = order; 
         
-        if (order.line_ids && order.line_ids.length > 0 && order.lines.length === 0) {
+        // FIX: Initialize the contact fields so the "Loading..." check triggers the DB fetch
+        if (!this.state.selectedOrder.phone) {
+            this.state.selectedOrder.phone = "Loading...";
+            this.state.selectedOrder.email = "Loading...";
+            this.state.selectedOrder.address = "Loading...";
+        }
+        
+        if (this.state.selectedOrder.line_ids && this.state.selectedOrder.line_ids.length > 0 && this.state.selectedOrder.lines.length === 0) {
             const lines = await this.orm.searchRead(
                 "sale.order.line",
-                [["id", "in", order.line_ids]],
-                // Added "tax_ids" to the requested fields
+                [["id", "in", this.state.selectedOrder.line_ids]],
                 ["name", "product_uom_qty", "product_uom_id", "price_unit", "price_subtotal", "tax_ids"] 
             );
             
-            order.lines = lines.map(l => {
+            // 2. Assign strictly to the reactive proxy so the UI repaints instantly
+            this.state.selectedOrder.lines = lines.map(l => {
                 const taxIds = l.tax_ids || [];
                 const taxNames = taxIds.map(id => {
-                    const tax = this.state.saleTaxes.find(t => t.id === id);
+                    const tax = this.state.saleTaxes ? this.state.saleTaxes.find(t => t.id === id) : null;
                     return tax ? tax.name : `Tax`;
                 }).join(', ');
                 return {
@@ -768,17 +642,18 @@ export class OperationsTracking extends Component {
             });
         }
 
-        if (order.partner_id && order.phone === "Loading...") {
+        if (this.state.selectedOrder.partner_id && this.state.selectedOrder.phone === "Loading...") {
             const partners = await this.orm.searchRead(
                 "res.partner",
-                [["id", "=", order.partner_id[0]]],
+                [["id", "=", this.state.selectedOrder.partner_id[0]]],
                 ["phone", "email", "street", "city"]
             );
             if (partners.length > 0) {
                 const p = partners[0];
-                order.phone = p.phone || 'N/A';
-                order.email = p.email || 'N/A';
-                order.address = [p.street, p.city].filter(Boolean).join(', ') || 'No address provided';
+                // 3. Assign strictly to the reactive proxy
+                this.state.selectedOrder.phone = p.phone || 'N/A';
+                this.state.selectedOrder.email = p.email || 'N/A';
+                this.state.selectedOrder.address = [p.street, p.city].filter(Boolean).join(', ') || 'No address provided';
             }
         }
     }
@@ -788,19 +663,48 @@ export class OperationsTracking extends Component {
     viewCheckin(log) { this.state.selectedCheckin = log; }
     closeCheckin() { this.state.selectedCheckin = null; }
 
-    async viewOrderFromCheckin(log) {
-        if (log.sale_order_id) {
-            let targetOrder = this.state.orders.find(o => o.odoo_id === log.sale_order_id[0]);
-            
-            if (!targetOrder) {
-                await this.fetchLiveOrders();
-                targetOrder = this.state.orders.find(o => o.odoo_id === log.sale_order_id[0]);
-            }
-            
-            if (targetOrder) {
-                this.setSubTab('orders');
+  async viewOrderFromCheckin(log) {
+        if (!log.sale_order_id) return;
+        
+        try {
+            const orders = await this.orm.searchRead(
+                "sale.order",
+                [["id", "=", log.sale_order_id[0]]],
+                ["name", "partner_id", "user_id", "date_order", "amount_total","amount_tax", "state", "order_line", "invoice_status"]
+            );
+
+            if (orders.length > 0) {
+                const o = orders[0];
+                const lines = o.order_line.length ? await this.orm.searchRead("sale.order.line", [["order_id", "=", o.id]], ["product_uom_qty", "qty_delivered"]) : [];
+                const totalOrd = lines.reduce((sum, l) => sum + l.product_uom_qty, 0);
+                const totalDel = lines.reduce((sum, l) => sum + l.qty_delivered, 0);
+                
+                let status = 'Draft';
+                if (o.state === 'sale') status = o.invoice_status === 'invoiced' ? 'Invoiced' : 'To Invoice';
+                else if (o.state === 'done') status = 'Delivered';
+
+                const targetOrder = {
+                    odoo_id: o.id, id: o.name, shop: o.partner_id ? o.partner_id[1] : 'Unknown', partner_id: o.partner_id,
+                    booker: o.user_id ? o.user_id[1] : 'Unknown', date: o.date_order || 'Unknown', items: o.order_line.length,
+                    total: `Rs. ${o.amount_total.toLocaleString(undefined, {minimumFractionDigits: 2})}`,
+                    tax: `Rs. ${(o.amount_tax || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`,
+                    status: status, invoice_status: o.invoice_status,
+                    is_fully_delivered: totalOrd > 0 && totalDel >= totalOrd, line_ids: o.order_line, lines: [] 
+                };
+
+                // 1. Activate the protection flag so data isn't wiped by the incoming sub-tab change
+                this._preserveDetailsOnSwitch = true;
+
+                // 2. Dispatch event to update parent sidebar smoothly
+                window.dispatchEvent(new CustomEvent('shahtaj-dashboard-switch', {
+                    detail: { tab: 'operations', subTab: 'orders' }
+                }));
+
+                // 3. Open the specific order details directly
                 await this.viewOrder(targetOrder);
             }
+        } catch (error) {
+            this.notification.add("Failed to load order: " + (error.data?.message || error.message), { type: "danger" });
         }
     }
 
@@ -827,7 +731,7 @@ export class OperationsTracking extends Component {
             this.state.selectedOrder.status = 'Invoiced'; 
             
             // Refresh the background data
-            await this.fetchLiveOrders();
+            await this.fetchActiveList();
 
         } catch (error) {
             this.notification.add(error.data?.message || "Failed to create invoice.", {
@@ -843,7 +747,7 @@ export class OperationsTracking extends Component {
             additionalContext: { active_id: orderId },
             onClose: async () => {
                 // Refresh the lists when the wizard closes
-                await this.fetchLiveOrders();
+                await this.fetchActiveList();
             }
         });
     }
