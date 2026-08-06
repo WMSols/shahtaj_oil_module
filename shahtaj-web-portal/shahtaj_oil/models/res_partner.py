@@ -341,7 +341,11 @@ class ResPartner(models.Model):
                 partner.with_context(shahtaj_skip_route_m2m_sync=True).write(vals)
 
     def _shahtaj_vals_mirror_route_id_to_route_ids(self, vals):
-        """Old single-route UI writes route_id → rewrite as route_ids replace."""
+        """Legacy primary route_id write → add to route_ids (never wipe others).
+
+        Clearing route_id alone does not clear M2M membership; primary is
+        re-synced from remaining route_ids after write.
+        """
         if self.env.context.get('shahtaj_skip_route_m2m_sync'):
             return vals
         if 'route_ids' in vals:
@@ -354,9 +358,8 @@ class ResPartner(models.Model):
             route = self.env['shahtaj.route'].browse(new_route_id).exists()
             if route:
                 vals['zone_id'] = route.zone_id.id
-            vals['route_ids'] = [(6, 0, [new_route_id])]
-        else:
-            vals['route_ids'] = [(5, 0, 0)]
+            # Add only — do not (6,0,[…]) replace other route memberships.
+            vals['route_ids'] = [(4, new_route_id)]
         return vals
 
     @api.depends('zone_id')
@@ -692,6 +695,15 @@ class ResPartner(models.Model):
             'shahtaj_posting_legacy_move'
         ):
             raise UserError(_('Legacy balance invoice cannot be changed manually.'))
+        old_routes_by_shop = {}
+        if (
+            'route_ids' in vals
+            and not self.env.context.get('shahtaj_skip_route_m2m_sync')
+        ):
+            old_routes_by_shop = {
+                p.id: set(p.route_ids.ids)
+                for p in self.filtered('is_shahtaj_shop')
+            }
         res = super().write(vals)
         if vals.get('active') is False:
             shops = self.filtered('is_shahtaj_shop')
@@ -710,14 +722,25 @@ class ResPartner(models.Model):
             shops = self.filtered('is_shahtaj_shop')
             shops._shahtaj_sync_primary_route_from_route_ids()
             shops._validate_operational_territory_assignment()
-            shops._sync_visit_tasks_after_route_assignment()
+            removed_by_shop = {
+                shop.id: (
+                    old_routes_by_shop.get(shop.id, set()) - set(shop.route_ids.ids)
+                )
+                for shop in shops
+            }
+            shops._sync_visit_tasks_after_route_assignment(
+                removed_route_ids_by_shop=removed_by_shop,
+            )
         elif (
             any(k in vals for k in ('route_id', 'zone_id'))
             and not self.env.context.get('shahtaj_skip_route_m2m_sync')
         ):
-            self.filtered('is_shahtaj_shop')._validate_operational_territory_assignment()
+            shops = self.filtered('is_shahtaj_shop')
+            # Primary is display-only when cleared/changed without explicit M2M;
+            # keep it aligned with remaining route_ids.
             if 'route_id' in vals:
-                self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_route_assignment()
+                shops._shahtaj_sync_primary_route_from_route_ids()
+            shops._validate_operational_territory_assignment()
         if 'shahtaj_shop_category' in vals:
             credit_shops = self.filtered(
                 lambda p: p.is_shahtaj_shop
@@ -759,19 +782,42 @@ class ResPartner(models.Model):
                     )
         return res
 
-    def _sync_visit_tasks_after_route_assignment(self):
-        """Rebuild pending visit tasks after shops move to/from routes."""
+    def _sync_visit_tasks_after_route_assignment(self, removed_route_ids_by_shop=None):
+        """Rebuild pending visit tasks after shops move to/from routes.
+
+        When ``removed_route_ids_by_shop`` is provided, only pending tasks for
+        those shop+route pairs are cancelled (sibling routes stay intact).
+        """
         Task = self.env['shahtaj.visit.task']
         shops = self.filtered('is_shahtaj_shop')
         if not shops:
             return
         today = fields.Date.context_today(self)
-        self._shahtaj_cancel_pending_tasks_for_shops(shops.ids, date_from=today)
+        if removed_route_ids_by_shop is not None:
+            for shop in shops:
+                removed = list(removed_route_ids_by_shop.get(shop.id) or ())
+                if removed:
+                    self._shahtaj_cancel_pending_tasks_for_shop_routes(
+                        [shop.id], removed, date_from=today,
+                    )
+        else:
+            self._shahtaj_cancel_pending_tasks_for_shops(
+                shops.ids, date_from=today,
+            )
         bookers = self.env['res.users']
         for partner in shops:
             if not partner._shahtaj_is_operational_for_booker():
                 continue
             bookers |= partner.route_ids.mapped('weekly_schedule_ids.order_booker_id')
+        # Also regenerate for bookers of routes the shop left (orphan cleanup).
+        if removed_route_ids_by_shop:
+            removed_all = set()
+            for ids in removed_route_ids_by_shop.values():
+                removed_all.update(ids)
+            if removed_all:
+                bookers |= self.env['shahtaj.route'].browse(
+                    list(removed_all),
+                ).mapped('weekly_schedule_ids.order_booker_id')
         if bookers:
             for booker in bookers:
                 Task._auto_generate_window(order_booker=booker)

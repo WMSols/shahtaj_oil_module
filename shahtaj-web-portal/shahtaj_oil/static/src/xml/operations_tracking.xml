@@ -459,7 +459,7 @@
                         <t t-esc="this.state.selectedCheckin.taskRef"/>
                     </p>
                     <p class="bg-info text-white mb-0 p-2 small" title="Booker Notes for this specific route task">
-                        <strong>Notes:</strong>
+                        <strong>Notes: </strong>
                         <t t-esc="this.state.selectedCheckin.notes"/>
                     </p>
                 </div>
@@ -853,7 +853,7 @@
                     <th class="ps-4">Booker</th>
                     <th>Day / Date</th>
                     <th>Route &amp; Zone</th>
-                    <th class="text-center" style="width: 200px;">Task Progress</th>
+                    <th class="text-center" style="width: 200px;">Route Progress</th>
                     <th class="text-center pe-4">Status</th>
                 </tr>
             </thead>
@@ -962,7 +962,7 @@
         </div>
         <div class="col-md-6">
             <div class="p-3 bg-light rounded-3 h-100">
-                <h6 class="fw-bold text-muted text-uppercase mb-3">Task Performance</h6>
+                <h6 class="fw-bold text-muted text-uppercase mb-3">Visit Performance</h6>
                 <div class="d-flex justify-content-between mb-2">
                     <span class="text-dark fw-bold">Shops on Route:</span>
                     <span class="badge bg-secondary">
@@ -970,20 +970,20 @@
                     </span>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
-                    <span class="text-dark fw-bold">Tasks Planned:</span>
+                    <span class="text-dark fw-bold">Visits Planned:</span>
                     <span>
                         <t t-esc="this.state.selectedSchedule.planned"/>
                     </span>
                 </div>
                 <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                    <span class="text-dark fw-bold">Tasks Completed:</span>
+                    <span class="text-dark fw-bold">Visits Completed:</span>
                     <span class="text-success fw-bold">
                         <t t-esc="this.state.selectedSchedule.done"/>
                     </span>
                 </div>
                                             <!-- NEW SKIPPED ROW -->
                 <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                    <span class="text-dark fw-bold">Tasks Skipped:</span>
+                    <span class="text-dark fw-bold">Visits Skipped:</span>
                     <span class="text-danger fw-bold">
                         <t t-esc="this.state.selectedSchedule.skipped"/>
                     </span>

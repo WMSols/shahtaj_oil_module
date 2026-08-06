@@ -1781,17 +1781,16 @@
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0">
                                     <thead class="bg-light text-uppercase small fw-bold text-muted">
-                                        <tr><th class="ps-4 py-3">Shop Name</th><th>Shop Owner</th><th>Assigned Route</th><th class="text-end">Credit Limit</th><th class="text-end pe-4">Outstanding (Receivable)</th></tr>
+                                        <tr><th class="ps-4 py-3">Shop Name</th><th>Shop Owner</th><th class="text-end">Credit Limit</th><th class="text-end pe-4">Outstanding (Receivable)</th></tr>
                                     </thead>
                                     <tbody>
                                         <t t-if="this.state.credits.length === 0 and !this.state.isLoadingList">
-                                            <tr><td colspan="5" class="text-center py-5 text-muted fw-bold"><i class="fa fa-balance-scale fs-1 mb-3 opacity-50"></i><p class="mb-1 fs-5 text-dark">No shops found.</p></td></tr>
+                                            <tr><td colspan="4" class="text-center py-5 text-muted fw-bold"><i class="fa fa-balance-scale fs-1 mb-3 opacity-50"></i><p class="mb-1 fs-5 text-dark">No shops found.</p></td></tr>
                                         </t>
                                         <t t-foreach="this.state.credits" t-as="bal" t-key="bal.id">
                                             <tr style="cursor:pointer;" t-on-click="() => this.viewShopBalance(bal)">
                                                 <td class="ps-4 fw-bold text-dark"><t t-esc="bal.shop"/><small class="d-block text-muted fw-normal">ID: <t t-esc="bal.shopId"/></small></td>
                                                 <td><t t-esc="bal.owner"/></td>
-                                                <td><span class="badge bg-secondary"><t t-esc="bal.route"/></span></td>
                                                 <td class="text-end fw-bold">Rs. <t t-esc="bal.limit"/></td>
                                                 <td class="text-end text-danger fw-bold pe-4">Rs. <t t-esc="bal.outstanding"/></td>
                                             </tr>

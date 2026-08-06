@@ -442,8 +442,11 @@
                                                     <t t-if="tgt.type === 'collective_qty' or tgt.type === 'collective_weight'"> · <t t-esc="tgt.lines.length"/> products</t>
                                                 </t>
                                             </small>
-                                            <div class="progress mt-1" style="height: 6px; max-width: 220px;">
-                                                <div class="progress-bar" role="progressbar" t-attf-style="width: #{tgt.progressWidth}%"/>
+                                            <div class="d-flex align-items-center mt-2" style="max-width: 220px;">
+                                                <div class="progress flex-grow-1 me-2 shadow-sm" style="height: 8px;">
+                                                    <div class="progress-bar bg-primary" role="progressbar" t-attf-style="width: #{tgt.progressWidth}%"/>
+                                                </div>
+                                                <span class="fw-bold text-dark fs-6"><t t-esc="tgt.progressPercentage"/></span>
                                             </div>
                                             <t t-if="tgt.expanded and tgt.lines.length">
                                                 <div class="mt-2 ps-2 border-start border-2">

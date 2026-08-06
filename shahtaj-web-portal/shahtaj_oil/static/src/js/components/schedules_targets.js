@@ -282,7 +282,7 @@ export class SchedulesTargets extends Component {
                 }
                 byTarget[tid].push({
                     id: line.id,
-                    product_id: line.product_id ? String(line.product_id[0]) : '',
+                    product_id: line.product_id ? line.product_id[0] : '',
                     product_name: line.product_id ? line.product_id[1] : '',
                     measure_type: line.measure_type || 'qty',
                     target_value: line.target_value,
@@ -386,8 +386,9 @@ export class SchedulesTargets extends Component {
             this.state.scheduleForm.operational_shop_count = null;
             return;
         }
+        // Use route_ids (multi-route membership), not legacy primary route_id.
         this.state.scheduleForm.operational_shop_count = await this.orm.searchCount('res.partner', [
-            ['route_id', '=', routeId],
+            ['route_ids', 'in', [routeId]],
             ['is_shahtaj_shop', '=', true],
             ['active', '=', true],
             ['shop_approval_state', '=', 'approved'],
@@ -535,7 +536,7 @@ export class SchedulesTargets extends Component {
 
         const routeId = parseInt(form.route_id, 10);
         const operationalShopCount = await this.orm.searchCount('res.partner', [
-            ['route_id', '=', routeId],
+            ['route_ids', 'in', [routeId]],
             ['is_shahtaj_shop', '=', true],
             ['active', '=', true],
             ['shop_approval_state', '=', 'approved'],

@@ -116,56 +116,120 @@ export class BankTransactions extends Component {
             const pag = this.state.pagination[tab];
             const filters = this.state.filters[tab];
             
-            if (tab === 'transactions') {
-                let domain = [["journal_id.type", "in", ["bank", "cash"]]];
+           if (tab === 'transactions') {
+                let payDomain = [["journal_id.type", "in", ["bank", "cash"]]];
+                let expDomain = [["journal_id.type", "in", ["bank", "cash"]]];
                 
                 if (filters.search) {
-                    domain.push('|', '|', 
+                    payDomain.push('|', '|', 
                         ['partner_id.name', 'ilike', filters.search], 
                         ['name', 'ilike', filters.search], 
                         ['shahtaj_instrument_reference', 'ilike', filters.search]
                     );
+                    expDomain.push('|', '|', 
+                        ['partner_id.name', 'ilike', filters.search], 
+                        ['name', 'ilike', filters.search], 
+                        ['description', 'ilike', filters.search]
+                    );
                 }
-                if (filters.journal !== 'all') domain.push(['journal_id', '=', parseInt(filters.journal)]);
-                if (filters.direction !== 'all') domain.push(['payment_type', '=', filters.direction]);
-                if (filters.dateFrom) domain.push(['date', '>=', filters.dateFrom]);
-                if (filters.dateTo) domain.push(['date', '<=', filters.dateTo]);
                 
-                let order = 'date desc';
-                if (filters.sortBy === 'amount_asc') order = 'amount asc';
-                if (filters.sortBy === 'amount_desc') order = 'amount desc';
+                if (filters.journal !== 'all') {
+                    payDomain.push(['journal_id', '=', parseInt(filters.journal)]);
+                    expDomain.push(['journal_id', '=', parseInt(filters.journal)]);
+                }
+                if (filters.dateFrom) {
+                    payDomain.push(['date', '>=', filters.dateFrom]);
+                    expDomain.push(['date', '>=', filters.dateFrom]);
+                }
+                if (filters.dateTo) {
+                    payDomain.push(['date', '<=', filters.dateTo]);
+                    expDomain.push(['date', '<=', filters.dateTo]);
+                }
                 
-                // Triple Query: Count, Paginated Data, and SQL Aggregated Totals
-                const [total, records, groups] = await Promise.all([
-                    this.orm.searchCount('account.payment', domain),
-                    this.orm.searchRead('account.payment', domain, [
+                // Fetch both up to a safe limit to paginate & sort locally
+                const [payments, expenses] = await Promise.all([
+                    this.orm.searchRead('account.payment', payDomain, [
                         "id", "name", "date", "journal_id", "partner_id", "amount", "amount_signed",
                         "state", "payment_type", "shahtaj_payment_channel",
                         "shahtaj_payer_bank_name", "shahtaj_payer_account_number",
                         "shahtaj_instrument_reference", "shahtaj_payment_notes"
-                    ], { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order }),
+                    ], { limit: 2000, order: "date desc" }),
                     
-                    // Uses native Odoo read_group to calculate the top row numbers instantly
-                    this.orm.call('account.payment', 'read_group', [domain, ['payment_type', 'amount:sum'], ['payment_type']])
+                    this.orm.searchRead('shahtaj.expense', expDomain, [
+                        "id", "name", "date", "journal_id", "partner_id", "amount", 
+                        "state", "description", "category_id", "notes"
+                    ], { limit: 2000, order: "date desc" })
                 ]);
                 
-                this.state.pagination.transactions.total = total;
-                this.state.tableTransactions = records.map(p => ({
-                    ...p,
-                    partner_name: p.partner_id ? p.partner_id[1] : 'Unknown',
-                    journal_name: p.journal_id ? p.journal_id[1] : 'Unknown',
-                    display_amount: Math.abs(p.amount_signed || p.amount || 0),
-                    flow_label: p.payment_type === 'outbound' ? 'Paid Out' : 'Collected',
-                }));
+                let combined = [];
                 
+                payments.forEach(p => {
+                    if (filters.direction === 'outbound' && p.payment_type !== 'outbound') return;
+                    if (filters.direction === 'inbound' && p.payment_type !== 'inbound') return;
+                    if (filters.direction === 'expense') return;
+                    
+                    combined.push({
+                        _model: 'account.payment',
+                        id: p.id,
+                        name: p.name,
+                        date: p.date,
+                        journal_name: p.journal_id ? p.journal_id[1] : 'Unknown',
+                        partner_name: p.partner_id ? p.partner_id[1] : 'Unknown',
+                        method_or_desc: p.shahtaj_payment_channel || 'System',
+                        display_amount: Math.abs(p.amount_signed || p.amount || 0),
+                        payment_type: p.payment_type, 
+                        flow_label: p.payment_type === 'outbound' ? 'Paid Out' : 'Collected',
+                        state: p.state,
+                        raw: p
+                    });
+                });
+
+                expenses.forEach(e => {
+                    if (filters.direction === 'inbound' || filters.direction === 'outbound') return; 
+                    
+                    combined.push({
+                        _model: 'shahtaj.expense',
+                        id: e.id,
+                        name: e.name,
+                        date: e.date,
+                        journal_name: e.journal_id ? e.journal_id[1] : 'Unknown',
+                        partner_name: e.partner_id ? e.partner_id[1] : (e.category_id ? e.category_id[1] : 'Expense'),
+                        method_or_desc: e.description || 'Operating Expense',
+                        display_amount: e.amount || 0,
+                        payment_type: 'outbound',
+                        flow_label: 'Expense',
+                        state: e.state,
+                        raw: e
+                    });
+                });
+
+                // Compute Real-time Totals (Ignoring Draft/Cancelled)
                 let mIn = 0; let mOut = 0;
-                groups.forEach(g => {
-                    if (g.payment_type === 'outbound') mOut += g.amount;
-                    else mIn += g.amount;
+                combined.forEach(r => {
+                    if (['posted', 'paid', 'in_process', 'reconciled'].includes(r.state)) {
+                        if (r.payment_type === 'outbound') mOut += r.display_amount;
+                        else mIn += r.display_amount;
+                    }
                 });
                 this.state.totals = { moneyIn: mIn, moneyOut: mOut, net: mIn - mOut };
-            } 
-            else if (tab === 'journals') {
+
+                // Apply dynamic sorting
+                combined.sort((a, b) => {
+                    if (filters.sortBy === 'date_desc') {
+                        return a.date > b.date ? -1 : (a.date < b.date ? 1 : 0);
+                    } else if (filters.sortBy === 'amount_asc') {
+                        return a.display_amount - b.display_amount;
+                    } else if (filters.sortBy === 'amount_desc') {
+                        return b.display_amount - a.display_amount;
+                    }
+                    return 0;
+                });
+
+                // Paginate UI
+                this.state.pagination.transactions.total = combined.length;
+                const start = (pag.page - 1) * pag.limit;
+                this.state.tableTransactions = combined.slice(start, start + pag.limit);
+            }else if (tab === 'journals') {
                 let domain = [["type", "in", ["bank", "cash"]]];
                 if (filters.search) domain.push(['name', 'ilike', filters.search]);
                 

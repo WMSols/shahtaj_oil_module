@@ -445,8 +445,11 @@
             </p>
             <p>
                 Shop name is enough to create. Assign routes later (Assign to Route).
-                Unassigned shops do not get visit tasks. Assign them from
+            <p>
+                Create the shop with a name only. Assign routes later from
                 <b>Routes</b> (shop checklist) or <b>Assign to Route</b>.
+                Unassigned shops do not get visit tasks.
+            </p>
             </p>
         </field>
     </record>

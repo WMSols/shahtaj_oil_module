@@ -366,6 +366,7 @@ export class OperationsTracking extends Component {
             this.orm.searchRead("product.template", [
                 ["sale_ok", "=", true],
                 ["active", "=", true],
+                ["default_code", "!=", "SHAHTAJ-LEGACY"],
             ], ["id", "name"]),
         ]);
         this.state.saleTaxes = taxes;

@@ -273,7 +273,7 @@ export class FinancialsInvoicing extends Component {
             'customer_invoices': { stateKey: 'invoices', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"] },
             'credit_notes': { stateKey: 'creditNotes', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"] },
             'payments': { stateKey: 'payments', model: 'account.payment', fields: ["name", "partner_id", "date", "amount", "journal_id", "memo", "state", "shahtaj_payment_channel", "shahtaj_payer_bank_name", "shahtaj_payer_account_number", "shahtaj_instrument_reference", "shahtaj_payment_notes"] },
-            'credit': { stateKey: 'credits', model: 'res.partner', fields: ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "outstanding_balance"] },
+            'credit': { stateKey: 'credits', model: 'res.partner', fields: ["name", "owner_name", "shahtaj_shop_category", "credit_limit", "outstanding_balance"] },
             'expenses': { stateKey: 'expenses', model: 'shahtaj.expense', fields: ['name', 'date', 'category_id', 'description', 'amount', 'journal_id', 'partner_id', 'state', 'move_name'] },
             'categories': { stateKey: 'expenseCategories', model: 'shahtaj.expense.category', fields: ['name', 'sequence', 'active', 'note'] }
         };
@@ -342,7 +342,6 @@ export class FinancialsInvoicing extends Component {
                     }
                     return {
                         id: shop.id, shopId: shop.id, shop: shop.name, owner: shop.owner_name || "N/A",
-                        route: shop.route_id ? shop.route_id[1] : "Unassigned",
                         limit: shop.shahtaj_shop_category === "cash" ? "N/A" : limit.toLocaleString(),
                         rawLimit: limit, utilized: utilized.toLocaleString(), rawUtilized: utilized,
                         available: Math.max(0, limit - utilized).toLocaleString(), status,
@@ -398,7 +397,7 @@ export class FinancialsInvoicing extends Component {
             else if (stateKey === 'balances') {
                 this.state.balances = records.map((shop) => ({
                     id: shop.id, shopId: shop.id, shop: shop.name, owner: shop.owner_name || "N/A",
-                    route: shop.route_id ? shop.route_id[1] : "Unassigned", category: shop.shahtaj_shop_category === "cash" ? "Cash" : "Credit",
+                    category: shop.shahtaj_shop_category === "cash" ? "Cash" : "Credit",
                     limit: shop.shahtaj_shop_category === "cash" ? "N/A" : (shop.credit_limit || 0).toLocaleString(),
                     rawLimit: shop.credit_limit || 0, outstanding: (shop.outstanding_balance || 0).toLocaleString(),
                     rawOutstanding: shop.outstanding_balance || 0,
@@ -618,7 +617,7 @@ export class FinancialsInvoicing extends Component {
 
         // 3. Temporarily fetch Credit Risk data (until we migrate this tab to pagination too)
         if (this.state.activeSubTab === 'credit' || !this.state.credits.length) {
-            const shopsData = await this.orm.searchRead("res.partner", [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]], ["name", "owner_name", "route_id", "shahtaj_shop_category", "credit_limit", "outstanding_balance"]);
+            const shopsData = await this.orm.searchRead("res.partner", [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]], ["name", "owner_name", "shahtaj_shop_category", "credit_limit", "outstanding_balance"]);
             this.state.credits = (shopsData || []).map((shop) => {
                 const limit = shop.credit_limit || 0;
                 const utilized = shop.outstanding_balance || 0;

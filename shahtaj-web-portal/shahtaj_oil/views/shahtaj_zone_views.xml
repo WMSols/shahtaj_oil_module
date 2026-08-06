@@ -73,7 +73,8 @@
                 Define your first sales zone
             </p>
             <p>
-                Zones are geographic areas. Create zones first, then routes, then assign shops to routes.
+                Zones are geographic areas. Create zones, then routes under them.
+                Assign shops from the <b>route</b> checklist (a shop can be on many routes).
             </p>
         </field>
     </record>

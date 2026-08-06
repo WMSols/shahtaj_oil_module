@@ -89,10 +89,32 @@ class ShahtajWeeklySchedule(models.Model):
                     route=schedule.route_id.display_name,
                 ))
 
-    _booker_route_day_unique = models.Constraint(
-        'unique(order_booker_id, route_id, day_of_week)',
-        'This order booker already has this route on the selected day.',
+    _booker_day_unique = models.Constraint(
+        'unique(order_booker_id, day_of_week)',
+        'This order booker already has a schedule on the selected day '
+        '(one route per weekday).',
     )
+
+    @api.constrains('order_booker_id', 'day_of_week', 'active')
+    def _check_one_schedule_per_booker_day(self):
+        """Match portal: one schedule line per booker per weekday."""
+        for schedule in self:
+            if not schedule.order_booker_id or schedule.day_of_week is False:
+                continue
+            siblings = self.search([
+                ('id', '!=', schedule.id),
+                ('order_booker_id', '=', schedule.order_booker_id.id),
+                ('day_of_week', '=', schedule.day_of_week),
+            ], limit=1)
+            if siblings:
+                day_labels = dict(DAY_SELECTION)
+                raise ValidationError(_(
+                    'Order booker "%(booker)s" already has a schedule on '
+                    '%(day)s. One route per day only — edit or deactivate '
+                    'the existing line first.',
+                    booker=schedule.order_booker_id.display_name,
+                    day=day_labels.get(schedule.day_of_week, schedule.day_of_week),
+                ))
 
     @api.depends('order_booker_id', 'route_id', 'day_of_week')
     def _compute_name(self):

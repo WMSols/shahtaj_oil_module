@@ -355,7 +355,7 @@
                 <div class="row g-3 mb-4 mb-md-5">
                     <div class="col-12 col-md-4">
                         <div class="card bg-light border-0 shadow-sm p-4 rounded-3 border-start border-4 border-dark h-100">
-                            <div class="text-muted fw-bold small text-uppercase">Total Daily Tasks</div>
+                            <div class="text-muted fw-bold small text-uppercase">Total Daily Visits</div>
                             <h2 class="fw-bold text-dark mb-0 mt-2"><t t-esc="this.state.selectedStaff.metrics.today.total"/></h2>
                         </div>
                     </div>
