@@ -57,7 +57,7 @@
                         <group>
                             <field name="zone_id"/>
                             <field name="shop_id" required="1"
-                                   domain="[('is_shahtaj_shop', '=', True), ('shop_approval_state', '=', 'approved'), ('route_id', '=', route_id)]"/>
+                                   domain="[('is_shahtaj_shop', '=', True), ('shop_approval_state', '=', 'approved'), ('route_ids', 'in', [route_id])]"/>
                             <field name="weekly_schedule_id" readonly="1"/>
                         </group>
                     </group>

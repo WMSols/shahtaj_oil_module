@@ -91,13 +91,31 @@ class ResPartner(models.Model):
         string='Zone',
         ondelete='set null',
         domain=lambda self: [('id', 'in', self._get_allowed_zone_ids())],
+        help='Display / primary zone (from primary route). '
+             'Shop↔route links are the source of truth.',
     )
+    # Legacy single-route field kept in sync with route_ids for existing UI.
     route_id = fields.Many2one(
         'shahtaj.route',
         string='Route',
         ondelete='set null',
         domain="[('id', 'in', allowed_route_ids)]",
         index=True,
+        help='Primary route for display. Full membership is in Routes.',
+    )
+    # Source of truth: shop may belong to many routes (cross-zone allowed).
+    route_ids = fields.Many2many(
+        'shahtaj.route',
+        'shahtaj_shop_route_rel',
+        'shop_id',
+        'route_id',
+        string='Routes',
+        domain=[('active', '=', True)],
+    )
+    shahtaj_routes_display = fields.Char(
+        string='Zones / Routes',
+        compute='_compute_shahtaj_routes_display',
+        help='Read-only summary of assigned zones and routes.',
     )
     registered_by_id = fields.Many2one(
         'res.users',
@@ -211,15 +229,32 @@ class ResPartner(models.Model):
             else:
                 partner.shahtaj_visit_tag = False
 
-    @api.depends('is_shahtaj_shop', 'route_id')
+    @api.depends('is_shahtaj_shop', 'route_ids')
     def _compute_shahtaj_route_tag(self):
         for partner in self:
             if not partner.is_shahtaj_shop:
                 partner.shahtaj_route_tag = False
-            elif partner.route_id:
+            elif partner.route_ids:
                 partner.shahtaj_route_tag = 'assigned'
             else:
                 partner.shahtaj_route_tag = 'unassigned'
+
+    @api.depends(
+        'route_ids',
+        'route_ids.name',
+        'route_ids.zone_id',
+        'route_ids.zone_id.name',
+    )
+    def _compute_shahtaj_routes_display(self):
+        for partner in self:
+            if not partner.route_ids:
+                partner.shahtaj_routes_display = False
+                continue
+            parts = []
+            for route in partner.route_ids.sorted(lambda r: (r.zone_id.name or '', r.name or '')):
+                zone = route.zone_id.name or '?'
+                parts.append(f'{zone} → {route.name}')
+            partner.shahtaj_routes_display = ', '.join(parts)
 
     # --- Zone/route dropdowns on shop forms (all active records for bookers) ---
     @api.model
@@ -237,7 +272,7 @@ class ResPartner(models.Model):
         return self.env['shahtaj.route'].search(domain).ids
 
     def _shahtaj_is_operational_for_booker(self):
-        """Shop is usable by order bookers only when the full territory chain is active."""
+        """Shop is usable when active, approved, and on at least one live route."""
         self.ensure_one()
         if not self.is_shahtaj_shop:
             return False
@@ -246,13 +281,8 @@ class ResPartner(models.Model):
             return False
         if partner.shop_approval_state != 'approved':
             return False
-        route = partner.route_id.with_context(active_test=False)
-        if not route or not route.active:
-            return False
-        zone = route.zone_id.with_context(active_test=False)
-        if not zone or not zone.active:
-            return False
-        return True
+        routes = partner.route_ids.with_context(active_test=False)
+        return any(route._shahtaj_is_operational_for_booker() for route in routes)
 
     def get_archive_impact(self):
         self.ensure_one()
@@ -266,11 +296,12 @@ class ResPartner(models.Model):
 
     def _validate_operational_territory_assignment(self):
         for partner in self.filtered('is_shahtaj_shop'):
-            if partner.route_id and not partner.route_id._shahtaj_is_operational_for_booker():
-                raise ValidationError(_(
-                    'Route "%(route)s" is archived or its zone is inactive.',
-                    route=partner.route_id.display_name,
-                ))
+            for route in partner.route_ids:
+                if not route._shahtaj_is_operational_for_booker():
+                    raise ValidationError(_(
+                        'Route "%(route)s" is archived or its zone is inactive.',
+                        route=route.display_name,
+                    ))
             if partner.zone_id and not partner.zone_id.active:
                 raise ValidationError(_(
                     'Zone "%(zone)s" is archived.',
@@ -282,13 +313,51 @@ class ResPartner(models.Model):
         for partner in self.filtered('is_shahtaj_shop'):
             if not partner._shahtaj_is_operational_for_booker():
                 continue
-            bookers = partner.route_id.mapped('weekly_schedule_ids.order_booker_id')
+            bookers = partner.route_ids.mapped('weekly_schedule_ids.order_booker_id')
             partner._reactivate_cancelled_visit_tasks(bookers=bookers)
             if bookers:
                 for booker in bookers:
                     Task._auto_generate_window(order_booker=booker)
             else:
                 Task._auto_generate_window()
+
+    def _shahtaj_sync_primary_route_from_route_ids(self):
+        """Keep route_id / zone_id aligned with route_ids for existing UI."""
+        for partner in self.filtered('is_shahtaj_shop'):
+            routes = partner.route_ids
+            if partner.route_id in routes:
+                primary = partner.route_id
+            elif routes:
+                primary = routes.sorted('id')[:1]
+            else:
+                primary = self.env['shahtaj.route']
+            vals = {}
+            primary_id = primary.id if primary else False
+            if partner.route_id.id != primary_id:
+                vals['route_id'] = primary_id
+            if primary and partner.zone_id != primary.zone_id:
+                vals['zone_id'] = primary.zone_id.id
+            if vals:
+                partner.with_context(shahtaj_skip_route_m2m_sync=True).write(vals)
+
+    def _shahtaj_vals_mirror_route_id_to_route_ids(self, vals):
+        """Old single-route UI writes route_id → rewrite as route_ids replace."""
+        if self.env.context.get('shahtaj_skip_route_m2m_sync'):
+            return vals
+        if 'route_ids' in vals:
+            return vals
+        if 'route_id' not in vals:
+            return vals
+        vals = dict(vals)
+        new_route_id = vals.get('route_id') or False
+        if new_route_id:
+            route = self.env['shahtaj.route'].browse(new_route_id).exists()
+            if route:
+                vals['zone_id'] = route.zone_id.id
+            vals['route_ids'] = [(6, 0, [new_route_id])]
+        else:
+            vals['route_ids'] = [(5, 0, 0)]
+        return vals
 
     @api.depends('zone_id')
     @api.depends_context('uid')
@@ -355,6 +424,7 @@ class ResPartner(models.Model):
 
     @api.constrains('route_id', 'zone_id', 'is_shahtaj_shop')
     def _check_shop_route_zone(self):
+        # Primary route_id must match display zone_id (route_ids may cross zones).
         for partner in self.filtered(lambda p: p.is_shahtaj_shop and p.route_id):
             if partner.zone_id and partner.route_id.zone_id != partner.zone_id:
                 raise ValidationError(_(
@@ -438,6 +508,13 @@ class ResPartner(models.Model):
                     self.env.context['default_shop_approval_state'],
                 )
             vals = self._sync_shop_category_credit_flags(vals)
+        # Mirror single route_id into route_ids on create (legacy UI / API).
+        if vals.get('route_id') and 'route_ids' not in vals:
+            rid = vals['route_id']
+            vals['route_ids'] = [(6, 0, [rid])]
+            route = self.env['shahtaj.route'].browse(rid).exists()
+            if route:
+                vals.setdefault('zone_id', route.zone_id.id)
         return vals
 
     def _get_shop_receivable_account(self, company):
@@ -558,6 +635,14 @@ class ResPartner(models.Model):
                     vals['shahtaj_field_verified_by_id'] = self.env.user.id
         partners = super().create(prepared)
         shop_partners = partners.filtered('is_shahtaj_shop')
+        # Ensure primary route_id/zone_id match route_ids after create.
+        need_primary = shop_partners.filtered(
+            lambda p: p.route_ids and (
+                not p.route_id or p.route_id not in p.route_ids
+            )
+        )
+        if need_primary:
+            need_primary._shahtaj_sync_primary_route_from_route_ids()
         shop_partners._validate_shop_required_fields()
         shop_partners._validate_operational_territory_assignment()
         shop_partners.filtered(
@@ -576,27 +661,32 @@ class ResPartner(models.Model):
     def write(self, vals):
         if vals.get('active') is True:
             for partner in self.filtered('is_shahtaj_shop'):
-                route = partner.route_id.with_context(active_test=False)
-                if route and not route.active:
+                # Prefer any linked route; fall back to primary route_id.
+                routes = partner.route_ids.with_context(active_test=False)
+                if not routes and partner.route_id:
+                    routes = partner.route_id.with_context(active_test=False)
+                inactive = routes.filtered(
+                    lambda r: not r.active or (
+                        r.zone_id and not r.zone_id.with_context(active_test=False).active
+                    ),
+                )
+                # Block restore only when every linked route/zone is archived
+                # and at least one link exists.
+                if routes and len(inactive) == len(routes):
+                    bad = inactive[:1]
                     self._shahtaj_raise_restore_parent_error(
                         _('shop'),
-                        route.display_name,
-                    )
-                zone = route.zone_id.with_context(active_test=False) if route else False
-                if zone and not zone.active:
-                    self._shahtaj_raise_restore_parent_error(
-                        _('shop'),
-                        zone.display_name,
+                        bad.display_name,
                     )
         vals = self._sync_shop_category_credit_flags(vals)
         vals = self._shahtaj_strip_distributor_exterior_photo(vals)
         if vals.get('owner_phone'):
             vals.setdefault('phone', vals['owner_phone'])
-        if vals.get('route_id'):
-            route = self.env['shahtaj.route'].browse(vals['route_id']).exists()
-            if route:
-                vals['zone_id'] = route.zone_id.id
-        if 'route_id' in vals:
+        vals = self._shahtaj_vals_mirror_route_id_to_route_ids(vals)
+        if 'route_ids' in vals and not self.env.context.get('shahtaj_skip_route_m2m_sync'):
+            # Block membership changes while a visit is in progress.
+            self._shahtaj_assert_can_change_route_membership(vals.get('route_ids'))
+        elif 'route_id' in vals and not self.env.context.get('shahtaj_skip_route_m2m_sync'):
             self._shahtaj_assert_can_change_route(vals.get('route_id'))
         if vals.get('legacy_balance_move_id') and not self.env.context.get(
             'shahtaj_posting_legacy_move'
@@ -613,10 +703,21 @@ class ResPartner(models.Model):
                 )
         if vals.get('active') is True:
             self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_territory_restore()
-        if any(k in vals for k in ('route_id', 'zone_id')):
+        if (
+            'route_ids' in vals
+            and not self.env.context.get('shahtaj_skip_route_m2m_sync')
+        ):
+            shops = self.filtered('is_shahtaj_shop')
+            shops._shahtaj_sync_primary_route_from_route_ids()
+            shops._validate_operational_territory_assignment()
+            shops._sync_visit_tasks_after_route_assignment()
+        elif (
+            any(k in vals for k in ('route_id', 'zone_id'))
+            and not self.env.context.get('shahtaj_skip_route_m2m_sync')
+        ):
             self.filtered('is_shahtaj_shop')._validate_operational_territory_assignment()
-        if 'route_id' in vals:
-            self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_route_assignment()
+            if 'route_id' in vals:
+                self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_route_assignment()
         if 'shahtaj_shop_category' in vals:
             credit_shops = self.filtered(
                 lambda p: p.is_shahtaj_shop
@@ -643,7 +744,7 @@ class ResPartner(models.Model):
         if shops:
             Log = self.env['shahtaj.activity.log']
             tracked = {
-                'active', 'name', 'route_id', 'zone_id', 'credit_limit',
+                'active', 'name', 'route_id', 'route_ids', 'zone_id', 'credit_limit',
                 'shahtaj_shop_category', 'owner_name', 'owner_phone',
             }
             if tracked.intersection(vals) and not self.env.context.get(
@@ -659,7 +760,7 @@ class ResPartner(models.Model):
         return res
 
     def _sync_visit_tasks_after_route_assignment(self):
-        """Rebuild pending visit tasks after shops move to/from a route."""
+        """Rebuild pending visit tasks after shops move to/from routes."""
         Task = self.env['shahtaj.visit.task']
         shops = self.filtered('is_shahtaj_shop')
         if not shops:
@@ -670,7 +771,7 @@ class ResPartner(models.Model):
         for partner in shops:
             if not partner._shahtaj_is_operational_for_booker():
                 continue
-            bookers |= partner.route_id.mapped('weekly_schedule_ids.order_booker_id')
+            bookers |= partner.route_ids.mapped('weekly_schedule_ids.order_booker_id')
         if bookers:
             for booker in bookers:
                 Task._auto_generate_window(order_booker=booker)
@@ -723,12 +824,23 @@ class ResPartner(models.Model):
                 shops=', '.join(blocked.mapped('display_name')),
             ))
 
+    def _shahtaj_assert_can_change_route_membership(self, commands):
+        """Block route_ids changes while a visit is in progress."""
+        shops = self.filtered('is_shahtaj_shop')
+        blocked = shops._shahtaj_shops_with_open_visit()
+        if blocked and commands is not None:
+            raise UserError(_(
+                'Cannot change routes for shop(s) with an in-progress visit: %(shops)s. '
+                'Finish or cancel the visit first.',
+                shops=', '.join(blocked.mapped('display_name')),
+            ))
+
     def action_shahtaj_unassign_route(self):
-        """Clear route assignment (shop stays; no visit tasks until reassigned)."""
-        shops = self.filtered(lambda p: p.is_shahtaj_shop and p.route_id)
+        """Clear all route assignments (shop stays; no visit tasks until reassigned)."""
+        shops = self.filtered(lambda p: p.is_shahtaj_shop and p.route_ids)
         if not shops:
             raise UserError(_('No route to remove on the selected shop(s).'))
-        shops.write({'route_id': False})
+        shops.write({'route_ids': [(5, 0, 0)]})
         return True
 
     def _sync_visit_tasks_after_approval_change(self):
@@ -738,7 +850,7 @@ class ResPartner(models.Model):
             if partner.shop_approval_state != 'approved':
                 Task._cancel_pending_tasks_for_unapproved_shops()
                 continue
-            bookers = partner.route_id.mapped('weekly_schedule_ids.order_booker_id')
+            bookers = partner.route_ids.mapped('weekly_schedule_ids.order_booker_id')
             partner._reactivate_cancelled_visit_tasks(bookers=bookers)
             if bookers:
                 for booker in bookers:

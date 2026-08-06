@@ -27,8 +27,8 @@
                 <sheet>
                     <div class="alert alert-info" role="alert">
                         <b>Checked</b> = shop is on this route.
-                        <b>Unchecked</b> = Unassigned (can be assigned here).
-                        Only Unassigned shops and shops already on this route are shown.
+                        <b>Unchecked</b> = not on this route (shop may still be on other routes).
+                        All approved shops can be selected (multi-route / cross-zone allowed).
                         Click <b>Save</b> after changing checks. Visit tasks follow assigned shops;
                         weekly schedules stay on the route.
                     </div>
@@ -40,7 +40,9 @@
                     </div>
                     <group>
                         <group string="Zone">
-                            <field name="zone_id" required="1" options="{'no_create': False}"/>
+                            <field name="zone_id" required="1"
+                                   domain="[('active', '=', True)]"
+                                   options="{'no_create': False}"/>
                         </group>
                         <group string="Status">
                             <field name="shop_count"/>
@@ -58,9 +60,6 @@
                                    ('is_shahtaj_shop', '=', True),
                                    ('active', '=', True),
                                    ('shop_approval_state', '=', 'approved'),
-                                   '|',
-                                   ('route_id', '=', False),
-                                   ('route_id', '=', id),
                                ]"
                                options="{'no_create': True}"/>
                     </group>
@@ -88,7 +87,9 @@
                 Create a sales route
             </p>
             <p>
-                Open a route and check shops to assign them. Unchecked shops stay Unassigned.
+                Open a route and check shops to assign them.
+                A shop can belong to more than one route. Unchecked only removes it from
+                <b>this</b> route.
             </p>
         </field>
     </record>

@@ -7,16 +7,16 @@
         <field name="model">res.partner</field>
         <field name="priority">1</field>
         <field name="arch" type="xml">
-            <list decoration-warning="not route_id"
-                  decoration-muted="not route_id">
+            <list decoration-warning="shahtaj_route_tag == 'unassigned'"
+                  decoration-muted="shahtaj_route_tag == 'unassigned'">
                 <header>
                     <button name="action_shahtaj_open_assign_to_route" type="object"
                             string="Assign to Route"
                             display="always"
                             groups="shahtaj_oil.group_shahtaj_distributor"/>
                     <button name="action_shahtaj_unassign_route" type="object"
-                            string="Remove from Route"
-                            confirm="Remove route from selected shops? They will get no visit tasks until reassigned."
+                            string="Clear all routes"
+                            confirm="Remove this shop from all routes? It will get no visit tasks until assigned again from a route."
                             groups="shahtaj_oil.group_shahtaj_distributor"/>
                 </header>
                 <field name="id" string="Shop ID" optional="show"/>
@@ -35,13 +35,12 @@
                        decoration-warning="shahtaj_route_tag == 'unassigned'"
                        decoration-success="shahtaj_route_tag == 'assigned'"/>
                 <field name="shahtaj_field_verified" optional="hide"/>
-                <field name="zone_id" optional="show"/>
-                <field name="route_id" optional="show"/>
+                <field name="shahtaj_routes_display" string="Zones / Routes" optional="show"/>
+                <field name="route_ids" widget="many2many_tags" optional="hide"
+                       options="{'no_create': True}"/>
                 <field name="shahtaj_shop_category" widget="badge"
                        decoration-info="shahtaj_shop_category == 'cash'"
                        decoration-primary="shahtaj_shop_category == 'credit'"/>
-                <field name="partner_latitude" string="Latitude"/>
-                <field name="partner_longitude" string="Longitude"/>
                 <field name="credit_limit" optional="hide"/>
                 <field name="legacy_balance" optional="hide"/>
                 <field name="outstanding_balance" optional="show"/>
@@ -60,12 +59,12 @@
                 <field name="name"/>
                 <field name="owner_name"/>
                 <field name="owner_phone"/>
-                <field name="route_id"/>
-                <field name="zone_id"/>
+                <field name="route_ids"/>
+                <field name="shahtaj_routes_display"/>
                 <filter string="Unassigned (no route)" name="unassigned_route"
-                        domain="[('route_id', '=', False)]"/>
+                        domain="[('route_ids', '=', False)]"/>
                 <filter string="Assigned to a route" name="assigned_route"
-                        domain="[('route_id', '!=', False)]"/>
+                        domain="[('route_ids', '!=', False)]"/>
                 <filter string="Route tag: Unassigned" name="tag_unassigned"
                         domain="[('shahtaj_route_tag', '=', 'unassigned')]"/>
                 <filter string="Route tag: Assigned" name="tag_assigned"
@@ -80,8 +79,6 @@
                 <filter string="Pending" name="pending"
                         domain="[('shop_approval_state', '=', 'pending')]"/>
                 <separator/>
-                <filter string="Route" name="groupby_route" context="{'group_by': 'route_id'}"/>
-                <filter string="Zone" name="groupby_zone" context="{'group_by': 'zone_id'}"/>
                 <filter string="Route Tag" name="groupby_route_tag"
                         context="{'group_by': 'shahtaj_route_tag'}"/>
                 <filter string="Visit Tag" name="groupby_visit"
@@ -109,9 +106,9 @@
                             string="Assign to Route"
                             groups="shahtaj_oil.group_shahtaj_distributor"/>
                     <button name="action_shahtaj_unassign_route" type="object"
-                            string="Remove from Route"
-                            invisible="not route_id"
-                            confirm="Remove this shop from its route?"
+                            string="Clear all routes"
+                            invisible="not route_ids"
+                            confirm="Remove this shop from all routes? It will get no visit tasks until assigned again from a route."
                             groups="shahtaj_oil.group_shahtaj_distributor"/>
                     <button name="action_view_legacy_balance_move" type="object"
                             string="Legacy Balance Invoice"
@@ -137,6 +134,8 @@
                     <field name="sale_order_count" invisible="1"/>
                     <field name="account_move_count" invisible="1"/>
                     <field name="credit" invisible="1"/>
+                    <field name="partner_latitude" invisible="1"/>
+                    <field name="partner_longitude" invisible="1"/>
                     <div class="oe_button_box" name="button_box">
                         <button type="object"
                                 name="action_shahtaj_view_sale_orders"
@@ -195,42 +194,33 @@
                             <field name="registered_by_name" readonly="1"/>
                             <field name="registered_by_booker_id" readonly="1"/>
                             <field name="create_date" string="Registered On" readonly="1"/>
-                        </group>
-                        <group string="Route assignment (optional)">
-                            <div class="text-muted" colspan="2">
-                                Create the shop with a name only. Assign a route later from
-                                <b>Shops → Assign to Route</b> or from the route form.
-                                Without a route, the shop gets no visit tasks.
-                            </div>
-                            <field name="route_id"
-                                   placeholder="Leave empty to assign later"
-                                   options="{'no_create': True}"/>
-                            <field name="zone_id"
-                                   placeholder="Set automatically from route"
-                                   options="{'no_create': True}"/>
-                            <field name="registered_by_id" readonly="1" groups="base.group_no_one"/>
-                        </group>
-                    </group>
-                    <group string="GPS Location">
-                        <group>
                             <field name="shahtaj_visit_tag" widget="badge" readonly="1"/>
                             <field name="shahtaj_field_verified" readonly="1"/>
                             <field name="shahtaj_field_verified_at" readonly="1"
                                    invisible="not shahtaj_field_verified"/>
                             <field name="shahtaj_field_verified_by_id" readonly="1"
                                    invisible="not shahtaj_field_verified"/>
-                            <field name="partner_latitude" string="GPS Latitude"
-                                   required="shahtaj_field_verified"/>
-                            <field name="partner_longitude" string="GPS Longitude"
-                                   required="shahtaj_field_verified"/>
                         </group>
-                        <group>
-                            <div class="text-muted">
-                                GPS is optional when creating a shop. Until an order booker
-                                completes <b>first-visit verification</b> (photo + GPS on site),
-                                the shop stays tagged <b>Not Visited</b> and cannot use normal
-                                distance check-in.
+                        <group string="Route assignment">
+                            <div class="text-muted" colspan="2"
+                                 invisible="route_ids">
+                                Not on any route — no visit tasks.
+                                Assign shops from <b>Routes</b> (shop checklist), or use
+                                <b>Assign to Route</b> above.
                             </div>
+                            <field name="shahtaj_routes_display"
+                                   string="Zones / Routes"
+                                   readonly="1"
+                                   invisible="not route_ids"
+                                   colspan="2"/>
+                            <field name="route_ids" widget="many2many_tags"
+                                   readonly="1"
+                                   invisible="not route_ids"
+                                   options="{'no_create': True}"
+                                   string="Routes"/>
+                            <field name="route_id" invisible="1"/>
+                            <field name="zone_id" invisible="1"/>
+                            <field name="registered_by_id" readonly="1" groups="base.group_no_one"/>
                         </group>
                     </group>
                     <group string="Credit and Balance">
@@ -299,8 +289,10 @@
                 <field name="shahtaj_visit_tag" string="Visit" widget="badge"
                        decoration-warning="shahtaj_visit_tag == 'not_visited'"
                        decoration-success="shahtaj_visit_tag == 'visited'"/>
-                <field name="zone_id" optional="show"/>
-                <field name="route_id" optional="show"/>
+                <field name="shahtaj_route_tag" string="Route" widget="badge"
+                       decoration-warning="shahtaj_route_tag == 'unassigned'"
+                       decoration-success="shahtaj_route_tag == 'assigned'"/>
+                <field name="shahtaj_routes_display" string="Zones / Routes" optional="show"/>
                 <field name="create_date" string="Registered On" optional="show"/>
             </list>
         </field>
@@ -332,7 +324,7 @@
                     <field name="registered_by_id" invisible="1"/>
                     <div class="alert alert-info" role="alert" invisible="id">
                         Submit shop details for distributor approval.
-                        Select a zone, then choose a route in that zone.
+                        Zone and route are assigned later by the distributor from Routes.
                     </div>
                     <div class="alert alert-warning" role="alert"
                          invisible="shop_approval_state != 'pending' or not id">
@@ -365,18 +357,18 @@
                                    placeholder="Required for on-site register"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                         </group>
-                        <group>
-                            <field name="zone_id"
-                                   string="Zone (Optional)"
-                                   options="{'no_create': True}"
-                                   readonly="shop_approval_state in ('approved', 'rejected')"/>
-                            <field name="route_id"
-                                   string="Route (Optional)"
-                                   domain="[('id', 'in', allowed_route_ids)]"
-                                   invisible="not zone_id"
-                                   options="{'no_create': True}"
-                                   readonly="shop_approval_state in ('approved', 'rejected')"/>
+                        <group string="Routes (read-only)"
+                               invisible="not id or not route_ids">
+                            <field name="shahtaj_routes_display"
+                                   string="Zones / Routes"
+                                   readonly="1"
+                                   colspan="2"/>
+                            <field name="route_ids" widget="many2many_tags"
+                                   readonly="1"
+                                   options="{'no_create': True}"/>
                         </group>
+                        <field name="route_id" invisible="1"/>
+                        <field name="zone_id" invisible="1"/>
                     </group>
                     <group string="Shop GPS (required — marks Visited)">
                         <group>
@@ -453,7 +445,8 @@
             </p>
             <p>
                 Shop name is enough to create. Assign routes later (Assign to Route).
-                Unassigned shops do not get visit tasks.
+                Unassigned shops do not get visit tasks. Assign them from
+                <b>Routes</b> (shop checklist) or <b>Assign to Route</b>.
             </p>
         </field>
     </record>
@@ -464,7 +457,7 @@
         <field name="view_mode">list,form</field>
         <field name="domain">[
             ('is_shahtaj_shop', '=', True),
-            ('route_id', '=', False),
+            ('route_ids', '=', False),
         ]</field>
         <field name="search_view_id" ref="view_shahtaj_shop_search"/>
         <field name="context">{
@@ -479,8 +472,8 @@
                 No unassigned shops
             </p>
             <p>
-                Shops without a route appear here. Select them and click
-                <b>Assign to Route</b>.
+                Shops with no route links appear here. Open a route and use
+                <b>Manage shops</b>, or select shops and click <b>Assign to Route</b>.
             </p>
         </field>
     </record>

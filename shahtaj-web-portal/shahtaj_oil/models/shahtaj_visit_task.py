@@ -116,9 +116,9 @@ class ShahtajVisitTask(models.Model):
     )
     notes = fields.Text()
 
-    _shop_date_booker_unique = models.Constraint(
-        'unique(shop_id, scheduled_date, order_booker_id)',
-        'A visit task for this shop, date, and order booker already exists.',
+    _shop_date_booker_route_unique = models.Constraint(
+        'unique(shop_id, scheduled_date, order_booker_id, route_id)',
+        'A visit task for this shop, date, order booker, and route already exists.',
     )
 
     @api.depends('shop_id', 'scheduled_date', 'route_id')
@@ -139,7 +139,7 @@ class ShahtajVisitTask(models.Model):
                     shop=task.shop_id.name,
                 ))
             if task.shop_id and task.route_id:
-                if task.shop_id.route_id != task.route_id:
+                if task.route_id not in task.shop_id.route_ids:
                     raise ValidationError(_(
                         'Shop "%(shop)s" is not on route "%(route)s". '
                         'Assign the shop to this route first.',
@@ -361,7 +361,7 @@ class ShahtajVisitTask(models.Model):
         return invalid
 
     def _shahtaj_is_operational_for_booker(self):
-        """True when route+shop territory chain is active for field work.
+        """True when this task's route is active and the shop is still on it.
 
         Shop/route flags are read with sudo so booker partner ACL edge-cases
         (e.g. schedule removed while today's task still exists) do not raise
@@ -369,13 +369,16 @@ class ShahtajVisitTask(models.Model):
         """
         self.ensure_one()
         route = self.route_id.sudo()
-        shop = self.shop_id.sudo()
+        shop = self.shop_id.sudo().with_context(active_test=False)
         if not route or not shop:
             return False
-        return (
-            route._shahtaj_is_operational_for_booker()
-            and shop._shahtaj_is_operational_for_booker()
-        )
+        if not route._shahtaj_is_operational_for_booker():
+            return False
+        if not shop.active or shop.shop_approval_state != 'approved':
+            return False
+        # Multi-route: shop may be operational via another route; this task
+        # only counts if the shop is still linked to *this* route.
+        return route in shop.route_ids.with_context(active_test=False)
 
     def _shahtaj_matches_active_weekly_schedule(self):
         """True when an active weekly schedule covers this task's booker/route/weekday.
@@ -512,6 +515,7 @@ class ShahtajVisitTask(models.Model):
                             ('shop_id', '=', shop.id),
                             ('scheduled_date', '=', day),
                             ('order_booker_id', '=', schedule.order_booker_id.id),
+                            ('route_id', '=', schedule.route_id.id),
                         ], limit=1)
                         if existing:
                             if (

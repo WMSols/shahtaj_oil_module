@@ -8,8 +8,9 @@
             <form string="Pick shops for route">
                 <div class="alert alert-info" role="alert">
                     <b>Checked</b> = on this route.
-                    <b>Unchecked</b> = Unassigned (removed from this route).
-                    Only Unassigned shops and shops already on this route are listed.
+                    <b>Unchecked</b> = removed from this route only
+                    (shop may still belong to other routes).
+                    Any approved shop can be selected.
                     Shop name-only shops appear here once Approved.
                     Long names are shortened in this list so checkboxes stay visible.
                 </div>

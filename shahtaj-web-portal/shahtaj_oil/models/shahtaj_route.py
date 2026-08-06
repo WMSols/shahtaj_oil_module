@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Sales route inside a zone. Shops link via res.partner.route_id (one route per shop)."""
+"""Sales route inside a zone.
+
+Shops link via many2many ``shahtaj_shop_route_rel`` (one shop → many routes,
+including cross-zone). ``assign_shop_ids`` checklist stays UI sugar synced to
+that membership.
+"""
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -12,10 +17,12 @@ class ShahtajRoute(models.Model):
 
     name = fields.Char(required=True)
     zone_id = fields.Many2one('shahtaj.zone', string='Zone', required=True, ondelete='restrict')
-    # Truth for operations / tasks: shops with route_id = this route.
-    shop_ids = fields.One2many(
+    # Source of truth for shop membership (multi-route, cross-zone allowed).
+    shop_ids = fields.Many2many(
         'res.partner',
+        'shahtaj_shop_route_rel',
         'route_id',
+        'shop_id',
         string='Shops',
         domain=[('is_shahtaj_shop', '=', True)],
     )
@@ -26,7 +33,8 @@ class ShahtajRoute(models.Model):
         'route_id',
         'shop_id',
         string='Shop assignment',
-        help='Checked = assigned to this route. Unchecked = Unassigned.',
+        help='Checked = assigned to this route. Unchecked = not on this route '
+             '(shop may still belong to other routes).',
     )
     shop_count = fields.Integer(compute='_compute_shop_count')
     unassigned_shop_count = fields.Integer(
@@ -52,25 +60,22 @@ class ShahtajRoute(models.Model):
             ('is_shahtaj_shop', '=', True),
             ('active', '=', True),
             ('shop_approval_state', '=', 'approved'),
-            ('route_id', '=', False),
+            ('route_ids', '=', False),
         ])
         for route in self:
             route.unassigned_shop_count = count
 
     def _shahtaj_candidate_shop_domain(self):
-        """Approved active shops that are unassigned or already on this route."""
+        """Any approved active shop may be linked (multi-route allowed)."""
         self.ensure_one()
         return [
             ('is_shahtaj_shop', '=', True),
             ('active', '=', True),
             ('shop_approval_state', '=', 'approved'),
-            '|',
-            ('route_id', '=', False),
-            ('route_id', '=', self.id),
         ]
 
     def _shahtaj_align_checklist_to_shops(self):
-        """Make checklist checked set match shops that actually have this route_id."""
+        """Make checklist checked set match shops linked on this route."""
         for route in self:
             wanted_ids = set(route.shop_ids.filtered(
                 lambda s: s.active and s.shop_approval_state == 'approved',
@@ -82,7 +87,10 @@ class ShahtajRoute(models.Model):
                 })
 
     def _shahtaj_sync_assigned_shops(self, wanted_shops):
-        """Set this route's shops to exactly wanted_shops (add/remove safely)."""
+        """Set this route's shop links to exactly wanted_shops (add/remove).
+
+        Does not remove the shop from other routes.
+        """
         self.ensure_one()
         if not self.active or not self.zone_id.active:
             raise UserError(_(
@@ -95,13 +103,6 @@ class ShahtajRoute(models.Model):
         to_add = wanted - current
         to_remove = current - wanted
 
-        foreign = wanted.filtered(lambda s: s.route_id and s.route_id != self)
-        if foreign:
-            raise UserError(_(
-                'These shops are already on another route: %(shops)s. '
-                'Unassign them there first.',
-                shops=', '.join(foreign.mapped('display_name')),
-            ))
         pending = to_add.filtered(lambda s: s.shop_approval_state != 'approved')
         if pending:
             raise UserError(_(
@@ -116,14 +117,15 @@ class ShahtajRoute(models.Model):
                     'Finish or cancel the visit first.',
                     shops=', '.join(blocked.mapped('display_name')),
                 ))
-            to_remove.with_context(shahtaj_checklist_sync=True).write({
-                'route_id': False,
-            })
+            for shop in to_remove:
+                shop.with_context(shahtaj_checklist_sync=True).write({
+                    'route_ids': [(3, self.id)],
+                })
         if to_add:
-            to_add.with_context(shahtaj_checklist_sync=True).write({
-                'route_id': self.id,
-                'zone_id': self.zone_id.id,
-            })
+            for shop in to_add:
+                shop.with_context(shahtaj_checklist_sync=True).write({
+                    'route_ids': [(4, self.id)],
+                })
         return len(to_add), len(to_remove)
 
     def read(self, fields=None, load='_classic_read'):
@@ -169,30 +171,17 @@ class ShahtajRoute(models.Model):
     def get_restore_impact(self):
         """Counts shown before restoring an archived route."""
         self.ensure_one()
-        archived_shops = self.shop_ids.filtered(
-            lambda s: s.is_shahtaj_shop
-            and not s.active
-            and s.shop_approval_state == 'approved',
-        )
         inactive_schedules = self.weekly_schedule_ids.filtered(lambda s: not s.active)
         return {
-            'archived_shop_count': len(archived_shops),
+            # Shops are no longer cascade-archived with the route.
+            'archived_shop_count': 0,
             'inactive_schedule_count': len(inactive_schedules),
         }
 
     def _sync_after_territory_restore(self):
-        """Restore cascade-archived shops/schedules and regenerate visit tasks."""
+        """Re-activate schedules and regenerate visit tasks for this route."""
         Task = self.env['shahtaj.visit.task']
         for route in self:
-            archived_shops = route.shop_ids.filtered(
-                lambda s: s.is_shahtaj_shop
-                and not s.active
-                and s.shop_approval_state == 'approved',
-            )
-            if archived_shops:
-                archived_shops.with_context(
-                    shahtaj_territory_cascade=True,
-                ).write({'active': True})
             inactive_schedules = route.weekly_schedule_ids.filtered(
                 lambda s: not s.active,
             )
@@ -223,13 +212,7 @@ class ShahtajRoute(models.Model):
         if archiving:
             today = fields.Date.context_today(self)
             for route in self:
-                active_shops = route.shop_ids.filtered(
-                    lambda s: s.is_shahtaj_shop and s.active,
-                )
-                if active_shops:
-                    active_shops.with_context(
-                        shahtaj_territory_cascade=True,
-                    ).write({'active': False})
+                # Keep shops active; only this route stops scheduling.
                 active_schedules = route.weekly_schedule_ids.filtered('active')
                 if active_schedules:
                     active_schedules.write({'active': False})

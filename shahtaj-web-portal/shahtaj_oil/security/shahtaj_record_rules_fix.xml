@@ -7,7 +7,7 @@
                 '|', '|', '|',
                 ('is_shahtaj_shop', '=', False),
                 ('registered_by_id', '=', user.id),
-                ('route_id.weekly_schedule_ids.order_booker_id', '=', user.id),
+                ('route_ids.weekly_schedule_ids.order_booker_id', '=', user.id),
                 ('shahtaj_visit_task_ids.order_booker_id', '=', user.id),
             ]</field>
         </record>

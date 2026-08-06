@@ -55,6 +55,7 @@ def shop_brief(partner):
     else:
         credit_remaining = max(credit_limit - outstanding, 0.0)
     setup = shop._shahtaj_first_visit_setup_payload()
+    routes = [_m2o(route) for route in shop.route_ids]
     return {
         'id': shop.id,
         'shop_id': shop.id,
@@ -76,6 +77,9 @@ def shop_brief(partner):
         'visit_tag': setup['visit_tag'],
         'needs_shop_setup': setup['needs_shop_setup'],
         'missing_fields': setup['missing_fields'],
+        # Primary route kept for older clients; routes = full membership.
+        'route': _m2o(shop.route_id),
+        'routes': routes,
     }
 
 
