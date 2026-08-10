@@ -325,7 +325,7 @@
                         <tr>
                             <th class="border-top-0 ps-4 py-3">Product Name</th>
                             <th class="border-top-0 py-3 text-end" title="Total physical units located in the warehouse">On-Hand Qty</th>
-                            <th class="border-top-0 py-3 text-end" title="Units currently available for order bookers to sell (On-Hand minus Reserved)">Available to Book</th>
+                            <th class="border-top-0 py-3 text-end" title="Units bookers can still sell: On-Hand minus open visit carts and undelivered confirmed sales orders">Available to Book</th>
                             <th class="border-top-0 py-3 text-end" title="Predicted future stock based on incoming/outgoing orders">Forecast</th>
                             <th t-if="this.hasFinancialAccess" class="border-top-0 py-3 text-end pe-4">Unit Price</th>
                         </tr>

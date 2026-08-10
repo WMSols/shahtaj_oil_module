@@ -885,7 +885,7 @@
                         </td>
                         <td class="text-center pe-4">
                             <span t-attf-class="badge #{sched.active ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
-                                <t t-esc="sched.active ? 'Active' : 'Inactive'"/>
+                                <t t-esc="sched.active ? 'Active' : 'Deactivated'"/>
                             </span>
                         </td>
                     </tr>
@@ -921,7 +921,7 @@
         <h4 class="text-dark fw-bold mb-0">Schedule: <t t-esc="this.state.selectedSchedule.name"/>
         </h4>
         <span t-attf-class="badge #{this.state.selectedSchedule.active ? 'bg-success' : 'bg-secondary'} text-white px-3 py-2 shadow-sm fs-6">
-            <t t-esc="this.state.selectedSchedule.active ? 'Active Schedule' : 'Inactive'"/>
+            <t t-esc="this.state.selectedSchedule.active ? 'Active Schedule' : 'Deactivated'"/>
         </span>
     </div>
     <div class="row g-4">
@@ -1061,7 +1061,7 @@
                                 <small class="fw-bold text-success"><t t-esc="tgt.progress.toFixed(0)"/>%</small>
                             </div>
                         </td>
-                        <td class="align-middle text-end pe-4 text-nowrap"><span t-attf-class="badge #{tgt.active ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm"><t t-esc="tgt.active ? 'Active' : 'Inactive'"/></span></td>
+                        <td class="align-middle text-end pe-4 text-nowrap"><span t-attf-class="badge #{tgt.active ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm"><t t-esc="tgt.active ? 'Active' : 'Deactivated'"/></span></td>
                     </tr>
                 </t>
             </tbody>
@@ -1095,7 +1095,7 @@
         <h4 class="text-dark fw-bold mb-0">Target: <t t-esc="this.state.selectedTarget.name"/>
         </h4>
         <span t-attf-class="badge #{this.state.selectedTarget.active ? 'text-success' : 'text-secondary'}  px-3 py-2 shadow-sm fs-6">
-            <t t-esc="this.state.selectedTarget.active ? 'Active Target' : 'Inactive'"/>
+            <t t-esc="this.state.selectedTarget.active ? 'Active Target' : 'Deactivated'"/>
         </span>
     </div>
     <div class="row g-4">

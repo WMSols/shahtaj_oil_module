@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Bookable quantity for order bookers: on-hand minus in-progress carts and confirmed orders."""
+"""Bookable quantity for order bookers: on-hand minus open carts and undelivered SOs."""
 from odoo import _, api, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare
@@ -72,11 +72,48 @@ class ProductProduct(models.Model):
 
         return committed
 
+    @api.model
+    def _get_shahtaj_so_committed_qty(self, product_ids):
+        """Undelivered qty on confirmed sales orders (held until deliver or cancel).
+
+        Counts ``product_uom_qty - qty_delivered`` for storable lines on orders in
+        ``sale`` / ``done``. Cancelled and draft/sent quotes do not hold stock.
+        """
+        if not product_ids:
+            return {}
+        committed = {pid: 0.0 for pid in product_ids}
+        # sudo: bookers/distributors may lack sale.order.line ACL while booking.
+        SaleLine = self.env['sale.order.line'].sudo()
+        lines = SaleLine.search([
+            ('product_id', 'in', product_ids),
+            ('order_id.state', 'in', ('sale', 'done')),
+            ('display_type', '=', False),
+        ])
+        for line in lines:
+            product = line.product_id
+            if not product or not product.is_storable:
+                continue
+            remaining = line.product_uom_qty - line.qty_delivered
+            if float_compare(remaining, 0.0, precision_rounding=product.uom_id.rounding) <= 0:
+                continue
+            # Convert line UoM → product UoM when they differ.
+            line_uom = line.product_uom_id
+            if line_uom and line_uom != product.uom_id:
+                remaining = line_uom._compute_quantity(
+                    remaining,
+                    product.uom_id,
+                    rounding_method='HALF-UP',
+                )
+            committed[product.id] = committed.get(product.id, 0.0) + remaining
+        return committed
+
     def _get_shahtaj_bookable_qty(self, exclude_visit_line_ids=None):
         """Qty order bookers may still book (None = no stock tracking on this product).
 
-        Confirmed Shahtaj orders reduce Odoo qty_available via stock reservation.
-        In-progress visit carts are subtracted here because they are not reserved yet.
+        Formula:
+          on-hand
+          − qty soft-held in in-progress visit carts (no SO yet)
+          − undelivered qty on confirmed sales orders (until delivered or cancelled)
         """
         self.ensure_one()
         if not self.is_storable:
@@ -85,11 +122,13 @@ class ProductProduct(models.Model):
             self.ids,
             exclude_visit_line_ids=exclude_visit_line_ids,
         )
+        so_map = self._get_shahtaj_so_committed_qty(self.ids)
         cart_committed = cart_map.get(self.id, 0.0)
+        so_committed = so_map.get(self.id, 0.0)
         rounding = self.uom_id.rounding
         # Order bookers / portal distributors lack stock.move ACL; elevate qty read.
         qty_on_hand = self.sudo().qty_available
-        bookable = qty_on_hand - cart_committed
+        bookable = qty_on_hand - cart_committed - so_committed
         if float_compare(bookable, 0.0, precision_rounding=rounding) < 0:
             return 0.0
         return bookable

@@ -49,7 +49,10 @@ class ProductTemplate(models.Model):
         string='Available to Book',
         compute='_compute_shahtaj_qty_bookable',
         digits='Product Unit of Measure',
-        help='Quantity order bookers can still place on visits.',
+        help=(
+            'Quantity order bookers can still place on visits: '
+            'on-hand minus open visit carts and undelivered confirmed sales orders.'
+        ),
     )
     shahtaj_unit_margin = fields.Float(
         string='Unit Profit',

@@ -309,20 +309,27 @@
                             </div>
                         </div>
 
-                        <!-- The Shop Checklist -->
+                        <!-- Assigned shops on this route -->
                         <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
-                            <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center">
-                                <h6 class="fw-bold mb-0 text-dark"><i class="fa fa-list-ul text-primary me-2"></i> Shop Assignment Checklist</h6>
-                                <div class="input-group input-group-sm w-25 shadow-sm">
-                                    <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
-                                    <input type="text" class="form-control border-start-0 ps-0" placeholder="Search shops..." 
-                                           t-model="this.state.routeChecklistSearchQuery" t-on-input="onChecklistSearchInput" />
+                            <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <h6 class="fw-bold mb-0 text-dark"><i class="fa fa-list-ul text-primary me-2"></i> Assigned Shops</h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="input-group input-group-sm shadow-sm" style="width: 220px;">
+                                        <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search assigned shops..."
+                                               t-model="this.state.routeChecklistSearchQuery" t-on-input="onChecklistSearchInput" />
+                                    </div>
+                                    <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm d-flex align-items-center"
+                                            t-on-click="openAddShopModal"
+                                            title="Add shops to this route">
+                                        <i class="fa fa-plus me-1"></i> Add Shop
+                                    </button>
                                 </div>
                             </div>
                             <div class="px-3 py-2 bg-light border-bottom small text-muted">
-                                Checked = on this route. Unchecked = not on this route (shop may still be on other routes). All approved shops are listed.
+                                Only shops on this route. Use <strong>Add Shop</strong> to assign more (a shop may already be on other routes).
                             </div>
-                            
+
                             <div class="position-relative">
                                 <t t-if="this.state.isLoadingList">
                                     <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
@@ -333,36 +340,35 @@
                                     <table class="table table-hover align-middle mb-0">
                                         <thead class="bg-light text-uppercase small fw-bold text-muted">
                                             <tr>
-                                                <th class="ps-4 text-center" style="width: 60px;">Assign</th>
-                                                <th>Shop Name</th>
+                                                <th class="ps-4">Shop Name</th>
                                                 <th>Owner</th>
-                                                <th class="text-end pe-4">Zones / Routes</th>
+                                                <th class="text-end pe-4">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <t t-if="this.state.tableRouteChecklist.length === 0 and !this.state.isLoadingList">
-                                                <tr><td colspan="4" class="text-center py-4 text-muted fw-bold">No available shops match your search.</td></tr>
+                                                <tr>
+                                                    <td colspan="3" class="text-center py-4 text-muted fw-bold">
+                                                        No shops assigned to this route yet. Click <strong>Add Shop</strong> to assign.
+                                                    </td>
+                                                </tr>
                                             </t>
                                             <t t-foreach="this.state.tableRouteChecklist" t-as="cshop" t-key="cshop.id">
                                                 <tr>
-                                                    <td class="ps-4 text-center">
-                                                        <input class="form-check-input fs-5 cursor-pointer shadow-sm" type="checkbox" 
-                                                               t-att-checked="this.isShopOnSelectedRoute(cshop)"
-                                                               t-on-change="(ev) => this.toggleShopRouteAssignment(cshop.id, ev)"/>
-                                                    </td>
-                                                    <td class="fw-bold text-dark"><t t-esc="cshop.name"/></td>
+                                                    <td class="ps-4 fw-bold text-dark"><t t-esc="cshop.name"/></td>
                                                     <td class="text-muted"><t t-esc="cshop.owner_name || 'N/A'"/></td>
                                                     <td class="text-end pe-4">
-                                                        <span t-attf-class="badge #{cshop.shahtaj_routes_display ? 'bg-info text-white' : 'bg-warning text-dark'} shadow-sm">
-                                                            <t t-esc="this.formatShopRoutes(cshop)"/>
-                                                        </span>
+                                                        <button class="btn btn-sm btn-outline-danger fw-bold"
+                                                                t-on-click="() => this.removeShopFromRoute(cshop)"
+                                                                title="Remove from this route only">
+                                                            Remove
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             </t>
                                         </tbody>
                                     </table>
                                 </div>
-                                <!-- Checklist Pagination -->
                                 <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
                                     <small class="text-muted fw-bold">
                                         Showing <t t-esc="this.state.pagination.routeChecklist.total === 0 ? 0 : ((this.state.pagination.routeChecklist.page - 1) * this.state.pagination.routeChecklist.limit) + 1"/>
@@ -416,13 +422,20 @@
                     </strong>
                 </small>
             </div>
-            <button class="btn btn-sm btn-outline-secondary fw-bold d-flex align-items-center" t-on-click="closeShopDetails" title="Close details and return to list">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
-                    <path d="m12 19-7-7 7-7"/>
-                    <path d="M19 12H5"/>
-                </svg>
-                        Back to Directory
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-primary fw-bold d-flex align-items-center"
+                        t-on-click="editShopFromDetails"
+                        title="Edit this shop">
+                    <i class="fa fa-pencil me-1"></i> Edit
+                </button>
+                <button class="btn btn-sm btn-outline-secondary fw-bold d-flex align-items-center" t-on-click="closeShopDetails" title="Close details and return to list">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+                        <path d="m12 19-7-7 7-7"/>
+                        <path d="M19 12H5"/>
+                    </svg>
+                    Back to Directory
+                </button>
+            </div>
         </div>
 
         <div class="p-4">
@@ -430,53 +443,145 @@
                 <div class="col-md-5">
                     <div class="mb-4">
                         <h6 class="fw-bold text-primary">Location Details</h6>
-                        <div class="mb-3">
-                            <strong class="d-block mb-2">Assigned routes</strong>
-                            <t t-if="this.state.selectedShopDetails.route_lines and this.state.selectedShopDetails.route_lines.length">
-                                <ul class="list-unstyled mb-0">
-                                    <t t-foreach="this.state.selectedShopDetails.route_lines" t-as="line" t-key="line.route_id">
-                                        <li class="mb-2 pb-2 border-bottom">
-                                            <div class="fw-bold text-dark"><t t-esc="line.route_name"/></div>
-                                            <small class="text-muted">Zone: <t t-esc="line.zone_name"/></small>
-                                        </li>
-                                    </t>
-                                </ul>
-                                <small class="text-muted">Read-only — assign or remove from Routes checklist.</small>
-                            </t>
-                            <t t-else="">
-                                <p class="mb-0 text-muted">
-                                    Unassigned — assign from Routes checklist.
-                                </p>
-                            </t>
+                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
+                            <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <strong class="mb-0 text-dark">Assigned Routes</strong>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="input-group input-group-sm shadow-sm" style="width: 180px;">
+                                        <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                        <input type="text" class="form-control border-start-0 ps-0"
+                                               placeholder="Search routes..."
+                                               t-model="this.state.shopRouteSearchQuery"
+                                               t-on-input="onShopRouteSearchInput"/>
+                                    </div>
+                                    <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm d-flex align-items-center"
+                                            t-on-click="openAddRouteModal"
+                                            title="Assign this shop to routes">
+                                        <i class="fa fa-plus me-1"></i> Add Route
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="px-3 py-2 bg-light border-bottom small text-muted">
+                                Routes this shop belongs to. Remove only unlinks from that route; Add Route can assign more.
+                            </div>
+                            <div class="table-responsive" style="height: 260px; overflow-y: auto;">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-uppercase small fw-bold text-muted sticky-top">
+                                        <tr>
+                                            <th class="ps-3">Route</th>
+                                            <th>Zone</th>
+                                            <th class="text-end pe-3">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="!this.paginatedShopRouteLines.length">
+                                            <tr>
+                                                <td colspan="3" class="text-center py-4 text-muted fw-bold">
+                                                    <t t-if="this.state.shopRouteSearchQuery and !this.filteredShopRouteLines.length">
+                                                        No routes match your search.
+                                                    </t>
+                                                    <t t-else="">
+                                                        No routes assigned. Click <strong>Add Route</strong> to assign.
+                                                    </t>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="this.paginatedShopRouteLines" t-as="line" t-key="line.route_id">
+                                            <tr>
+                                                <td class="ps-3 fw-bold text-dark"><t t-esc="line.route_name"/></td>
+                                                <td class="text-muted"><t t-esc="line.zone_name"/></td>
+                                                <td class="text-end pe-3">
+                                                    <button class="btn btn-sm btn-outline-danger fw-bold"
+                                                            t-on-click="() => this.removeRouteFromShop(line)"
+                                                            title="Remove shop from this route only">
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2">
+                                <small class="text-muted fw-bold">
+                                    Showing
+                                    <t t-esc="this.state.pagination.shopRoutes.total === 0 ? 0 : ((this.state.pagination.shopRoutes.page - 1) * this.state.pagination.shopRoutes.limit) + 1"/>
+                                    to
+                                    <t t-esc="Math.min(this.state.pagination.shopRoutes.page * this.state.pagination.shopRoutes.limit, this.state.pagination.shopRoutes.total)"/>
+                                    of
+                                    <t t-esc="this.state.pagination.shopRoutes.total"/>
+                                </small>
+                                <div class="btn-group shadow-sm">
+                                    <button class="btn btn-sm btn-white border fw-bold"
+                                            t-on-click="() => this.changeShopRoutePage(-1)"
+                                            t-att-disabled="this.state.pagination.shopRoutes.page === 1">Prev</button>
+                                    <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                        <t t-esc="this.state.pagination.shopRoutes.page"/>
+                                        /
+                                        <t t-esc="Math.max(1, Math.ceil(this.state.pagination.shopRoutes.total / this.state.pagination.shopRoutes.limit))"/>
+                                    </button>
+                                    <button class="btn btn-sm btn-white border fw-bold"
+                                            t-on-click="() => this.changeShopRoutePage(1)"
+                                            t-att-disabled="this.state.pagination.shopRoutes.page &gt;= Math.ceil(this.state.pagination.shopRoutes.total / this.state.pagination.shopRoutes.limit)">Next</button>
+                                </div>
+                            </div>
                         </div>
-                        <p class="mb-0">
-                            <strong>Coordinates:</strong>
-                            <t t-esc="this.state.selectedShopDetails.partner_latitude"/>
-,                            <t t-esc="this.state.selectedShopDetails.partner_longitude"/>
-                        </p>
+                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
+                            <div class="px-3 py-2 bg-light border-bottom">
+                                <strong class="text-dark small text-uppercase">Coordinates</strong>
+                            </div>
+                            <div class="p-3">
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="text-muted small mb-1">Latitude</div>
+                                        <div class="fw-bold text-dark">
+                                            <t t-esc="this.state.selectedShopDetails.partner_latitude || '—'"/>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small mb-1">Longitude</div>
+                                        <div class="fw-bold text-dark">
+                                            <t t-esc="this.state.selectedShopDetails.partner_longitude || '—'"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div>
                         <h6 class="fw-bold text-success">Financial Details</h6>
-                        <p class="mb-2">
-                            <strong>Category:</strong>
-                            <select class="form-select form-select-sm d-inline-block w-auto ms-2" t-model="this.state.shopCategoryEdit" title="Switching to Cash disables credit limits">
-                                <option value="credit">Credit</option>
-                                <option value="cash">Cash</option>
-                            </select>
-                            <button class="btn btn-sm btn-primary ms-2" t-on-click="saveShopCategory" title="Save changes to shop category">
+                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+                            <div class="p-3 border-bottom">
+                                <div class="text-muted small mb-2">Category</div>
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    <select class="form-select form-select-sm" style="max-width: 140px;" t-model="this.state.shopCategoryEdit" title="Switching to Cash disables credit limits">
+                                        <option value="credit">Credit</option>
+                                        <option value="cash">Cash</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-primary fw-bold" t-on-click="saveShopCategory" title="Save changes to shop category">
                                         Save Category
-                            </button>
-                        </p>
-                        <p class="mb-1" t-if="this.hasFinancialAccess and this.state.selectedShopDetails.shahtaj_shop_category === 'credit'">
-                            <strong>Credit Limit:</strong> Rs. <t t-esc="this.state.selectedShopDetails.credit_limit"/>
-                        </p>
-                        <p class="mb-1" t-if="this.hasFinancialAccess">
-                            <strong>Legacy Balance:</strong> Rs. <t t-esc="this.state.selectedShopDetails.legacy_balance"/>
-                        </p>
-                        <p class="mb-0" t-if="this.hasFinancialAccess">
-                            <strong>Outstanding Balance:</strong> Rs. <t t-esc="this.state.selectedShopDetails.outstanding_balance"/>
-                        </p>
+                                    </button>
+                                </div>
+                            </div>
+                            <t t-if="this.hasFinancialAccess">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2"
+                                         t-if="this.state.selectedShopDetails.shahtaj_shop_category === 'credit'">
+                                        <span class="text-muted">Credit Limit</span>
+                                        <strong class="text-dark">Rs. <t t-esc="this.state.selectedShopDetails.credit_limit"/></strong>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                        <span class="text-muted">Legacy Balance</span>
+                                        <strong class="text-dark">Rs. <t t-esc="this.state.selectedShopDetails.legacy_balance"/></strong>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                        <span class="text-muted">Outstanding Balance</span>
+                                        <strong class="text-dark">Rs. <t t-esc="this.state.selectedShopDetails.outstanding_balance"/></strong>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
                     </div>
                 </div>
 
@@ -633,7 +738,7 @@
                     <tr>
                         <th class="border-top-0 ps-4">Shop Details</th>
                         <th class="border-top-0">Contact</th>
-                        <th class="border-top-0 text-center">Visit Status</th>
+                        <th class="border-top-0 text-center">On-site Verified</th>
                         <th class="border-top-0 text-center">Category</th>
                         <th class="border-top-0 text-center">Status</th>
                         <th class="border-top-0 text-end pe-4">Actions</th>
@@ -681,7 +786,7 @@
                         </td>
                         <td class="align-middle text-center">
                             <span t-attf-class="badge #{shop.shahtaj_visit_tag === 'visited' ? 'bg-success text-white' : 'bg-warning text-dark'} shadow-sm">
-                                <t t-esc="shop.shahtaj_visit_tag === 'visited' ? 'Visited' : 'Not Visited'"/>
+                                <t t-esc="shop.shahtaj_visit_tag === 'visited' ? 'Verified' : 'Not Verified'"/>
                             </span>
                         </td>
                         <td class="align-middle text-center">
@@ -947,6 +1052,206 @@
                         </li>
                     </t>
                 </ul>
+            </div>
+        </t>
+
+        <!-- Add shops to route (multi-select) -->
+        <t t-if="this.state.showAddShopModal">
+            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                 style="background-color: rgba(0, 0, 0, 0.55); z-index: 1060; padding: 1rem;"
+                 t-on-click="closeAddShopModal">
+                <div class="bg-white rounded-3 shadow-lg border-0 w-100 d-flex flex-column"
+                     style="max-width: 720px; max-height: 85vh;"
+                     t-on-click.stop="">
+                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light rounded-top-3">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Add Shops to Route</h5>
+                            <small class="text-muted">
+                                Select shops not yet on
+                                <strong><t t-esc="this.state.selectedRouteDetails and this.state.selectedRouteDetails.name"/></strong>
+                            </small>
+                        </div>
+                        <button type="button" class="btn-close" t-on-click="closeAddShopModal" aria-label="Close"></button>
+                    </div>
+                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="max-width: 280px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0"
+                                   placeholder="Search shop or owner..."
+                                   t-model="this.state.addShopSearchQuery"
+                                   t-on-input="onAddShopSearchInput"/>
+                        </div>
+                        <small class="text-muted fw-bold">
+                            <t t-esc="this.addShopSelectedCount"/> selected
+                        </small>
+                    </div>
+                    <div class="position-relative flex-grow-1 overflow-auto" style="min-height: 280px;">
+                        <t t-if="this.state.isLoadingAddShops">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted sticky-top">
+                                <tr>
+                                    <th class="ps-4 text-center" style="width: 56px;">
+                                        <input class="form-check-input cursor-pointer shadow-sm" type="checkbox"
+                                               title="Select all on this page"
+                                               t-att-checked="this.isAllAddShopPageSelected"
+                                               t-on-change="toggleSelectAllAddShopPage"/>
+                                    </th>
+                                    <th>Shop Name</th>
+                                    <th class="pe-4">Owner</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="this.state.tableAddShopCandidates.length === 0 and !this.state.isLoadingAddShops">
+                                    <tr>
+                                        <td colspan="3" class="text-center py-5 text-muted fw-bold">
+                                            No shops available to add. All approved shops may already be on this route.
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="this.state.tableAddShopCandidates" t-as="ashop" t-key="ashop.id">
+                                    <tr class="cursor-pointer" t-on-click="() => this.toggleAddShopSelection(ashop.id)">
+                                        <td class="ps-4 text-center" t-on-click.stop="">
+                                            <input class="form-check-input fs-5 cursor-pointer shadow-sm" type="checkbox"
+                                                   t-att-checked="!!this.state.addShopSelectedIds[ashop.id]"
+                                                   t-on-change="() => this.toggleAddShopSelection(ashop.id)"/>
+                                        </td>
+                                        <td class="fw-bold text-dark"><t t-esc="ashop.name"/></td>
+                                        <td class="text-muted pe-4"><t t-esc="ashop.owner_name || 'N/A'"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2 rounded-bottom-3">
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold"
+                                    t-on-click="() => this.changeAddShopPage(-1)"
+                                    t-att-disabled="this.state.pagination.addShops.page === 1 or this.state.isLoadingAddShops">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                <t t-esc="this.state.pagination.addShops.page"/>
+                                /
+                                <t t-esc="Math.max(1, Math.ceil(this.state.pagination.addShops.total / this.state.pagination.addShops.limit))"/>
+                            </button>
+                            <button class="btn btn-sm btn-white border fw-bold"
+                                    t-on-click="() => this.changeAddShopPage(1)"
+                                    t-att-disabled="this.state.pagination.addShops.page &gt;= Math.ceil(this.state.pagination.addShops.total / this.state.pagination.addShops.limit) or this.state.isLoadingAddShops">Next</button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-light border fw-bold px-4" t-on-click="closeAddShopModal"
+                                    t-att-disabled="this.state.isAddingShops">Cancel</button>
+                            <button class="btn btn-success fw-bold text-white px-4 shadow-sm"
+                                    t-on-click="confirmAddSelectedShops"
+                                    t-att-disabled="this.state.isAddingShops or !this.addShopSelectedCount">
+                                <t t-if="this.state.isAddingShops">Adding…</t>
+                                <t t-else="">Add Selected (<t t-esc="this.addShopSelectedCount"/>)</t>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+
+        <!-- Add routes to shop (multi-select) -->
+        <t t-if="this.state.showAddRouteModal">
+            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                 style="background-color: rgba(0, 0, 0, 0.55); z-index: 1060; padding: 1rem;"
+                 t-on-click="closeAddRouteModal">
+                <div class="bg-white rounded-3 shadow-lg border-0 w-100 d-flex flex-column"
+                     style="max-width: 720px; max-height: 85vh;"
+                     t-on-click.stop="">
+                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light rounded-top-3">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Add Routes to Shop</h5>
+                            <small class="text-muted">
+                                Select routes not yet assigned to
+                                <strong><t t-esc="this.state.selectedShopDetails and this.state.selectedShopDetails.name"/></strong>
+                            </small>
+                        </div>
+                        <button type="button" class="btn-close" t-on-click="closeAddRouteModal" aria-label="Close"></button>
+                    </div>
+                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="max-width: 280px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0"
+                                   placeholder="Search route or zone..."
+                                   t-model="this.state.addRouteSearchQuery"
+                                   t-on-input="onAddRouteSearchInput"/>
+                        </div>
+                        <small class="text-muted fw-bold">
+                            <t t-esc="this.addRouteSelectedCount"/> selected
+                        </small>
+                    </div>
+                    <div class="position-relative flex-grow-1 overflow-auto" style="min-height: 280px;">
+                        <t t-if="this.state.isLoadingAddRoutes">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted sticky-top">
+                                <tr>
+                                    <th class="ps-4 text-center" style="width: 56px;">
+                                        <input class="form-check-input cursor-pointer shadow-sm" type="checkbox"
+                                               title="Select all on this page"
+                                               t-att-checked="this.isAllAddRoutePageSelected"
+                                               t-on-change="toggleSelectAllAddRoutePage"/>
+                                    </th>
+                                    <th>Route</th>
+                                    <th class="pe-4">Zone</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="this.state.tableAddRouteCandidates.length === 0 and !this.state.isLoadingAddRoutes">
+                                    <tr>
+                                        <td colspan="3" class="text-center py-5 text-muted fw-bold">
+                                            No routes available to add. All active routes may already be assigned.
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="this.state.tableAddRouteCandidates" t-as="aroute" t-key="aroute.id">
+                                    <tr class="cursor-pointer" t-on-click="() => this.toggleAddRouteSelection(aroute.id)">
+                                        <td class="ps-4 text-center" t-on-click.stop="">
+                                            <input class="form-check-input fs-5 cursor-pointer shadow-sm" type="checkbox"
+                                                   t-att-checked="!!this.state.addRouteSelectedIds[aroute.id]"
+                                                   t-on-change="() => this.toggleAddRouteSelection(aroute.id)"/>
+                                        </td>
+                                        <td class="fw-bold text-dark"><t t-esc="aroute.name"/></td>
+                                        <td class="text-muted pe-4"><t t-esc="aroute.zone_id ? aroute.zone_id[1] : '—'"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2 rounded-bottom-3">
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold"
+                                    t-on-click="() => this.changeAddRoutePage(-1)"
+                                    t-att-disabled="this.state.pagination.addRoutes.page === 1 or this.state.isLoadingAddRoutes">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                <t t-esc="this.state.pagination.addRoutes.page"/>
+                                /
+                                <t t-esc="Math.max(1, Math.ceil(this.state.pagination.addRoutes.total / this.state.pagination.addRoutes.limit))"/>
+                            </button>
+                            <button class="btn btn-sm btn-white border fw-bold"
+                                    t-on-click="() => this.changeAddRoutePage(1)"
+                                    t-att-disabled="this.state.pagination.addRoutes.page &gt;= Math.ceil(this.state.pagination.addRoutes.total / this.state.pagination.addRoutes.limit) or this.state.isLoadingAddRoutes">Next</button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-light border fw-bold px-4" t-on-click="closeAddRouteModal"
+                                    t-att-disabled="this.state.isAddingRoutes">Cancel</button>
+                            <button class="btn btn-success fw-bold text-white px-4 shadow-sm"
+                                    t-on-click="confirmAddSelectedRoutes"
+                                    t-att-disabled="this.state.isAddingRoutes or !this.addRouteSelectedCount">
+                                <t t-if="this.state.isAddingRoutes">Adding…</t>
+                                <t t-else="">Add Selected (<t t-esc="this.addRouteSelectedCount"/>)</t>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </t>
 

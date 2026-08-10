@@ -158,7 +158,7 @@
       purpose: 'List sellable products',
       auth: true,
       params: [
-        { name: 'visit_id', required: false, type: 'int', note: 'Adjusts qty_bookable for active visit cart' },
+        { name: 'visit_id', required: false, type: 'int', note: 'Excludes this visit cart from qty_bookable; still subtracts other carts + undelivered SOs' },
         { name: 'limit', required: false, type: 'int', default: '500' },
         { name: 'offset', required: false, type: 'int', default: '0' },
       ],

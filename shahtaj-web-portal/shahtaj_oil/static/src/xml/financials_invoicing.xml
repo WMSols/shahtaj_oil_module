@@ -156,7 +156,7 @@
                         </div>
                         <div class="col-md-3 col-6">
                             <button class="card border-0 shadow-sm p-3 h-100 rounded-4 text-start w-100 bg-white" t-on-click="openShopBalancesFromMoney" title="Open shop balances">
-                                <small class="fw-bold text-muted text-uppercase">Still Owed</small>
+                                <small class="fw-bold text-muted text-uppercase">Receivable</small>
                                 <h3 class="fw-bold text-warning mb-1">Rs. <t t-esc="this.state.money.stillOwed.toLocaleString()"/></h3>
                                 <small class="text-muted">Shop outstanding balance</small>
                             </button>

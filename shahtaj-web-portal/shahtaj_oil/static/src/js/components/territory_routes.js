@@ -76,11 +76,28 @@ export class TerritoryRoutes extends Component {
             selectedRouteDetails: null,
             routeChecklistSearchQuery: '',
             tableRouteChecklist: [],
+            showAddShopModal: false,
+            addShopSearchQuery: '',
+            tableAddShopCandidates: [],
+            addShopSelectedIds: {},
+            isLoadingAddShops: false,
+            isAddingShops: false,
+            shopRouteSearchQuery: '',
+            showAddRouteModal: false,
+            addRouteSearchQuery: '',
+            tableAddRouteCandidates: [],
+            addRouteSelectedIds: {},
+            isLoadingAddRoutes: false,
+            isAddingRoutes: false,
+            returnToShopDetailsAfterEdit: null,
             pagination: {
                 areas: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
                 routes: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
                 shops: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
-                routeChecklist: { page: 1, limit: ITEMS_PER_PAGE, total: 0 }, // Checklist pagination
+                routeChecklist: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                addShops: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                addRoutes: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                shopRoutes: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
             },
             
         });
@@ -92,7 +109,9 @@ export class TerritoryRoutes extends Component {
             };
         };
         this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
-        this.debouncedFetchRouteChecklist = this.debounceSearch(() => this.fetchRouteChecklist(), 400)
+        this.debouncedFetchRouteChecklist = this.debounceSearch(() => this.fetchRouteChecklist(), 400);
+        this.debouncedFetchAddShopCandidates = this.debounceSearch(() => this.fetchAddShopCandidates(), 400);
+        this.debouncedFetchAddRouteCandidates = this.debounceSearch(() => this.fetchAddRouteCandidates(), 400);
 
         onWillStart(async () => {
             await this.fetchDashboardData();
@@ -383,6 +402,7 @@ export class TerritoryRoutes extends Component {
     }
     
     closeRouteDetails() {
+        this.closeAddShopModal();
         this.state.selectedRouteDetails = null;
     }
 
@@ -415,106 +435,473 @@ export class TerritoryRoutes extends Component {
         this.state.isLoadingList = true;
         try {
             const pag = this.state.pagination.routeChecklist;
-            // All approved shops — checked = on this route (multi-route allowed).
+            const routeId = this.state.selectedRouteDetails.id;
+            // Assigned shops on this route only.
             let domain = [
                 ['is_shahtaj_shop', '=', true],
                 ['active', '=', true],
                 ['shop_approval_state', '=', 'approved'],
+                ['route_ids', 'in', [routeId]],
             ];
-            
+
             if (this.state.routeChecklistSearchQuery) {
                 domain.push('|', ['name', 'ilike', this.state.routeChecklistSearchQuery], ['owner_name', 'ilike', this.state.routeChecklistSearchQuery]);
             }
-            
+
             const [total, records] = await Promise.all([
                 this.orm.searchCount('res.partner', domain),
                 this.orm.searchRead(
                     'res.partner',
                     domain,
-                    ["id", "name", "owner_name", "route_ids", "shahtaj_routes_display", "shahtaj_route_tag"],
+                    ["id", "name", "owner_name"],
                     { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: "name asc" },
                 ),
             ]);
-            
+
             this.state.pagination.routeChecklist.total = total;
             this.state.tableRouteChecklist = records;
-            
-            // Live-refresh the route counts
-            const routeData = await this.orm.read('shahtaj.route', [this.state.selectedRouteDetails.id], ['shop_count', 'unassigned_shop_count']);
+
+            const routeData = await this.orm.read('shahtaj.route', [routeId], ['shop_count', 'unassigned_shop_count']);
             if (routeData.length) {
                 this.state.selectedRouteDetails.shop_count = routeData[0].shop_count;
                 this.state.selectedRouteDetails.unassigned_shop_count = routeData[0].unassigned_shop_count;
             }
         } catch (error) {
-            this.notification.add("Failed to fetch checklist: " + (error.data?.message || error.message), { type: "danger" });
+            this.notification.add("Failed to fetch assigned shops: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
             this.state.isLoadingList = false;
         }
     }
 
-    isShopOnSelectedRoute(shop) {
-        const routeId = this.state.selectedRouteDetails && this.state.selectedRouteDetails.id;
-        if (!routeId || !shop) {
+    get addShopSelectedCount() {
+        return Object.keys(this.state.addShopSelectedIds || {}).filter(
+            (id) => this.state.addShopSelectedIds[id],
+        ).length;
+    }
+
+    get isAllAddShopPageSelected() {
+        const rows = this.state.tableAddShopCandidates || [];
+        if (!rows.length) {
             return false;
         }
-        return (shop.route_ids || []).includes(routeId);
+        return rows.every((s) => this.state.addShopSelectedIds[s.id]);
     }
 
-    formatShopRoutes(shop) {
-        if (!shop) {
-            return 'Unassigned';
+    openAddShopModal() {
+        if (!this.state.selectedRouteDetails) {
+            return;
         }
-        if (shop.shahtaj_routes_display) {
-            return shop.shahtaj_routes_display;
-        }
-        if (shop.shahtaj_route_tag === 'unassigned') {
-            return 'Unassigned';
-        }
-        return 'Unassigned';
+        this.state.showAddShopModal = true;
+        this.state.addShopSearchQuery = '';
+        this.state.addShopSelectedIds = {};
+        this.state.pagination.addShops.page = 1;
+        this.fetchAddShopCandidates();
     }
 
-    async _loadShopRouteLines(routeIds) {
-        if (!routeIds || !routeIds.length) {
-            return [];
-        }
-        const routes = await this.orm.read(
-            'shahtaj.route',
-            routeIds,
-            ['id', 'name', 'zone_id'],
-        );
-        return routes
-            .slice()
-            .sort((a, b) => {
-                const az = (a.zone_id && a.zone_id[1]) || '';
-                const bz = (b.zone_id && b.zone_id[1]) || '';
-                if (az !== bz) {
-                    return az.localeCompare(bz);
-                }
-                return (a.name || '').localeCompare(b.name || '');
-            })
-            .map((route) => ({
-                route_id: route.id,
-                route_name: route.name || '—',
-                zone_name: (route.zone_id && route.zone_id[1]) || '—',
-            }));
+    closeAddShopModal() {
+        this.state.showAddShopModal = false;
+        this.state.addShopSearchQuery = '';
+        this.state.tableAddShopCandidates = [];
+        this.state.addShopSelectedIds = {};
+        this.state.isLoadingAddShops = false;
+        this.state.isAddingShops = false;
+        this.state.pagination.addShops.page = 1;
+        this.state.pagination.addShops.total = 0;
     }
 
-    async toggleShopRouteAssignment(shopId, ev) {
-        const isAssigned = ev.target.checked;
-        const routeId = this.state.selectedRouteDetails.id;
+    onAddShopSearchInput() {
+        this.state.pagination.addShops.page = 1;
+        this.debouncedFetchAddShopCandidates();
+    }
+
+    changeAddShopPage(direction) {
+        const pag = this.state.pagination.addShops;
+        const newPage = pag.page + direction;
+        const maxPage = Math.max(1, Math.ceil(pag.total / pag.limit));
+        if (newPage >= 1 && newPage <= maxPage) {
+            pag.page = newPage;
+            this.fetchAddShopCandidates();
+        }
+    }
+
+    async fetchAddShopCandidates() {
+        if (!this.state.selectedRouteDetails || !this.state.showAddShopModal) {
+            return;
+        }
+        this.state.isLoadingAddShops = true;
         try {
-            // Add/remove this route only — do not clear other route links.
-            const payload = isAssigned
-                ? { route_ids: [[4, routeId]] }
-                : { route_ids: [[3, routeId]] };
-                
-            await this.orm.write('res.partner', [shopId], payload);
-            await this.fetchRouteChecklist();
-            await this.fetchActiveList(); // Update main tab numbers quietly
+            const pag = this.state.pagination.addShops;
+            const routeId = this.state.selectedRouteDetails.id;
+            let domain = [
+                ['is_shahtaj_shop', '=', true],
+                ['active', '=', true],
+                ['shop_approval_state', '=', 'approved'],
+                ['route_ids', 'not in', [routeId]],
+            ];
+            if (this.state.addShopSearchQuery) {
+                domain.push(
+                    '|',
+                    ['name', 'ilike', this.state.addShopSearchQuery],
+                    ['owner_name', 'ilike', this.state.addShopSearchQuery],
+                );
+            }
+            const [total, records] = await Promise.all([
+                this.orm.searchCount('res.partner', domain),
+                this.orm.searchRead(
+                    'res.partner',
+                    domain,
+                    ['id', 'name', 'owner_name'],
+                    { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: 'name asc' },
+                ),
+            ]);
+            this.state.pagination.addShops.total = total;
+            this.state.tableAddShopCandidates = records;
         } catch (error) {
-            this.notification.add("Failed to update shop assignment: " + (error.data?.message || error.message), { type: "danger" });
-            ev.target.checked = !isAssigned; // Revert checkbox on fail
+            this.notification.add(
+                "Failed to load shops: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isLoadingAddShops = false;
         }
+    }
+
+    toggleAddShopSelection(shopId) {
+        const next = { ...this.state.addShopSelectedIds };
+        if (next[shopId]) {
+            delete next[shopId];
+        } else {
+            next[shopId] = true;
+        }
+        this.state.addShopSelectedIds = next;
+    }
+
+    toggleSelectAllAddShopPage(ev) {
+        const selectAll = ev.target.checked;
+        const next = { ...this.state.addShopSelectedIds };
+        for (const shop of this.state.tableAddShopCandidates) {
+            if (selectAll) {
+                next[shop.id] = true;
+            } else {
+                delete next[shop.id];
+            }
+        }
+        this.state.addShopSelectedIds = next;
+    }
+
+    async confirmAddSelectedShops() {
+        const routeId = this.state.selectedRouteDetails && this.state.selectedRouteDetails.id;
+        const shopIds = Object.keys(this.state.addShopSelectedIds)
+            .filter((id) => this.state.addShopSelectedIds[id])
+            .map((id) => parseInt(id, 10));
+        if (!routeId || !shopIds.length) {
+            this.notification.add("Select at least one shop to add.", { type: "warning" });
+            return;
+        }
+        this.state.isAddingShops = true;
+        try {
+            await Promise.all(
+                shopIds.map((shopId) => this.orm.write('res.partner', [shopId], {
+                    route_ids: [[4, routeId]],
+                })),
+            );
+            this.notification.add(
+                `${shopIds.length} shop(s) added to this route.`,
+                { type: "success" },
+            );
+            this.closeAddShopModal();
+            await this.fetchRouteChecklist();
+            await this.fetchActiveList();
+        } catch (error) {
+            this.notification.add(
+                "Failed to add shops: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isAddingShops = false;
+        }
+    }
+
+    removeShopFromRoute(shop) {
+        if (!shop || !this.state.selectedRouteDetails) {
+            return;
+        }
+        const routeId = this.state.selectedRouteDetails.id;
+        const routeName = this.state.selectedRouteDetails.name || 'this route';
+        this.state.confirmModal = {
+            isOpen: true,
+            title: 'Remove shop from route',
+            message: `Remove "${shop.name}" from ${routeName}? The shop stays on any other routes.`,
+            onConfirm: async () => {
+                this.closeConfirm();
+                try {
+                    await this.orm.write('res.partner', [shop.id], {
+                        route_ids: [[3, routeId]],
+                    });
+                    this.notification.add("Shop removed from this route.", { type: "success" });
+                    await this.fetchRouteChecklist();
+                    await this.fetchActiveList();
+                } catch (error) {
+                    this.notification.add(
+                        "Failed to remove shop: " + (error.data?.message || error.message),
+                        { type: "danger" },
+                    );
+                }
+            },
+        };
+    }
+
+    get filteredShopRouteLines() {
+        const lines = (this.state.selectedShopDetails && this.state.selectedShopDetails.route_lines) || [];
+        const q = (this.state.shopRouteSearchQuery || '').trim().toLowerCase();
+        if (!q) {
+            return lines;
+        }
+        return lines.filter(
+            (line) =>
+                (line.route_name || '').toLowerCase().includes(q) ||
+                (line.zone_name || '').toLowerCase().includes(q),
+        );
+    }
+
+    get paginatedShopRouteLines() {
+        const lines = this.filteredShopRouteLines;
+        const pag = this.state.pagination.shopRoutes;
+        const start = (pag.page - 1) * pag.limit;
+        return lines.slice(start, start + pag.limit);
+    }
+
+    get addRouteSelectedCount() {
+        return Object.keys(this.state.addRouteSelectedIds || {}).filter(
+            (id) => this.state.addRouteSelectedIds[id],
+        ).length;
+    }
+
+    get isAllAddRoutePageSelected() {
+        const rows = this.state.tableAddRouteCandidates || [];
+        if (!rows.length) {
+            return false;
+        }
+        return rows.every((r) => this.state.addRouteSelectedIds[r.id]);
+    }
+
+    onShopRouteSearchInput() {
+        this.state.pagination.shopRoutes.page = 1;
+        this._syncShopRoutesPagination();
+    }
+
+    changeShopRoutePage(direction) {
+        this._syncShopRoutesPagination();
+        const pag = this.state.pagination.shopRoutes;
+        const newPage = pag.page + direction;
+        const maxPage = Math.max(1, Math.ceil(pag.total / pag.limit) || 1);
+        if (newPage >= 1 && newPage <= maxPage) {
+            pag.page = newPage;
+        }
+    }
+
+    _syncShopRoutesPagination() {
+        const total = this.filteredShopRouteLines.length;
+        const pag = this.state.pagination.shopRoutes;
+        pag.total = total;
+        const maxPage = Math.max(1, Math.ceil(total / pag.limit) || 1);
+        if (pag.page > maxPage) {
+            pag.page = maxPage;
+        }
+        if (pag.page < 1) {
+            pag.page = 1;
+        }
+    }
+
+    openAddRouteModal() {
+        if (!this.state.selectedShopDetails) {
+            return;
+        }
+        this.state.showAddRouteModal = true;
+        this.state.addRouteSearchQuery = '';
+        this.state.addRouteSelectedIds = {};
+        this.state.pagination.addRoutes.page = 1;
+        this.fetchAddRouteCandidates();
+    }
+
+    closeAddRouteModal() {
+        this.state.showAddRouteModal = false;
+        this.state.addRouteSearchQuery = '';
+        this.state.tableAddRouteCandidates = [];
+        this.state.addRouteSelectedIds = {};
+        this.state.isLoadingAddRoutes = false;
+        this.state.isAddingRoutes = false;
+        this.state.pagination.addRoutes.page = 1;
+        this.state.pagination.addRoutes.total = 0;
+    }
+
+    onAddRouteSearchInput() {
+        this.state.pagination.addRoutes.page = 1;
+        this.debouncedFetchAddRouteCandidates();
+    }
+
+    changeAddRoutePage(direction) {
+        const pag = this.state.pagination.addRoutes;
+        const newPage = pag.page + direction;
+        const maxPage = Math.max(1, Math.ceil(pag.total / pag.limit));
+        if (newPage >= 1 && newPage <= maxPage) {
+            pag.page = newPage;
+            this.fetchAddRouteCandidates();
+        }
+    }
+
+    async fetchAddRouteCandidates() {
+        if (!this.state.selectedShopDetails || !this.state.showAddRouteModal) {
+            return;
+        }
+        this.state.isLoadingAddRoutes = true;
+        try {
+            const pag = this.state.pagination.addRoutes;
+            const assigned = this.state.selectedShopDetails.route_ids || [];
+            let domain = [['active', '=', true]];
+            if (assigned.length) {
+                domain.push(['id', 'not in', assigned]);
+            }
+            if (this.state.addRouteSearchQuery) {
+                domain.push(
+                    '|',
+                    ['name', 'ilike', this.state.addRouteSearchQuery],
+                    ['zone_id.name', 'ilike', this.state.addRouteSearchQuery],
+                );
+            }
+            const [total, records] = await Promise.all([
+                this.orm.searchCount('shahtaj.route', domain),
+                this.orm.searchRead(
+                    'shahtaj.route',
+                    domain,
+                    ['id', 'name', 'zone_id'],
+                    { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: 'name asc' },
+                ),
+            ]);
+            this.state.pagination.addRoutes.total = total;
+            this.state.tableAddRouteCandidates = records;
+        } catch (error) {
+            this.notification.add(
+                "Failed to load routes: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isLoadingAddRoutes = false;
+        }
+    }
+
+    toggleAddRouteSelection(routeId) {
+        const next = { ...this.state.addRouteSelectedIds };
+        if (next[routeId]) {
+            delete next[routeId];
+        } else {
+            next[routeId] = true;
+        }
+        this.state.addRouteSelectedIds = next;
+    }
+
+    toggleSelectAllAddRoutePage(ev) {
+        const selectAll = ev.target.checked;
+        const next = { ...this.state.addRouteSelectedIds };
+        for (const route of this.state.tableAddRouteCandidates) {
+            if (selectAll) {
+                next[route.id] = true;
+            } else {
+                delete next[route.id];
+            }
+        }
+        this.state.addRouteSelectedIds = next;
+    }
+
+    async refreshShopRouteMembership() {
+        const shop = this.state.selectedShopDetails;
+        if (!shop) {
+            return;
+        }
+        const [updated] = await this.orm.read(
+            'res.partner',
+            [shop.id],
+            ['route_ids', 'shahtaj_routes_display', 'shahtaj_route_tag'],
+        );
+        if (!updated) {
+            return;
+        }
+        shop.route_ids = updated.route_ids;
+        shop.shahtaj_routes_display = updated.shahtaj_routes_display;
+        shop.shahtaj_route_tag = updated.shahtaj_route_tag;
+        shop.route_lines = await this._loadShopRouteLines(shop.route_ids || []);
+        this._syncShopRoutesPagination();
+        await this.fetchDashboardData();
+        await this.fetchActiveList();
+    }
+
+    async confirmAddSelectedRoutes() {
+        const shop = this.state.selectedShopDetails;
+        const routeIds = Object.keys(this.state.addRouteSelectedIds)
+            .filter((id) => this.state.addRouteSelectedIds[id])
+            .map((id) => parseInt(id, 10));
+        if (!shop || !routeIds.length) {
+            this.notification.add("Select at least one route to add.", { type: "warning" });
+            return;
+        }
+        this.state.isAddingRoutes = true;
+        try {
+            await this.orm.write('res.partner', [shop.id], {
+                route_ids: routeIds.map((routeId) => [4, routeId]),
+            });
+            this.notification.add(
+                `${routeIds.length} route(s) assigned to this shop.`,
+                { type: "success" },
+            );
+            this.closeAddRouteModal();
+            await this.refreshShopRouteMembership();
+        } catch (error) {
+            this.notification.add(
+                "Failed to add routes: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isAddingRoutes = false;
+        }
+    }
+
+    removeRouteFromShop(line) {
+        const shop = this.state.selectedShopDetails;
+        if (!shop || !line) {
+            return;
+        }
+        this.state.confirmModal = {
+            isOpen: true,
+            title: 'Remove shop from route',
+            message: `Remove this shop from "${line.route_name}"? The shop stays on any other routes.`,
+            onConfirm: async () => {
+                this.closeConfirm();
+                try {
+                    await this.orm.write('res.partner', [shop.id], {
+                        route_ids: [[3, line.route_id]],
+                    });
+                    this.notification.add("Shop removed from this route.", { type: "success" });
+                    await this.refreshShopRouteMembership();
+                } catch (error) {
+                    this.notification.add(
+                        "Failed to remove route: " + (error.data?.message || error.message),
+                        { type: "danger" },
+                    );
+                }
+            },
+        };
+    }
+
+    async editShopFromDetails() {
+        const shop = this.state.selectedShopDetails;
+        if (!shop) {
+            return;
+        }
+        const shopId = shop.id;
+        this.closeAddRouteModal();
+        this.state.returnToShopDetailsAfterEdit = shopId;
+        this.closeShopDetails();
+        await this.editShop({ id: shopId });
     }
 
     // Checklist specific pagination handlers
@@ -532,6 +919,9 @@ export class TerritoryRoutes extends Component {
         }
     }
     cancelForms() {
+        const reopenShopId = this.state.returnToShopDetailsAfterEdit;
+        this.state.returnToShopDetailsAfterEdit = null;
+
         this.state.showAreaForm = false;
         this.state.showRouteForm = false;
         this.state.showShopForm = false;
@@ -542,6 +932,10 @@ export class TerritoryRoutes extends Component {
         this.closeShopActionMenu();
 
         this.resetForms();
+
+        if (reopenShopId) {
+            this.viewShopDetails(reopenShopId);
+        }
     }
 
     resetForms() {
@@ -686,6 +1080,45 @@ export class TerritoryRoutes extends Component {
         this.toggleArchive('res.partner', shop.id, false);
     }
 
+    formatShopRoutes(shop) {
+        if (!shop) {
+            return 'Unassigned';
+        }
+        if (shop.shahtaj_routes_display) {
+            return shop.shahtaj_routes_display;
+        }
+        if (shop.shahtaj_route_tag === 'unassigned') {
+            return 'Unassigned';
+        }
+        return 'Unassigned';
+    }
+
+    async _loadShopRouteLines(routeIds) {
+        if (!routeIds || !routeIds.length) {
+            return [];
+        }
+        const routes = await this.orm.read(
+            'shahtaj.route',
+            routeIds,
+            ['id', 'name', 'zone_id'],
+        );
+        return routes
+            .slice()
+            .sort((a, b) => {
+                const az = (a.zone_id && a.zone_id[1]) || '';
+                const bz = (b.zone_id && b.zone_id[1]) || '';
+                if (az !== bz) {
+                    return az.localeCompare(bz);
+                }
+                return (a.name || '').localeCompare(b.name || '');
+            })
+            .map((route) => ({
+                route_id: route.id,
+                route_name: route.name || '—',
+                zone_name: (route.zone_id && route.zone_id[1]) || '—',
+            }));
+    }
+
     async viewShopDetails(shopId) {
         this.closeShopActionMenu();
         const details = await this.orm.read(
@@ -704,12 +1137,19 @@ export class TerritoryRoutes extends Component {
             shop.route_lines = await this._loadShopRouteLines(shop.route_ids || []);
             this.state.selectedShopDetails = shop;
             this.state.shopCategoryEdit = shop.shahtaj_shop_category || 'credit';
+            this.state.shopRouteSearchQuery = '';
+            this.state.pagination.shopRoutes.page = 1;
+            this._syncShopRoutesPagination();
         }
     }
 
     closeShopDetails() {
+        this.closeAddRouteModal();
         this.state.selectedShopDetails = null;
         this.state.shopCategoryEdit = 'credit';
+        this.state.shopRouteSearchQuery = '';
+        this.state.pagination.shopRoutes.page = 1;
+        this.state.pagination.shopRoutes.total = 0;
         this.closeShopActionMenu();
     }
 
@@ -905,6 +1345,10 @@ export class TerritoryRoutes extends Component {
             if (this.state.shopForm.owner_cnic_back) payload.owner_cnic_back = this.state.shopForm.owner_cnic_back;
             if (this.state.shopForm.owner_photo) payload.owner_photo = this.state.shopForm.owner_photo;
 
+            const reopenShopId = this.state.returnToShopDetailsAfterEdit
+                || (this.state.editingShopId || null);
+            const cameFromDetails = !!this.state.returnToShopDetailsAfterEdit;
+
             if (this.state.editingShopId) {
                 await this.orm.write("res.partner", [this.state.editingShopId], payload);
                 this.notification.add("Shop updated successfully.", { type: "success" });
@@ -914,9 +1358,14 @@ export class TerritoryRoutes extends Component {
                 this.notification.add("Shop registered and pending approval.", { type: "success" });
             }
 
+            // Avoid cancelForms auto-reopening before lists refresh; reopen after.
+            this.state.returnToShopDetailsAfterEdit = null;
             this.cancelForms();
             await this.fetchDashboardData();
             await this.fetchActiveList();
+            if (cameFromDetails && reopenShopId) {
+                await this.viewShopDetails(reopenShopId);
+            }
         } catch (error) {
             this.notification.add("Failed to save shop: " + (error.data?.message || error.message), { type: "danger" });
         } finally {

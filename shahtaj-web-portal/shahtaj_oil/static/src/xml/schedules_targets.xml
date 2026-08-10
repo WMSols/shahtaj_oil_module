@@ -206,7 +206,7 @@
                             <div class="col-md-2 pb-2">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="schedActiveSwitch" t-model="this.state.scheduleForm.is_active"/>
-                                    <label class="form-check-label small fw-bold cursor-pointer" for="schedActiveSwitch">Active</label>
+                                    <label class="form-check-label small fw-bold cursor-pointer" for="schedActiveSwitch" title="When off, the order booker does not get visits for this weekday">Active (visible to booker)</label>
                                 </div>
                             </div>
                         </div>
@@ -255,7 +255,7 @@
                             <div class="col-md-2 pt-4 mt-1">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="targetActiveSwitch" t-model="this.state.targetForm.is_active"/>
-                                    <label class="form-check-label small fw-bold cursor-pointer" for="targetActiveSwitch">Active</label>
+                                    <label class="form-check-label small fw-bold cursor-pointer" for="targetActiveSwitch" title="When off, this target is hidden from the booker">Active (visible to booker)</label>
                                 </div>
                             </div>
                         </div>
@@ -288,54 +288,91 @@
 
                         <t t-if="this.isMultiProductTargetType(this.state.targetForm.type)">
                             <div class="border rounded-3 p-3 mb-3 bg-light">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="fw-bold mb-0 small text-uppercase text-muted">Products</h6>
-                                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-on-click="addTargetLine">+ Add Product</button>
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                    <div>
+                                        <h6 class="fw-bold mb-0 small text-uppercase text-muted">Products</h6>
+                                        <small class="text-muted" t-if="this.state.targetForm.lines.length">
+                                            <t t-esc="this.state.targetForm.lines.length"/> on list
+                                            <t t-if="this.targetProductsNotYetAddedCount">
+                                                · <t t-esc="this.targetProductsNotYetAddedCount"/> not added yet
+                                            </t>
+                                        </small>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <button type="button"
+                                                class="btn btn-sm btn-dark fw-bold text-white shadow-sm"
+                                                t-on-click="addAllTargetProducts"
+                                                t-att-disabled="!this.targetProductsNotYetAddedCount"
+                                                title="Add every sellable catalog product not already on this list">
+                                            <i class="fa fa-list me-1"></i>
+                                            Add all products
+                                            <t t-if="this.targetProductsNotYetAddedCount">
+                                                (<t t-esc="this.targetProductsNotYetAddedCount"/>)
+                                            </t>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-on-click="addTargetLine" title="Add one empty product row">
+                                            + Add Product
+                                        </button>
+                                    </div>
                                 </div>
-                                <t t-if="!this.state.targetForm.lines.length">
-                                    <p class="small text-muted mb-0">Add the products that count toward this target.</p>
+                                <t t-if="this.state.targetForm.type === 'product_bundle'">
+                                    <p class="small text-muted mb-2">
+                                        After adding products, set each line’s <strong>Target</strong> (and measure/unit). Remove any products you do not want.
+                                    </p>
                                 </t>
-                                <t t-foreach="this.state.targetForm.lines" t-as="line" t-key="line_index">
-                                    <div class="row g-2 align-items-end mb-2">
-                                        <div t-attf-class="#{this.state.targetForm.type === 'product_bundle' ? 'col-md-4' : 'col-md-10'}">
-                                            <label class="small fw-bold">Product</label>
-                                            <select class="form-select form-select-sm" t-model="line.product_id">
-                                                <option value="">-- Select --</option>
-                                                <t t-foreach="this.state.products" t-as="p" t-key="p.id">
-                                                    <option t-att-value="p.id"><t t-esc="p.name"/></option>
-                                                </t>
-                                            </select>
-                                        </div>
-                                        <t t-if="this.state.targetForm.type === 'product_bundle'">
-                                            <div class="col-md-2">
-                                                <label class="small fw-bold">Measure</label>
-                                                <select class="form-select form-select-sm" t-model="line.measure_type">
-                                                    <option value="qty">Quantity</option>
-                                                    <option value="weight">Weight</option>
+                                <t t-elif="this.state.targetForm.type">
+                                    <p class="small text-muted mb-2">
+                                        Products below share the collective goal above. Remove any that should not count.
+                                    </p>
+                                </t>
+                                <t t-if="!this.state.targetForm.lines.length">
+                                    <p class="small text-muted mb-0">No products yet — use <strong>Add all products</strong> or <strong>+ Add Product</strong>.</p>
+                                </t>
+                                <div t-else="" class="pe-1" style="max-height: 320px; overflow-y: auto;">
+                                    <t t-foreach="this.state.targetForm.lines" t-as="line" t-key="line.product_id ? ('p-' + line.product_id) : ('empty-' + line_index)">
+                                        <div class="row g-2 align-items-end mb-2">
+                                            <div t-attf-class="#{this.state.targetForm.type === 'product_bundle' ? 'col-md-4' : 'col-md-10'}">
+                                                <label class="small fw-bold">Product</label>
+                                                <select class="form-select form-select-sm"
+                                                        t-att-value="line.product_id === '' || line.product_id === false || line.product_id === null ? '' : line.product_id"
+                                                        t-on-change="(ev) => this.onTargetLineProductChange(line, ev)">
+                                                    <option value="">-- Select --</option>
+                                                    <t t-foreach="this.state.products" t-as="p" t-key="p.id">
+                                                        <option t-att-value="p.id"><t t-esc="p.name"/></option>
+                                                    </t>
                                                 </select>
                                             </div>
-                                            <div class="col-md-2">
-                                                <label class="small fw-bold">Target</label>
-                                                <input type="number" class="form-control form-control-sm" t-model="line.target_value" placeholder="e.g. 100"/>
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="small fw-bold">Unit</label>
-                                                <t t-if="line.measure_type === 'weight'">
-                                                    <select class="form-select form-select-sm" t-model="line.target_weight_uom">
-                                                        <option value="kg">kg</option>
-                                                        <option value="ton">ton</option>
+                                            <t t-if="this.state.targetForm.type === 'product_bundle'">
+                                                <div class="col-md-2">
+                                                    <label class="small fw-bold">Measure</label>
+                                                    <select class="form-select form-select-sm" t-model="line.measure_type">
+                                                        <option value="qty">Quantity</option>
+                                                        <option value="weight">Weight</option>
                                                     </select>
-                                                </t>
-                                                <t t-else="">
-                                                    <input type="text" class="form-control form-control-sm" value="units" disabled="1"/>
-                                                </t>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="small fw-bold">Target</label>
+                                                    <input type="number" class="form-control form-control-sm" t-model="line.target_value" placeholder="e.g. 100"/>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="small fw-bold">Unit</label>
+                                                    <t t-if="line.measure_type === 'weight'">
+                                                        <select class="form-select form-select-sm" t-model="line.target_weight_uom">
+                                                            <option value="kg">kg</option>
+                                                            <option value="ton">ton</option>
+                                                        </select>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <input type="text" class="form-control form-control-sm" value="units" disabled="1"/>
+                                                    </t>
+                                                </div>
+                                            </t>
+                                            <div class="col-md-2">
+                                                <button type="button" class="btn btn-sm btn-outline-danger w-100" t-on-click="() => this.removeTargetLine(line_index)">Remove</button>
                                             </div>
-                                        </t>
-                                        <div class="col-md-2">
-                                            <button type="button" class="btn btn-sm btn-outline-danger w-100" t-on-click="() => this.removeTargetLine(line_index)">Remove</button>
                                         </div>
-                                    </div>
-                                </t>
+                                    </t>
+                                </div>
                             </div>
                         </t>
 
@@ -356,6 +393,7 @@
                             <i class="fa fa-info-circle me-1 text-primary"></i>
                             Editing a weekday updates the plan from the <strong>next</strong> that weekday.
                             Today's row is locked only if visits are already in progress or completed.
+                            <strong>Deactivated</strong> days stay listed here — activate the toggle to give the booker that day again (bookers only see active schedules).
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -376,7 +414,7 @@
                                     </tr>
                                 </t>
                                 <t t-foreach="currentBookerSchedules" t-as="sched" t-key="sched.id">
-                                    <tr>
+                                    <tr t-att-class="!sched.isActive ? 'table-secondary' : ''">
                                         <td class="ps-4 align-middle fw-bold">
                                             <t t-esc="sched.day"/>
                                             <t t-if="sched.isLocked"><span class="badge bg-warning text-dark ms-2">Locked today</span></t>
@@ -387,10 +425,12 @@
                                         </td>
                                         <td class="align-middle text-center"><t t-esc="sched.shops"/></td>
                                         <td class="align-middle">
-                                            <span t-attf-class="badge #{sched.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm"><t t-esc="sched.status"/></span>
+                                            <span t-attf-class="badge #{sched.isActive ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
+                                                <t t-esc="sched.status"/>
+                                            </span>
                                         </td>
                                         <td class="align-middle text-end pe-4">
-                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editSchedule(sched)" t-att-disabled="sched.isLocked" title="Edit schedule">Edit</button>
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editSchedule(sched)" t-att-disabled="sched.isLocked" title="Edit schedule (includes Active toggle)">Edit</button>
                                             <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.promptDeleteSchedule(sched)" t-att-disabled="sched.isLocked" title="Delete schedule">Delete</button>
                                         </td>
                                     </tr>
@@ -401,6 +441,12 @@
                 </t>
 
                 <t t-if="!this.state.showForm and this.state.activeMainTab === 'targets'">
+                    <div class="px-4 pt-3">
+                        <div class="alert alert-light border small text-muted mb-0">
+                            <i class="fa fa-info-circle me-1 text-primary"></i>
+                            <strong>Deactivated</strong> targets stay listed here — turn Active on in Edit to show them to the booker again.
+                        </div>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead class="bg-light text-uppercase small fw-bold text-muted">
@@ -417,7 +463,7 @@
                                     <tr><td colspan="5" class="text-center py-4 text-muted">No targets configured for this booker.</td></tr>
                                 </t>
                                 <t t-foreach="currentBookerTargets" t-as="tgt" t-key="tgt.id">
-                                    <tr>
+                                    <tr t-att-class="!tgt.isActive ? 'table-secondary' : ''">
                                         <td class="ps-4 align-middle">
                                             <div class="fw-bold small"><t t-esc="tgt.startDate"/></div>
                                             <div class="text-muted small">to <t t-esc="tgt.endDate"/></div>
@@ -485,10 +531,10 @@
                                             </t>
                                         </td>
                                         <td class="align-middle">
-                                            <span t-attf-class="badge #{tgt.status === 'Active' ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm"><t t-esc="tgt.status"/></span>
+                                            <span t-attf-class="badge #{tgt.isActive ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm"><t t-esc="tgt.status"/></span>
                                         </td>
                                         <td class="align-middle text-end pe-4">
-                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editTarget(tgt)">Edit</button>
+                                            <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editTarget(tgt)" title="Edit target (includes Active toggle)">Edit</button>
                                             <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.promptDeleteTarget(tgt)">Delete</button>
                                         </td>
                                     </tr>

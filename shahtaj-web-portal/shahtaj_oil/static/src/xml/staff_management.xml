@@ -407,11 +407,11 @@
                             <tbody>
                                 <t t-if="this.state.detailSchedules.length === 0">
                                     <tr>
-                                        <td colspan="3" class="text-center py-4 text-muted fw-bold">No active schedules assigned to this booker.</td>
+                                        <td colspan="3" class="text-center py-4 text-muted fw-bold">No schedules assigned to this booker.</td>
                                     </tr>
                                 </t>
                                 <t t-foreach="this.state.detailSchedules" t-as="schedule" t-key="schedule.id">
-                                    <tr>
+                                    <tr t-att-class="!schedule.active ? 'table-secondary' : ''">
                                         <td class="ps-4 align-middle fw-bold text-dark text-nowrap"><t t-esc="schedule.day"/></td>
                                         <td class="align-middle">
                                             <div class="fw-bold text-dark text-nowrap"><t t-esc="schedule.route_id ? schedule.route_id[1] : 'Unknown Route'"/></div>
@@ -424,7 +424,7 @@
                                         </td>
                                         <td class="align-middle text-end pe-4 text-nowrap">
                                             <span t-attf-class="badge #{schedule.active ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
-                                                <t t-esc="schedule.active ? 'Active' : 'Inactive'"/>
+                                                <t t-esc="schedule.active ? 'Active' : 'Deactivated'"/>
                                             </span>
                                         </td>
                                     </tr>
@@ -453,7 +453,7 @@
                                     </tr>
                                 </t>
                                 <t t-foreach="this.state.detailTargets" t-as="target" t-key="target.id">
-                                    <tr>
+                                    <tr t-att-class="!target.active ? 'table-secondary' : ''">
                                         <td class="ps-4 align-middle text-nowrap">
                                             <div class="fw-bold small text-dark"><t t-esc="target.date_start"/></div>
                                             <div class="text-muted small">to <t t-esc="target.date_end"/></div>
@@ -475,7 +475,7 @@
                                         </td>
                                         <td class="align-middle text-end pe-4 text-nowrap">
                                             <span t-attf-class="badge #{target.active ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
-                                                <t t-esc="target.active ? 'Active' : 'Inactive'"/>
+                                                <t t-esc="target.active ? 'Active' : 'Deactivated'"/>
                                             </span>
                                         </td>
                                     </tr>

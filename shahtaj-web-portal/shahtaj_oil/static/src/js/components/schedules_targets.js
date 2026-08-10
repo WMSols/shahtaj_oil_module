@@ -195,6 +195,8 @@ export class SchedulesTargets extends Component {
     }
 
     async _loadBookerSchedules(bookerId) {
+        // Include deactivated rows so distributors can reactivate/edit/delete
+        // (unique is one row per booker/day including inactive).
         const records = await this.orm.searchRead(
             'shahtaj.weekly.schedule',
             [['order_booker_id', '=', bookerId]],
@@ -203,7 +205,11 @@ export class SchedulesTargets extends Component {
                 'active', 'shop_count', 'is_day_locked',
                 'week_tasks_planned', 'week_tasks_completed', 'week_tasks_progress',
                 'week_occurrence_date'
-            ]
+            ],
+            {
+                context: { active_test: false },
+                order: 'day_of_week asc, active desc, id asc',
+            },
         );
         
         const dayMap = {
@@ -220,7 +226,8 @@ export class SchedulesTargets extends Component {
             route_id: r.route_id ? r.route_id[0] : '',
             route: r.route_id ? r.route_id[1] : '',
             zone: r.zone_id ? r.zone_id[1] : '',    
-            status: r.active ? 'Active' : 'Inactive',
+            status: r.active ? 'Active' : 'Deactivated',
+            isActive: !!r.active,
             shops: r.shop_count,
             isLocked: r.is_day_locked,
             planned: r.week_tasks_planned,
@@ -231,6 +238,7 @@ export class SchedulesTargets extends Component {
     }
 
     async _loadBookerTargets(bookerId) {
+        // Include deactivated targets so distributors can reactivate/edit/delete.
         const records = await this.orm.searchRead(
             'shahtaj.visit.target',
             [['order_booker_id', '=', bookerId]],
@@ -238,7 +246,11 @@ export class SchedulesTargets extends Component {
                 'id', 'name', 'date_start', 'date_end', 'target_type',
                 'target_value', 'achieved_value', 'remaining_value', 'progress_percent',
                 'product_id', 'currency_id', 'target_weight_uom', 'active'
-            ]
+            ],
+            {
+                context: { active_test: false },
+                order: 'date_start desc, active desc, id desc',
+            },
         );
         this.state.targets = records.map(r => ({
             id: r.id,
@@ -258,7 +270,8 @@ export class SchedulesTargets extends Component {
             product: r.product_id ? r.product_id[1] : null,
             currency_id_raw: r.currency_id ? r.currency_id[0] : '',
             currency: r.currency_id ? r.currency_id[1] : null,
-            status: r.active ? 'Active' : 'Inactive',
+            status: r.active ? 'Active' : 'Deactivated',
+            isActive: !!r.active,
             lines: [],
             isExpandable: ['collective_qty', 'collective_weight', 'product_bundle'].includes(r.target_type),
             expanded: false,
@@ -371,7 +384,7 @@ export class SchedulesTargets extends Component {
             day: sched.day_raw.toString(),
             route_id: sched.route_id,
             zone_name: sched.zone,
-            is_active: sched.status === 'Active',
+            is_active: sched.isActive !== false && sched.status !== 'Deactivated',
             operational_shop_count: sched.shops,
         };
         this.state.editingScheduleId = sched.id;
@@ -410,9 +423,10 @@ export class SchedulesTargets extends Component {
             product_id: tgt.product_id_raw,
             currency_id: tgt.currency_id_raw,
             target_weight_uom: tgt.weightUom || 'kg',
-            is_active: tgt.status === 'Active',
+            is_active: tgt.isActive !== false && tgt.status !== 'Deactivated',
             lines: (tgt.lines || []).map((line) => ({
-                product_id: line.product_id,
+                product_id: line.product_id ? parseInt(line.product_id, 10) : '',
+                product_name: line.product_name || '',
                 measure_type: line.measure_type || 'qty',
                 target_value: line.target_value || '',
                 target_weight_uom: line.target_weight_uom || 'kg',
@@ -426,13 +440,91 @@ export class SchedulesTargets extends Component {
         return ['collective_qty', 'collective_weight', 'product_bundle'].includes(type);
     }
 
-    addTargetLine() {
-        this.state.targetForm.lines.push({
-            product_id: '',
+    get targetProductsNotYetAddedCount() {
+        const catalog = this.state.products || [];
+        if (!catalog.length) {
+            return 0;
+        }
+        const used = new Set(
+            (this.state.targetForm.lines || [])
+                .map((line) => parseInt(line.product_id, 10))
+                .filter((id) => Number.isFinite(id) && id > 0),
+        );
+        return catalog.filter((p) => !used.has(p.id)).length;
+    }
+
+    _newTargetLine(productId = null) {
+        const pid = productId != null && productId !== ''
+            ? parseInt(productId, 10)
+            : null;
+        const product = Number.isFinite(pid)
+            ? (this.state.products || []).find((p) => p.id === pid)
+            : null;
+        return {
+            // Keep numeric id so <select t-model> matches t-att-value="p.id".
+            product_id: Number.isFinite(pid) ? pid : '',
+            product_name: product ? product.name : '',
             measure_type: 'qty',
             target_value: '',
             target_weight_uom: 'kg',
+        };
+    }
+
+    addTargetLine() {
+        this.state.targetForm.lines.push(this._newTargetLine());
+    }
+
+    onTargetLineProductChange(line, ev) {
+        const raw = ev.target.value;
+        if (raw === '' || raw === null || raw === undefined) {
+            line.product_id = '';
+            line.product_name = '';
+            return;
+        }
+        const pid = parseInt(raw, 10);
+        line.product_id = Number.isFinite(pid) ? pid : '';
+        const product = (this.state.products || []).find((p) => p.id === line.product_id);
+        line.product_name = product ? product.name : '';
+    }
+
+    addAllTargetProducts() {
+        if (!this.isMultiProductTargetType(this.state.targetForm.type)) {
+            return;
+        }
+        const catalog = [...(this.state.products || [])].sort((a, b) =>
+            (a.name || '').localeCompare(b.name || ''),
+        );
+        if (!catalog.length) {
+            this.notification.add('No sellable products in the catalog to add.', { type: 'warning' });
+            return;
+        }
+        const used = new Set(
+            (this.state.targetForm.lines || [])
+                .map((line) => parseInt(line.product_id, 10))
+                .filter((id) => Number.isFinite(id) && id > 0),
+        );
+        // Keep rows that already have a real product assigned.
+        const kept = (this.state.targetForm.lines || []).filter((line) => {
+            const id = parseInt(line.product_id, 10);
+            return Number.isFinite(id) && id > 0;
         });
+        const toAdd = catalog.filter((p) => !used.has(p.id));
+        if (!toAdd.length) {
+            this.notification.add('All catalog products are already on this list.', { type: 'info' });
+            this.state.targetForm.lines = kept;
+            return;
+        }
+        this.state.targetForm.lines = [
+            ...kept,
+            ...toAdd.map((p) => this._newTargetLine(p.id)),
+        ];
+        const hint = this.state.targetForm.type === 'product_bundle'
+            ? ' Set each line’s target value before saving.'
+            : ' Remove any products that should not count toward the collective goal.';
+        this.notification.add(
+            `Assigned ${toAdd.length} product(s) to the list.${hint}`,
+            { type: 'success' },
+        );
     }
 
     removeTargetLine(index) {
@@ -510,7 +602,7 @@ export class SchedulesTargets extends Component {
 
         const activeDayConflict = this.currentBookerSchedules.some(
             (s) => s.day_raw.toString() === form.day
-                && s.status === 'Active'
+                && s.isActive
                 && s.id !== this.state.editingScheduleId
         );
         if (activeDayConflict) {
@@ -523,12 +615,12 @@ export class SchedulesTargets extends Component {
         let editingScheduleId = this.state.editingScheduleId;
         if (!editingScheduleId) {
             const inactiveExisting = this.currentBookerSchedules.find(
-                (s) => s.day_raw.toString() === form.day && s.status === 'Inactive'
+                (s) => s.day_raw.toString() === form.day && !s.isActive
             );
             if (inactiveExisting) {
                 editingScheduleId = inactiveExisting.id;
                 this.notification.add(
-                    `Reactivating the existing inactive ${inactiveExisting.day} schedule.`,
+                    `Reactivating the existing deactivated ${inactiveExisting.day} schedule.`,
                     { type: "info" }
                 );
             }

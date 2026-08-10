@@ -213,7 +213,11 @@ export class StaffManagement extends Component {
         const schedules = await this.orm.searchRead(
             "shahtaj.weekly.schedule",
             [["order_booker_id", "=", staff.id]],
-            ["id", "day_of_week", "route_id", "zone_id", "active"]
+            ["id", "day_of_week", "route_id", "zone_id", "active"],
+            {
+                context: { active_test: false },
+                order: "day_of_week asc, active desc, id asc",
+            },
         );
 
         const dayMap = {
@@ -229,7 +233,11 @@ export class StaffManagement extends Component {
         this.state.detailTargets = await this.orm.searchRead(
             "shahtaj.visit.target",
             [["order_booker_id", "=", staff.id]],
-            ["id", "date_start", "date_end", "target_type", "target_value", "achieved_value", "progress_percent", "active"]
+            ["id", "date_start", "date_end", "target_type", "target_value", "achieved_value", "progress_percent", "active"],
+            {
+                context: { active_test: false },
+                order: "date_start desc, active desc, id desc",
+            },
         );
 
         this.state.viewMode = 'detail';

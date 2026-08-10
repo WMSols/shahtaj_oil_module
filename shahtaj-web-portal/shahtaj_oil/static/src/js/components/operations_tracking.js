@@ -167,9 +167,25 @@ export class OperationsTracking extends Component {
             }
 
             // 2. EXECUTE QUERY
+            const queryKwargs = {
+                limit: pag.limit,
+                offset: (pag.page - 1) * pag.limit,
+                order: "id desc",
+            };
+            // Schedules/targets: include deactivated rows for distributor visibility.
+            if (tab === 'schedules' || tab === 'targets') {
+                queryKwargs.context = { active_test: false };
+            }
+            if (tab === 'schedules') {
+                queryKwargs.order = 'day_of_week asc, active desc, id desc';
+            }
             const [total, records] = await Promise.all([
-                this.orm.searchCount(model, domain),
-                this.orm.searchRead(model, domain, fields, { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: "id desc" })
+                this.orm.searchCount(
+                    model,
+                    domain,
+                    (tab === 'schedules' || tab === 'targets') ? { context: { active_test: false } } : {},
+                ),
+                this.orm.searchRead(model, domain, fields, queryKwargs),
             ]);
 
             this.state.pagination[tab].total = total;
