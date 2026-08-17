@@ -90,6 +90,22 @@ def _sync_distributor_partner_rules(env):
     })
 
 
+def _enable_purchase_ok_on_storable_products(env):
+    """Allow existing warehouse products on native purchase orders.
+
+    SHAHTAJ-LEGACY stays non-purchasable (service / opening-balance product).
+    """
+    templates = env['product.template'].with_context(active_test=False).search([
+        ('purchase_ok', '=', False),
+        ('is_storable', '=', True),
+        '|',
+        ('default_code', '=', False),
+        ('default_code', '!=', 'SHAHTAJ-LEGACY'),
+    ])
+    if templates:
+        templates.write({'purchase_ok': True})
+
+
 def post_init_hook(env):
     env['ir.config_parameter'].sudo().set_param(
         'base.enable_programmatic_api_keys', '1'
@@ -97,6 +113,7 @@ def post_init_hook(env):
     _sync_distributor_partner_rules(env)
     _sync_distributor_booker_user_rule(env)
     _recompute_shahtaj_order_booker_flags(env)
+    _enable_purchase_ok_on_storable_products(env)
     env['res.users']._sync_all_shahtaj_ui_groups()
     env['res.users']._clear_shahtaj_distributor_flags_on_non_distributors()
     env['res.users']._sync_all_shahtaj_financial_groups()

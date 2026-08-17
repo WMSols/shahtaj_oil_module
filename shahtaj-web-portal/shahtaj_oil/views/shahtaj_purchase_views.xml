@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Simplified PO form for native Shahtaj menus only (full Purchase app unchanged). -->
+    <record id="view_shahtaj_purchase_order_form" model="ir.ui.view">
+        <field name="name">purchase.order.form.shahtaj</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="mode">primary</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="replace">
+                <header>
+                    <field name="locked" invisible="1"/>
+                    <field name="lock_confirmed_po" invisible="1"/>
+                    <field name="is_shipped" invisible="1"/>
+                    <field name="invoice_status" invisible="1"/>
+                    <button name="button_confirm" type="object" string="Confirm Order"
+                            class="oe_highlight"
+                            context="{'validate_analytic': True}"
+                            invisible="state not in ('draft', 'sent')"/>
+                    <button name="button_approve" type="object" string="Approve Order"
+                            class="oe_highlight"
+                            groups="purchase.group_purchase_manager"
+                            invisible="state != 'to approve'"/>
+                    <button name="action_view_picking" type="object" string="Receive Products"
+                            class="oe_highlight"
+                            groups="stock.group_stock_user"
+                            invisible="is_shipped or state != 'purchase' or incoming_picking_count == 0"/>
+                    <button name="action_create_invoice" type="object" string="Create Bill"
+                            class="oe_highlight"
+                            groups="account.group_account_invoice"
+                            invisible="state != 'purchase' or invoice_status != 'to invoice'"/>
+                    <button name="print_quotation" type="object" string="Print"
+                            invisible="state == 'purchase'"/>
+                    <button name="%(purchase.action_report_purchase_order)d" type="action" string="Print"
+                            invisible="state != 'purchase'"/>
+                    <button name="button_cancel" type="object" string="Cancel"
+                            invisible="state not in ('draft', 'sent', 'to approve', 'purchase') or locked"/>
+                    <button name="button_draft" type="object" string="Set to Draft"
+                            invisible="state != 'cancel'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,purchase" readonly="1"/>
+                </header>
+            </xpath>
+            <xpath expr="//button[@name='action_bill_matching']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_purchase_comparison']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//div[hasclass('oe_title')]" position="replace">
+                <div class="oe_title">
+                    <h1 class="d-flex">
+                        <field name="name" readonly="1"/>
+                    </h1>
+                </div>
+            </xpath>
+            <xpath expr="//field[@name='partner_ref']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='date_order']" position="attributes">
+                <attribute name="invisible">0</attribute>
+                <attribute name="string">Order Deadline</attribute>
+            </xpath>
+            <xpath expr="//label[@for='date_planned']" position="attributes">
+                <attribute name="string">Expected Delivery</attribute>
+            </xpath>
+            <xpath expr="//div[@name='date_planned_div']/div" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//div[@name='reminder']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//label[@for='receipt_reminder_email']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='picking_type_id']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='dest_address_id']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list/control" position="replace">
+                <control>
+                    <create name="add_product_control" string="Add a product"/>
+                </control>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list/field[@name='name']" position="attributes">
+                <attribute name="column_invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list/field[@name='date_planned']" position="attributes">
+                <attribute name="column_invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list/field[@name='discount']" position="attributes">
+                <attribute name="column_invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list/field[@name='tax_ids']" position="attributes">
+                <attribute name="optional">hide</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list/field[@name='product_uom_id']" position="attributes">
+                <attribute name="optional">hide</attribute>
+            </xpath>
+            <xpath expr="//page[@name='purchase_delivery_invoice']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='note']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_purchase_order_list" model="ir.ui.view">
+        <field name="name">purchase.order.list.shahtaj</field>
+        <field name="model">purchase.order</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <list string="Purchase Orders"
+                  decoration-muted="state == 'cancel'"
+                  decoration-info="state in ('draft', 'sent')">
+                <field name="name" string="Reference"/>
+                <field name="partner_id" string="Vendor"/>
+                <field name="date_order" string="Order Deadline"/>
+                <field name="date_planned" string="Expected Delivery"/>
+                <field name="amount_total" string="Total" sum="Total"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"
+                       decoration-info="state in ('draft', 'sent')"
+                       decoration-success="state == 'purchase'"
+                       decoration-danger="state == 'cancel'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Native distributor only: simplified PO → receive → stock on hand. -->
+    <record id="action_shahtaj_purchase_orders" model="ir.actions.act_window">
+        <field name="name">Purchase Orders</field>
+        <field name="res_model">purchase.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_shahtaj_purchase_order_list"/>
+        <field name="context">{
+            'res_partner_search_mode': 'supplier',
+            'default_supplier_rank': 1,
+            'default_is_shahtaj_shop': False,
+            'default_receipt_reminder_email': False,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No purchase orders yet
+            </p>
+            <p>
+                Create a purchase order for the manufacturer, confirm it, then
+                <b>Receive Products</b>. Warehouse on-hand quantity updates when
+                the incoming receipt is validated, and a draft vendor bill is
+                created from this order. Post the bill and Register Payment
+                when you pay the manufacturer.
+                Use <b>Add Stock</b> only for opening stock or manual adjustments.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_purchase_orders_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_purchase_order_list"/>
+        <field name="act_window_id" ref="action_shahtaj_purchase_orders"/>
+    </record>
+
+    <record id="action_shahtaj_purchase_orders_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shahtaj_purchase_order_form"/>
+        <field name="act_window_id" ref="action_shahtaj_purchase_orders"/>
+    </record>
+
+    <record id="action_shahtaj_incoming_receipts" model="ir.actions.act_window">
+        <field name="name">Incoming Receipts</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="domain">[('picking_type_code', '=', 'incoming')]</field>
+        <field name="context">{'default_picking_type_code': 'incoming'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No incoming receipts
+            </p>
+            <p>
+                Confirm a purchase order first. Open the receipt, set done
+                quantities, and <b>Validate</b> to add stock to the warehouse.
+                A draft vendor bill is created from the purchase order.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_vendor_bills" model="ir.actions.act_window">
+        <field name="name">Vendor Bills</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="domain">[('move_type', 'in', ('in_invoice', 'in_refund'))]</field>
+        <field name="context">{
+            'default_move_type': 'in_invoice',
+            'search_default_in_invoice': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No vendor bills yet
+            </p>
+            <p>
+                After you receive a purchase order, a draft vendor bill is
+                created automatically (linked to the PO). Open it, post it,
+                then Register Payment from Cash/Bank.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_vendor_search" model="ir.ui.view">
+        <field name="name">res.partner.search.shahtaj.vendor</field>
+        <field name="model">res.partner</field>
+        <field name="priority">60</field>
+        <field name="arch" type="xml">
+            <search string="Vendors">
+                <field name="name"/>
+                <field name="phone"/>
+                <field name="email"/>
+                <field name="city"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_vendor_list" model="ir.ui.view">
+        <field name="name">res.partner.list.shahtaj.vendor</field>
+        <field name="model">res.partner</field>
+        <field name="priority">60</field>
+        <field name="arch" type="xml">
+            <list string="Vendors">
+                <field name="name" string="Vendor"/>
+                <field name="phone"/>
+                <field name="email"/>
+                <field name="city" optional="show"/>
+                <field name="street" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_vendor_form" model="ir.ui.view">
+        <field name="name">res.partner.form.shahtaj.vendor</field>
+        <field name="model">res.partner</field>
+        <field name="priority">60</field>
+        <field name="arch" type="xml">
+            <form string="Vendor">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Shahtaj Industry"/></h1>
+                    </div>
+                    <group>
+                        <group string="Contact">
+                            <field name="phone"/>
+                            <field name="email"/>
+                        </group>
+                        <group string="Address">
+                            <field name="street"/>
+                            <field name="street2"/>
+                            <field name="city"/>
+                            <field name="zip"/>
+                        </group>
+                    </group>
+                    <field name="company_type" invisible="1"/>
+                    <field name="is_shahtaj_shop" invisible="1"/>
+                    <field name="supplier_rank" invisible="1"/>
+                    <field name="customer_rank" invisible="1"/>
+                    <field name="shahtaj_shop_category" invisible="1"/>
+                    <field name="shop_approval_state" invisible="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_vendors" model="ir.actions.act_window">
+        <field name="name">Vendors</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_shahtaj_vendor_list"/>
+        <field name="search_view_id" ref="view_shahtaj_vendor_search"/>
+        <field name="domain">[('supplier_rank', '&gt;', 0), ('is_shahtaj_shop', '=', False)]</field>
+        <field name="context">{
+            'default_supplier_rank': 1,
+            'default_customer_rank': 0,
+            'default_is_shahtaj_shop': False,
+            'default_company_type': 'company',
+            'res_partner_search_mode': 'supplier',
+            'form_view_ref': 'shahtaj_oil.view_shahtaj_vendor_form',
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No vendors yet
+            </p>
+            <p>
+                Add the manufacturer (or other suppliers) here, then select them
+                on purchase orders. Vendors are not shops.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_vendors_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_vendor_list"/>
+        <field name="act_window_id" ref="action_shahtaj_vendors"/>
+    </record>
+
+    <record id="action_shahtaj_vendors_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shahtaj_vendor_form"/>
+        <field name="act_window_id" ref="action_shahtaj_vendors"/>
+    </record>
+
+</odoo>

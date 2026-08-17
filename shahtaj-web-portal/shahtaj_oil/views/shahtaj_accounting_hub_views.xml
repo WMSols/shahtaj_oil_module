@@ -25,6 +25,14 @@
                             <field name="expense_invoice_count" readonly="1"/>
                             <field name="shop_count" readonly="1"/>
                         </group>
+                        <group string="Purchase (stock in)" groups="purchase.group_purchase_user">
+                            <field name="purchase_order_count" readonly="1"
+                                   groups="purchase.group_purchase_user"/>
+                            <field name="incoming_receipt_count" readonly="1"
+                                   groups="purchase.group_purchase_user"/>
+                            <field name="vendor_bill_count" readonly="1"
+                                   groups="purchase.group_purchase_user"/>
+                        </group>
                     </group>
                     <div class="alert alert-info" role="alert">
                         <strong>Typical workflow</strong>
@@ -35,6 +43,8 @@
                             <li>Record payments on the invoice (partial payments are allowed).</li>
                             <li>For returns, open a posted invoice → <b>Credit Note</b> → post the credit note.</li>
                             <li>Record operating costs as <b>Expense Invoices</b> (fuel, salary, rent) paid from Cash/Bank.</li>
+                            <li>To restock from the manufacturer: create a <b>Purchase Order</b>, confirm it, then <b>Receive Products</b>. Stock increases and a draft vendor bill is created from the PO. Post the bill, then Register Payment from Cash/Bank.</li>
+                            <li>Use <b>Add Stock</b> only for opening stock or manual adjustments (Inventory menu).</li>
                             <li>Review each shop's balance under Shop Balances.</li>
                         </ol>
                     </div>
@@ -83,6 +93,26 @@
                                     class="btn btn-primary mb-2"
                                     icon="fa-balance-scale"/>
                         </group>
+                        <group string="Stock in — Purchase" groups="purchase.group_purchase_user">
+                            <button name="action_open_vendors" type="object"
+                                    string="Vendors"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-building"/>
+                            <button name="action_open_purchase_orders" type="object"
+                                    string="Purchase Orders"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-shopping-basket"/>
+                            <button name="action_open_incoming_receipts" type="object"
+                                    string="Incoming Receipts"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-download"/>
+                            <button name="action_open_vendor_bills" type="object"
+                                    string="Vendor Bills"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-file-text"/>
+                        </group>
+                    </group>
+                    <group>
                         <group string="Step 4 — Tax &amp; Profit">
                             <button name="action_open_tax_ledger" type="object"
                                     string="Tax Ledger"

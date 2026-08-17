@@ -29,7 +29,7 @@ export class FinancialsInvoicing extends Component {
         };
         this.todayStr = formatDate(today);
         // 2. SMART INITIALIZATION
-       const target = this.props.requestedSubTab || 'invoices';
+        const target = this.props.requestedSubTab || 'invoices';
         const topLevelTabs = ['credit', 'pnl', 'money', 'cash', 'tax_ledger', 'expenses'];
         const initActive = topLevelTabs.includes(target) ? target : 'invoices';
         const initInvoice = (target === 'credit' || target === 'pnl' || target === 'money' || target === 'cash' || target === 'tax_ledger' || target === 'invoices')
@@ -636,7 +636,7 @@ export class FinancialsInvoicing extends Component {
         }
 
         if (includePnl) {
-            await this.fetchPnlData();
+        await this.fetchPnlData();
         }
     }
 
@@ -710,7 +710,7 @@ export class FinancialsInvoicing extends Component {
         this.state.pnl.isLoading = false;
     }
     // --- MANUFACTURER SUMMARY PRINTING ---
-   async printManufacturerSummary() {
+    async printManufacturerSummary() {
         // Optional: Trigger your existing loading spinner so the UI doesn't freeze
         this.state.pnl.isLoading = true; 
         
@@ -1598,7 +1598,7 @@ export class FinancialsInvoicing extends Component {
                 date: this.state.refundForm.date,
                 journal_id: this.state.selectedInvoice.journal_id,
             }], { context });
-
+            
             const action = await this.orm.call('account.move.reversal', 'reverse_moves', [wizardIds], { context });
             const creditNoteId = action?.res_id;
             if (!creditNoteId) throw new Error('Credit note was created but could not be opened.');

@@ -36,6 +36,18 @@ class ShahtajAccountingHub(models.TransientModel):
         string='Approved Shops',
         compute='_compute_counts',
     )
+    purchase_order_count = fields.Integer(
+        string='Purchase Orders',
+        compute='_compute_counts',
+    )
+    incoming_receipt_count = fields.Integer(
+        string='Incoming Receipts',
+        compute='_compute_counts',
+    )
+    vendor_bill_count = fields.Integer(
+        string='Vendor Bills',
+        compute='_compute_counts',
+    )
 
     @api.depends_context('uid')
     def _compute_counts(self):
@@ -73,6 +85,22 @@ class ShahtajAccountingHub(models.TransientModel):
                 ('is_shahtaj_shop', '=', True),
                 ('shop_approval_state', '=', 'approved'),
             ])
+            if 'purchase.order' in self.env:
+                hub.purchase_order_count = self.env['purchase.order'].sudo().search_count([
+                    ('state', 'in', ('draft', 'sent', 'to approve', 'purchase')),
+                ])
+                hub.incoming_receipt_count = self.env['stock.picking'].sudo().search_count([
+                    ('picking_type_code', '=', 'incoming'),
+                    ('state', 'not in', ('done', 'cancel')),
+                ])
+                hub.vendor_bill_count = AccountMove.search_count([
+                    ('move_type', 'in', ('in_invoice', 'in_refund')),
+                    ('state', 'in', ('draft', 'posted')),
+                ])
+            else:
+                hub.purchase_order_count = 0
+                hub.incoming_receipt_count = 0
+                hub.vendor_bill_count = 0
 
     @api.model
     def action_open_accounting_hub(self):
@@ -146,4 +174,24 @@ class ShahtajAccountingHub(models.TransientModel):
     def action_open_expense_categories(self):
         return self.env['ir.actions.act_window']._for_xml_id(
             'shahtaj_oil.action_shahtaj_expense_category',
+        )
+
+    def action_open_purchase_orders(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_purchase_orders',
+        )
+
+    def action_open_incoming_receipts(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_incoming_receipts',
+        )
+
+    def action_open_vendor_bills(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_vendor_bills',
+        )
+
+    def action_open_vendors(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_vendors',
         )

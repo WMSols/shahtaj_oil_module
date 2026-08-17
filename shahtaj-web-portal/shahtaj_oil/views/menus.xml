@@ -144,6 +144,13 @@
               sequence="33"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_vendor_bills"
+              name="Vendor Bills"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_vendor_bills"
+              sequence="34"
+              groups="purchase.group_purchase_user"/>
+
     <menuitem id="menu_shahtaj_tax_ledger"
               name="Tax Ledger"
               parent="menu_shahtaj_accounting"
@@ -206,6 +213,27 @@
               parent="menu_shahtaj_inventory"
               action="action_shahtaj_add_stock"
               sequence="5"/>
+
+    <menuitem id="menu_shahtaj_purchase_orders"
+              name="Purchase Orders"
+              parent="menu_shahtaj_inventory"
+              action="action_shahtaj_purchase_orders"
+              sequence="6"
+              groups="purchase.group_purchase_user"/>
+
+    <menuitem id="menu_shahtaj_incoming_receipts"
+              name="Incoming Receipts"
+              parent="menu_shahtaj_inventory"
+              action="action_shahtaj_incoming_receipts"
+              sequence="7"
+              groups="purchase.group_purchase_user"/>
+
+    <menuitem id="menu_shahtaj_vendors"
+              name="Vendors"
+              parent="menu_shahtaj_inventory"
+              action="action_shahtaj_vendors"
+              sequence="9"
+              groups="purchase.group_purchase_user"/>
 
     <menuitem id="menu_shahtaj_orders_to_deliver"
               name="Orders to Deliver"

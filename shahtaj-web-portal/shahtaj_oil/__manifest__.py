@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.1.27',
+    'version': '19.0.1.1.33',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -14,8 +14,10 @@
         'sale_stock', 
         'mail', 
         'account', 
-        'stock', 
-        'fastapi'
+        'stock',
+        'purchase',
+        'purchase_stock',
+        'fastapi',
     ],
     'data': [
         # ── 1. SECURITY (groups first, then access, then rules) ──
@@ -51,6 +53,7 @@
         'views/shahtaj_accounting_views.xml',
         'views/shahtaj_sale_accounting_views.xml',
         'views/shahtaj_accounting_hub_views.xml',
+        'views/shahtaj_purchase_views.xml',
         'views/shahtaj_expense_views.xml',
         'views/shahtaj_pnl_dashboard_views.xml',
         'views/shahtaj_tax_ledger_views.xml',

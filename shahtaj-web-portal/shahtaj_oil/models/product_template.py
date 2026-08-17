@@ -314,10 +314,11 @@ class ProductTemplate(models.Model):
         category = self._ensure_shahtaj_category_accounts()
         vals.setdefault('type', 'consu')
         vals.setdefault('sale_ok', True)
-        vals.setdefault('purchase_ok', False)
+        vals.setdefault('purchase_ok', True)
         vals.setdefault('is_storable', True)
         vals.setdefault('tracking', 'none')
         vals.setdefault('invoice_policy', 'delivery')
+        vals.setdefault('purchase_method', 'receive')
         sale_uom = vals.get('shahtaj_sale_uom', 'piece')
         vals.setdefault('shahtaj_sale_uom', sale_uom)
         vals.setdefault(

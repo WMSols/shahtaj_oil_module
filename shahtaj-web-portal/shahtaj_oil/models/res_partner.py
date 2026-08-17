@@ -482,6 +482,9 @@ class ResPartner(models.Model):
     def _prepare_shop_vals(self, vals):
         """Set defaults when creating a shop from distributor, portal, or booker API."""
         vals = dict(vals)
+        if self.env.context.get('res_partner_search_mode') == 'supplier':
+            vals['is_shahtaj_shop'] = False
+            return vals
         is_shop_create = (
             vals.get('is_shahtaj_shop')
             or self.env.context.get('shahtaj_shop_form')

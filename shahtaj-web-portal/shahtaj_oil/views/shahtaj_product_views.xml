@@ -150,6 +150,7 @@
         <field name="context">{
             'shahtaj_simple_product': True,
             'default_sale_ok': True,
+            'default_purchase_ok': True,
             'default_is_storable': True,
             'default_type': 'consu',
         }</field>

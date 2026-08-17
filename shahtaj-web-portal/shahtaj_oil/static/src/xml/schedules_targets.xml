@@ -196,12 +196,21 @@
                                     </small>
                                 </t>
                                 <label class="small fw-bold">Route</label>
-                                <select class="form-select form-control" t-model="this.state.scheduleForm.route_id" t-on-change="onScheduleRouteChange">
-                                    <option value="">-- Select Route --</option>
-                                    <t t-foreach="this.filteredRoutes" t-as="r" t-key="r.id">
-                                        <option t-att-value="r.id"><t t-esc="r.name"/></option>
-                                    </t>
-                                </select>
+                                <div class="input-group">
+                                    <select class="form-select form-control" t-model="this.state.scheduleForm.route_id" t-on-change="onScheduleRouteChange">
+                                        <option value="">-- Select Route --</option>
+                                        <t t-foreach="this.filteredRoutes" t-as="r" t-key="r.id">
+                                            <option t-att-value="r.id"><t t-esc="r.name"/></option>
+                                        </t>
+                                    </select>
+                                    <button type="button"
+                                            class="btn btn-dark fw-bold text-white shadow-sm d-flex align-items-center"
+                                            t-on-click="openEditShopsModal"
+                                            t-att-disabled="!this.state.scheduleForm.route_id"
+                                            title="Add or remove shops on this route">
+                                        <i class="fa fa-list-ul me-1"></i> Edit shops
+                                    </button>
+                                </div>
                             </div>
                             <div class="col-md-2 pb-2">
                                 <div class="form-check form-switch">
@@ -218,7 +227,7 @@
                         </div>
 
                         <div class="d-flex justify-content-end mt-3">
-                            <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="() => this.state.showForm = false">Cancel</button>
+                            <button class="btn btn-outline-secondary me-2 fw-bold" t-on-click="cancelScheduleForm">Cancel</button>
                             <button class="btn btn-dark px-4 fw-bold text-white" t-on-click="saveSchedule" t-att-disabled="this.state.isLoading">
                                 <t t-if="this.state.isLoading"><i class="fa fa-spinner fa-spin me-1"></i> Saving...</t>
                                 <t t-else=""><t t-esc="this.state.editingScheduleId ? 'Update Schedule' : 'Save Schedule'"/></t>
@@ -543,6 +552,179 @@
                         </table>
                     </div>
                 </t>
+            </t>
+
+            <!-- Edit shops on selected schedule route (same assignment as Routes) -->
+            <t t-if="this.state.showEditShopsModal">
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                     style="background-color: rgba(0, 0, 0, 0.55); z-index: 1060; padding: 1rem;"
+                     t-on-click="closeEditShopsModal">
+                    <div class="bg-white rounded-3 shadow-lg border-0 w-100 d-flex flex-column"
+                         style="max-width: 720px; max-height: 85vh;"
+                         t-on-click.stop="">
+                        <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light rounded-top-3">
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">Edit shops on route</h5>
+                                <small class="text-muted">
+                                    Same assignment as Routes.
+                                    <strong><t t-esc="this.selectedScheduleRoute and this.selectedScheduleRoute.name"/></strong>
+                                </small>
+                            </div>
+                            <button type="button" class="btn-close" t-on-click="closeEditShopsModal" aria-label="Close"></button>
+                        </div>
+                        <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="btn-group shadow-sm">
+                                <button type="button" class="btn btn-sm fw-bold"
+                                        t-att-class="this.state.editShopsTab === 'assigned' ? 'btn-dark text-white' : 'btn-white border'"
+                                        t-on-click="() => this.setEditShopsTab('assigned')">Assigned</button>
+                                <button type="button" class="btn btn-sm fw-bold"
+                                        t-att-class="this.state.editShopsTab === 'add' ? 'btn-dark text-white' : 'btn-white border'"
+                                        t-on-click="() => this.setEditShopsTab('add')">
+                                    <i class="fa fa-plus me-1"></i> Add Shop
+                                </button>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="input-group input-group-sm shadow-sm" style="max-width: 260px;">
+                                    <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                    <input type="text" class="form-control border-start-0 ps-0"
+                                           t-att-placeholder="this.state.editShopsTab === 'add' ? 'Search shop or owner...' : 'Search assigned shops...'"
+                                           t-model="this.state.editShopsSearchQuery"
+                                           t-on-input="onEditShopsSearchInput"/>
+                                </div>
+                                <t t-if="this.state.editShopsTab === 'add'">
+                                    <small class="text-muted fw-bold">
+                                        <t t-esc="this.editShopSelectedCount"/> selected
+                                    </small>
+                                </t>
+                            </div>
+                        </div>
+                        <div class="px-3 py-2 bg-light border-bottom small text-muted">
+                            <t t-if="this.state.editShopsTab === 'add'">
+                                Select shops not yet on this route. A shop may already be on other routes.
+                            </t>
+                            <t t-else="">
+                                Only shops on this route. Use <strong>Add Shop</strong> to assign more. Remove leaves the shop on any other routes.
+                            </t>
+                        </div>
+                        <div class="position-relative flex-grow-1 overflow-auto" style="min-height: 280px;">
+                            <t t-if="this.state.isLoadingEditShops">
+                                <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                </div>
+                            </t>
+                            <t t-if="this.state.editShopsTab === 'assigned'">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-uppercase small fw-bold text-muted sticky-top">
+                                        <tr>
+                                            <th class="ps-4">Shop Name</th>
+                                            <th>Owner</th>
+                                            <th class="text-end pe-4">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="this.state.tableEditShopsAssigned.length === 0 and !this.state.isLoadingEditShops">
+                                            <tr>
+                                                <td colspan="3" class="text-center py-5 text-muted fw-bold">
+                                                    No shops assigned to this route yet. Click <strong>Add Shop</strong> to assign.
+                                                </td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="this.state.tableEditShopsAssigned" t-as="cshop" t-key="cshop.id">
+                                            <tr>
+                                                <td class="ps-4 fw-bold text-dark"><t t-esc="cshop.name"/></td>
+                                                <td class="text-muted"><t t-esc="cshop.owner_name || 'N/A'"/></td>
+                                                <td class="text-end pe-4">
+                                                    <button class="btn btn-sm btn-outline-danger fw-bold"
+                                                            t-on-click="() => this.removeShopFromScheduleRoute(cshop)"
+                                                            title="Remove from this route only">
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
+                            <t t-else="">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-uppercase small fw-bold text-muted sticky-top">
+                                        <tr>
+                                            <th class="ps-4 text-center" style="width: 56px;">
+                                                <input class="form-check-input cursor-pointer shadow-sm" type="checkbox"
+                                                       title="Select all on this page"
+                                                       t-att-checked="this.isAllEditShopAddPageSelected"
+                                                       t-on-change="toggleSelectAllEditShopAddPage"/>
+                                            </th>
+                                            <th>Shop Name</th>
+                                            <th class="pe-4">Owner</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="this.state.tableEditShopsCandidates.length === 0 and !this.state.isLoadingEditShops">
+                                            <tr>
+                                                <td colspan="3" class="text-center py-5 text-muted fw-bold">
+                                                    No shops available to add. All approved shops may already be on this route.
+                                                </td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="this.state.tableEditShopsCandidates" t-as="ashop" t-key="ashop.id">
+                                            <tr class="cursor-pointer" t-on-click="() => this.toggleEditShopSelection(ashop.id)">
+                                                <td class="ps-4 text-center" t-on-click.stop="">
+                                                    <input class="form-check-input fs-5 cursor-pointer shadow-sm" type="checkbox"
+                                                           t-att-checked="!!this.state.editShopSelectedIds[ashop.id]"
+                                                           t-on-change="() => this.toggleEditShopSelection(ashop.id)"/>
+                                                </td>
+                                                <td class="fw-bold text-dark"><t t-esc="ashop.name"/></td>
+                                                <td class="text-muted pe-4"><t t-esc="ashop.owner_name || 'N/A'"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
+                        </div>
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2 rounded-bottom-3">
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-white border fw-bold"
+                                        t-on-click="() => this.changeEditShopsPage(-1)"
+                                        t-att-disabled="(this.state.editShopsTab === 'add' ? this.state.pagination.editShopsAdd.page : this.state.pagination.editShopsAssigned.page) === 1 or this.state.isLoadingEditShops">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                    <t t-esc="this.state.editShopsTab === 'add' ? this.state.pagination.editShopsAdd.page : this.state.pagination.editShopsAssigned.page"/>
+                                    /
+                                    <t t-esc="Math.max(1, Math.ceil((this.state.editShopsTab === 'add' ? this.state.pagination.editShopsAdd.total : this.state.pagination.editShopsAssigned.total) / (this.state.editShopsTab === 'add' ? this.state.pagination.editShopsAdd.limit : this.state.pagination.editShopsAssigned.limit)))"/>
+                                </button>
+                                <button class="btn btn-sm btn-white border fw-bold"
+                                        t-on-click="() => this.changeEditShopsPage(1)"
+                                        t-att-disabled="(this.state.editShopsTab === 'add' ? this.state.pagination.editShopsAdd.page : this.state.pagination.editShopsAssigned.page) &gt;= Math.ceil((this.state.editShopsTab === 'add' ? this.state.pagination.editShopsAdd.total : this.state.pagination.editShopsAssigned.total) / (this.state.editShopsTab === 'add' ? this.state.pagination.editShopsAdd.limit : this.state.pagination.editShopsAssigned.limit)) or this.state.isLoadingEditShops">Next</button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-light border fw-bold px-4" t-on-click="closeEditShopsModal"
+                                        t-att-disabled="this.state.isAddingEditShops">
+                                    <t t-if="this.state.editShopsTab === 'add'">Cancel</t>
+                                    <t t-else="">Close</t>
+                                </button>
+                                <t t-if="this.state.editShopsTab === 'add'">
+                                    <button class="btn btn-success fw-bold text-white px-4 shadow-sm"
+                                            t-on-click="confirmAddSelectedEditShops"
+                                            t-att-disabled="this.state.isAddingEditShops or !this.editShopSelectedCount">
+                                        <t t-if="this.state.isAddingEditShops">Adding…</t>
+                                        <t t-else="">Add Selected (<t t-esc="this.editShopSelectedCount"/>)</t>
+                                    </button>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <t t-if="this.state.confirmModal.isOpen">
+                <div style="position: relative; z-index: 1080;">
+                    <ConfirmModal
+                        title="this.state.confirmModal.title"
+                        message="this.state.confirmModal.message"
+                        onConfirm="this.state.confirmModal.onConfirm"
+                        onCancel="() => this.closeConfirm()"
+                    />
+                </div>
             </t>
 
             <!-- ========================================== -->

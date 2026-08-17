@@ -103,7 +103,7 @@
                     </div>
                 </div>
             </t>
-            
+
             <!-- 1. Money Overview Tab -->
             <t t-if="this.state.activeSubTab === 'money'">
                 <div class="p-4">
@@ -276,41 +276,41 @@
                                 </div>
                             </t>
 
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="bg-light text-uppercase small fw-bold text-muted">
-                                        <tr>
-                                            <th class="ps-4 py-3">Order Ref #</th>
-                                            <th>Shop Name</th>
-                                            <th>Order Booker</th>
-                                            <th>Order Date</th>
-                                            <th class="text-end">Total Amount</th>
-                                            <th class="text-center pe-4">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 py-3">Order Ref #</th>
+                                        <th>Shop Name</th>
+                                        <th>Order Booker</th>
+                                        <th>Order Date</th>
+                                        <th class="text-end">Total Amount</th>
+                                        <th class="text-center pe-4">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                                         <t t-if="this.state.allOrders.length === 0 and !this.state.isLoadingList">
-                                            <tr>
+                                        <tr>
                                                 <td colspan="6" class="text-center py-5 text-muted">
                                                     <i class="fa fa-shopping-bag fs-1 mb-3 opacity-50"></i>
                                                     <p class="mb-1 fw-bold fs-5 text-dark">No sales orders found.</p>
-                                                </td>
-                                            </tr>
-                                        </t>
+                                            </td>
+                                        </tr>
+                                    </t>
                                         <t t-else="">
                                             <t t-foreach="this.state.allOrders" t-as="ord" t-key="ord.id">
-                                                <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewOrder(ord)">
+                                        <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewOrder(ord)">
                                                     <td class="ps-4 fw-bold text-dark"><t t-esc="ord.display_name"/></td>
                                                     <td class="fw-bold"><t t-esc="ord.shop"/><small class="d-block text-muted fw-normal">ID: <t t-esc="ord.shopId"/></small></td>
                                                     <td><span class="badge "><i class="fa fa-user me-1"></i><t t-esc="ord.booker"/></span></td>
                                                     <td class="text-muted"><t t-esc="ord.date"/></td>
                                                     <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/></td>
                                                     <td class="text-center pe-4"><span t-attf-class="badge #{ord.status === 'Confirmed' ? 'bg-primary' : ord.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary'} text-white px-2 py-1 shadow-sm"><t t-esc="ord.status"/></span></td>
-                                                </tr>
+                                        </tr>
                                             </t>
-                                        </t>
-                                    </tbody>
-                                </table>
+                                    </t>
+                                </tbody>
+                            </table>
                             </div>
 
                             <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
@@ -476,27 +476,27 @@
                                 </div>
                             </t>
 
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="bg-light text-uppercase small fw-bold text-muted">
-                                        <tr>
-                                            <th class="ps-4 py-3">Order Ref #</th>
-                                            <th>Shop Name</th>
-                                            <th>Order Booker</th>
-                                            <th>Order Date</th>
-                                            <th class="text-end">Total Amount</th>
-                                            <th class="text-end pe-4">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 py-3">Order Ref #</th>
+                                        <th>Shop Name</th>
+                                        <th>Order Booker</th>
+                                        <th>Order Date</th>
+                                        <th class="text-end">Total Amount</th>
+                                        <th class="text-end pe-4">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                                         <t t-if="this.state.orders.length === 0 and !this.state.isLoadingList">
-                                            <tr>
+                                        <tr>
                                                 <td colspan="6" class="text-center py-5 text-muted">
                                                     <i class="fa fa-file-clock-o fs-1 mb-3 opacity-50"></i>
                                                     <p class="mb-1 fw-bold fs-5 text-dark">No pending orders to invoice.</p>
-                                                </td>
-                                            </tr>
-                                        </t>
+                                            </td>
+                                        </tr>
+                                    </t>
                                         <t t-else="">
                                             <t t-foreach="this.state.orders" t-as="ord" t-key="ord.id">
                                                 <tr>
@@ -506,11 +506,11 @@
                                                     <td class="text-muted"><t t-esc="ord.date"/></td>
                                                     <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/></td>
                                                     <td class="text-end pe-4"><button class="btn btn-sm btn-dark fw-bold px-3" t-on-click="() => this.viewOrder(ord)" title="Open this order to verify items and generate a bill">View &amp; Invoice</button></td>
-                                                </tr>
+                                        </tr>
                                             </t>
-                                        </t>
-                                    </tbody>
-                                </table>
+                                    </t>
+                                </tbody>
+                            </table>
                             </div>
 
                             <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
@@ -685,27 +685,27 @@
                                 </div>
                             </t>
 
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="bg-light text-uppercase small fw-bold text-muted">
-                                        <tr>
-                                            <th class="ps-4 py-3">Invoice #</th>
-                                            <th>Billed Shop</th>
-                                            <th>Date</th>
-                                            <th class="text-end">Total Amount</th>
-                                            <th class="text-end">Amount Due</th>
-                                            <th class="text-center pe-4">Billing Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 py-3">Invoice #</th>
+                                        <th>Billed Shop</th>
+                                        <th>Date</th>
+                                        <th class="text-end">Total Amount</th>
+                                        <th class="text-end">Amount Due</th>
+                                        <th class="text-center pe-4">Billing Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                                         <t t-if="this.state.invoices.length === 0 and !this.state.isLoadingList">
-                                            <tr>
-                                                <td colspan="6" class="text-center py-5 text-muted">
-                                                    <i class="fa fa-file-text-o fs-1 mb-3 opacity-50"></i>
-                                                    <p class="mb-1 fw-bold fs-5 text-dark">No invoices match your search.</p>
-                                                </td>
-                                            </tr>
-                                        </t>
+                                        <tr>
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                <i class="fa fa-file-text-o fs-1 mb-3 opacity-50"></i>
+                                                <p class="mb-1 fw-bold fs-5 text-dark">No invoices match your search.</p>
+                                            </td>
+                                        </tr>
+                                    </t>
                                         <t t-foreach="this.state.invoices" t-as="inv" t-key="inv.id">
                                             <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewInvoice(inv)">
                                                 <td class="ps-4 fw-bold text-primary"><t t-esc="inv.display_name"/></td>
@@ -713,15 +713,15 @@
                                                 <td><t t-esc="inv.date"/></td>
                                                 <td class="text-end fw-bold">Rs. <t t-esc="inv.amount"/></td>
                                                 <td class="text-end fw-bold text-danger">Rs. <t t-esc="inv.residual"/></td>
-                                                <td class="text-center pe-4">
+                                            <td class="text-center pe-4">
                                                     <span t-attf-class="badge text-white #{inv.status === 'Paid' ? 'bg-success' : inv.status === 'Posted' ? 'bg-info ' : inv.status === 'Partial' ? 'bg-warning text-dark' : inv.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary text-black'} px-2 py-1 shadow-sm">
-                                                        <t t-esc="inv.status"/>
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        </t>
-                                    </tbody>
-                                </table>
+                                                    <t t-esc="inv.status"/>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
                             </div>
 
                             <!-- UNIVERSAL PAGINATION FOOTER -->
@@ -871,7 +871,7 @@
                                                             <input type="number" step="any" class="form-control form-control-sm text-end" t-model="line.price"/>
                                                         </t>
                                                         <t t-else="">
-                                                            Rs. <t t-esc="line.price"/>
+                    Rs. <t t-esc="line.price"/>
                                                         </t>
                                                     </td>
                                                     <td class="text-center">
@@ -898,7 +898,7 @@
                                                             </button>
                                                         </t>
                                                         <t t-else="">
-                                                            Rs. <t t-esc="line.subtotal"/>
+                    Rs. <t t-esc="line.subtotal"/>
                                                         </t>
                                                     </td>
                                                 </tr>
@@ -1045,12 +1045,12 @@
                                             <span class="fw-bold text-dark">Rs. <t t-esc="this.getRefundEstimate().toLocaleString(undefined, {minimumFractionDigits: 2})"/></span>
                                         </div>
                                         <div class="d-flex gap-2">
-                                            <button class="btn btn-light fw-bold border px-4" t-on-click="closeRefundModal" t-att-disabled="this.state.isRefunding">Cancel</button>
-                                            <button class="btn btn-danger fw-bold text-white px-4 shadow-sm" t-on-click="processRefund" t-att-disabled="this.state.isRefunding">
-                                                <span t-if="this.state.isRefunding" class="spinner-border spinner-border-sm me-2"/>
-                                                <t t-if="this.state.isRefunding">Processing...</t>
+                                        <button class="btn btn-light fw-bold border px-4" t-on-click="closeRefundModal" t-att-disabled="this.state.isRefunding">Cancel</button>
+                                        <button class="btn btn-danger fw-bold text-white px-4 shadow-sm" t-on-click="processRefund" t-att-disabled="this.state.isRefunding">
+                                            <span t-if="this.state.isRefunding" class="spinner-border spinner-border-sm me-2"/>
+                                            <t t-if="this.state.isRefunding">Processing...</t>
                                                 <t t-else="">Create Credit Note</t>
-                                            </button>
+                                        </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1085,7 +1085,7 @@
                                             <input type="date" class="form-control" t-model="this.state.paymentForm.date"/>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="mb-3 mt-2">
                                         <label class="small fw-bold">Payment Method</label>
                                         <select class="form-select form-control" t-model="this.state.paymentForm.method">
@@ -1124,7 +1124,7 @@
                                             </t>
                                         </select>
                                     </div>
-                                    
+
                                     <div class="mb-4">
                                         <label class="small fw-bold">Payment Notes</label>
                                         <textarea class="form-control" rows="2" t-model="this.state.paymentForm.notes" placeholder="Optional notes..."></textarea>
@@ -1336,41 +1336,41 @@
                                 </div>
                             </t>
 
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="bg-light text-uppercase small fw-bold text-muted">
-                                        <tr>
-                                            <th class="ps-4 py-3">Refund Ref #</th>
-                                            <th>Customer Shop</th>
-                                            <th>Date</th>
-                                            <th class="text-end">Refund Amount</th>
-                                            <th class="text-center pe-4">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 py-3">Refund Ref #</th>
+                                        <th>Customer Shop</th>
+                                        <th>Date</th>
+                                        <th class="text-end">Refund Amount</th>
+                                        <th class="text-center pe-4">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                                         <t t-if="this.state.creditNotes.length === 0 and !this.state.isLoadingList">
-                                            <tr>
-                                                <td colspan="5" class="text-center py-5 text-muted">
-                                                    <i class="fa fa-reply fs-1 mb-3 opacity-50"></i>
-                                                    <p class="mb-1 fw-bold fs-5 text-dark">No Credit Notes found.</p>
-                                                </td>
-                                            </tr>
-                                        </t>
+                                        <tr>
+                                            <td colspan="5" class="text-center py-5 text-muted">
+                                                <i class="fa fa-reply fs-1 mb-3 opacity-50"></i>
+                                                <p class="mb-1 fw-bold fs-5 text-dark">No Credit Notes found.</p>
+                                            </td>
+                                        </tr>
+                                    </t>
                                         <t t-foreach="this.state.creditNotes" t-as="cn" t-key="cn.id">
                                             <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewInvoice(cn)">
                                                 <td class="ps-4 fw-bold text-danger"><t t-esc="cn.display_name"/></td>
                                                 <td class="fw-bold"><t t-esc="cn.shop"/></td>
                                                 <td><t t-esc="cn.date"/></td>
                                                 <td class="text-end fw-bold">Rs. <t t-esc="cn.amount"/></td>
-                                                <td class="text-center pe-4">
+                                            <td class="text-center pe-4">
                                                     <span t-attf-class="badge text-white #{cn.status === 'Paid/Reconciled' ? 'bg-success' : cn.status === 'Posted' ? 'bg-info ' : cn.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary text-black'} px-2 py-1 shadow-sm">
-                                                        <t t-esc="cn.status"/>
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        </t>
-                                    </tbody>
-                                </table>
+                                                    <t t-esc="cn.status"/>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
                             </div>
 
                             <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
@@ -1475,113 +1475,113 @@
 
                                 <div class="table-responsive bg-white">
                                     <table class="table table-borderless table-striped align-middle mb-0">
-                                        <thead class="bg-light text-muted small text-uppercase fw-bold border-bottom">
-                                            <tr>
-                                                <th class="ps-4">Product Description</th>
-                                                <th class="text-center" style="width: 120px;">Quantity</th>
-                                                <th class="text-end" style="width: 150px;">Unit Price (Rs)</th>
-                                                <th class="text-center">Taxes</th>
-                                                <th class="text-end pe-4" style="width: 150px;">
-                                                    <t t-if="this.state.isEditingInvoice">Action</t>
-                                                    <t t-else="">Subtotal (Rs)</t>
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <!-- 1. EXPLICIT LOADING CHECK -->
-                                            <t t-if="this.state.isLoadingLines">
-                                                <tr>
-                                                    <td colspan="5" class="text-center text-muted py-4">
-                                                        <i class="fa fa-circle-o-notch fa-spin me-2"></i> Loading lines...
-                                                    </td>
-                                                </tr>
-                                            </t>
-                                            
-                                            <!-- 2. EXPLICIT EMPTY STATE CHECK -->
-                                            <t t-elif="this.state.selectedInvoiceLines.length === 0">
-                                                <tr>
-                                                    <td colspan="5" class="text-center text-muted py-4">
-                                                        <i class="fa fa-exclamation-circle me-2"></i> No products found on this document.
-                                                    </td>
-                                                </tr>
-                                            </t>
-                                            
-                                            <!-- 3. RENDER LINES IF LOADED AND NOT EMPTY -->
-                                            <t t-else="">
-                                                <t t-foreach="this.state.selectedInvoiceLines" t-as="line" t-key="line.id">
-                                                    <tr>
-                                                        <td class="ps-4 fw-bold text-dark">
-                                                            <t t-if="this.state.isEditingInvoice">
-                                                                <select class="form-select form-select-sm shadow-sm" t-model="line.product_id">
-                                                                    <option value="">Select Product...</option>
-                                                                    <t t-foreach="this.state.products" t-as="p" t-key="p.id">
-                                                                        <option t-att-value="p.id">
-                                                                            <t t-esc="p.name"/>
-                                                                        </option>
-                                                                    </t>
-                                                                </select>
-                                                            </t>
-                                                            <t t-else="">
-                                                                <t t-esc="line.product"/>
-                                                            </t>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <t t-if="this.state.isEditingInvoice">
-                                                                <input type="number" class="form-control form-control-sm text-center mx-auto shadow-sm" style="width: 100px;" t-model="line.qty"/>
-                                                            </t>
-                                                            <t t-else="">
-                                                                <t t-esc="line.qty"/>
-                                                            </t>
-                                                        </td>
-                                                        <td class="text-end">
-                                                            <t t-if="this.state.isEditingInvoice">
-                                                                <input type="number" step="any" class="form-control form-control-sm text-end ms-auto shadow-sm" style="width: 120px;" t-model="line.price"/>
-                                                            </t>
-                                                            <t t-else="">
-                                                                <t t-esc="line.price"/>
-                                                            </t>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <t t-if="this.state.isEditingInvoice">
-                                                                <select class="form-select form-select-sm" t-model="line.tax_id">
-                                                                    <option value="">None</option>
-                                                                    <t t-foreach="this.state.availableTaxes" t-as="tax" t-key="tax.id">
-                                                                        <option t-att-value="tax.id">
-                                                                            <t t-esc="tax.name"/>
-                                                                        </option>
-                                                                    </t>
-                                                                </select>
-                                                            </t>
-                                                            <t t-else="">
-                                                                <span class="badge bg-light border text-dark">
-                                                                    <t t-esc="line.taxes"/>
-                                                                </span>
-                                                            </t>
-                                                        </td>
-                                                        <td class="text-end pe-4 fw-bold text-dark">
-                                                            <t t-if="this.state.isEditingInvoice">
-                                                                <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.removeLine(line.id)" title="Remove Product">
-                                                                    <i class="fa fa-trash"></i>
-                                                                </button>
-                                                            </t>
-                                                            <t t-else="">
-                                                                <t t-esc="line.subtotal"/>
-                                                            </t>
-                                                        </td>
-                                                    </tr>
-                                                </t>
-                                            </t>
-                                            
-                                            <!-- 4. RENDER ADD ROW BUTTON DURING EDIT MODE -->
-                                            <tr t-if="this.state.isEditingInvoice">
-                                                <td colspan="5" class="ps-4 py-3">
-                                                    <button class="btn btn-sm btn-outline-primary fw-bold" t-on-click="addLine">
-                                                        <i class="fa fa-plus me-1"></i> Add Product
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+    <thead class="bg-light text-muted small text-uppercase fw-bold border-bottom">
+        <tr>
+            <th class="ps-4">Product Description</th>
+            <th class="text-center" style="width: 120px;">Quantity</th>
+            <th class="text-end" style="width: 150px;">Unit Price (Rs)</th>
+            <th class="text-center">Taxes</th>
+            <th class="text-end pe-4" style="width: 150px;">
+                <t t-if="this.state.isEditingInvoice">Action</t>
+                <t t-else="">Subtotal (Rs)</t>
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- 1. EXPLICIT LOADING CHECK -->
+        <t t-if="this.state.isLoadingLines">
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    <i class="fa fa-circle-o-notch fa-spin me-2"></i> Loading lines...
+                </td>
+            </tr>
+        </t>
+        
+        <!-- 2. EXPLICIT EMPTY STATE CHECK -->
+        <t t-elif="this.state.selectedInvoiceLines.length === 0">
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    <i class="fa fa-exclamation-circle me-2"></i> No products found on this document.
+                </td>
+            </tr>
+        </t>
+        
+        <!-- 3. RENDER LINES IF LOADED AND NOT EMPTY -->
+        <t t-else="">
+            <t t-foreach="this.state.selectedInvoiceLines" t-as="line" t-key="line.id">
+                <tr>
+                    <td class="ps-4 fw-bold text-dark">
+                        <t t-if="this.state.isEditingInvoice">
+                            <select class="form-select form-select-sm shadow-sm" t-model="line.product_id">
+                                <option value="">Select Product...</option>
+                                <t t-foreach="this.state.products" t-as="p" t-key="p.id">
+                                    <option t-att-value="p.id">
+                                        <t t-esc="p.name"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </t>
+                        <t t-else="">
+                            <t t-esc="line.product"/>
+                        </t>
+                    </td>
+                    <td class="text-center">
+                        <t t-if="this.state.isEditingInvoice">
+                            <input type="number" class="form-control form-control-sm text-center mx-auto shadow-sm" style="width: 100px;" t-model="line.qty"/>
+                        </t>
+                        <t t-else="">
+                            <t t-esc="line.qty"/>
+                        </t>
+                    </td>
+                    <td class="text-end">
+                        <t t-if="this.state.isEditingInvoice">
+                            <input type="number" step="any" class="form-control form-control-sm text-end ms-auto shadow-sm" style="width: 120px;" t-model="line.price"/>
+                        </t>
+                        <t t-else="">
+                            <t t-esc="line.price"/>
+                        </t>
+                    </td>
+                    <td class="text-center">
+                        <t t-if="this.state.isEditingInvoice">
+                            <select class="form-select form-select-sm" t-model="line.tax_id">
+                                <option value="">None</option>
+                                <t t-foreach="this.state.availableTaxes" t-as="tax" t-key="tax.id">
+                                    <option t-att-value="tax.id">
+                                        <t t-esc="tax.name"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </t>
+                        <t t-else="">
+                            <span class="badge bg-light border text-dark">
+                                <t t-esc="line.taxes"/>
+                            </span>
+                        </t>
+                    </td>
+                    <td class="text-end pe-4 fw-bold text-dark">
+                        <t t-if="this.state.isEditingInvoice">
+                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.removeLine(line.id)" title="Remove Product">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </t>
+                        <t t-else="">
+                            <t t-esc="line.subtotal"/>
+                        </t>
+                    </td>
+                </tr>
+            </t>
+        </t>
+        
+        <!-- 4. RENDER ADD ROW BUTTON DURING EDIT MODE -->
+        <tr t-if="this.state.isEditingInvoice">
+            <td colspan="5" class="ps-4 py-3">
+                <button class="btn btn-sm btn-outline-primary fw-bold" t-on-click="addLine">
+                    <i class="fa fa-plus me-1"></i> Add Product
+                </button>
+            </td>
+        </tr>
+    </tbody>
+</table>
                                 </div>
 
                                 <div class="p-4 bg-light text-end border-top">
@@ -1641,7 +1641,7 @@
                                             <input type="date" class="form-control" t-model="this.state.paymentForm.date"/>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="mb-3 mt-2">
                                         <label class="small fw-bold">Payment Method</label>
                                         <select class="form-select form-control" t-model="this.state.paymentForm.method">
@@ -1680,7 +1680,7 @@
                                             </t>
                                         </select>
                                     </div>
-                                    
+
                                     <div class="mb-4">
                                         <label class="small fw-bold">Payment Notes</label>
                                         <textarea class="form-control" rows="2" t-model="this.state.paymentForm.notes" placeholder="Optional notes..."></textarea>
@@ -1697,10 +1697,10 @@
                                 </div>
                             </div>
                         </t>
+                        </t>
                     </t>
                 </t>
-            </t>
-            
+
             <!-- 4. Credit Risk Control Tab (Merged with Shop Balances) -->
             <t t-if="this.state.activeSubTab === 'credit'">
                 <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -1728,8 +1728,8 @@
                             <option value="Exceeded">Exceeded</option>
                             <option value="Cash">Cash Only</option>
                         </select>
-                    </div>
-                </div>
+                            </div>
+                        </div>
 
                 <!-- Sub-view A: Risk Monitor -->
                 <t t-if="this.state.creditSubView === 'risk'">
@@ -1811,27 +1811,27 @@
                                     <div class="col-md-6 border-end">
                                         <label class="small fw-bold text-muted">Shop Owner</label>
                                         <h5 class="text-dark fw-bold mb-0"><t t-esc="this.state.selectedShopBalance.owner"/></h5>
-                                    </div>
+                                </div>
                                     <div class="col-md-6 ps-4">
                                         <label class="small fw-bold text-muted">Current Outstanding</label>
                                         <h3 class="text-danger fw-bold mb-0">Rs. <t t-esc="this.state.selectedShopBalance.outstanding"/></h3>
                                     </div>
-                                </div>
+                                    </div>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <label class="small fw-bold text-dark mb-2">Approved Credit Limit (Rs.)</label>
                                         <div class="input-group input-group-lg shadow-sm">
                                             <span class="input-group-text bg-white border-end-0 fw-bold text-muted">Rs.</span>
                                             <input type="number" class="form-control border-start-0 fw-bold" t-model="this.state.selectedShopBalance.rawLimit"/>
-                                        </div>
+                                    </div>
                                     </div>
                                     <div class="col-md-12 mt-4 text-end">
                                         <button class="btn btn-dark fw-bold text-white px-5 shadow-sm" t-on-click="saveShopBalanceLimit"><i class="fa fa-save me-1"></i> Save Credit Limit</button>
-                                    </div>
-                                </div>
+                                        </div>
+                                        </div>
                             </div>
-                        </div>
-                    </t>
+                                        </div>
+                                    </t>
                 </t>
 
                 <!-- Universal Pagination Footer for Credit Control -->
@@ -1842,8 +1842,8 @@
                         <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.credits.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.credits.total / this.state.pagination.credits.limit))"/></button>
                         <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('credits', 1)" t-att-disabled="this.state.pagination.credits.page &gt;= Math.ceil(this.state.pagination.credits.total / this.state.pagination.credits.limit)">Next</button>
                     </div>
-                </div>
-            </t>
+                                        </div>
+                                    </t>
 
             <!-- 5. Tax Ledger Dashboard Tab -->
             <t t-if="this.state.activeSubTab === 'tax_ledger'">
@@ -1873,7 +1873,7 @@
                             <i class="fa fa-file-text-o me-1"></i> Open Taxed Documents
                         </button>
                     </div>
-                </div>
+                                    </div>
 
                 <!-- KPI Cards -->
                 <div class="p-4 bg-light">
@@ -1887,14 +1887,14 @@
                                         <div>
                                             <span class="fw-bold text-muted text-uppercase tracking-wider small d-block mb-1">Tax on Invoices</span>
                                             <h3 class="fw-bold text-dark mb-0">Rs. <t t-esc="this.state.taxLedger.stats.amount_tax_invoiced ? this.state.taxLedger.stats.amount_tax_invoiced.toLocaleString(undefined, {minimumFractionDigits: 2}) : '0.00'"/></h3>
-                                        </div>
+                                    </div>
                                         <div class="text-white rounded-circle d-flex align-items-center justify-content-center bg-primary bg-opacity-10 shadow-sm" style="width: 45px; height: 45px;">
                                             <i class="fa fa-arrow-up fs-5"></i>
-                                        </div>
-                                    </div>
+                                </div>
+                            </div>
                                     <div class="pt-2 border-top mt-3">
                                         <small class="text-muted">Tax charged to shops in the period.</small>
-                                    </div>
+                        </div>
                                 </div>
                             </div>
                         </div>
@@ -1908,7 +1908,7 @@
                                         <div>
                                             <span class="fw-bold text-muted text-uppercase tracking-wider small d-block mb-1">Tax on Credit Notes</span>
                                             <h3 class="fw-bold text-danger mb-0">Rs. <t t-esc="this.state.taxLedger.stats.amount_tax_credited ? this.state.taxLedger.stats.amount_tax_credited.toLocaleString(undefined, {minimumFractionDigits: 2}) : '0.00'"/></h3>
-                                        </div>
+                            </div>
                                         <div class="text-white rounded-circle d-flex align-items-center justify-content-center bg-danger bg-opacity-10 shadow-sm" style="width: 45px; height: 45px;">
                                             <i class="fa fa-arrow-down fs-5"></i>
                                         </div>
@@ -2118,11 +2118,11 @@
                                                 <td class="text-end fw-bold text-dark">Rs. <t t-esc="exp.amount"/></td>
                                                 <td class="text-center pe-4">
                                                     <span t-attf-class="badge #{exp.state === 'posted' ? 'bg-success' : exp.state === 'draft' ? 'bg-info text-dark' : 'bg-danger'} text-white px-2 py-1 shadow-sm text-capitalize"><t t-esc="exp.state"/></span>
-                                                </td>
-                                            </tr>
-                                        </t>
-                                    </tbody>
-                                </table>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
                             </div>
                             <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
                                 <small class="text-muted fw-bold">Showing <t t-esc="this.state.pagination.expenses.total === 0 ? 0 : ((this.state.pagination.expenses.page - 1) * this.state.pagination.expenses.limit) + 1"/> to <t t-esc="Math.min(this.state.pagination.expenses.page * this.state.pagination.expenses.limit, this.state.pagination.expenses.total)"/> of <t t-esc="this.state.pagination.expenses.total"/></small>
@@ -2180,14 +2180,14 @@
                                             <div class="small text-muted fw-bold text-uppercase mb-1">Paid To</div>
                                             <div class="fw-bold text-dark fs-6"><t t-esc="this.state.selectedExpense.partner"/></div>
                                         </div>
-                                        <div class="col-md-6">
+                                    <div class="col-md-6">
                                             <div class="small text-muted fw-bold text-uppercase mb-1">Description</div>
                                             <div class="text-dark fs-6"><t t-esc="this.state.selectedExpense.description"/></div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="small text-muted fw-bold text-uppercase mb-1">Amount</div>
                                             <div class="text-danger fw-bold fs-4">Rs. <t t-esc="this.state.selectedExpense.amount"/></div>
-                                        </div>
+                                    </div>
                                         <div class="col-12 mt-3 pt-3 border-top">
                                             <div class="small text-muted fw-bold text-uppercase mb-2">Notes</div>
                                             <div class="bg-light p-3 rounded text-dark" style="min-height: 80px;"><t t-esc="this.state.selectedExpense.notes"/></div>
@@ -2267,8 +2267,8 @@
                             </div>
                             <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="() => this.openCategoryForm()">
                                 <i class="fa fa-plus me-1"></i> New Category
-                            </button>
-                        </div>
+                                        </button>
+                                    </div>
                         <div class="position-relative">
                             <t t-if="this.state.isLoadingList">
                                 <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;"><div class="spinner-border text-primary" role="status"></div></div>
@@ -2338,8 +2338,8 @@
                                 </div>
                             </div>
                         </div>
-                    </t>
                 </t>
+            </t>
             </t>
 
             <!-- 7. Profit & Loss Dashboard Tab -->
@@ -2351,7 +2351,7 @@
                         <small class="text-muted">Analyzes invoiced sales vs product cost over your selected period.</small>
                     </div>
                     <div class="d-flex align-items-center gap-2 bg-white p-2 rounded-3 shadow-sm border">
-                      <span class="text-muted fw-bold small text-uppercase ms-1">Period:</span>
+                        <span class="text-muted fw-bold small text-uppercase ms-1">Period:</span>
                         <input type="date" class="form-control form-control-sm border-0 bg-light" style="width: 140px;" t-model="this.state.pnl.date_from" t-att-max="this.todayStr"/>
                         <span class="text-muted small">to</span>
                         <input type="date" class="form-control form-control-sm border-0 bg-light" style="width: 140px;" t-model="this.state.pnl.date_to" t-att-max="this.todayStr"/>
@@ -2524,9 +2524,9 @@
                                     <h4 class="fw-bold text-danger mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_shop_outstanding ? this.state.pnl.stats.amount_shop_outstanding.toLocaleString() : '0'"/></h4>
                                     <div class="pt-2 border-top mt-3">
                                         <small class="text-muted mb-1">Total Outstanding Amount from Shops</small>
-                                    </div>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
 
@@ -2654,12 +2654,12 @@
                         
                         <!-- Modal Header -->
                         <div class="d-flex justify-content-between align-items-center p-4 bg-light border-bottom">
-                            <div>
+                    <div>
                                 <h5 class="fw-bold text-dark mb-1">
                                     <i class="fa fa-book text-primary me-2"></i> Journal Entry
                                 </h5>
                                 <small class="text-muted">Detailed view of the double-entry accounting record.</small>
-                            </div>
+                    </div>
                             <span t-attf-class="badge #{this.state.selectedExpenseMove.state === 'Posted' ? 'bg-success' : 'bg-secondary'} text-white px-3 py-2 shadow-sm fs-6">
                                 <t t-esc="this.state.selectedExpenseMove.state"/>
                             </span>
@@ -2685,8 +2685,8 @@
                                         <span class="text-muted fw-bold small d-block text-uppercase mb-1">Accounting Date</span>
                                         <span class="fw-bold text-dark"><t t-esc="this.state.selectedExpenseMove.date"/></span>
                                     </div>
-                                </div>
-                            </div>
+                    </div>
+                </div>
 
                             <h6 class="fw-bold text-dark mb-3">Journal Items (Debits &amp; Credits)</h6>
                             <div class="table-responsive border rounded-3 shadow-sm bg-white">
@@ -2697,9 +2697,9 @@
                                             <th>Label / Description</th>
                                             <th class="text-end text-success">Debit</th>
                                             <th class="text-end pe-4 text-danger">Credit</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                            </tr>
+                        </thead>
+                        <tbody>
                                         <t t-foreach="this.state.selectedExpenseMove.lines" t-as="line" t-key="line.id">
                                             <tr>
                                                 <td class="ps-4 fw-bold text-dark"><t t-esc="line.account"/></td>
@@ -2707,15 +2707,15 @@
                                                 <td class="text-end fw-bold text-dark">
                                                     <t t-if="line.debit > 0">Rs. <t t-esc="line.debit.toLocaleString(undefined, {minimumFractionDigits: 2})"/></t>
                                                     <t t-else="">-</t>
-                                                </td>
+                                    </td>
                                                 <td class="text-end pe-4 fw-bold text-dark">
                                                     <t t-if="line.credit > 0">Rs. <t t-esc="line.credit.toLocaleString(undefined, {minimumFractionDigits: 2})"/></t>
                                                     <t t-else="">-</t>
-                                                </td>
-                                            </tr>
-                                        </t>
-                                    </tbody>
-                                </table>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
                             </div>
                         </div>
 

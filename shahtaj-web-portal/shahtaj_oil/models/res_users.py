@@ -359,6 +359,23 @@ class ResUsers(models.Model):
                     desired.add(cmd[1])
                 elif cmd[0] == 3:
                     desired.discard(cmd[1])
+            # native_apps implies Purchase, but existing users are not rewritten
+            # when native_apps is already assigned — add/remove Purchase here.
+            purchase_manager = self.env.ref(
+                'purchase.group_purchase_manager',
+                raise_if_not_found=False,
+            )
+            purchase_user = self.env.ref(
+                'purchase.group_purchase_user',
+                raise_if_not_found=False,
+            )
+            purchase_ids = {
+                group.id for group in (purchase_manager, purchase_user) if group
+            }
+            if native_apps_group.id in desired:
+                desired.update(purchase_ids)
+            elif is_distributor:
+                desired.difference_update(purchase_ids)
             if desired != group_ids:
                 user.with_context(shahtaj_skip_ui_sync=True).write({
                     'group_ids': [(6, 0, list(desired))],

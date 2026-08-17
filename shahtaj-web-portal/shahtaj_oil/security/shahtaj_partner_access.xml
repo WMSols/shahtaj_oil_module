@@ -24,6 +24,18 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!-- Native Purchase users: manufacturer / vendor contacts for POs -->
+        <record id="rule_shahtaj_distributor_vendor_read" model="ir.rule">
+            <field name="name">Distributor: read vendor contacts</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="domain_force">[('supplier_rank', '>', 0)]</field>
+            <field name="groups" eval="[(4, ref('purchase.group_purchase_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 
 </odoo>

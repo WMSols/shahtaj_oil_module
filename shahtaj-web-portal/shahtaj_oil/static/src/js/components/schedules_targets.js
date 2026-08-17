@@ -2,11 +2,13 @@
 
 import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { ConfirmModal } from "./confirm_modal";
 
 export class SchedulesTargets extends Component {
     static props = {
         requestedSubTab: { type: String, optional: true },
     };
+    static components = { ConfirmModal };
 
     setup() {
         this.orm = useService("orm");
@@ -30,6 +32,22 @@ export class SchedulesTargets extends Component {
             deleteType: null, // 'schedule' or 'target'
             deleteId: null,
             deleteTitle: '',
+
+            confirmModal: {
+                isOpen: false,
+                title: '',
+                message: '',
+                onConfirm: () => {},
+            },
+
+            showEditShopsModal: false,
+            editShopsTab: 'assigned',
+            editShopsSearchQuery: '',
+            editShopSelectedIds: {},
+            tableEditShopsAssigned: [],
+            tableEditShopsCandidates: [],
+            isLoadingEditShops: false,
+            isAddingEditShops: false,
 
             // Form Data
             scheduleForm: {
@@ -57,7 +75,9 @@ export class SchedulesTargets extends Component {
             searchTimeout: null,
             tableBookers: [],
             pagination: {
-                bookers: { page: 1, limit: ITEMS_PER_PAGE, total: 0 }
+                bookers: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                editShopsAssigned: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                editShopsAdd: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
             },
             filters: {
                 bookers: { search: '' }
@@ -77,6 +97,7 @@ export class SchedulesTargets extends Component {
             };
         };
         this.debouncedFetchBookers = this.debounceSearch(() => this.fetchBookersList(), 400);
+        this.debouncedFetchEditShops = this.debounceSearch(() => this.fetchEditShopsList(), 400);
 
         onWillStart(async () => {
             await this._loadDropdownOptions();
@@ -165,6 +186,7 @@ export class SchedulesTargets extends Component {
         this.state.errorMessage = '';
         this.state.editingScheduleId = null;
         this.state.editingTargetId = null;
+        this.closeEditShopsModal();
     }
 
 
@@ -324,6 +346,7 @@ export class SchedulesTargets extends Component {
         this.state.editingTargetId = null;
         this.state.schedules = [];
         this.state.targets = [];
+        this.closeEditShopsModal();
     }
 
     async openBookerDetails(booker) {
@@ -352,6 +375,7 @@ export class SchedulesTargets extends Component {
         this.state.editingTargetId = null;
         this.state.schedules = [];
         this.state.targets = [];
+        this.closeEditShopsModal();
     }
 
     openForm() {
@@ -359,6 +383,7 @@ export class SchedulesTargets extends Component {
         this.state.errorMessage = '';
         this.state.editingScheduleId = null;
         this.state.editingTargetId = null;
+        this.closeEditShopsModal();
         this.state.scheduleForm = {
             day: '', route_id: '', zone_name: '', is_active: true, operational_shop_count: null,
         };
@@ -368,6 +393,11 @@ export class SchedulesTargets extends Component {
             target_weight_uom: 'kg',
             lines: [],
         };
+    }
+
+    cancelScheduleForm() {
+        this.state.showForm = false;
+        this.closeEditShopsModal();
     }
 
     // ─── Editing ─────────────────────────────────────────────────────────────────
@@ -389,6 +419,7 @@ export class SchedulesTargets extends Component {
         };
         this.state.editingScheduleId = sched.id;
         this.state.showForm = true;
+        this.closeEditShopsModal();
         if (sched.route_id) {
             this.refreshScheduleRouteShopCount(parseInt(sched.route_id));
         }
@@ -410,7 +441,252 @@ export class SchedulesTargets extends Component {
 
     onScheduleRouteChange(ev) {
         const routeId = parseInt(ev.target.value, 10);
+        this.closeEditShopsModal();
         this.refreshScheduleRouteShopCount(Number.isNaN(routeId) ? null : routeId);
+    }
+
+    get selectedScheduleRoute() {
+        const routeId = parseInt(this.state.scheduleForm.route_id, 10);
+        if (Number.isNaN(routeId)) {
+            return null;
+        }
+        return (this.state.routes || []).find((route) => route.id === routeId) || null;
+    }
+
+    get editShopSelectedCount() {
+        return Object.keys(this.state.editShopSelectedIds || {}).filter(
+            (id) => this.state.editShopSelectedIds[id],
+        ).length;
+    }
+
+    get isAllEditShopAddPageSelected() {
+        const rows = this.state.tableEditShopsCandidates || [];
+        if (!rows.length) {
+            return false;
+        }
+        return rows.every((shop) => this.state.editShopSelectedIds[shop.id]);
+    }
+
+    _editShopsRouteId() {
+        const routeId = parseInt(this.state.scheduleForm.route_id, 10);
+        return Number.isNaN(routeId) ? null : routeId;
+    }
+
+    closeConfirm() {
+        this.state.confirmModal = {
+            isOpen: false,
+            title: '',
+            message: '',
+            onConfirm: () => {},
+        };
+    }
+
+    closeEditShopsModal() {
+        this.state.showEditShopsModal = false;
+        this.state.editShopsTab = 'assigned';
+        this.state.editShopsSearchQuery = '';
+        this.state.editShopSelectedIds = {};
+        this.state.tableEditShopsAssigned = [];
+        this.state.tableEditShopsCandidates = [];
+        this.state.isLoadingEditShops = false;
+        this.state.isAddingEditShops = false;
+        this.state.pagination.editShopsAssigned.page = 1;
+        this.state.pagination.editShopsAssigned.total = 0;
+        this.state.pagination.editShopsAdd.page = 1;
+        this.state.pagination.editShopsAdd.total = 0;
+        if (this.state.confirmModal.isOpen) {
+            this.closeConfirm();
+        }
+    }
+
+    openEditShopsModal() {
+        const routeId = this._editShopsRouteId();
+        if (!routeId) {
+            this.notification.add("Select a route first.", { type: "warning" });
+            return;
+        }
+        this.state.showEditShopsModal = true;
+        this.state.editShopsTab = 'assigned';
+        this.state.editShopsSearchQuery = '';
+        this.state.editShopSelectedIds = {};
+        this.state.pagination.editShopsAssigned.page = 1;
+        this.state.pagination.editShopsAdd.page = 1;
+        this.fetchEditShopsList();
+    }
+
+    setEditShopsTab(tab) {
+        this.state.editShopsTab = tab;
+        this.state.editShopsSearchQuery = '';
+        this.state.editShopSelectedIds = {};
+        this.state.pagination.editShopsAssigned.page = 1;
+        this.state.pagination.editShopsAdd.page = 1;
+        this.fetchEditShopsList();
+    }
+
+    onEditShopsSearchInput() {
+        this.state.pagination.editShopsAssigned.page = 1;
+        this.state.pagination.editShopsAdd.page = 1;
+        this.debouncedFetchEditShops();
+    }
+
+    changeEditShopsPage(direction) {
+        const pag = this.state.editShopsTab === 'add'
+            ? this.state.pagination.editShopsAdd
+            : this.state.pagination.editShopsAssigned;
+        const newPage = pag.page + direction;
+        const maxPage = Math.max(1, Math.ceil(pag.total / pag.limit));
+        if (newPage >= 1 && newPage <= maxPage) {
+            pag.page = newPage;
+            this.fetchEditShopsList();
+        }
+    }
+
+    async fetchEditShopsList() {
+        const routeId = this._editShopsRouteId();
+        if (!routeId || !this.state.showEditShopsModal) {
+            return;
+        }
+        this.state.isLoadingEditShops = true;
+        try {
+            const isAdd = this.state.editShopsTab === 'add';
+            const pag = isAdd
+                ? this.state.pagination.editShopsAdd
+                : this.state.pagination.editShopsAssigned;
+            const domain = [
+                ['is_shahtaj_shop', '=', true],
+                ['active', '=', true],
+                ['shop_approval_state', '=', 'approved'],
+                ['route_ids', isAdd ? 'not in' : 'in', [routeId]],
+            ];
+            if (this.state.editShopsSearchQuery) {
+                domain.push(
+                    '|',
+                    ['name', 'ilike', this.state.editShopsSearchQuery],
+                    ['owner_name', 'ilike', this.state.editShopsSearchQuery],
+                );
+            }
+            const [total, records] = await Promise.all([
+                this.orm.searchCount('res.partner', domain),
+                this.orm.searchRead(
+                    'res.partner',
+                    domain,
+                    ['id', 'name', 'owner_name'],
+                    {
+                        limit: pag.limit,
+                        offset: (pag.page - 1) * pag.limit,
+                        order: 'name asc',
+                    },
+                ),
+            ]);
+            pag.total = total;
+            if (isAdd) {
+                this.state.tableEditShopsCandidates = records;
+            } else {
+                this.state.tableEditShopsAssigned = records;
+            }
+        } catch (error) {
+            this.notification.add(
+                "Failed to load shops: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isLoadingEditShops = false;
+        }
+    }
+
+    toggleEditShopSelection(shopId) {
+        const next = { ...this.state.editShopSelectedIds };
+        if (next[shopId]) {
+            delete next[shopId];
+        } else {
+            next[shopId] = true;
+        }
+        this.state.editShopSelectedIds = next;
+    }
+
+    toggleSelectAllEditShopAddPage(ev) {
+        const selectAll = ev.target.checked;
+        const next = { ...this.state.editShopSelectedIds };
+        for (const shop of this.state.tableEditShopsCandidates) {
+            if (selectAll) {
+                next[shop.id] = true;
+            } else {
+                delete next[shop.id];
+            }
+        }
+        this.state.editShopSelectedIds = next;
+    }
+
+    async confirmAddSelectedEditShops() {
+        const routeId = this._editShopsRouteId();
+        const shopIds = Object.keys(this.state.editShopSelectedIds)
+            .filter((id) => this.state.editShopSelectedIds[id])
+            .map((id) => parseInt(id, 10));
+        if (!routeId || !shopIds.length) {
+            this.notification.add("Select at least one shop to add.", { type: "warning" });
+            return;
+        }
+        this.state.isAddingEditShops = true;
+        try {
+            await Promise.all(
+                shopIds.map((shopId) => this.orm.write('res.partner', [shopId], {
+                    route_ids: [[4, routeId]],
+                })),
+            );
+            this.notification.add(
+                `${shopIds.length} shop(s) added to this route.`,
+                { type: "success" },
+            );
+            this.state.editShopSelectedIds = {};
+            this.state.editShopsTab = 'assigned';
+            this.state.editShopsSearchQuery = '';
+            this.state.pagination.editShopsAssigned.page = 1;
+            this.state.pagination.editShopsAdd.page = 1;
+            await this.fetchEditShopsList();
+            await this.refreshScheduleRouteShopCount(routeId);
+            if (this.state.selectedBooker) {
+                await this._loadBookerSchedules(this.state.selectedBooker.id);
+            }
+        } catch (error) {
+            this.notification.add(
+                "Failed to add shops: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isAddingEditShops = false;
+        }
+    }
+
+    removeShopFromScheduleRoute(shop) {
+        const routeId = this._editShopsRouteId();
+        if (!shop || !routeId) {
+            return;
+        }
+        const routeName = (this.selectedScheduleRoute && this.selectedScheduleRoute.name) || 'this route';
+        this.state.confirmModal = {
+            isOpen: true,
+            title: 'Remove shop from route',
+            message: `Remove "${shop.name}" from ${routeName}? The shop stays on any other routes.`,
+            onConfirm: async () => {
+                this.closeConfirm();
+                try {
+                    await this.orm.write('res.partner', [shop.id], {
+                        route_ids: [[3, routeId]],
+                    });
+                    this.notification.add("Shop removed from this route.", { type: "success" });
+                    await this.fetchEditShopsList();
+                    await this.refreshScheduleRouteShopCount(routeId);
+                    if (this.state.selectedBooker) {
+                        await this._loadBookerSchedules(this.state.selectedBooker.id);
+                    }
+                } catch (error) {
+                    this.notification.add(
+                        "Failed to remove shop: " + (error.data?.message || error.message),
+                        { type: "danger" },
+                    );
+                }
+            },
+        };
     }
 
     editTarget(tgt) {
@@ -664,6 +940,7 @@ export class SchedulesTargets extends Component {
             }
 
             this.state.showForm = false;
+            this.closeEditShopsModal();
             await this._loadBookerSchedules(this.state.selectedBooker.id);
         } catch (error) {
             const msg = error.data?.message || error.message || 'Failed to save schedule.';
