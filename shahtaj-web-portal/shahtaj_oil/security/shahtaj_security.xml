@@ -18,8 +18,8 @@
     <record id="group_shahtaj_distributor_financial" model="res.groups">
         <field name="name">Distributor Financial Access</field>
         <field name="sequence">11</field>
-        <field name="privilege_id" ref="res_groups_privilege_shahtaj"/>
-        <field name="comment">Technical: invoices, payments, P&amp;L, bank/cash, and product pricing.</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Technical add-on (not a Shahtaj role): invoices, payments, P&amp;L, bank/cash, and product pricing. Must stack with Distributor — never share the Shahtaj privilege or Odoo 19 drops the Distributor role.</field>
     </record>
 
     <!-- Native Odoo apps (Sales, Inventory, Accounting, …) — only for native-UI distributors -->
@@ -33,7 +33,7 @@
             (4, ref('account.group_account_readonly')),
             (4, ref('purchase.group_purchase_manager')),
         ]"/>
-        <field name="comment">Technical: exposes standard Odoo application menus for native-UI distributors.</field>
+        <field name="comment">Technical: Purchase, Sales, Inventory, and invoicing ACLs for distributors with Financial Access (native and custom portal). Custom portal still hides native menus in the UI.</field>
     </record>
 
     <!-- Native Shahtaj menus (zones, routes, shops, …) — hidden when custom portal is enabled -->

@@ -132,6 +132,7 @@ def post_init_hook(env):
     _sync_distributor_booker_user_rule(env)
     _recompute_shahtaj_order_booker_flags(env)
     _enable_purchase_ok_on_storable_products(env)
+    env['res.users']._shahtaj_fix_financial_group_privilege()
     env['res.users']._sync_all_shahtaj_ui_groups()
     env['res.users']._clear_shahtaj_distributor_flags_on_non_distributors()
     env['res.users']._sync_all_shahtaj_financial_groups()

@@ -245,6 +245,13 @@ class ResUsers(models.Model):
             elif 'shahtaj_distributor_financial_access' not in vals:
                 # New distributors get financial access unless explicitly disabled.
                 vals['shahtaj_distributor_financial_access'] = True
+            if self._shahtaj_vals_include_group(
+                vals, 'shahtaj_oil.group_shahtaj_order_booker',
+            ):
+                vals['tz'] = 'Asia/Karachi'
+                pakistan = self.env.ref('base.pk', raise_if_not_found=False)
+                if pakistan:
+                    vals['country_id'] = pakistan.id
             prepared.append(vals)
         users = super().create(prepared)
         users._sync_shahtaj_ui_groups()
@@ -297,6 +304,25 @@ class ResUsers(models.Model):
             self._sync_shahtaj_financial_group()
         return res
 
+    def _shahtaj_write_group_ids(self, current_ids, desired_ids):
+        """Add/remove groups without replacing the full set.
+
+        A (6, 0, ids) write on res.users in Odoo 19 can drop the Distributor
+        role when another Shahtaj privilege group is present (Financial Access
+        used to share that privilege). Custom portal then fails the constraint
+        'Custom Distributor Portal can only be enabled for users with the
+        Distributor role.'
+        """
+        self.ensure_one()
+        to_add = desired_ids - current_ids
+        to_remove = current_ids - desired_ids
+        if not to_add and not to_remove:
+            return
+        commands = [(4, gid) for gid in to_add] + [(3, gid) for gid in to_remove]
+        self.with_context(shahtaj_skip_ui_sync=True).write({
+            'group_ids': commands,
+        })
+
     def _sync_shahtaj_ui_groups(self):
         """Assign technical UI groups from shahtaj_custom_frontend + distributor role."""
         custom_group = self.env.ref(
@@ -326,13 +352,13 @@ class ResUsers(models.Model):
                 commands = [
                     (4, custom_group.id),
                     (3, native_ui_group.id),
-                    (3, native_apps_group.id),
                 ]
             elif is_distributor:
                 commands = [
                     (3, custom_group.id),
                     (4, native_ui_group.id),
                 ]
+            if is_distributor:
                 if has_financial:
                     commands.append((4, native_apps_group.id))
                 else:
@@ -359,27 +385,26 @@ class ResUsers(models.Model):
                     desired.add(cmd[1])
                 elif cmd[0] == 3:
                     desired.discard(cmd[1])
-            # native_apps implies Purchase, but existing users are not rewritten
-            # when native_apps is already assigned — add/remove Purchase here.
-            purchase_manager = self.env.ref(
-                'purchase.group_purchase_manager',
-                raise_if_not_found=False,
-            )
-            purchase_user = self.env.ref(
-                'purchase.group_purchase_user',
-                raise_if_not_found=False,
-            )
-            purchase_ids = {
-                group.id for group in (purchase_manager, purchase_user) if group
+            # native_apps = Purchase / Sales / Inventory / invoicing ACLs.
+            # Financial ON → every distributor (native + custom portal).
+            # Financial OFF → strip those app groups (never strip Internal User
+            # or the Shahtaj Distributor role).
+            user_group = self.env.ref('base.group_user', raise_if_not_found=False)
+            protected = {
+                dist_group.id,
+                custom_group.id,
+                native_ui_group.id,
             }
+            if user_group:
+                protected.add(user_group.id)
+            app_ids = set(native_apps_group.all_implied_ids.ids)
+            app_ids.add(native_apps_group.id)
+            app_ids -= protected
             if native_apps_group.id in desired:
-                desired.update(purchase_ids)
+                desired.update(app_ids)
             elif is_distributor:
-                desired.difference_update(purchase_ids)
-            if desired != group_ids:
-                user.with_context(shahtaj_skip_ui_sync=True).write({
-                    'group_ids': [(6, 0, list(desired))],
-                })
+                desired.difference_update(app_ids)
+            user._shahtaj_write_group_ids(group_ids, desired)
 
     def _sync_shahtaj_financial_group(self):
         """Assign financial security group from the per-user toggle."""
@@ -404,10 +429,17 @@ class ResUsers(models.Model):
                 desired.add(financial_group.id)
             else:
                 desired.discard(financial_group.id)
-            if desired != group_ids:
-                user.with_context(shahtaj_skip_ui_sync=True).write({
-                    'group_ids': [(6, 0, list(desired))],
-                })
+            user._shahtaj_write_group_ids(group_ids, desired)
+
+    @api.model
+    def _shahtaj_fix_financial_group_privilege(self):
+        """Financial Access must not share the Shahtaj role privilege."""
+        group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_distributor_financial',
+            raise_if_not_found=False,
+        )
+        if group and group.privilege_id:
+            group.sudo().write({'privilege_id': False})
 
     @api.model
     def _sync_all_shahtaj_ui_groups(self):

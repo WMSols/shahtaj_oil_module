@@ -43,6 +43,8 @@ class ShahtajCreateOrderBookerWizard(models.TransientModel):
             # Distributor-only options — never apply to order bookers.
             'shahtaj_custom_frontend': False,
             'shahtaj_distributor_financial_access': False,
+            'tz': 'Asia/Karachi',
+            'country_id': self.env.ref('base.pk').id,
         })
         self.env['shahtaj.activity.log'].log_business(
             operation='order_booker.create',
