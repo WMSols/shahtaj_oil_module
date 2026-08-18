@@ -5,7 +5,7 @@ from odoo import SUPERUSER_ID, api
 
 # Keep in sync with security/shahtaj_partner_access_upgrade.xml
 _DISTRIBUTOR_PARTNER_READ_DOMAIN = """[
-    '|', '|', '|', '|', '|', '|', '|',
+    '|', '|', '|', '|', '|', '|', '|', '|',
     ('is_shahtaj_shop', '=', True),
     ('parent_id.is_shahtaj_shop', '=', True),
     ('commercial_partner_id.is_shahtaj_shop', '=', True),
@@ -14,6 +14,7 @@ _DISTRIBUTOR_PARTNER_READ_DOMAIN = """[
     ('id', '=', user.company_id.partner_id.id),
     ('customer_rank', '>', 0),
     ('user_ids.shahtaj_is_order_booker', '=', True),
+    ('supplier_rank', '>', 0),
 ]"""
 
 
@@ -74,20 +75,37 @@ def _sync_distributor_partner_rules(env):
         'shahtaj_oil.rule_shahtaj_distributor_partner_read',
         raise_if_not_found=False,
     )
-    if not read_rule:
-        return
-
     distributor_group = env.ref('shahtaj_oil.group_shahtaj_distributor')
-    read_rule.write({
-        'name': 'Distributor: read shops and staff contacts',
-        'domain_force': _DISTRIBUTOR_PARTNER_READ_DOMAIN,
-        'groups': [(6, 0, [distributor_group.id])],
-        'perm_read': True,
-        'perm_write': False,
-        'perm_create': False,
-        'perm_unlink': False,
-        'active': True,
-    })
+    if read_rule:
+        read_rule.write({
+            'name': 'Distributor: read shops and staff contacts',
+            'domain_force': _DISTRIBUTOR_PARTNER_READ_DOMAIN,
+            'groups': [(6, 0, [distributor_group.id])],
+            'perm_read': True,
+            'perm_write': False,
+            'perm_create': False,
+            'perm_unlink': False,
+            'active': True,
+        })
+
+    # Never attach this to purchase.group_purchase_user: Odoo puts Administrator
+    # (uid=2) in Purchase Manager, and a vendor-only partner rule then blocks
+    # reading their own user (res.users inherits res.partner).
+    vendor_rule = env.ref(
+        'shahtaj_oil.rule_shahtaj_distributor_vendor_read',
+        raise_if_not_found=False,
+    )
+    if vendor_rule:
+        vendor_rule.write({
+            'name': 'Distributor: read vendor contacts',
+            'domain_force': "[('supplier_rank', '>', 0)]",
+            'groups': [(6, 0, [distributor_group.id])],
+            'perm_read': True,
+            'perm_write': False,
+            'perm_create': False,
+            'perm_unlink': False,
+            'active': True,
+        })
 
 
 def _enable_purchase_ok_on_storable_products(env):

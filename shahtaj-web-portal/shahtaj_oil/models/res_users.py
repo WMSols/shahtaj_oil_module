@@ -629,7 +629,9 @@ class ResUsers(models.Model):
         from odoo.addons.shahtaj_oil.hooks import (
             _recompute_shahtaj_order_booker_flags,
             _sync_distributor_booker_user_rule,
+            _sync_distributor_partner_rules,
         )
+        _sync_distributor_partner_rules(self.env)
         _sync_distributor_booker_user_rule(self.env)
         _recompute_shahtaj_order_booker_flags(self.env)
 

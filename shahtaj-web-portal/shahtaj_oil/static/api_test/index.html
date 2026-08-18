@@ -87,6 +87,9 @@
           <label>Owner CNIC number (required on verify)
             <input id="inp-verify-cnic" type="text" placeholder="e.g. 35202-1234567-1" value="35202-1234567-1"/>
           </label>
+          <label>License number (optional)
+            <input id="inp-verify-license" type="text" placeholder="e.g. TRADE-12345"/>
+          </label>
         </div>
         <div class="actions-row">
           <button id="btn-use-shop-gps" class="ghost sm">Copy shop GPS</button>
@@ -107,7 +110,7 @@
         <p class="endpoint-tag">
           check-in → if needs_shop_setup → shops/verify-on-site
           (required: task_id, shop_id, lat/lng, shop_exterior_photo, owner_cnic_number;
-          optional: owner_photo, CNIC images, owner_name, owner_phone, shop_category)
+          optional: shop_license_number, owner_photo, CNIC images, owner_name, owner_phone, shop_category)
         </p>
       </div>
     </section>
@@ -224,6 +227,9 @@
           <label>Owner phone<input id="reg-phone" type="text"/></label>
           <label>Owner ID card no. (required)
             <input id="reg-owner-cnic-number" type="text" placeholder="e.g. 35202-1234567-1" value="35202-1234567-1"/>
+          </label>
+          <label>License number (optional)
+            <input id="reg-shop-license" type="text" placeholder="e.g. TRADE-12345"/>
           </label>
           <label>Credit limit (Rs)<input id="reg-credit" type="number" step="any"/></label>
           <label>Legacy balance (Rs)<input id="reg-legacy" type="number" step="any"/></label>

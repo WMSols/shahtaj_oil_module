@@ -54,6 +54,7 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
         digits=(10, 7),
     )
     owner_cnic_number = fields.Char(string='Owner ID Card Number')
+    shop_license_number = fields.Char(string='License Number')
     shop_exterior_photo = fields.Image(
         string='Shop Exterior Photo',
         max_width=1920,
@@ -122,6 +123,8 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
                 res.setdefault('booker_longitude', shop.partner_longitude)
             if shop.owner_cnic_number:
                 res.setdefault('owner_cnic_number', shop.owner_cnic_number)
+            if shop.shop_license_number:
+                res.setdefault('shop_license_number', shop.shop_license_number)
         return res
 
     def action_check_in(self):
@@ -151,6 +154,9 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
                 verify_vals['owner_cnic_front'] = self.owner_cnic_front
             if self.owner_cnic_back:
                 verify_vals['owner_cnic_back'] = self.owner_cnic_back
+            license_number = (self.shop_license_number or '').strip()
+            if license_number:
+                verify_vals['shop_license_number'] = license_number
             currency = shop.currency_id or self.env.company.currency_id
             if (
                 self.show_legacy_balance

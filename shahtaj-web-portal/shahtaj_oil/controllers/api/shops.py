@@ -36,6 +36,13 @@ class ShahtajApiShops(http.Controller):
         latitude = kwargs.get('latitude')
         longitude = kwargs.get('longitude')
         owner_cnic_number = (kwargs.get('owner_cnic_number') or '').strip()
+        shop_license_number = (
+            kwargs.get('shop_license_number') or kwargs.get('license_number') or ''
+        )
+        if isinstance(shop_license_number, str):
+            shop_license_number = shop_license_number.strip()
+        else:
+            shop_license_number = ''
         photo_vals = shop_photo_vals_from_kwargs(kwargs)
         if not all([name, owner_name, owner_phone, latitude, longitude]):
             raise UserError(_(
@@ -54,6 +61,7 @@ class ShahtajApiShops(http.Controller):
             'owner_name': owner_name,
             'owner_phone': owner_phone,
             'owner_cnic_number': owner_cnic_number,
+            'shop_license_number': shop_license_number or False,
             'partner_latitude': float(latitude),
             'partner_longitude': float(longitude),
             'is_shahtaj_shop': True,
@@ -149,7 +157,8 @@ class ShahtajApiShops(http.Controller):
 
         Required: shop_id, task_id, latitude, longitude, shop_exterior_photo,
                   owner_cnic_number (unless already on the shop)
-        Optional: owner_photo, owner_cnic_front/back, owner_name, owner_phone,
+        Optional: shop_license_number (alias license_number), owner_photo,
+                  owner_cnic_front/back, owner_name, owner_phone,
                   shop_category, legacy_balance (if distributor left empty)
         """
         shop_id = kwargs.get('shop_id')
@@ -192,6 +201,11 @@ class ShahtajApiShops(http.Controller):
         }
         if kwargs.get('owner_cnic_number'):
             verify_vals['owner_cnic_number'] = kwargs['owner_cnic_number']
+        license_number = kwargs.get('shop_license_number') or kwargs.get('license_number')
+        if isinstance(license_number, str):
+            license_number = license_number.strip()
+        if license_number:
+            verify_vals['shop_license_number'] = license_number
         if kwargs.get('owner_name'):
             verify_vals['owner_name'] = kwargs['owner_name']
         if kwargs.get('owner_phone'):

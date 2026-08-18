@@ -54,7 +54,7 @@ export class TerritoryRoutes extends Component {
             areaForm: { name: '', is_active: true },
             routeForm: { name: '', zone_id: '', is_active: true }, 
             shopForm: { 
-                name: '', owner_name: '', owner_phone: '', owner_cnic_number: '', address: '',
+                name: '', owner_name: '', owner_phone: '', owner_cnic_number: '', shop_license_number: '', address: '',
                 shopCategory: 'credit',
                 creditLimit: '', legacyBalance: '', outstandingBalance: '',
                 owner_cnic_front: null, owner_cnic_back: null, 
@@ -942,7 +942,7 @@ export class TerritoryRoutes extends Component {
         this.state.areaForm = { name: '', is_active: true };
         this.state.routeForm = { name: '', zone_id: '', is_active: true };
         this.state.shopForm = { 
-            name: '', owner_name: '', owner_phone: '', owner_cnic_number: '', address: '',
+            name: '', owner_name: '', owner_phone: '', owner_cnic_number: '', shop_license_number: '', address: '',
             shopCategory: 'credit',
             creditLimit: '', legacyBalance: '', outstandingBalance: '',
             owner_cnic_front: null, owner_cnic_back: null, 
@@ -1125,7 +1125,7 @@ export class TerritoryRoutes extends Component {
             "res.partner",
             [shopId],
             [
-                "id", "name", "owner_name", "phone", "owner_cnic_number", "partner_latitude", "partner_longitude",
+                "id", "name", "owner_name", "phone", "owner_cnic_number", "shop_license_number", "partner_latitude", "partner_longitude",
                 "shahtaj_shop_category", "credit_limit", "legacy_balance", "outstanding_balance",
                 "route_ids", "shahtaj_routes_display", "shahtaj_route_tag", "registered_by_id",
                 "owner_cnic_front", "owner_cnic_back", "owner_photo", "shop_exterior_photo",
@@ -1236,7 +1236,7 @@ export class TerritoryRoutes extends Component {
 
     async editShop(shop) {
         const details = await this.orm.read("res.partner", [shop.id], [
-            "name", "owner_name", "phone", "owner_cnic_number",
+            "name", "owner_name", "phone", "owner_cnic_number", "shop_license_number",
             "shahtaj_shop_category", "credit_limit", "legacy_balance"
         ]);
 
@@ -1247,6 +1247,7 @@ export class TerritoryRoutes extends Component {
                 owner_name: d.owner_name || '',
                 owner_phone: d.phone || '',
                 owner_cnic_number: d.owner_cnic_number || '',
+                shop_license_number: d.shop_license_number || '',
                 shopCategory: d.shahtaj_shop_category || 'credit',
                 creditLimit: d.credit_limit || '',
                 legacyBalance: d.legacy_balance || '',
@@ -1335,6 +1336,7 @@ export class TerritoryRoutes extends Component {
                 owner_phone: phone || false,
                 phone: phone || false,
                 owner_cnic_number: cnic || false,
+                shop_license_number: this.state.shopForm.shop_license_number || false,
                 credit_limit: this.state.shopForm.shopCategory === 'credit'
                     ? (parseFloat(this.state.shopForm.creditLimit) || 0.0)
                     : 0.0,

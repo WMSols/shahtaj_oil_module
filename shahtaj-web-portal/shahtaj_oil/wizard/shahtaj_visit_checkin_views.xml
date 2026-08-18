@@ -23,7 +23,7 @@
                     This shop is <b>Not Visited</b>. Capture GPS with the exterior photo,
                     enter the owner CNIC number, then confirm. That verifies the shop
                     and starts the visit (same as Flutter <code>shops/verify-on-site</code>).
-                    Legacy / opening balance is optional if the distributor left it empty.
+                    License number and legacy / opening balance are optional if empty.
                 </div>
                 <div class="alert alert-info" role="alert"
                      invisible="needs_shop_setup">
@@ -40,6 +40,8 @@
                     <group>
                         <field name="owner_cnic_number" required="needs_shop_setup"
                                placeholder="e.g. 35202-1234567-1"/>
+                        <field name="shop_license_number"
+                               placeholder="Optional license number"/>
                         <field name="shop_exterior_photo" widget="image"
                                required="needs_shop_setup"/>
                         <field name="legacy_balance"

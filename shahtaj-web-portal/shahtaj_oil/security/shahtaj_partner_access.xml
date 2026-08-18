@@ -8,7 +8,7 @@
             <field name="name">Distributor: read shops and staff contacts</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="domain_force">[
-                '|', '|', '|', '|', '|', '|',
+                '|', '|', '|', '|', '|', '|', '|',
                 ('is_shahtaj_shop', '=', True),
                 ('parent_id.is_shahtaj_shop', '=', True),
                 ('commercial_partner_id.is_shahtaj_shop', '=', True),
@@ -16,6 +16,7 @@
                 ('id', '=', user.partner_id.id),
                 ('id', '=', user.company_id.partner_id.id),
                 ('customer_rank', '>', 0),
+                ('supplier_rank', '>', 0),
             ]</field>
             <field name="groups" eval="[(4, ref('group_shahtaj_distributor'))]"/>
             <field name="perm_read" eval="True"/>
@@ -24,12 +25,14 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <!-- Native Purchase users: manufacturer / vendor contacts for POs -->
+        <!-- Vendors for native POs. Bound to Distributor only — never Purchase User.
+             Odoo assigns Purchase Manager to Administrator (uid=2); a vendor-only
+             partner rule on Purchase User blocks that user from reading res.users. -->
         <record id="rule_shahtaj_distributor_vendor_read" model="ir.rule">
             <field name="name">Distributor: read vendor contacts</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="domain_force">[('supplier_rank', '>', 0)]</field>
-            <field name="groups" eval="[(4, ref('purchase.group_purchase_user'))]"/>
+            <field name="groups" eval="[(6, 0, [ref('group_shahtaj_distributor')])]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>

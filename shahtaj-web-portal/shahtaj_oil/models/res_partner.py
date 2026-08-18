@@ -86,6 +86,10 @@ class ResPartner(models.Model):
     owner_name = fields.Char(string='Owner Name')
     owner_phone = fields.Char(string='Owner Phone')
     owner_cnic_number = fields.Char(string='Owner ID Card Number')
+    shop_license_number = fields.Char(
+        string='License Number',
+        help='Shop trade / business license number (optional).',
+    )
     zone_id = fields.Many2one(
         'shahtaj.zone',
         string='Zone',
@@ -772,6 +776,7 @@ class ResPartner(models.Model):
             tracked = {
                 'active', 'name', 'route_id', 'route_ids', 'zone_id', 'credit_limit',
                 'shahtaj_shop_category', 'owner_name', 'owner_phone',
+                'owner_cnic_number', 'shop_license_number',
             }
             if tracked.intersection(vals) and not self.env.context.get(
                 'shahtaj_posting_legacy_move'
@@ -1068,7 +1073,7 @@ class ResPartner(models.Model):
         """Fields the app should collect on first on-site verification.
 
         Required: GPS + shop exterior photo + owner CNIC number.
-        Optional: other images and any empty profile gaps (name, phone, category…).
+        Optional: license number, other images, and empty profile gaps.
         """
         self.ensure_one()
         missing = []
@@ -1099,6 +1104,14 @@ class ResPartner(models.Model):
                 'key': 'owner_cnic_number',
                 'label': 'Owner ID Card Number',
                 'required': True,
+                'type': 'string',
+                'source': 'form',
+            })
+        if not (self.shop_license_number or '').strip():
+            missing.append({
+                'key': 'shop_license_number',
+                'label': 'License Number',
+                'required': False,
                 'type': 'string',
                 'source': 'form',
             })
@@ -1235,6 +1248,11 @@ class ResPartner(models.Model):
                     'owner_name', 'owner_phone'):
             if vals.get(key):
                 write_vals[key] = vals[key]
+        license_number = vals.get('shop_license_number') or vals.get('license_number')
+        if isinstance(license_number, str):
+            license_number = license_number.strip()
+        if license_number:
+            write_vals['shop_license_number'] = license_number
 
         shop_category = vals.get('shop_category') or vals.get('shahtaj_shop_category')
         if shop_category:

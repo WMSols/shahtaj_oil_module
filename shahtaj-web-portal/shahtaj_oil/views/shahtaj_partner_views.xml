@@ -24,6 +24,7 @@
                 <field name="owner_name"/>
                 <field name="owner_phone"/>
                 <field name="owner_cnic_number" optional="hide"/>
+                <field name="shop_license_number" optional="hide"/>
                 <field name="shop_approval_state" widget="badge"
                        decoration-success="shop_approval_state == 'approved'"
                        decoration-warning="shop_approval_state == 'pending'"
@@ -59,6 +60,8 @@
                 <field name="name"/>
                 <field name="owner_name"/>
                 <field name="owner_phone"/>
+                <field name="owner_cnic_number"/>
+                <field name="shop_license_number"/>
                 <field name="route_ids"/>
                 <field name="shahtaj_routes_display"/>
                 <filter string="Unassigned (no route)" name="unassigned_route"
@@ -189,6 +192,7 @@
                             <field name="owner_name" placeholder="Optional"/>
                             <field name="owner_phone" widget="phone" placeholder="Optional"/>
                             <field name="owner_cnic_number" placeholder="Optional"/>
+                            <field name="shop_license_number" placeholder="Optional"/>
                         </group>
                         <group string="Registration">
                             <field name="registered_by_name" readonly="1"/>
@@ -282,6 +286,7 @@
                 <field name="owner_name"/>
                 <field name="owner_phone"/>
                 <field name="owner_cnic_number" optional="hide"/>
+                <field name="shop_license_number" optional="hide"/>
                 <field name="shop_approval_state" widget="badge"
                        decoration-success="shop_approval_state == 'approved'"
                        decoration-warning="shop_approval_state == 'pending'"
@@ -355,6 +360,9 @@
                             <field name="owner_cnic_number"
                                    required="1"
                                    placeholder="Required for on-site register"
+                                   readonly="shop_approval_state in ('approved', 'rejected')"/>
+                            <field name="shop_license_number"
+                                   placeholder="Optional"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                         </group>
                         <group string="Routes (read-only)"

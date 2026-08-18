@@ -52,6 +52,7 @@
         { name: 'longitude', required: true, type: 'float' },
         { name: 'shop_exterior_photo', required: true, type: 'base64', note: 'Booker-only; captured with GPS' },
         { name: 'owner_cnic_number', required: true, type: 'string', note: 'Required unless already on shop' },
+        { name: 'shop_license_number', required: false, type: 'string', note: 'Optional; alias license_number' },
         { name: 'owner_photo', required: false, type: 'base64' },
         { name: 'owner_cnic_front', required: false, type: 'base64' },
         { name: 'owner_cnic_back', required: false, type: 'base64' },
@@ -198,6 +199,7 @@
         { name: 'owner_name', required: true, type: 'string' },
         { name: 'owner_phone', required: true, type: 'string' },
         { name: 'owner_cnic_number', required: true, type: 'string' },
+        { name: 'shop_license_number', required: false, type: 'string', note: 'Optional; alias license_number' },
         { name: 'latitude', required: true, type: 'float', note: 'On-site GPS → field-verified (Visited)' },
         { name: 'longitude', required: true, type: 'float' },
         { name: 'shop_exterior_photo', required: true, type: 'base64' },
@@ -655,7 +657,7 @@
       alert('Enter latitude/longitude first (device GPS or typed).');
       return;
     }
-    const data = await api('/api/shahtaj/v1/shops/verify-on-site', {
+    const body = {
       shop_id: shop.shop_id || shop.id,
       task_id: state.selectedTask.id,
       latitude: lat,
@@ -663,7 +665,12 @@
       shop_exterior_photo: TINY_PNG_B64,
       owner_cnic_number: ($('inp-verify-cnic') && $('inp-verify-cnic').value.trim())
         || '35202-1234567-1',
-    });
+    };
+    const verifyLicense = $('inp-verify-license') && $('inp-verify-license').value.trim();
+    if (verifyLicense) {
+      body.shop_license_number = verifyLicense;
+    }
+    const data = await api('/api/shahtaj/v1/shops/verify-on-site', body);
     state.visit = data.visit;
     alert(data.message || 'Shop verified. Visit started.');
     switchTab('visit');
@@ -1087,6 +1094,8 @@
     if (legacy) body.legacy_balance = parseFloat(legacy);
     if (zone) body.zone_id = parseInt(zone, 10);
     if (route) body.route_id = parseInt(route, 10);
+    const licenseNumber = $('reg-shop-license') && $('reg-shop-license').value.trim();
+    if (licenseNumber) body.shop_license_number = licenseNumber;
     const photoFields = [
       ['reg-cnic-front', 'owner_cnic_front'],
       ['reg-cnic-back', 'owner_cnic_back'],

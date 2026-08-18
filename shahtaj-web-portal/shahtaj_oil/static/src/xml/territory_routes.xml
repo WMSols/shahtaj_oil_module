@@ -410,6 +410,11 @@
                         <t t-esc="this.state.selectedShopDetails.owner_cnic_number"/>
                     </strong>
                 </small>
+                    <small class="text-muted d-block" t-if="this.state.selectedShopDetails.shop_license_number">
+                            License No: <strong>
+                        <t t-esc="this.state.selectedShopDetails.shop_license_number"/>
+                    </strong>
+                </small>
                 <small class="text-muted d-block">
                             Registered by:
                     <strong>
@@ -906,6 +911,11 @@
                         <label class="small fw-bold">Owner ID Card No. <span class="text-muted">(Optional)</span>
                         </label>
                         <input type="text" class="form-control" t-model="this.state.shopForm.owner_cnic_number" placeholder="e.g. 35202-1234567-1"/>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">License Number <span class="text-muted">(Optional)</span>
+                        </label>
+                        <input type="text" class="form-control" t-model="this.state.shopForm.shop_license_number" placeholder="e.g. TRADE-12345"/>
                     </div>
                 </div>
             </div>

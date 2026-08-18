@@ -63,6 +63,8 @@ def shop_brief(partner):
         'owner_name': shop.owner_name or '',
         'owner_phone': shop.owner_phone or '',
         'owner_cnic_number': shop.owner_cnic_number or '',
+        'shop_license_number': shop.shop_license_number or '',
+        'license_number': shop.shop_license_number or '',
         'latitude': shop.partner_latitude,
         'longitude': shop.partner_longitude,
         'approval_state': shop.shop_approval_state,
