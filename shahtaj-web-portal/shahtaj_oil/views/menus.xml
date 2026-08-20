@@ -32,6 +32,20 @@
               sequence="6"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_delivery_men"
+              name="Delivery Men"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_delivery_man_management"
+              sequence="7"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_create_delivery_man"
+              name="Create Delivery Man"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_create_delivery_man_wizard"
+              sequence="8"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_zone"
               name="1. Zones"
               parent="menu_shahtaj_root"
@@ -222,7 +236,7 @@
               groups="purchase.group_purchase_user"/>
 
     <menuitem id="menu_shahtaj_incoming_receipts"
-              name="Incoming Receipts"
+              name="Receipts &amp; Returns"
               parent="menu_shahtaj_inventory"
               action="action_shahtaj_incoming_receipts"
               sequence="7"
@@ -294,6 +308,21 @@
               action="action_shahtaj_active_visit"
               sequence="25"
               groups="shahtaj_oil.group_shahtaj_order_booker"/>
+
+    <!-- ── Delivery Man menus (visible only when logged in as delivery man) ── -->
+    <menuitem id="menu_shahtaj_dm_pending"
+              name="My Deliveries"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_dm_my_deliveries"
+              sequence="30"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
+    <menuitem id="menu_shahtaj_dm_all_orders"
+              name="All My Orders"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_dm_all_delivery_orders"
+              sequence="31"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
 
     <menuitem id="menu_shahtaj_activity_logs"
               name="Activity Logs"
