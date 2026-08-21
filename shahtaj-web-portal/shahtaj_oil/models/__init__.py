@@ -13,8 +13,6 @@ from . import sale_order
 from . import sale_order_line
 from . import product_product
 from . import product_template
-from . import purchase_order
-from . import stock_picking
 from . import account_move
 from . import account_move_line
 from . import account_payment
@@ -31,4 +29,5 @@ from . import shahtaj_stock_receipt
 from . import shahtaj_manufacturer_summary
 from . import ir_http
 from . import ir_ui_menu
+from . import shahtaj_dm_delivery
 from . import shahtaj_activity_log
