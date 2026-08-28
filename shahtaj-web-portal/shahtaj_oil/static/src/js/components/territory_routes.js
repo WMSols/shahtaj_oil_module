@@ -1080,6 +1080,37 @@ export class TerritoryRoutes extends Component {
         this.toggleArchive('res.partner', shop.id, false);
     }
 
+    onShopMenuResetVerification(shop) {
+        this.closeShopActionMenu();
+        this.resetShopVerification(shop.id);
+    }
+
+    async resetShopVerification(shopId) {
+        if (!shopId) return;
+        const ok = confirm(
+            "Are you sure you want to reset verification and clear GPS coordinates for this shop?\n\n" +
+            "The Order Booker will be required to re-verify the location and take exterior photo on their next on-site visit."
+        );
+        if (!ok) return;
+
+        try {
+            await this.orm.call("res.partner", "action_shahtaj_reset_field_verification", [[shopId]]);
+            this.notification.add("Shop verification and GPS coordinates reset. Shop is now unverified.", { type: "success" });
+            if (this.state.selectedShopDetails && this.state.selectedShopDetails.id === shopId) {
+                await this.viewShopDetails(shopId);
+            }
+            if (this.state.editingShopId === shopId && this.state.shopForm) {
+                this.state.shopForm.is_field_verified = false;
+                this.state.shopForm.partner_latitude = false;
+                this.state.shopForm.partner_longitude = false;
+            }
+            await this.fetchDashboardData();
+            await this.fetchActiveList();
+        } catch (error) {
+            this.notification.add("Failed to reset shop verification: " + (error.data?.message || error.message), { type: "danger" });
+        }
+    }
+
     formatShopRoutes(shop) {
         if (!shop) {
             return 'Unassigned';
@@ -1129,7 +1160,7 @@ export class TerritoryRoutes extends Component {
                 "shahtaj_shop_category", "credit_limit", "legacy_balance", "outstanding_balance",
                 "route_ids", "shahtaj_routes_display", "shahtaj_route_tag", "registered_by_id",
                 "owner_cnic_front", "owner_cnic_back", "owner_photo", "shop_exterior_photo",
-                "shop_approval_state"
+                "shop_approval_state", "shahtaj_field_verified", "shahtaj_field_verified_at", "shahtaj_field_verified_by_id", "shahtaj_visit_tag"
             ]
         );
         if (details.length > 0) {
@@ -1237,7 +1268,8 @@ export class TerritoryRoutes extends Component {
     async editShop(shop) {
         const details = await this.orm.read("res.partner", [shop.id], [
             "name", "owner_name", "phone", "owner_cnic_number", "shop_license_number",
-            "shahtaj_shop_category", "credit_limit", "legacy_balance"
+            "shahtaj_shop_category", "credit_limit", "legacy_balance",
+            "shahtaj_field_verified", "partner_latitude", "partner_longitude", "shahtaj_visit_tag"
         ]);
 
         if (details.length > 0) {
@@ -1251,6 +1283,10 @@ export class TerritoryRoutes extends Component {
                 shopCategory: d.shahtaj_shop_category || 'credit',
                 creditLimit: d.credit_limit || '',
                 legacyBalance: d.legacy_balance || '',
+                is_field_verified: d.shahtaj_field_verified || false,
+                partner_latitude: d.partner_latitude || null,
+                partner_longitude: d.partner_longitude || null,
+                visit_tag: d.shahtaj_visit_tag || 'not_visited',
                 owner_cnic_front: null, owner_cnic_back: null, 
                 owner_photo: null, shop_exterior_photo: null,
                 preview_owner_cnic_front: null, preview_owner_cnic_back: null, 

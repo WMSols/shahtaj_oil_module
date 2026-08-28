@@ -117,6 +117,12 @@
                             string="Legacy Balance Invoice"
                             invisible="not legacy_balance_move_id"
                             groups="shahtaj_oil.group_shahtaj_distributor_financial,account.group_account_readonly,account.group_account_invoice"/>
+                    <button name="action_shahtaj_reset_field_verification" type="object"
+                            string="Reset Verification &amp; GPS"
+                            class="btn-outline-warning"
+                            invisible="not shahtaj_field_verified"
+                            confirm="Are you sure you want to reset verification and clear GPS coordinates for this shop? The Order Booker will be required to re-verify the location and take exterior photo on their next visit."
+                            groups="shahtaj_oil.group_shahtaj_distributor,account.group_account_manager"/>
                     <field name="shahtaj_visit_tag" widget="badge"
                            decoration-warning="shahtaj_visit_tag == 'not_visited'"
                            decoration-success="shahtaj_visit_tag == 'visited'"/>
@@ -199,7 +205,17 @@
                             <field name="registered_by_booker_id" readonly="1"/>
                             <field name="create_date" string="Registered On" readonly="1"/>
                             <field name="shahtaj_visit_tag" widget="badge" readonly="1"/>
-                            <field name="shahtaj_field_verified" readonly="1"/>
+                            <label for="shahtaj_field_verified" string="Field Verification"/>
+                            <div class="o_row">
+                                <field name="shahtaj_field_verified" readonly="1"/>
+                                <button name="action_shahtaj_reset_field_verification"
+                                        type="object"
+                                        string="Reset to Unverified"
+                                        class="btn btn-sm btn-link text-warning p-0"
+                                        invisible="not shahtaj_field_verified"
+                                        confirm="Reset field verification and clear GPS coordinates for this shop?"
+                                        groups="shahtaj_oil.group_shahtaj_distributor,account.group_account_manager"/>
+                            </div>
                             <field name="shahtaj_field_verified_at" readonly="1"
                                    invisible="not shahtaj_field_verified"/>
                             <field name="shahtaj_field_verified_by_id" readonly="1"

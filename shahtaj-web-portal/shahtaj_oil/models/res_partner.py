@@ -1291,3 +1291,38 @@ class ResPartner(models.Model):
                       lng=longitude),
         )
         return True
+
+    def action_shahtaj_reset_field_verification(self):
+        """Reset field verification and GPS coordinates so OB can re-verify on site."""
+        self.ensure_one()
+        if not self.is_shahtaj_shop:
+            raise UserError(_('Only shops can have field verification reset.'))
+        if not (
+            self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            or self.env.user.has_group('account.group_account_manager')
+            or self.env.is_admin()
+        ):
+            raise AccessError(_('Only distributors or administrators can reset shop verification.'))
+
+        old_lat = self.partner_latitude
+        old_lng = self.partner_longitude
+        self.sudo().write({
+            'shahtaj_field_verified': False,
+            'shahtaj_field_verified_at': False,
+            'shahtaj_field_verified_by_id': False,
+            'partner_latitude': False,
+            'partner_longitude': False,
+        })
+        self.env['shahtaj.activity.log'].log_business(
+            operation='shop.reset_verification',
+            name='Shop verification and GPS reset',
+            related_record=self,
+            message=_(
+                'Verification reset by %(user)s. Previous GPS was (%(lat)s, %(lng)s). '
+                'Shop marked unverified and GPS cleared for field re-verification.',
+                user=self.env.user.display_name,
+                lat=old_lat or 'None',
+                lng=old_lng or 'None',
+            ),
+        )
+        return True
