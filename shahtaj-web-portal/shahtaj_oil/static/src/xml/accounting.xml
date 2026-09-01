@@ -1,0 +1,927 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.Accounting" owl="1">
+        <div class="card border-0 shadow-sm bg-white rounded-3 overflow-hidden w-100" style="min-width: 0;">
+            <div class="p-4 border-bottom bg-light rounded-top">
+                <t t-if="this.state.activeSubTab === 'journals'">
+                    <h2 class="h4 fw-bold text-dark mb-0">Journals</h2>
+                    <small class="text-muted">Open a journal to view its details and journal entries.</small>
+                </t>
+                <t t-else="">
+                    <h2 class="h4 fw-bold text-dark mb-0">Chart of Accounts</h2>
+                    <small class="text-muted">Browse ledger accounts by code, type, and prefix.</small>
+                </t>
+            </div>
+
+            <!-- ================= JOURNALS ================= -->
+            <t t-if="this.state.activeSubTab === 'journals'">
+                <t t-if="this.state.journalPanel === 'form'">
+                    <div class="p-4 bg-light border-bottom">
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <div>
+                                <h4 class="fw-bold mb-0"><t t-esc="this.state.journalForm.id ? 'Edit Journal' : 'Create Journal'"/></h4>
+                                <small class="text-muted">Changing the type reveals the matching Odoo journal options.</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="closeJournalForm" t-att-disabled="this.state.isSaving">
+                                <t t-esc="this.state.journalForm.id ? 'Back to Journal' : 'Back to Journals'"/>
+                            </button>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="small fw-bold">Journal Name</label>
+                                <input type="text" class="form-control" t-model="this.state.journalForm.name" placeholder="e.g. Bank, Customer Invoices"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold">Type</label>
+                                <select class="form-select" t-model="this.state.journalForm.type" t-on-change="onJournalTypeChange">
+                                    <t t-foreach="this.state.selections.journalTypes" t-as="opt" t-key="opt_index">
+                                        <option t-att-value="opt[0]"><t t-esc="opt[1]"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold">Sequence Prefix</label>
+                                <input type="text" class="form-control" maxlength="5" t-model="this.state.journalForm.code" placeholder="BNK1"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold">Currency</label>
+                                <select class="form-select" t-model="this.state.journalForm.currency_id">
+                                    <option value="">Company currency</option>
+                                    <t t-foreach="this.state.lookups.currencies" t-as="cur" t-key="cur.id">
+                                        <option t-att-value="cur.id"><t t-esc="cur.name"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="journalActive" t-model="this.state.journalForm.active"/>
+                                    <label class="form-check-label small fw-bold" for="journalActive">Active</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="small fw-bold"><t t-esc="this.defaultAccountLabel"/></label>
+                                <select class="form-select" t-on-change="(ev) => this.setJournalFormField('default_account_id', ev.target.value)">
+                                    <option value="" t-att-selected="this.isSelectedId(this.state.journalForm.default_account_id, '')"><t t-esc="this.defaultAccountEmptyLabel"/></option>
+                                    <t t-foreach="this.filteredDefaultAccounts" t-as="acc" t-key="acc.id">
+                                        <option t-att-value="this.optionId(acc.id)" t-att-selected="this.isSelectedId(this.state.journalForm.default_account_id, acc.id)"><t t-esc="acc.code"/> <t t-esc="acc.name"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div t-if="this.isLiquidityJournal" class="col-md-6">
+                                <label class="small fw-bold">Suspense Account</label>
+                                <select class="form-select" t-on-change="(ev) => this.setJournalFormField('suspense_account_id', ev.target.value)">
+                                    <option value="" t-att-selected="this.isSelectedId(this.state.journalForm.suspense_account_id, '')">— Select —</option>
+                                    <t t-foreach="this.suspenseAccounts" t-as="acc" t-key="acc.id">
+                                        <option t-att-value="this.optionId(acc.id)" t-att-selected="this.isSelectedId(this.state.journalForm.suspense_account_id, acc.id)"><t t-esc="acc.code"/> <t t-esc="acc.name"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div t-if="this.isPurchaseJournal" class="col-md-6">
+                                <label class="small fw-bold">Private Share Account</label>
+                                <select class="form-select" t-on-change="(ev) => this.setJournalFormField('non_deductible_account_id', ev.target.value)">
+                                    <option value="" t-att-selected="this.isSelectedId(this.state.journalForm.non_deductible_account_id, '')">— None —</option>
+                                    <t t-foreach="this.lossAccounts" t-as="acc" t-key="acc.id">
+                                        <option t-att-value="this.optionId(acc.id)" t-att-selected="this.isSelectedId(this.state.journalForm.non_deductible_account_id, acc.id)"><t t-esc="acc.code"/> <t t-esc="acc.name"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div t-if="this.showsProfitLoss" class="col-md-3">
+                                <label class="small fw-bold">Profit Account</label>
+                                <select class="form-select" t-on-change="(ev) => this.setJournalFormField('profit_account_id', ev.target.value)">
+                                    <option value="" t-att-selected="this.isSelectedId(this.state.journalForm.profit_account_id, '')">— None —</option>
+                                    <t t-foreach="this.profitAccounts" t-as="acc" t-key="acc.id">
+                                        <option t-att-value="this.optionId(acc.id)" t-att-selected="this.isSelectedId(this.state.journalForm.profit_account_id, acc.id)"><t t-esc="acc.code"/> <t t-esc="acc.name"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div t-if="this.showsProfitLoss" class="col-md-3">
+                                <label class="small fw-bold">Loss Account</label>
+                                <select class="form-select" t-on-change="(ev) => this.setJournalFormField('loss_account_id', ev.target.value)">
+                                    <option value="" t-att-selected="this.isSelectedId(this.state.journalForm.loss_account_id, '')">— None —</option>
+                                    <t t-foreach="this.lossAccounts" t-as="acc" t-key="acc.id">
+                                        <option t-att-value="this.optionId(acc.id)" t-att-selected="this.isSelectedId(this.state.journalForm.loss_account_id, acc.id)"><t t-esc="acc.code"/> <t t-esc="acc.name"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                        </div>
+
+                        <t t-if="this.isBankJournal">
+                            <div class="card border-0 shadow-sm rounded-3 p-3 mb-3 bg-white">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="small fw-bold">Bank Account Number</label>
+                                        <select class="form-select mb-2" t-model="this.state.journalForm.bank_account_id" t-on-change="onBankAccountChange">
+                                            <option value="">— None —</option>
+                                            <t t-foreach="this.state.lookups.partnerBanks" t-as="pb" t-key="pb.id">
+                                                <option t-att-value="pb.id"><t t-esc="pb.acc_number"/></option>
+                                            </t>
+                                        </select>
+                                        <t t-if="!this.state.journalForm.bank_account_id">
+                                            <input type="text" class="form-control" t-model="this.state.journalForm.bank_acc_number" placeholder="Or enter a new account number"/>
+                                        </t>
+                                    </div>
+                                    <div t-if="this.showsBankInstitution" class="col-md-6">
+                                        <label class="small fw-bold">Bank</label>
+                                        <select class="form-select" t-model="this.state.journalForm.bank_id">
+                                            <option value="">— None —</option>
+                                            <t t-foreach="this.state.lookups.banks" t-as="bank" t-key="bank.id">
+                                                <option t-att-value="bank.id"><t t-esc="bank.name"/></option>
+                                            </t>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="small fw-bold">Bank Feeds</label>
+                                        <select class="form-select" t-model="this.state.journalForm.bank_statements_source">
+                                            <t t-foreach="this.state.selections.statementSources" t-as="opt" t-key="opt_index">
+                                                <option t-att-value="opt[0]"><t t-esc="opt[1]"/></option>
+                                            </t>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+
+                        <t t-if="this.isCreditJournal">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="small fw-bold">Transaction Feeds</label>
+                                    <select class="form-select" t-model="this.state.journalForm.bank_statements_source">
+                                        <t t-foreach="this.state.selections.statementSources" t-as="opt" t-key="opt_index">
+                                            <option t-att-value="opt[0]"><t t-esc="opt[1]"/></option>
+                                        </t>
+                                    </select>
+                                </div>
+                            </div>
+                        </t>
+
+                        <div class="row g-3 mb-3">
+                            <div t-if="this.showsRefundSequence" class="col-md-3 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="refundSeq" t-model="this.state.journalForm.refund_sequence"/>
+                                    <label class="form-check-label small fw-bold" for="refundSeq">Dedicated Credit Note Sequence</label>
+                                </div>
+                            </div>
+                            <div t-if="this.isLiquidityJournal" class="col-md-3 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="paySeq" t-model="this.state.journalForm.payment_sequence"/>
+                                    <label class="form-check-label small fw-bold" for="paySeq">Dedicated Payment Sequence</label>
+                                </div>
+                            </div>
+                            <div t-if="this.showsSelfBilling" class="col-md-3 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="selfBill" t-model="this.state.journalForm.is_self_billing"/>
+                                    <label class="form-check-label small fw-bold" for="selfBill">Self-Billing</label>
+                                </div>
+                            </div>
+                            <div t-if="this.showsHashLock" class="col-md-3 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="hashLock" t-model="this.state.journalForm.restrict_mode_hash_table"/>
+                                    <label class="form-check-label small fw-bold" for="hashLock">Lock Posted Entries with Hash</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <t t-if="this.isSaleJournal">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="small fw-bold">Communication Type</label>
+                                    <select class="form-select" t-model="this.state.journalForm.invoice_reference_type">
+                                        <t t-foreach="this.state.selections.invoiceReferenceTypes" t-as="opt" t-key="opt_index">
+                                            <option t-att-value="opt[0]"><t t-esc="opt[1]"/></option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="small fw-bold">Communication Standard</label>
+                                    <select class="form-select" t-model="this.state.journalForm.invoice_reference_model">
+                                        <t t-foreach="this.state.selections.invoiceReferenceModels" t-as="opt" t-key="opt_index">
+                                            <option t-att-value="opt[0]"><t t-esc="opt[1]"/></option>
+                                        </t>
+                                    </select>
+                                </div>
+                            </div>
+                        </t>
+
+                        <t t-if="this.isLiquidityJournal and this.state.journalForm.id">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="fw-bold mb-0">Incoming Payments</h6>
+                                        <button class="btn btn-sm btn-outline-primary fw-bold" t-on-click="() => this.addPaymentLine('inbound')">Add Method</button>
+                                    </div>
+                                    <div class="table-responsive bg-white rounded-3 border">
+                                        <table class="table table-sm mb-0 align-middle">
+                                            <thead class="bg-light small text-muted text-uppercase">
+                                                <tr>
+                                                    <th class="ps-2">Method</th>
+                                                    <th>Name</th>
+                                                    <th>Account</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-if="!this.state.inboundLines.length">
+                                                    <tr><td colspan="4" class="text-center text-muted py-3">Odoo default methods apply until you add lines.</td></tr>
+                                                </t>
+                                                <t t-foreach="this.state.inboundLines" t-as="line" t-key="line.id">
+                                                    <tr>
+                                                        <td class="ps-2">
+                                                            <select class="form-select form-select-sm" t-model="line.payment_method_id">
+                                                                <option value="">— Method —</option>
+                                                                <t t-foreach="this.inboundPaymentMethods" t-as="pm" t-key="pm.id">
+                                                                    <option t-att-value="pm.id"><t t-esc="pm.name"/></option>
+                                                                </t>
+                                                            </select>
+                                                        </td>
+                                                        <td><input type="text" class="form-control form-control-sm" t-model="line.name"/></td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm" t-model="line.payment_account_id">
+                                                                <option value="">Journal default</option>
+                                                                <t t-foreach="this.state.lookups.accounts" t-as="acc" t-key="'in-acc-' + acc.id">
+                                                                    <option t-att-value="acc.id"><t t-esc="acc.code"/> <t t-esc="acc.name"/></option>
+                                                                </t>
+                                                            </select>
+                                                        </td>
+                                                        <td class="text-end pe-2">
+                                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.removePaymentLine('inbound', line.id)">Remove</button>
+                                                        </td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="fw-bold mb-0">Outgoing Payments</h6>
+                                        <button class="btn btn-sm btn-outline-primary fw-bold" t-on-click="() => this.addPaymentLine('outbound')">Add Method</button>
+                                    </div>
+                                    <div class="table-responsive bg-white rounded-3 border">
+                                        <table class="table table-sm mb-0 align-middle">
+                                            <thead class="bg-light small text-muted text-uppercase">
+                                                <tr>
+                                                    <th class="ps-2">Method</th>
+                                                    <th>Name</th>
+                                                    <th>Account</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-if="!this.state.outboundLines.length">
+                                                    <tr><td colspan="4" class="text-center text-muted py-3">Odoo default methods apply until you add lines.</td></tr>
+                                                </t>
+                                                <t t-foreach="this.state.outboundLines" t-as="line" t-key="line.id">
+                                                    <tr>
+                                                        <td class="ps-2">
+                                                            <select class="form-select form-select-sm" t-model="line.payment_method_id">
+                                                                <option value="">— Method —</option>
+                                                                <t t-foreach="this.outboundPaymentMethods" t-as="pm" t-key="pm.id">
+                                                                    <option t-att-value="pm.id"><t t-esc="pm.name"/></option>
+                                                                </t>
+                                                            </select>
+                                                        </td>
+                                                        <td><input type="text" class="form-control form-control-sm" t-model="line.name"/></td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm" t-model="line.payment_account_id">
+                                                                <option value="">Journal default</option>
+                                                                <t t-foreach="this.state.lookups.accounts" t-as="acc" t-key="'out-acc-' + acc.id">
+                                                                    <option t-att-value="acc.id"><t t-esc="acc.code"/> <t t-esc="acc.name"/></option>
+                                                                </t>
+                                                            </select>
+                                                        </td>
+                                                        <td class="text-end pe-2">
+                                                            <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.removePaymentLine('outbound', line.id)">Remove</button>
+                                                        </td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <button class="btn btn-outline-secondary fw-bold" t-on-click="closeJournalForm" t-att-disabled="this.state.isSaving">Cancel</button>
+                            <button class="btn btn-success fw-bold text-white" t-on-click="saveJournal" t-att-disabled="this.state.isSaving">
+                                <span t-if="this.state.isSaving" class="spinner-border spinner-border-sm me-1"/>
+                                Save Journal
+                            </button>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-elif="this.state.journalPanel === 'detail'">
+                    <div class="p-4 bg-light">
+                        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                            <button class="btn btn-sm btn-light border shadow-sm fw-bold" t-on-click="closeJournalDetail">Back to Journals</button>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-outline-primary fw-bold" t-on-click="() => this.openJournalForm(this.state.journalForm)">
+                                    <i class="fa fa-pencil me-1"></i> Edit
+                                </button>
+                                <button class="btn btn-outline-danger fw-bold" t-on-click="() => this.archiveJournal(this.state.journalForm)">
+                                    <t t-esc="this.state.journalForm.active === false ? 'Restore' : 'Archive'"/>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                            <div class="card border-0 shadow-sm rounded-4 flex-grow-1" style="min-width: 0;">
+                                <div class="p-4">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                                        <div>
+                                            <h4 class="fw-bold mb-1"><t t-esc="this.state.journalForm.name"/></h4>
+                                            <div class="text-muted">Prefix <span class="fw-bold text-dark"><t t-esc="this.state.journalForm.code"/></span></div>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <span class="badge bg-light border text-dark fs-6 px-3 py-2"><t t-esc="this.journalTypeDisplay"/></span>
+                                            <span t-attf-class="badge fs-6 px-3 py-2 #{this.journalActiveBadgeClass}">
+                                                <t t-esc="this.state.journalForm.active === false ? 'Archived' : 'Active'"/>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Currency</small>
+                                            <span class="fw-bold"><t t-esc="this.currencyDisplay"/></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold"><t t-esc="this.defaultAccountLabel"/></small>
+                                            <span class="fw-bold"><t t-esc="this.defaultAccountDisplay"/></span>
+                                        </div>
+                                        <div t-if="this.isLiquidityJournal" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Suspense Account</small>
+                                            <span class="fw-bold"><t t-esc="this.suspenseAccountDisplay"/></span>
+                                        </div>
+                                        <div t-if="this.isPurchaseJournal" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Private Share Account</small>
+                                            <span class="fw-bold"><t t-esc="this.privateShareDisplay"/></span>
+                                        </div>
+                                        <div t-if="this.showsProfitLoss" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Profit Account</small>
+                                            <span class="fw-bold"><t t-esc="this.profitAccountDisplay"/></span>
+                                        </div>
+                                        <div t-if="this.showsProfitLoss" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Loss Account</small>
+                                            <span class="fw-bold"><t t-esc="this.lossAccountDisplay"/></span>
+                                        </div>
+                                        <div t-if="this.isBankJournal" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Bank Account Number</small>
+                                            <span class="fw-bold"><t t-esc="this.linkedBankAccountDisplay !== '—' ? this.linkedBankAccountDisplay : (this.state.journalForm.bank_acc_number || '—')"/></span>
+                                        </div>
+                                        <div t-if="this.isBankJournal and this.state.journalForm.bank_account_id" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Bank</small>
+                                            <span class="fw-bold"><t t-esc="this.bankDisplay"/></span>
+                                        </div>
+                                        <div t-if="this.isLiquidityJournal" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold"><t t-esc="this.isCreditJournal ? 'Transaction Feeds' : 'Bank Feeds'"/></small>
+                                            <span class="fw-bold"><t t-esc="this.statementSourceDisplay"/></span>
+                                        </div>
+                                        <div t-if="this.showsRefundSequence" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Dedicated Credit Note Sequence</small>
+                                            <span class="fw-bold"><t t-esc="this.state.journalForm.refund_sequence ? 'Yes' : 'No'"/></span>
+                                        </div>
+                                        <div t-if="this.isLiquidityJournal" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Dedicated Payment Sequence</small>
+                                            <span class="fw-bold"><t t-esc="this.state.journalForm.payment_sequence ? 'Yes' : 'No'"/></span>
+                                        </div>
+                                        <div t-if="this.showsSelfBilling" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Self-Billing</small>
+                                            <span class="fw-bold"><t t-esc="this.state.journalForm.is_self_billing ? 'Yes' : 'No'"/></span>
+                                        </div>
+                                        <div t-if="this.showsHashLock" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Lock Posted Entries with Hash</small>
+                                            <span class="fw-bold"><t t-esc="this.state.journalForm.restrict_mode_hash_table ? 'Yes' : 'No'"/></span>
+                                        </div>
+                                        <div t-if="this.isSaleJournal" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Communication Type</small>
+                                            <span class="fw-bold"><t t-esc="this.invoiceReferenceTypeDisplay"/></span>
+                                        </div>
+                                        <div t-if="this.isSaleJournal" class="col-md-4">
+                                            <small class="text-muted d-block text-uppercase fw-bold">Communication Standard</small>
+                                            <span class="fw-bold"><t t-esc="this.invoiceReferenceModelDisplay"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-light border shadow-sm text-center px-4 py-3 rounded-4" t-on-click="openJournalEntries" style="min-width: 150px;">
+                                <div class="fw-bold fs-3 text-primary lh-1 mb-1"><t t-esc="this.state.entryCount"/></div>
+                                <small class="text-muted fw-bold text-uppercase">Journal Entries</small>
+                            </button>
+                        </div>
+                        <t t-if="this.isLiquidityJournal and this.state.journalForm.id">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card border-0 shadow-sm rounded-3">
+                                        <div class="p-3 border-bottom"><h6 class="fw-bold mb-0">Incoming Payments</h6></div>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm mb-0 align-middle">
+                                                <thead class="bg-light small text-muted text-uppercase">
+                                                    <tr>
+                                                        <th class="ps-3">Method</th>
+                                                        <th>Name</th>
+                                                        <th class="pe-3">Account</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <t t-if="!this.state.inboundLines.length">
+                                                        <tr><td colspan="3" class="text-center text-muted py-3">Odoo default methods apply until you add lines.</td></tr>
+                                                    </t>
+                                                    <t t-foreach="this.state.inboundLines" t-as="line" t-key="line.id">
+                                                        <tr>
+                                                            <td class="ps-3 fw-bold"><t t-esc="this.paymentMethodDisplay(line.payment_method_id)"/></td>
+                                                            <td><t t-esc="line.name || '—'"/></td>
+                                                            <td class="pe-3"><t t-esc="this.paymentAccountDisplay(line.payment_account_id)"/></td>
+                                                        </tr>
+                                                    </t>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card border-0 shadow-sm rounded-3">
+                                        <div class="p-3 border-bottom"><h6 class="fw-bold mb-0">Outgoing Payments</h6></div>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm mb-0 align-middle">
+                                                <thead class="bg-light small text-muted text-uppercase">
+                                                    <tr>
+                                                        <th class="ps-3">Method</th>
+                                                        <th>Name</th>
+                                                        <th class="pe-3">Account</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <t t-if="!this.state.outboundLines.length">
+                                                        <tr><td colspan="3" class="text-center text-muted py-3">Odoo default methods apply until you add lines.</td></tr>
+                                                    </t>
+                                                    <t t-foreach="this.state.outboundLines" t-as="line" t-key="line.id">
+                                                        <tr>
+                                                            <td class="ps-3 fw-bold"><t t-esc="this.paymentMethodDisplay(line.payment_method_id)"/></td>
+                                                            <td><t t-esc="line.name || '—'"/></td>
+                                                            <td class="pe-3"><t t-esc="this.paymentAccountDisplay(line.payment_account_id)"/></td>
+                                                        </tr>
+                                                    </t>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+
+                <t t-elif="this.state.journalPanel === 'entries'">
+                    <t t-if="this.state.selectedEntry">
+                        <div class="p-4 bg-light">
+                            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                                <button class="btn btn-sm btn-light border shadow-sm fw-bold" t-on-click="closeJournalEntry">Back to Entries</button>
+                                <span t-attf-class="badge fs-6 px-3 py-2 shadow-sm #{this.entryStateBadgeClass(this.state.selectedEntry.state)}">
+                                    <t t-esc="this.state.selectedEntry.stateLabel"/>
+                                </span>
+                            </div>
+                            <t t-if="this.state.isLoadingLines">
+                                <div class="d-flex justify-content-center py-5">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <div class="card border-0 shadow-sm rounded-3 p-4 mb-4 bg-white">
+                                    <div class="row g-4">
+                                        <div class="col-md-4">
+                                            <span class="text-muted fw-bold small d-block text-uppercase mb-1">Entry Number</span>
+                                            <span class="fw-bold fs-5 text-primary"><t t-esc="this.state.selectedEntry.name"/></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <span class="text-muted fw-bold small d-block text-uppercase mb-1">Type</span>
+                                            <span class="fw-bold text-dark"><t t-esc="this.state.selectedEntry.typeLabel"/></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <span class="text-muted fw-bold small d-block text-uppercase mb-1">Accounting Date</span>
+                                            <span class="fw-bold text-dark"><t t-esc="this.state.selectedEntry.date"/></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <span class="text-muted fw-bold small d-block text-uppercase mb-1">Partner</span>
+                                            <span class="fw-bold text-dark"><t t-esc="this.state.selectedEntry.partner"/></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <span class="text-muted fw-bold small d-block text-uppercase mb-1">Reference</span>
+                                            <span class="fw-bold text-dark"><t t-esc="this.state.selectedEntry.ref"/></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <span class="text-muted fw-bold small d-block text-uppercase mb-1">Amount</span>
+                                            <span class="fw-bold text-success">Rs. <t t-esc="this.state.selectedEntry.amount"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <h6 class="fw-bold text-dark mb-3">Journal Items (Debits &amp; Credits)</h6>
+                                <div class="table-responsive border rounded-3 shadow-sm bg-white" style="max-width: 100%;">
+                                    <table class="table table-hover table-borderless table-striped align-middle mb-0">
+                                        <thead class="bg-light text-muted small text-uppercase fw-bold border-bottom">
+                                            <tr>
+                                                <th class="ps-4 py-3">Account</th>
+                                                <th>Label / Description</th>
+                                                <th>Partner</th>
+                                                <th class="text-end text-success">Debit</th>
+                                                <th class="text-end pe-4 text-danger">Credit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-if="!this.state.selectedEntryLines.length">
+                                                <tr><td colspan="5" class="text-center py-4 text-muted">No journal items found.</td></tr>
+                                            </t>
+                                            <t t-foreach="this.state.selectedEntryLines" t-as="line" t-key="line.id">
+                                                <tr>
+                                                    <td class="ps-4 fw-bold text-dark"><t t-esc="line.account"/></td>
+                                                    <td class="text-muted"><t t-esc="line.label"/></td>
+                                                    <td class="text-muted"><t t-esc="line.partner || '—'"/></td>
+                                                    <td class="text-end fw-bold text-dark">
+                                                        <t t-if="line.debit > 0">Rs. <t t-esc="this.formatMoney(line.debit)"/></t>
+                                                        <t t-else="">-</t>
+                                                    </td>
+                                                    <td class="text-end pe-4 fw-bold text-dark">
+                                                        <t t-if="line.credit > 0">Rs. <t t-esc="this.formatMoney(line.credit)"/></t>
+                                                        <t t-else="">-</t>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                        <tfoot t-if="this.state.selectedEntryLines.length" class="border-top bg-light fw-bold">
+                                            <tr>
+                                                <td class="ps-4 py-3" colspan="3">Total</td>
+                                                <td class="text-end text-success">Rs. <t t-esc="this.formatMoney(this.selectedEntryDebitTotal)"/></td>
+                                                <td class="text-end pe-4 text-danger">Rs. <t t-esc="this.formatMoney(this.selectedEntryCreditTotal)"/></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button class="btn btn-sm btn-light border shadow-sm fw-bold" t-on-click="closeJournalEntries">Back to Journal</button>
+                                <div>
+                                    <div class="fw-bold text-dark"><t t-esc="this.state.journalForm.name"/> Entries</div>
+                                    <small class="text-muted">Click an entry to view debit and credit lines.</small>
+                                </div>
+                            </div>
+                            <div class="input-group input-group-sm shadow-sm" style="width: 280px;">
+                                <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search entries..." t-att-value="this.state.filters.entries.search" t-on-input="(ev) => this.onSearchInput(ev, 'entries')"/>
+                            </div>
+                        </div>
+                        <div class="position-relative overflow-hidden">
+                            <t t-if="this.state.isLoadingList">
+                                <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                </div>
+                            </t>
+                            <div class="table-responsive" style="max-width: 100%;">
+                                <table class="table table-hover mb-0 align-middle">
+                                    <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                        <tr>
+                                            <th class="ps-4">Number</th>
+                                            <th>Date</th>
+                                            <th>Partner</th>
+                                            <th>Reference</th>
+                                            <th>Type</th>
+                                            <th class="text-end">Amount</th>
+                                            <th>Status</th>
+                                            <th class="text-end pe-3 text-nowrap">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="this.state.tableEntries.length === 0 and !this.state.isLoadingList">
+                                            <tr><td colspan="8" class="text-center py-5 text-muted fw-bold">No journal entries found.</td></tr>
+                                        </t>
+                                        <t t-foreach="this.state.tableEntries" t-as="entry" t-key="entry.id">
+                                            <tr t-on-click="() => this.viewJournalEntry(entry)" style="cursor: pointer;">
+                                                <td class="ps-4 fw-bold text-primary"><t t-esc="entry.name"/></td>
+                                                <td><t t-esc="entry.date"/></td>
+                                                <td><t t-esc="entry.partner"/></td>
+                                                <td><t t-esc="entry.ref"/></td>
+                                                <td><span class="badge bg-light border text-dark"><t t-esc="entry.typeLabel"/></span></td>
+                                                <td class="text-end fw-bold">Rs. <t t-esc="entry.amount"/></td>
+                                                <td>
+                                                    <span t-attf-class="badge #{this.entryStateBadgeClass(entry.state)}">
+                                                        <t t-esc="entry.stateLabel"/>
+                                                    </span>
+                                                </td>
+                                                <td class="text-end pe-3 text-nowrap">
+                                                    <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click.stop="() => this.viewJournalEntry(entry)">View</button>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2">
+                                <small class="text-muted fw-bold">
+                                    Showing <t t-esc="this.state.pagination.entries.total === 0 ? 0 : ((this.state.pagination.entries.page - 1) * this.state.pagination.entries.limit) + 1"/>
+                                    to
+                                    <t t-esc="Math.min(this.state.pagination.entries.page * this.state.pagination.entries.limit, this.state.pagination.entries.total)"/>
+                                    of <t t-esc="this.state.pagination.entries.total"/>
+                                </small>
+                                <div class="btn-group shadow-sm">
+                                    <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('entries', -1)" t-att-disabled="this.state.pagination.entries.page === 1">Prev</button>
+                                    <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                        <t t-esc="this.state.pagination.entries.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.entries.total / this.state.pagination.entries.limit))"/>
+                                    </button>
+                                    <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('entries', 1)" t-att-disabled="this.state.pagination.entries.page &gt;= Math.ceil(this.state.pagination.entries.total / this.state.pagination.entries.limit)">Next</button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+
+                <t t-else="">
+                    <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom flex-wrap gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="width: 280px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search journals..." t-att-value="this.state.filters.journals.search" t-on-input="(ev) => this.onSearchInput(ev, 'journals')"/>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <select class="form-select form-select-sm shadow-sm" style="width: 180px;" t-model="this.state.filters.journals.type" t-on-change="() => this.onFilterChange('journals')">
+                                <option value="all">All Journals</option>
+                                <option value="sale">Sales</option>
+                                <option value="purchase">Purchases</option>
+                                <option value="liquidity">Liquidity</option>
+                                <option value="miscellaneous">Miscellaneous</option>
+                                <option value="archived">Archived</option>
+                            </select>
+                            <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="() => this.openJournalForm()">New Journal</button>
+                        </div>
+                    </div>
+                    <div class="position-relative overflow-hidden">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <div class="table-responsive" style="max-width: 100%;">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4">Name</th>
+                                        <th>Prefix</th>
+                                        <th>Type</th>
+                                        <th>Default Account</th>
+                                        <th>Currency</th>
+                                        <th class="text-end pe-3 text-nowrap">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="this.state.tableJournals.length === 0 and !this.state.isLoadingList">
+                                        <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No journals found.</td></tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableJournals" t-as="journal" t-key="journal.id">
+                                        <tr t-on-click="() => this.openJournalDetail(journal)" style="cursor: pointer;">
+                                            <td class="ps-4 fw-bold text-dark"><t t-esc="journal.name"/></td>
+                                            <td><t t-esc="journal.code"/></td>
+                                            <td><span class="badge bg-light border text-dark"><t t-esc="journal.typeLabel"/></span></td>
+                                            <td><t t-esc="journal.accountLabel"/></td>
+                                            <td><t t-esc="journal.currencyLabel"/></td>
+                                            <td class="text-end pe-3 text-nowrap">
+                                                <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click.stop="() => this.openJournalDetail(journal)">View</button>
+                                                <button class="btn btn-sm btn-outline-danger fw-bold ms-1" t-on-click.stop="() => this.archiveJournal(journal)">
+                                                    <t t-esc="journal.active === false ? 'Restore' : 'Archive'"/>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.journals.total === 0 ? 0 : ((this.state.pagination.journals.page - 1) * this.state.pagination.journals.limit) + 1"/>
+                                to
+                                <t t-esc="Math.min(this.state.pagination.journals.page * this.state.pagination.journals.limit, this.state.pagination.journals.total)"/>
+                                of <t t-esc="this.state.pagination.journals.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('journals', -1)" t-att-disabled="this.state.pagination.journals.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                    <t t-esc="this.state.pagination.journals.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.journals.total / this.state.pagination.journals.limit))"/>
+                                </button>
+                                <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('journals', 1)" t-att-disabled="this.state.pagination.journals.page &gt;= Math.ceil(this.state.pagination.journals.total / this.state.pagination.journals.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+
+            <!-- ================= CHART OF ACCOUNTS ================= -->
+            <t t-if="this.state.activeSubTab === 'accounts'">
+                <t t-if="this.state.showAccountForm">
+                    <div class="p-4 bg-light border-bottom">
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <div>
+                                <h4 class="fw-bold mb-0"><t t-esc="this.state.accountForm.id ? 'Edit Account' : 'Create Account'"/></h4>
+                                <small class="text-muted">Use the same code numbering as Odoo (e.g. 101000, 200000).</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="closeAccountForm" t-att-disabled="this.state.isSaving">Back to Accounts</button>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-2">
+                                <label class="small fw-bold">Code</label>
+                                <input type="text" class="form-control" t-model="this.state.accountForm.code" placeholder="101000"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold">Account Name</label>
+                                <input type="text" class="form-control" t-model="this.state.accountForm.name"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold">Type</label>
+                                <select class="form-select" t-model="this.state.accountForm.account_type" t-on-change="onAccountTypeChange">
+                                    <t t-foreach="this.state.selections.accountTypes" t-as="opt" t-key="opt_index">
+                                        <option t-att-value="opt[0]"><t t-esc="opt[1]"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold">Currency</label>
+                                <select class="form-select" t-model="this.state.accountForm.currency_id">
+                                    <option value="">Company currency</option>
+                                    <t t-foreach="this.state.lookups.currencies" t-as="cur" t-key="cur.id">
+                                        <option t-att-value="cur.id"><t t-esc="cur.name"/></option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div t-if="this.accountTypeLockedReconcile === 'free'" class="col-md-3 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="accReconcile" t-model="this.state.accountForm.reconcile"/>
+                                    <label class="form-check-label small fw-bold" for="accReconcile">Allow Reconciliation</label>
+                                </div>
+                            </div>
+                            <div t-if="this.showsNonTrade" class="col-md-3 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="accNonTrade" t-model="this.state.accountForm.non_trade"/>
+                                    <label class="form-check-label small fw-bold" for="accNonTrade">Non-Trade</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="accActive" t-model="this.state.accountForm.active"/>
+                                    <label class="form-check-label small fw-bold" for="accActive">Active</label>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="small fw-bold">Description</label>
+                                <textarea class="form-control" rows="2" t-model="this.state.accountForm.description" placeholder="Optional notes..."></textarea>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div t-if="this.showsAccountTaxes" class="col-md-6">
+                                <label class="small fw-bold">Default Taxes</label>
+                                <div class="border rounded-3 p-2 bg-white" style="max-height: 160px; overflow-y: auto;">
+                                    <t t-foreach="this.state.lookups.taxes" t-as="tax" t-key="tax.id">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" t-att-id="'tax-' + tax.id" t-att-checked="this.isSelectedId(this.state.accountForm.tax_ids, tax.id)" t-on-change="() => this.toggleFormId('tax_ids', tax.id)"/>
+                                            <label class="form-check-label small" t-att-for="'tax-' + tax.id"><t t-esc="tax.name"/></label>
+                                        </div>
+                                    </t>
+                                    <t t-if="!this.state.lookups.taxes.length">
+                                        <small class="text-muted">No taxes available.</small>
+                                    </t>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="small fw-bold">Tags</label>
+                                <div class="border rounded-3 p-2 bg-white" style="max-height: 160px; overflow-y: auto;">
+                                    <t t-foreach="this.state.lookups.tags" t-as="tag" t-key="tag.id">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" t-att-id="'tag-' + tag.id" t-att-checked="this.isSelectedId(this.state.accountForm.tag_ids, tag.id)" t-on-change="() => this.toggleFormId('tag_ids', tag.id)"/>
+                                            <label class="form-check-label small" t-att-for="'tag-' + tag.id"><t t-esc="tag.name"/></label>
+                                        </div>
+                                    </t>
+                                    <t t-if="!this.state.lookups.tags.length">
+                                        <small class="text-muted">No tags available.</small>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button class="btn btn-outline-secondary fw-bold" t-on-click="closeAccountForm" t-att-disabled="this.state.isSaving">Cancel</button>
+                            <button class="btn btn-success fw-bold text-white" t-on-click="saveAccount" t-att-disabled="this.state.isSaving">
+                                <span t-if="this.state.isSaving" class="spinner-border spinner-border-sm me-1"/>
+                                Save Account
+                            </button>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-else="">
+                    <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom flex-wrap gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="width: 280px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search code or name..." t-att-value="this.state.filters.accounts.search" t-on-input="(ev) => this.onSearchInput(ev, 'accounts')"/>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.filters.accounts.typeGroup" t-on-change="() => this.onFilterChange('accounts')">
+                                <option value="all">All Types</option>
+                                <option value="receivable">Receivable</option>
+                                <option value="payable">Payable</option>
+                                <option value="assets">Assets</option>
+                                <option value="liability">Liability</option>
+                                <option value="equity">Equity</option>
+                                <option value="income">Income</option>
+                                <option value="expenses">Expenses</option>
+                                <option value="off_balance">Off-Balance</option>
+                            </select>
+                            <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.filters.accounts.status" t-on-change="() => this.onFilterChange('accounts')">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="all">All Statuses</option>
+                            </select>
+                            <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="() => this.openAccountForm()">New Account</button>
+                        </div>
+                    </div>
+                    <t t-if="this.accountPrefixes.length">
+                        <div class="px-3 py-2 border-bottom d-flex flex-wrap gap-2 align-items-center" style="max-width: 100%;">
+                            <small class="text-muted fw-bold me-1">Code prefix:</small>
+                            <button t-attf-class="btn btn-sm #{this.state.filters.accounts.prefix === '' ? 'btn-dark text-white' : 'btn-outline-secondary'}" t-on-click="() => this.setAccountPrefix('')">All</button>
+                            <t t-foreach="this.accountPrefixes" t-as="prefix" t-key="prefix">
+                                <button t-attf-class="btn btn-sm #{this.state.filters.accounts.prefix === prefix ? 'btn-dark text-white' : 'btn-outline-secondary'}" t-on-click="() => this.setAccountPrefix(prefix)">
+                                    <t t-esc="prefix"/>…
+                                </button>
+                            </t>
+                        </div>
+                    </t>
+                    <div class="position-relative overflow-hidden">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <div class="table-responsive" style="max-width: 100%;">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4">Code</th>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th class="text-center">Reconcile</th>
+                                        <th>Taxes</th>
+                                        <th>Currency</th>
+                                        <th class="text-end pe-3 text-nowrap">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="this.state.tableAccounts.length === 0 and !this.state.isLoadingList">
+                                        <tr><td colspan="7" class="text-center py-5 text-muted fw-bold">No accounts found.</td></tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableAccounts" t-as="account" t-key="account.id">
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-dark"><t t-esc="account.displayCode"/></td>
+                                            <td><t t-esc="account.name"/></td>
+                                            <td><span class="badge bg-light border text-dark"><t t-esc="account.typeLabel"/></span></td>
+                                            <td class="text-center"><t t-esc="account.reconcile ? 'Yes' : 'No'"/></td>
+                                            <td><t t-esc="account.taxLabel"/></td>
+                                            <td><t t-esc="account.currencyLabel"/></td>
+                                            <td class="text-end pe-3 text-nowrap">
+                                                <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.openAccountForm(account)">Edit</button>
+                                                <button class="btn btn-sm btn-outline-danger fw-bold ms-1" t-on-click="() => this.archiveAccount(account)">
+                                                    <t t-esc="account.active === false ? 'Restore' : 'Archive'"/>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.accounts.total === 0 ? 0 : ((this.state.pagination.accounts.page - 1) * this.state.pagination.accounts.limit) + 1"/>
+                                to
+                                <t t-esc="Math.min(this.state.pagination.accounts.page * this.state.pagination.accounts.limit, this.state.pagination.accounts.total)"/>
+                                of <t t-esc="this.state.pagination.accounts.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('accounts', -1)" t-att-disabled="this.state.pagination.accounts.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                    <t t-esc="this.state.pagination.accounts.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.accounts.total / this.state.pagination.accounts.limit))"/>
+                                </button>
+                                <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('accounts', 1)" t-att-disabled="this.state.pagination.accounts.page &gt;= Math.ceil(this.state.pagination.accounts.total / this.state.pagination.accounts.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+
+            <t t-if="this.state.confirmModal.isOpen">
+                <ConfirmModal
+                    title="this.state.confirmModal.title"
+                    message="this.state.confirmModal.message"
+                    onConfirm="this.state.confirmModal.onConfirm"
+                    onCancel="() => this.closeConfirm()"
+                />
+            </t>
+        </div>
+    </t>
+</templates>

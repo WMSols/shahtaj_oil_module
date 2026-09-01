@@ -343,11 +343,11 @@
                                             <div t-attf-class="#{this.state.targetForm.type === 'product_bundle' ? 'col-md-4' : 'col-md-10'}">
                                                 <label class="small fw-bold">Product</label>
                                                 <select class="form-select form-select-sm"
-                                                        t-att-value="line.product_id === '' || line.product_id === false || line.product_id === null ? '' : line.product_id"
+                                                        t-model="line.product_id"
                                                         t-on-change="(ev) => this.onTargetLineProductChange(line, ev)">
                                                     <option value="">-- Select --</option>
                                                     <t t-foreach="this.state.products" t-as="p" t-key="p.id">
-                                                        <option t-att-value="p.id"><t t-esc="p.name"/></option>
+                                                        <option t-att-value="p.id" t-att-selected="p.id === line.product_id"><t t-esc="p.name"/></option>
                                                     </t>
                                                 </select>
                                             </div>

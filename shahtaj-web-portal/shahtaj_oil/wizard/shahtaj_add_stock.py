@@ -26,6 +26,10 @@ class ShahtajAddStockWizard(models.TransientModel):
         default=1.0,
         digits='Product Unit of Measure',
     )
+    unit_cost = fields.Float(
+        string='Unit Purchase Cost (Rs.)',
+        help='Purchase cost per unit for this stock batch. Leave 0 to use current average cost.',
+    )
 
     @api.constrains('qty_to_add')
     def _check_qty_to_add(self):
@@ -35,7 +39,10 @@ class ShahtajAddStockWizard(models.TransientModel):
 
     def action_add_stock(self):
         self.ensure_one()
-        self.product_id._shahtaj_add_on_hand_qty(self.qty_to_add)
+        self.product_id._shahtaj_add_on_hand_qty(
+            self.qty_to_add,
+            unit_cost=self.unit_cost if self.unit_cost > 0 else None,
+        )
         return {
             'type': 'ir.actions.act_window',
             'name': _('Stock Overview'),

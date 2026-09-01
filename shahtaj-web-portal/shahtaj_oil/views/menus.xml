@@ -18,100 +18,205 @@
               sequence="1"
               groups="shahtaj_oil.group_shahtaj_custom_portal_user"/>
 
+    <!-- ── 3. Order Booker Operations (native distributor) ── -->
+    <menuitem id="menu_shahtaj_order_booker_ops"
+              name="3. Order Booker"
+              parent="menu_shahtaj_root"
+              sequence="10"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_order_bookers"
               name="Order Bookers"
-              parent="menu_shahtaj_root"
+              parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_order_booker_management"
-              sequence="5"
+              sequence="10"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_create_order_booker"
               name="Create Order Booker"
-              parent="menu_shahtaj_root"
+              parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_create_order_booker_wizard"
-              sequence="6"
+              sequence="11"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_order_booker_overview"
+              name="Overview"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_order_booker_hub"
+              sequence="1"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_weekly_schedules"
+              name="Weekly Schedules"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_schedule_hub"
+              sequence="20"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_visit_tasks_progress"
+              name="Visit Tasks Progress"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_visit_hub_ob"
+              sequence="21"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_all_visit_tasks"
+              name="All Visit Tasks"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_visit_task"
+              sequence="22"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_generate_tasks"
+              name="Generate Tasks"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_generate_tasks_wizard"
+              sequence="23"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_shop_visits"
+              name="Shop Visits"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_visit"
+              sequence="30"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_targets"
+              name="Sales Targets"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_visit_target"
+              sequence="31"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_zones"
+              name="Zones"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_zone"
+              sequence="40"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_routes"
+              name="Routes"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_route"
+              sequence="41"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_shops"
+              name="All Shops"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_shop"
+              sequence="42"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_shop_approvals"
+              name="Pending Shop Approvals"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_shop_pending"
+              sequence="43"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_shops_unassigned"
+              name="Unassigned Shops"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_shop_unassigned"
+              sequence="44"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_orders_overview"
+              name="Field Orders Overview"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_orders_hub"
+              sequence="50"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_orders_needing_verification"
+              name="Orders Needing Verification"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_orders_needing_verification"
+              sequence="51"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_orders_all"
+              name="All Field Sales Orders"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_field_sales_orders"
+              sequence="52"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_orders_rejected"
+              name="Rejected Orders"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_orders_rejected"
+              sequence="53"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_ob_orders_to_invoice"
+              name="Orders to Invoice"
+              parent="menu_shahtaj_order_booker_ops"
+              action="action_shahtaj_orders_to_invoice"
+              sequence="54"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <!-- ── 4. Delivery Man Operations (native distributor) ── -->
+    <menuitem id="menu_shahtaj_delivery_man_ops"
+              name="4. Delivery Man"
+              parent="menu_shahtaj_root"
+              sequence="15"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_delivery_man_overview"
+              name="Overview"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_delivery_man_hub"
+              sequence="1"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_delivery_men"
               name="Delivery Men"
-              parent="menu_shahtaj_root"
+              parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_delivery_man_management"
-              sequence="7"
+              sequence="10"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_create_delivery_man"
               name="Create Delivery Man"
-              parent="menu_shahtaj_root"
+              parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_create_delivery_man_wizard"
-              sequence="8"
+              sequence="11"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
-    <menuitem id="menu_shahtaj_zone"
-              name="1. Zones"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_zone"
-              sequence="10"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
-
-    <menuitem id="menu_shahtaj_route"
-              name="2. Routes"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_route"
+    <menuitem id="menu_shahtaj_dm_dispatch_orders"
+              name="Dispatch Orders"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_dispatch_orders"
               sequence="20"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
-    <menuitem id="menu_shahtaj_shops"
-              name="3. Shops"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_shop"
-              sequence="30"
+    <menuitem id="menu_shahtaj_dm_dispatch_jobs"
+              name="Delivery Jobs"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_dispatch_jobs"
+              sequence="21"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
-    <menuitem id="menu_shahtaj_shops_unassigned"
-              name="3b. Unassigned Shops"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_shop_unassigned"
-              sequence="31"
+    <menuitem id="menu_shahtaj_dm_all_deliveries"
+              name="All Delivery Orders"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_delivery_all"
+              sequence="22"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
-    <menuitem id="menu_shahtaj_weekly_schedule"
-              name="4. Weekly Schedules"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_schedule_hub"
-              sequence="35"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
-
-    <menuitem id="menu_shahtaj_visit_task"
-              name="5. Visit Tasks"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_visit_hub"
-              sequence="37"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
-              
-    <menuitem id="menu_shahtaj_visit_target"
-              name="6. Targets"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_visit_target"
-              sequence="38"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
-
-    <menuitem id="menu_shahtaj_visit"
-              name="Shop Visits"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_visit"
-              sequence="39"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
-              
-    <menuitem id="menu_shahtaj_shop_approvals"
-              name="Pending Approvals"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_shop_pending"
-              sequence="40"
+    <menuitem id="menu_shahtaj_dm_visit_tasks_progress"
+              name="DM Visit Tasks Progress"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_visit_hub_dm"
+              sequence="23"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <!-- Parent is a folder; Overview restores the hub screen that child menus had hidden. -->
     <menuitem id="menu_shahtaj_accounting"
-              name="7. Shop Accounting"
+              name="8. Shop Accounting"
               parent="menu_shahtaj_root"
               sequence="42"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
@@ -324,18 +429,18 @@
               sequence="31"
               groups="shahtaj_oil.group_shahtaj_delivery_man"/>
 
-    <menuitem id="menu_shahtaj_activity_logs"
-              name="Activity Logs"
+    <menuitem id="menu_shahtaj_dm_my_van_stock"
+              name="Today Load"
               parent="menu_shahtaj_root"
-              action="action_shahtaj_activity_logs_html"
-              sequence="90"
-              groups="base.group_system"/>
+              action="action_shahtaj_dm_today_load"
+              sequence="32"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
 
-    <menuitem id="menu_shahtaj_activity_logs_list"
-              name="Activity Logs (List)"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_activity_logs"
-              sequence="91"
-              groups="base.group_system"/>
+    <!-- Legacy top-level Orders &amp; Dispatch folder (replaced by OB/DM parents) -->
+    <delete model="ir.ui.menu" id="menu_shahtaj_orders"/>
+    <delete model="ir.ui.menu" id="menu_shahtaj_orders_overview"/>
+    <delete model="ir.ui.menu" id="menu_shahtaj_orders_needing_verification"/>
+    <delete model="ir.ui.menu" id="menu_shahtaj_orders_all"/>
+    <delete model="ir.ui.menu" id="menu_shahtaj_orders_rejected_menu"/>
 
 </odoo>

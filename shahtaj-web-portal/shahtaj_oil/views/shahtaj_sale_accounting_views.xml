@@ -9,6 +9,30 @@
         <field name="arch" type="xml">
             <div name="button_box" position="inside">
                 <button type="object"
+                        name="action_shahtaj_open_shop"
+                        class="oe_stat_button"
+                        icon="fa-building-o"
+                        invisible="not partner_id"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial">
+                    <span class="o_stat_text">Shop Account</span>
+                </button>
+                <button type="object"
+                        name="action_shahtaj_view_shop_orders"
+                        class="oe_stat_button"
+                        icon="fa-shopping-cart"
+                        invisible="not partner_id"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial">
+                    <field name="shahtaj_shop_confirmed_order_count" widget="statinfo" string="Shop Orders"/>
+                </button>
+                <button type="object"
+                        name="action_shahtaj_view_shop_discounted_orders"
+                        class="oe_stat_button"
+                        icon="fa-percent"
+                        invisible="not partner_id or shahtaj_shop_past_discount_count == 0"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial">
+                    <field name="shahtaj_shop_past_discount_count" widget="statinfo" string="Past Discounts"/>
+                </button>
+                <button type="object"
                         name="action_shahtaj_view_visit"
                         class="oe_stat_button"
                         icon="fa-map-marker"
@@ -16,8 +40,31 @@
                         groups="shahtaj_oil.group_shahtaj_distributor_financial">
                     <span class="o_stat_text">Shop Visit</span>
                 </button>
+                <button type="object"
+                        name="action_shahtaj_view_dm_deliveries"
+                        class="oe_stat_button"
+                        icon="fa-truck"
+                        invisible="shahtaj_dm_delivery_count == 0"
+                        groups="shahtaj_oil.group_shahtaj_distributor">
+                    <field name="shahtaj_dm_delivery_count" widget="statinfo" string="DM Jobs"/>
+                </button>
             </div>
             <header position="inside">
+                <button name="action_shahtaj_approve_order" type="object"
+                        string="Approve Order"
+                        class="oe_highlight btn-success"
+                        invisible="shahtaj_approval_state != 'to_approve' or state not in ('draft', 'sent')"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <button name="action_shahtaj_open_reject_wizard" type="object"
+                        string="Reject Order"
+                        class="btn-outline-danger"
+                        invisible="shahtaj_approval_state != 'to_approve' or state not in ('draft', 'sent')"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <button name="action_shahtaj_assign_dm" type="object"
+                        string="Assign / Split DM"
+                        class="oe_highlight"
+                        invisible="state not in ('sale', 'done') or shahtaj_delivery_status == 'no_stock'"
+                        groups="shahtaj_oil.group_shahtaj_distributor"/>
                 <button name="action_shahtaj_mark_delivery" type="object"
                         string="Mark Delivery"
                         class="oe_highlight"
@@ -25,6 +72,33 @@
                         groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
             </header>
             <field name="partner_id" position="after">
+                <field name="shahtaj_dm_delivery_count" invisible="1"/>
+                <field name="shahtaj_approval_state" widget="badge" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       decoration-warning="shahtaj_approval_state == 'to_approve'"
+                       decoration-success="shahtaj_approval_state == 'approved'"
+                       decoration-danger="shahtaj_approval_state == 'rejected'"/>
+                <field name="shahtaj_approval_reasons_display" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       invisible="shahtaj_approval_state == 'none'"/>
+                <field name="shahtaj_approval_reason_discount" invisible="1"/>
+                <field name="shahtaj_approval_reason_credit" invisible="1"/>
+                <field name="shahtaj_total_discount_amount" widget="monetary" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       decoration-danger="shahtaj_total_discount_amount &gt; 0"
+                       invisible="not shahtaj_has_discount"/>
+                <field name="shahtaj_discount_reasons" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       invisible="not shahtaj_discount_reasons"/>
+                <field name="shahtaj_rejection_reason" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       invisible="shahtaj_approval_state != 'rejected'"/>
+                <field name="shahtaj_verified_by_id" readonly="1" optional="hide"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       invisible="shahtaj_approval_state in ('none', 'to_approve')"/>
+                <field name="shahtaj_verified_at" readonly="1" optional="hide"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       invisible="shahtaj_approval_state in ('none', 'to_approve')"/>
                 <field name="shahtaj_visit_id" readonly="1"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        invisible="not shahtaj_visit_id"/>
@@ -34,6 +108,16 @@
                 <field name="shahtaj_order_booker_id" readonly="1"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        invisible="not shahtaj_order_booker_id"/>
+                <field name="shahtaj_assigned_dm_id" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_planned_delivery_date"
+                       string="Planned Delivery Date"
+                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       invisible="state not in ('sale', 'done')"/>
+                <field name="shahtaj_dm_scheduled_date" readonly="1"
+                       string="Delivery Day"
+                       groups="shahtaj_oil.group_shahtaj_distributor"
+                       invisible="state in ('sale', 'done') or not shahtaj_dm_scheduled_date"/>
                 <field name="shahtaj_delivery_status" widget="badge" readonly="1"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        decoration-warning="shahtaj_delivery_status == 'pending'"
@@ -43,6 +127,65 @@
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        invisible="shahtaj_delivery_status in ('done', 'no_stock')"/>
             </field>
+            <xpath expr="//sheet/group[1]" position="before">
+                <div class="alert alert-info mb-3" role="alert"
+                     invisible="not partner_id or shahtaj_approval_state != 'to_approve'"
+                     groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial">
+                    <strong>Verification review:</strong>
+                    Review the verification reasons below (discount and/or credit limit) before approving.
+                </div>
+                <div class="alert alert-danger mb-3" role="alert"
+                     invisible="not shahtaj_shop_credit_would_exceed"
+                     groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial">
+                    <strong>Credit limit exceeded</strong>
+                    Effective outstanding
+                    <field name="shahtaj_shop_effective_outstanding" widget="monetary"
+                           nolabel="1" readonly="1" class="oe_inline fw-bold"/>
+                    exceeds limit
+                    <field name="shahtaj_shop_credit_limit" nolabel="1" readonly="1" class="oe_inline"/>.
+                    Approving will prompt for override or credit limit increase.
+                </div>
+                <group string="Shop Snapshot"
+                       invisible="not partner_id"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial">
+                    <group string="Credit &amp; Balance">
+                        <field name="shahtaj_shop_category" widget="badge"
+                               decoration-info="shahtaj_shop_category == 'credit'"
+                               decoration-success="shahtaj_shop_category == 'cash'"/>
+                        <field name="shahtaj_shop_credit_limit" widget="monetary"
+                               invisible="shahtaj_shop_category != 'credit'"/>
+                        <field name="shahtaj_shop_outstanding" widget="monetary"
+                               string="Posted Outstanding"
+                               decoration-danger="shahtaj_shop_outstanding &gt; 0"/>
+                        <field name="shahtaj_shop_pending_exposure" widget="monetary"
+                               invisible="shahtaj_shop_category != 'credit'"/>
+                        <field name="shahtaj_shop_uninvoiced_exposure" widget="monetary"
+                               invisible="shahtaj_shop_category != 'credit'"/>
+                        <field name="shahtaj_shop_effective_outstanding" widget="monetary"
+                               invisible="shahtaj_shop_category != 'credit'"
+                               class="fw-bold"
+                               decoration-danger="shahtaj_shop_credit_would_exceed"/>
+                        <field name="shahtaj_shop_credit_remaining" widget="monetary"
+                               invisible="shahtaj_shop_category != 'credit'"
+                               decoration-warning="shahtaj_shop_credit_would_exceed"/>
+                        <field name="shahtaj_shop_credit_would_exceed" invisible="1"/>
+                        <field name="shahtaj_shop_credit_shortfall" widget="monetary"
+                               invisible="not shahtaj_shop_credit_would_exceed"
+                               decoration-danger="shahtaj_shop_credit_would_exceed"/>
+                    </group>
+                    <group string="Sales &amp; Discount History">
+                        <field name="shahtaj_shop_lifetime_sales" widget="monetary"/>
+                        <field name="shahtaj_shop_confirmed_order_count"/>
+                        <field name="shahtaj_shop_past_discount_total" widget="monetary"
+                               decoration-danger="shahtaj_shop_past_discount_total &gt; 0"/>
+                        <field name="shahtaj_shop_past_discount_count"/>
+                        <field name="shahtaj_shop_last_discount_date"
+                               invisible="not shahtaj_shop_last_discount_date"/>
+                        <field name="shahtaj_shop_last_discount_amount" widget="monetary"
+                               invisible="not shahtaj_shop_last_discount_date"/>
+                    </group>
+                </group>
+            </xpath>
         </field>
     </record>
 
@@ -54,8 +197,22 @@
             <field name="partner_id" position="after">
                 <field name="shahtaj_order_booker_id" optional="show"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <field name="shahtaj_approval_state" optional="show" widget="badge"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       decoration-warning="shahtaj_approval_state == 'to_approve'"
+                       decoration-success="shahtaj_approval_state == 'approved'"
+                       decoration-danger="shahtaj_approval_state == 'rejected'"/>
+                <field name="shahtaj_approval_reasons_display" string="Verification Reasons" optional="show"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <field name="shahtaj_total_discount_amount" optional="show" widget="monetary"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                       decoration-danger="shahtaj_total_discount_amount &gt; 0"/>
                 <field name="shahtaj_visit_id" optional="hide"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <field name="shahtaj_assigned_dm_id" optional="show"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="shahtaj_dm_scheduled_date" optional="show"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
                 <field name="shahtaj_delivery_status" optional="show" widget="badge"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"
                        decoration-warning="shahtaj_delivery_status == 'pending'"
@@ -63,6 +220,15 @@
                        decoration-success="shahtaj_delivery_status == 'done'"/>
                 <field name="shahtaj_qty_to_deliver" optional="show"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <button name="action_shahtaj_approve_order" type="object"
+                        string="Approve" icon="fa-check"
+                        class="btn-success"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
+                        invisible="shahtaj_approval_state != 'to_approve' or state not in ('draft', 'sent')"/>
+                <button name="action_shahtaj_assign_dm" type="object"
+                        string="Assign / Split" icon="fa-user"
+                        groups="shahtaj_oil.group_shahtaj_distributor"
+                        invisible="state not in ('sale', 'done') or shahtaj_delivery_status == 'no_stock'"/>
                 <button name="action_shahtaj_mark_delivery" type="object"
                         string="Deliver" icon="fa-truck"
                         groups="shahtaj_oil.group_shahtaj_distributor_financial"
@@ -103,6 +269,43 @@
                 <field name="sale_order_id" optional="hide"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
             </field>
+        </field>
+    </record>
+
+    <!-- Field sales / booker orders: Today + This Week on order date -->
+    <record id="view_sale_order_search_shahtaj_week" model="ir.ui.view">
+        <field name="name">sale.order.search.shahtaj.week</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+        <field name="arch" type="xml">
+            <filter name="my_sale_orders_filter" position="after">
+                <separator/>
+                <filter string="Today" name="today"
+                        domain="[('date_order', '&gt;=', 'today'), ('date_order', '&lt;', 'today +1d')]"/>
+                <filter string="This Week" name="this_week"
+                        domain="[('date_order', '&gt;=', '=monday'), ('date_order', '&lt;', '=monday +1w')]"/>
+                <filter string="Order Booker" name="has_order_booker"
+                        domain="[('shahtaj_order_booker_id', '!=', False)]"/>
+                <separator/>
+                <filter string="Needs Verification" name="to_approve"
+                        domain="[('shahtaj_approval_state', '=', 'to_approve')]"/>
+                <filter string="Discounted Orders" name="has_discount"
+                        domain="[('shahtaj_has_discount', '=', True)]"/>
+                <filter string="Credit Limit Approval" name="credit_approval"
+                        domain="[('shahtaj_approval_reason_credit', '=', True)]"/>
+                <filter string="Discount Approval" name="discount_approval"
+                        domain="[('shahtaj_approval_reason_discount', '=', True)]"/>
+                <filter string="Verified" name="approved"
+                        domain="[('shahtaj_approval_state', '=', 'approved')]"/>
+                <filter string="Rejected" name="rejected"
+                        domain="[('shahtaj_approval_state', '=', 'rejected')]"/>
+            </filter>
+            <filter name="order_month" position="after">
+                <filter string="Order Booker" name="group_order_booker"
+                        context="{'group_by': 'shahtaj_order_booker_id'}"/>
+                <filter string="Verification Status" name="group_approval_state"
+                        context="{'group_by': 'shahtaj_approval_state'}"/>
+            </filter>
         </field>
     </record>
 

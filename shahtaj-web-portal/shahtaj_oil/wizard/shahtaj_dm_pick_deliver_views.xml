@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Pick wizard -->
+    <record id="view_shahtaj_dm_pick_wizard_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.pick.wizard.form</field>
+        <field name="model">shahtaj.dm.pick.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Pick Stock to Van">
+                <group>
+                    <field name="delivery_id"/>
+                    <field name="partner_id"/>
+                </group>
+                <div class="alert alert-info" role="alert">
+                    Set <b>Pick Now</b> up to your <b>assigned</b> quantity for this job
+                    (not the full sales order if it was split). Stock moves WH → van.
+                </div>
+                <field name="line_ids">
+                    <list editable="bottom" create="false" delete="false">
+                        <field name="delivery_line_id" column_invisible="1" force_save="1"/>
+                        <field name="product_id" readonly="1"/>
+                        <field name="qty_assigned" readonly="1" force_save="1"/>
+                        <field name="qty_required" readonly="1" force_save="1"/>
+                        <field name="qty_already_picked" readonly="1" force_save="1"/>
+                        <field name="qty_to_pick" force_save="1"/>
+                        <field name="product_uom_id" readonly="1"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_confirm_pick" type="object"
+                            string="Confirm Pick" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Deliver wizard -->
+    <record id="view_shahtaj_dm_deliver_wizard_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.deliver.wizard.form</field>
+        <field name="model">shahtaj.dm.deliver.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Deliver to Shop">
+                <group>
+                    <group string="Shop">
+                        <field name="delivery_id"/>
+                        <field name="partner_id"/>
+                        <field name="shop_latitude"/>
+                        <field name="shop_longitude"/>
+                    </group>
+                    <group string="My Location">
+                        <div colspan="2" class="mb-2">
+                            <widget name="shahtaj_geolocate"
+                                    latitude_field="latitude"
+                                    longitude_field="longitude"/>
+                        </div>
+                        <field name="latitude"/>
+                        <field name="longitude"/>
+                        <field name="distance_m"/>
+                        <field name="max_distance_m"/>
+                        <field name="gps_ok" invisible="1"/>
+                        <field name="gps_hint" readonly="1"/>
+                    </group>
+                </group>
+                <div class="alert alert-warning" role="alert" invisible="gps_ok">
+                    You must be near the shop. Tap <b>Use My GPS</b>, wait for the
+                    status to show OK, then confirm. Stock will not move if you are too far.
+                </div>
+                <div class="alert alert-success" role="alert" invisible="not gps_ok">
+                    GPS OK — set <b>Deliver Now</b> quantities and confirm.
+                </div>
+                <field name="line_ids">
+                    <list editable="bottom" create="false" delete="false">
+                        <field name="delivery_line_id" column_invisible="1" force_save="1"/>
+                        <field name="product_id" readonly="1"/>
+                        <field name="qty_on_van" readonly="1" force_save="1"/>
+                        <field name="qty_already_delivered" readonly="1" force_save="1"/>
+                        <field name="qty_to_deliver" force_save="1"/>
+                        <field name="product_uom_id" readonly="1"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_confirm_deliver" type="object"
+                            string="Confirm Delivery" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_delivery_man_hub_form" model="ir.ui.view">
+        <field name="name">shahtaj.delivery.man.hub.form</field>
+        <field name="model">shahtaj.delivery.man.hub</field>
+        <field name="arch" type="xml">
+            <form string="Delivery Man Operations" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Delivery Man Operations</h1>
+                        <p class="text-muted">
+                            Manage delivery men, assign dispatch orders, track delivery jobs,
+                            and monitor field delivery progress.
+                        </p>
+                    </div>
+                    <group string="Overview">
+                        <group>
+                            <field name="delivery_man_count" readonly="1"/>
+                            <field name="dm_jobs_today_count" readonly="1"/>
+                            <field name="dm_jobs_active_count" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="dispatch_orders_count" readonly="1"/>
+                            <field name="dm_tasks_today_pending" readonly="1"/>
+                            <field name="dm_deliveries_in_transit" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <strong>Typical workflow</strong>
+                        <ol class="mb-0 mt-2">
+                            <li>Create delivery men and assign confirmed orders from <b>Dispatch Orders</b>.</li>
+                            <li>Plan trips under <b>Delivery Jobs</b> (assign / split by delivery man and date).</li>
+                            <li>Delivery men load vans and complete stops via the DM mobile menus.</li>
+                            <li>After delivery, invoice shops under <b>Shop Accounting</b>.</li>
+                        </ol>
+                    </div>
+                    <group string="Open a section">
+                        <group string="Staff">
+                            <button name="action_open_delivery_men" type="object"
+                                    string="Delivery Men"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-users"/>
+                            <button name="action_open_create_delivery_man" type="object"
+                                    string="Create Delivery Man"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-user-plus"/>
+                        </group>
+                        <group string="Dispatch &amp; Delivery">
+                            <button name="action_open_dispatch_orders" type="object"
+                                    string="Dispatch Orders"
+                                    class="btn btn-primary mb-2 fw-bold"
+                                    icon="fa-truck"/>
+                            <button name="action_open_dispatch_jobs" type="object"
+                                    string="Delivery Jobs"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-list-alt"/>
+                            <button name="action_open_all_deliveries" type="object"
+                                    string="All Delivery Orders"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-archive"/>
+                            <button name="action_open_visit_tasks_progress" type="object"
+                                    string="DM Visit Tasks Progress"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-tasks"/>
+                            <button name="action_open_orders_hub" type="object"
+                                    string="Field Orders Overview"
+                                    class="btn btn-link mb-2"
+                                    icon="fa-dashboard"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_delivery_man_hub" model="ir.actions.server">
+        <field name="name">Delivery Man Overview</field>
+        <field name="model_id" ref="shahtaj_oil.model_shahtaj_delivery_man_hub"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_delivery_man_hub()
+        </field>
+    </record>
+
+</odoo>

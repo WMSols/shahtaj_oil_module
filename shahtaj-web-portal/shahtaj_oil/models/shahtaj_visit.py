@@ -34,6 +34,29 @@ class ShahtajVisit(models.Model):
     _order = 'started_at desc, id desc'
 
     name = fields.Char(compute='_compute_name', store=True)
+    visit_kind = fields.Selection(
+        [
+            ('order_booker', 'Order Booker'),
+            ('delivery_man', 'Delivery Man'),
+        ],
+        string='Staff Type',
+        default='order_booker',
+        required=True,
+        index=True,
+    )
+    delivery_man_id = fields.Many2one(
+        'res.users',
+        string='Delivery Man',
+        index=True,
+        ondelete='restrict',
+    )
+    dm_delivery_id = fields.Many2one(
+        'shahtaj.dm.delivery',
+        string='DM Delivery',
+        index=True,
+        ondelete='set null',
+        copy=False,
+    )
     visit_task_id = fields.Many2one(
         'shahtaj.visit.task',
         string='Visit Task',
@@ -135,6 +158,80 @@ class ShahtajVisit(models.Model):
         related='sale_order_id.amount_total',
         currency_field='currency_id',
     )
+    shahtaj_order_approval_state = fields.Selection(
+        related='sale_order_id.shahtaj_approval_state',
+        string='Order Verification',
+        store=True,
+        readonly=True,
+    )
+    shahtaj_order_approval_reason_discount = fields.Boolean(
+        related='sale_order_id.shahtaj_approval_reason_discount',
+        string='Discount Approval Required',
+        store=True,
+        readonly=True,
+    )
+    shahtaj_order_approval_reason_credit = fields.Boolean(
+        related='sale_order_id.shahtaj_approval_reason_credit',
+        string='Credit Approval Required',
+        store=True,
+        readonly=True,
+    )
+    shahtaj_order_approval_reasons_display = fields.Char(
+        related='sale_order_id.shahtaj_approval_reasons_display',
+        string='Verification Reasons',
+        readonly=True,
+    )
+    shahtaj_visit_cart_needs_discount_approval = fields.Boolean(
+        string='Cart Needs Discount Approval',
+        compute='_compute_shahtaj_visit_approval_preview',
+    )
+    shahtaj_visit_cart_needs_credit_approval = fields.Boolean(
+        string='Cart Needs Credit Approval',
+        compute='_compute_shahtaj_visit_approval_preview',
+    )
+    shahtaj_visit_cart_needs_approval = fields.Boolean(
+        string='Cart Needs Verification',
+        compute='_compute_shahtaj_visit_approval_preview',
+    )
+    shahtaj_order_state = fields.Selection(
+        related='sale_order_id.state',
+        string='Sales Order Status',
+        readonly=True,
+    )
+    shahtaj_order_has_discount = fields.Boolean(
+        related='sale_order_id.shahtaj_has_discount',
+        string='Order Has Discount',
+        store=True,
+        readonly=True,
+    )
+    shahtaj_order_catalog_amount = fields.Monetary(
+        related='sale_order_id.shahtaj_catalog_amount_total',
+        string='Order Catalog Total',
+        currency_field='currency_id',
+        readonly=True,
+    )
+    shahtaj_order_discount_amount = fields.Monetary(
+        related='sale_order_id.shahtaj_total_discount_amount',
+        string='Order Discount Amount',
+        currency_field='currency_id',
+        store=True,
+        readonly=True,
+    )
+    shahtaj_order_discount_reasons = fields.Char(
+        related='sale_order_id.shahtaj_discount_reasons',
+        string='Order Discount Reasons',
+        readonly=True,
+    )
+    shahtaj_order_rejection_reason = fields.Text(
+        related='sale_order_id.shahtaj_rejection_reason',
+        string='Order Rejection Reason',
+        readonly=True,
+    )
+    shahtaj_visit_discount_total = fields.Monetary(
+        string='Discount Total',
+        compute='_compute_shahtaj_visit_discount_total',
+        currency_field='currency_id',
+    )
     currency_id = fields.Many2one(
         'res.currency',
         related='shop_id.currency_id',
@@ -145,6 +242,99 @@ class ShahtajVisit(models.Model):
         string='Order Lines',
     )
     notes = fields.Text()
+
+    shahtaj_shop_credit_limit = fields.Float(
+        related='shop_id.credit_limit',
+        string='Shop Credit Limit',
+        readonly=True,
+    )
+    shahtaj_shop_effective_outstanding = fields.Monetary(
+        string='Shop Effective Outstanding',
+        compute='_compute_shahtaj_visit_shop_credit',
+        currency_field='currency_id',
+    )
+    shahtaj_shop_credit_remaining = fields.Monetary(
+        string='Shop Credit Remaining',
+        compute='_compute_shahtaj_visit_shop_credit',
+        currency_field='currency_id',
+    )
+    shahtaj_shop_cart_exposure = fields.Monetary(
+        string='Current Cart Total',
+        compute='_compute_shahtaj_visit_shop_credit',
+        currency_field='currency_id',
+    )
+
+    @api.depends(
+        'shop_id',
+        'shop_id.credit',
+        'shop_id.credit_limit',
+        'shop_id.shahtaj_shop_category',
+        'line_ids.subtotal',
+        'state',
+    )
+    def _compute_shahtaj_visit_shop_credit(self):
+        for visit in self:
+            shop = visit.shop_id
+            cart_total = sum(visit.line_ids.mapped('subtotal')) if visit.state == 'in_progress' else 0.0
+            visit.shahtaj_shop_cart_exposure = cart_total
+            if not shop or not shop.is_shahtaj_shop:
+                visit.shahtaj_shop_effective_outstanding = 0.0
+                visit.shahtaj_shop_credit_remaining = 0.0
+                continue
+            snap = shop._shahtaj_get_credit_snapshot(extra_order_amount=cart_total)
+            visit.shahtaj_shop_effective_outstanding = snap['effective_outstanding']
+            visit.shahtaj_shop_credit_remaining = snap['credit_remaining']
+
+    @api.depends(
+        'sale_order_id.shahtaj_approval_reason_discount',
+        'sale_order_id.shahtaj_approval_reason_credit',
+        'line_ids.has_discount',
+        'line_ids.subtotal',
+        'shop_id',
+        'shop_id.credit',
+        'shop_id.credit_limit',
+        'shop_id.shahtaj_shop_category',
+        'shop_id.use_partner_credit_limit',
+        'state',
+    )
+    def _compute_shahtaj_visit_approval_preview(self):
+        SaleOrder = self.env['sale.order']
+        for visit in self:
+            if visit.sale_order_id:
+                visit.shahtaj_visit_cart_needs_discount_approval = bool(
+                    visit.sale_order_id.shahtaj_approval_reason_discount
+                )
+                visit.shahtaj_visit_cart_needs_credit_approval = bool(
+                    visit.sale_order_id.shahtaj_approval_reason_credit
+                )
+            elif visit.state == 'in_progress' and visit.line_ids:
+                has_discount = any(visit.line_ids.mapped('has_discount'))
+                cart_total = sum(visit.line_ids.mapped('subtotal'))
+                req = SaleOrder._shahtaj_evaluate_field_order_approval(
+                    visit.shop_id,
+                    cart_total,
+                    has_discount,
+                )
+                visit.shahtaj_visit_cart_needs_discount_approval = req['needs_discount']
+                visit.shahtaj_visit_cart_needs_credit_approval = req['needs_credit']
+            else:
+                visit.shahtaj_visit_cart_needs_discount_approval = False
+                visit.shahtaj_visit_cart_needs_credit_approval = False
+            visit.shahtaj_visit_cart_needs_approval = (
+                visit.shahtaj_visit_cart_needs_discount_approval
+                or visit.shahtaj_visit_cart_needs_credit_approval
+            )
+
+    @api.depends(
+        'sale_order_id.shahtaj_total_discount_amount',
+        'line_ids.total_discount',
+    )
+    def _compute_shahtaj_visit_discount_total(self):
+        for visit in self:
+            if visit.sale_order_id:
+                visit.shahtaj_visit_discount_total = visit.sale_order_id.shahtaj_total_discount_amount or 0.0
+            else:
+                visit.shahtaj_visit_discount_total = sum(visit.line_ids.mapped('total_discount'))
 
     # One open (non-cancelled) visit per task — cancelled/undone visits stay for audit.
     @api.constrains('visit_task_id', 'state')
@@ -431,6 +621,7 @@ class ShahtajVisit(models.Model):
         distance = self._validate_check_in_coordinates(shop, latitude, longitude)
         now = fields.Datetime.now()
         visit = self.create({
+            'visit_kind': 'order_booker',
             'visit_task_id': task.id,
             'order_booker_id': task.order_booker_id.id,
             'shop_id': shop.id,
@@ -499,29 +690,6 @@ class ShahtajVisit(models.Model):
             'state': 'completed',
         })
 
-    def _check_credit_limit(self, order_total):
-        self.ensure_one()
-        shop = self.shop_id
-        if shop.shahtaj_shop_category == 'cash':
-            return
-        if not shop.use_partner_credit_limit or not shop.credit_limit:
-            return
-        outstanding = shop.sudo().credit
-        currency = shop.currency_id or self.env.company.currency_id
-        if float_compare(
-            outstanding + order_total,
-            shop.credit_limit,
-            precision_rounding=currency.rounding,
-        ) > 0:
-            raise UserError(_(
-                'Credit limit exceeded for shop "%(shop)s". '
-                'Outstanding: %(outstanding).2f, order: %(order).2f, limit: %(limit).2f.',
-                shop=shop.name,
-                outstanding=outstanding,
-                order=order_total,
-                limit=shop.credit_limit,
-            ))
-
     def _check_visit_line_stock(self):
         """Ensure each product total in this visit does not exceed bookable qty."""
         for visit in self.filtered(lambda v: v.state == 'in_progress'):
@@ -578,41 +746,82 @@ class ShahtajVisit(models.Model):
         self._check_visit_line_stock()
         order_lines = []
         order_total = 0.0
+        has_any_discount = False
+        total_discount = 0.0
+
         for line in self.line_ids:
             if line.product_uom_qty <= 0:
                 raise UserError(_('Quantity must be greater than zero for all lines.'))
-            subtotal = line.product_uom_qty * line.price_unit
+            catalog_price = line.product_id.lst_price if line.product_id else 0.0
+            price_unit = line.price_unit or 0.0
+            is_discounted = float_compare(price_unit, catalog_price, precision_rounding=0.01) < 0
+            unit_disc = max(0.0, catalog_price - price_unit) if is_discounted else 0.0
+            total_disc = unit_disc * line.product_uom_qty
+            disc_pct = ((catalog_price - price_unit) / catalog_price * 100.0) if (is_discounted and catalog_price > 0) else 0.0
+
+            if is_discounted:
+                has_any_discount = True
+                total_discount += total_disc
+
+            subtotal = line.product_uom_qty * price_unit
             order_total += subtotal
             order_lines.append((0, 0, {
                 'product_id': line.product_id.id,
                 'product_uom_qty': line.product_uom_qty,
-                'price_unit': line.price_unit,
+                'price_unit': price_unit,
+                'discount': disc_pct if is_discounted else 0.0,
+                'shahtaj_catalog_price': catalog_price,
+                'shahtaj_unit_discount': unit_disc,
+                'shahtaj_total_discount': total_disc,
+                'shahtaj_discount_reason': line.discount_reason or False,
             }))
-        self._check_credit_limit(order_total)
+        SaleOrder = self.env['sale.order']
+        approval_req = SaleOrder._shahtaj_evaluate_field_order_approval(
+            self.shop_id,
+            order_total,
+            has_any_discount,
+        )
         # sudo: booker has no Sales app rights; order is linked to visit and booker.
-        order = self.env['sale.order'].sudo().create({
+        order = SaleOrder.sudo().with_context(
+            shahtaj_skip_approval_sync=True,
+        ).create({
             'partner_id': self.shop_id.id,
             'user_id': self.order_booker_id.id,
             'origin': _('Shop visit %s', self.display_name),
             'shahtaj_visit_id': self.id,
             'shahtaj_visit_task_id': self.visit_task_id.id,
+            'shahtaj_approval_state': approval_req['approval_state'],
+            'shahtaj_approval_reason_discount': approval_req['needs_discount'],
+            'shahtaj_approval_reason_credit': approval_req['needs_credit'],
             'order_line': order_lines,
         })
-        order.sudo().action_confirm()
-        # Confirm path refreshes targets; call again so place-order always
-        # leaves stored progress current for API/UI reads in this request.
-        order.sudo()._shahtaj_recompute_visit_targets()
+        order._shahtaj_sync_approval_state_from_lines()
+        approval_state = order.shahtaj_approval_state
+
+        if order.shahtaj_approval_state == 'none':
+            order.sudo().with_context(shahtaj_skip_credit_check=True).action_confirm()
+            # Confirm path refreshes targets; call again so place-order always
+            # leaves stored progress current for API/UI reads in this request.
+            order.sudo()._shahtaj_recompute_visit_targets()
+
         self.with_context(shahtaj_system_visit_write=True).write({
             'sale_order_id': order.id,
         })
         self._finish_visit('order')
+        reasons_label = order.shahtaj_approval_reasons_display or _('none')
+        log_msg = _(
+            'Order %(order)s for %(shop)s (Verification: %(state)s, Reasons: %(reasons)s, Discount: %(disc)s)',
+            order=order.display_name,
+            shop=self.shop_id.display_name,
+            state=approval_state,
+            reasons=reasons_label,
+            disc=total_discount,
+        )
         self.env['shahtaj.activity.log'].log_business(
             operation='visit.place_order',
             name='Place order from visit',
             related_record=self,
-            message=_('Order %(order)s for %(shop)s',
-                      order=order.display_name,
-                      shop=self.shop_id.display_name),
+            message=log_msg,
         )
         # Bookers see completed visit; distributors can open the sales order form.
         if self._is_booker_only_user():
@@ -820,10 +1029,61 @@ class ShahtajVisitLine(models.Model):
         string='Unit Price',
         digits='Product Price',
     )
+    catalog_price = fields.Float(
+        string='Catalog Price',
+        compute='_compute_pricing_and_discounts',
+        digits='Product Price',
+        store=True,
+    )
+    has_discount = fields.Boolean(
+        string='Has Discount',
+        compute='_compute_pricing_and_discounts',
+        store=True,
+    )
+    unit_discount = fields.Float(
+        string='Unit Discount',
+        compute='_compute_pricing_and_discounts',
+        digits='Product Price',
+        store=True,
+    )
+    total_discount = fields.Float(
+        string='Total Discount',
+        compute='_compute_pricing_and_discounts',
+        digits='Product Price',
+        store=True,
+    )
+    discount_percent = fields.Float(
+        string='Discount %',
+        compute='_compute_pricing_and_discounts',
+        digits=(16, 2),
+        store=True,
+    )
+    discount_reason = fields.Char(
+        string='Discount Reason',
+        help='Reason for giving a discount on this line.',
+    )
     subtotal = fields.Float(
         string='Subtotal',
         compute='_compute_subtotal',
     )
+
+    @api.depends('price_unit', 'product_id', 'product_uom_qty')
+    def _compute_pricing_and_discounts(self):
+        for line in self:
+            catalog = line.product_id.lst_price if line.product_id else 0.0
+            line.catalog_price = catalog
+            price = line.price_unit or 0.0
+            if line.product_id and float_compare(price, catalog, precision_rounding=0.01) < 0:
+                unit_disc = max(0.0, catalog - price)
+                line.has_discount = True
+                line.unit_discount = unit_disc
+                line.total_discount = unit_disc * line.product_uom_qty
+                line.discount_percent = (unit_disc / catalog) * 100.0 if catalog > 0 else 0.0
+            else:
+                line.has_discount = False
+                line.unit_discount = 0.0
+                line.total_discount = 0.0
+                line.discount_percent = 0.0
 
     @api.depends(
         'product_id',

@@ -31,6 +31,38 @@ class ResUsers(models.Model):
         store=True,
         index=True,
     )
+    shahtaj_is_delivery_man = fields.Boolean(
+        string='Is Delivery Man',
+        compute='_compute_shahtaj_is_delivery_man',
+        store=True,
+        index=True,
+    )
+    shahtaj_assigned_booker_ids = fields.Many2many(
+        'res.users',
+        'shahtaj_delivery_man_booker_rel',
+        'delivery_man_id',
+        'booker_id',
+        string='Assigned Order Bookers',
+        domain="[('shahtaj_is_order_booker', '=', True)]",
+        help='Order bookers whose orders this delivery man will deliver.',
+    )
+    shahtaj_assigned_booker_count = fields.Integer(
+        string='Bookers',
+        compute='_compute_shahtaj_dm_stats',
+    )
+    shahtaj_pending_delivery_count = fields.Integer(
+        string='Pending Deliveries',
+        compute='_compute_shahtaj_dm_stats',
+    )
+    shahtaj_dm_job_ids = fields.One2many(
+        'shahtaj.dm.delivery',
+        'delivery_man_id',
+        string='Assigned Delivery Jobs',
+    )
+    shahtaj_dm_job_count = fields.Integer(
+        string='Delivery Jobs',
+        compute='_compute_shahtaj_dm_stats',
+    )
     shahtaj_online_status = fields.Selection(
         [
             ('online', 'Online'),
@@ -247,6 +279,8 @@ class ResUsers(models.Model):
                 vals['shahtaj_distributor_financial_access'] = True
             if self._shahtaj_vals_include_group(
                 vals, 'shahtaj_oil.group_shahtaj_order_booker',
+            ) or self._shahtaj_vals_include_group(
+                vals, 'shahtaj_oil.group_shahtaj_delivery_man',
             ):
                 vals['tz'] = 'Asia/Karachi'
                 pakistan = self.env.ref('base.pk', raise_if_not_found=False)
@@ -258,6 +292,17 @@ class ResUsers(models.Model):
         users._sync_shahtaj_financial_group()
         return users
 
+    def _shahtaj_split_managed_staff(self):
+        """Return (managed_staff, other_users) — bookers + delivery men."""
+        booker_group = self.env.ref('shahtaj_oil.group_shahtaj_order_booker')
+        dm_group = self.env.ref('shahtaj_oil.group_shahtaj_delivery_man')
+        targets = self.with_context(active_test=False)
+        managed = targets.filtered(
+            lambda user: booker_group in user.sudo().group_ids
+            or dm_group in user.sudo().group_ids
+        )
+        return managed, targets - managed
+
     def _shahtaj_split_managed_bookers(self):
         """Return (booker_users, other_users) for the current distributor context."""
         booker_group = self.env.ref('shahtaj_oil.group_shahtaj_order_booker')
@@ -268,27 +313,28 @@ class ResUsers(models.Model):
         return bookers, targets - bookers
 
     def check_access(self, operation):
-        """Let distributors run booker actions on read-only res.users forms."""
+        """Let distributors run booker/delivery-man actions on read-only res.users forms."""
         if (
             operation == 'write'
             and not self.env.su
             and self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
         ):
-            bookers, others = self._shahtaj_split_managed_bookers()
-            if bookers and not others:
-                return super(ResUsers, bookers).check_access('read')
+            managed, others = self._shahtaj_split_managed_staff()
+            if managed and not others:
+                return super(ResUsers, managed).check_access('read')
         return super().check_access(operation)
 
     def write(self, vals):
         if self.env.context.get('shahtaj_skip_ui_sync'):
             return super().write(vals)
 
-        # Distributors manage order bookers with sudo to avoid res.users/partner rules.
+        # Distributors manage order bookers / delivery men with sudo.
         if (
             not self.env.su
             and self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
         ):
-            bookers, others = self._shahtaj_split_managed_bookers()
+            managed, others = self._shahtaj_split_managed_staff()
+            bookers = managed  # keep variable name for rest of method
             if bookers:
                 res = super(ResUsers, bookers.sudo()).write(vals)
                 if others:
@@ -432,6 +478,12 @@ class ResUsers(models.Model):
             user._shahtaj_write_group_ids(group_ids, desired)
 
     @api.model
+    def _shahtaj_run_setup_checks(self):
+        """Called from data/shahtaj_user_access_sync.xml on every module upgrade."""
+        from ..setup import run_all_setup_checks
+        run_all_setup_checks(self.env)
+
+    @api.model
     def _shahtaj_fix_financial_group_privilege(self):
         """Financial Access must not share the Shahtaj role privilege."""
         group = self.env.ref(
@@ -479,6 +531,28 @@ class ResUsers(models.Model):
             user.shahtaj_is_order_booker = user.has_group(
                 'shahtaj_oil.group_shahtaj_order_booker'
             )
+
+    @api.depends('group_ids')
+    def _compute_shahtaj_is_delivery_man(self):
+        for user in self:
+            user.shahtaj_is_delivery_man = user.has_group(
+                'shahtaj_oil.group_shahtaj_delivery_man'
+            )
+
+    def _compute_shahtaj_dm_stats(self):
+        DmDelivery = self.env['shahtaj.dm.delivery']
+        for user in self:
+            if not user.shahtaj_is_delivery_man:
+                user.shahtaj_assigned_booker_count = 0
+                user.shahtaj_pending_delivery_count = 0
+                user.shahtaj_dm_job_count = 0
+                continue
+            user.shahtaj_assigned_booker_count = len(user.shahtaj_assigned_booker_ids)
+            jobs = DmDelivery.sudo().search([('delivery_man_id', '=', user.id)])
+            user.shahtaj_dm_job_count = len(jobs)
+            user.shahtaj_pending_delivery_count = len(jobs.filtered(
+                lambda j: j.state in ('not_ready', 'ready', 'picked', 'partial')
+            ))
 
     @api.depends('shahtaj_last_seen_at', 'shahtaj_is_order_booker')
     def _compute_shahtaj_online_status(self):
@@ -548,21 +622,29 @@ class ResUsers(models.Model):
         return True
 
     def _compute_task_subsets(self):
-        """Split visit tasks into today / this week / older for booker hub views."""
+        """Split visit tasks into today / this week / older for hub views."""
         Task = self.env['shahtaj.visit.task']
         today = fields.Date.context_today(self)
         week_start, week_end = shahtaj_week_bounds(today)
         empty = Task.browse()
         for user in self:
-            if not user.shahtaj_is_order_booker:
+            if user.shahtaj_is_order_booker:
+                tasks = Task.search([
+                    ('order_booker_id', '=', user.id),
+                    ('task_kind', '=', 'order_booker'),
+                    ('state', '!=', 'cancelled'),
+                ], order='scheduled_date desc, route_id, shop_id')
+            elif user.shahtaj_is_delivery_man:
+                tasks = Task.search([
+                    ('delivery_man_id', '=', user.id),
+                    ('task_kind', '=', 'delivery_man'),
+                    ('state', '!=', 'cancelled'),
+                ], order='scheduled_date desc, route_id, shop_id')
+            else:
                 user.shahtaj_task_today_ids = empty
                 user.shahtaj_task_week_ids = empty
                 user.shahtaj_task_history_ids = empty
                 continue
-            tasks = Task.search([
-                ('order_booker_id', '=', user.id),
-                ('state', '!=', 'cancelled'),
-            ], order='scheduled_date desc, route_id, shop_id')
             user.shahtaj_task_today_ids = tasks.filtered(
                 lambda t: t.scheduled_date == today
             )
@@ -575,6 +657,7 @@ class ResUsers(models.Model):
 
     @api.depends(
         'shahtaj_is_order_booker',
+        'shahtaj_is_delivery_man',
         'shahtaj_schedule_ids',
         'shahtaj_target_ids',
         'shahtaj_target_ids.progress_percent',
@@ -582,7 +665,7 @@ class ResUsers(models.Model):
         'partner_id.im_status',
     )
     def _compute_shahtaj_stats(self):
-        """Counts for distributor order booker form and visit hub."""
+        """Counts for distributor order booker / delivery man form and visit hub."""
         Task = self.env['shahtaj.visit.task']
         today = fields.Date.context_today(self)
         week_start, week_end = shahtaj_week_bounds(today)
@@ -618,6 +701,7 @@ class ResUsers(models.Model):
 
             today_tasks = Task.search([
                 ('order_booker_id', '=', user.id),
+                ('task_kind', '=', 'order_booker'),
                 ('scheduled_date', '=', today),
                 ('state', '!=', 'cancelled'),
             ]).filtered(lambda t: t._shahtaj_belongs_on_booker_day_list())
@@ -631,6 +715,7 @@ class ResUsers(models.Model):
 
             week_tasks = Task.search([
                 ('order_booker_id', '=', user.id),
+                ('task_kind', '=', 'order_booker'),
                 ('scheduled_date', '>=', week_start),
                 ('scheduled_date', '<=', week_end),
                 ('state', '!=', 'cancelled'),
@@ -643,7 +728,44 @@ class ResUsers(models.Model):
                 user.shahtaj_week_task_done / user.shahtaj_week_task_total * 100.0
                 if user.shahtaj_week_task_total else 0.0
             )
-        for user in self - self.filtered('shahtaj_is_order_booker'):
+        for user in self.filtered(
+            lambda u: u.shahtaj_is_delivery_man and not u.shahtaj_is_order_booker
+        ):
+            user.shahtaj_schedule_count = 0
+            user.shahtaj_target_count = 0
+            user.shahtaj_active_target_progress = 0.0
+            user.shahtaj_active_target_summary = ''
+            today_tasks = Task.search([
+                ('delivery_man_id', '=', user.id),
+                ('task_kind', '=', 'delivery_man'),
+                ('scheduled_date', '=', today),
+                ('state', '!=', 'cancelled'),
+            ])
+            user.shahtaj_task_today_total = len(today_tasks)
+            user.shahtaj_task_today_pending = len(
+                today_tasks.filtered(lambda t: t.state in ('pending', 'in_progress'))
+            )
+            user.shahtaj_task_today_done = len(
+                today_tasks.filtered(lambda t: t.state == 'completed')
+            )
+            week_tasks = Task.search([
+                ('delivery_man_id', '=', user.id),
+                ('task_kind', '=', 'delivery_man'),
+                ('scheduled_date', '>=', week_start),
+                ('scheduled_date', '<=', week_end),
+                ('state', '!=', 'cancelled'),
+            ])
+            user.shahtaj_week_task_total = len(week_tasks)
+            user.shahtaj_week_task_done = len(
+                week_tasks.filtered(lambda t: t.state == 'completed')
+            )
+            user.shahtaj_week_task_progress = (
+                user.shahtaj_week_task_done / user.shahtaj_week_task_total * 100.0
+                if user.shahtaj_week_task_total else 0.0
+            )
+        for user in self.filtered(
+            lambda u: not u.shahtaj_is_order_booker and not u.shahtaj_is_delivery_man
+        ):
             user.shahtaj_schedule_count = 0
             user.shahtaj_target_count = 0
             user.shahtaj_task_today_total = 0
@@ -706,6 +828,76 @@ class ResUsers(models.Model):
             'context': {'search_default_active': 1},
             'target': 'current',
         }
+
+    def _shahtaj_ensure_distributor_manage_delivery_man(self):
+        if not self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            raise AccessError(_('Only distributors can manage delivery man accounts.'))
+        dm_group = self.env.ref('shahtaj_oil.group_shahtaj_delivery_man')
+        for user in self.sudo().with_context(active_test=False):
+            if dm_group not in user.group_ids:
+                raise UserError(_(
+                    'User "%(user)s" is not a delivery man account.',
+                    user=user.display_name,
+                ))
+
+    def action_shahtaj_deactivate_delivery_man(self):
+        self.ensure_one()
+        self._shahtaj_ensure_distributor_manage_delivery_man()
+        self.sudo().write({'active': False})
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Delivery Men'),
+            'res_model': 'res.users',
+            'view_mode': 'list,form',
+            'domain': [('shahtaj_is_delivery_man', '=', True)],
+            'context': {'search_default_active': 1, 'active_test': False},
+            'target': 'current',
+        }
+
+    def action_shahtaj_activate_delivery_man(self):
+        self.ensure_one()
+        self._shahtaj_ensure_distributor_manage_delivery_man()
+        self.sudo().write({'active': True})
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Delivery Men'),
+            'res_model': 'res.users',
+            'view_mode': 'list,form',
+            'domain': [('shahtaj_is_delivery_man', '=', True)],
+            'context': {'search_default_active': 1, 'active_test': False},
+            'target': 'current',
+        }
+
+    def action_shahtaj_delete_delivery_man(self):
+        self.ensure_one()
+        self._shahtaj_ensure_distributor_manage_delivery_man()
+        self.sudo().with_context(active_test=False).unlink()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Delivery Men'),
+            'res_model': 'res.users',
+            'view_mode': 'list,form',
+            'domain': [('shahtaj_is_delivery_man', '=', True)],
+            'context': {'search_default_active': 1, 'active_test': False},
+            'target': 'current',
+        }
+
+    def action_shahtaj_dm_view_jobs(self):
+        """Open this delivery man's jobs (distributor dispatch view)."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Delivery Jobs — %s', self.name),
+            'res_model': 'shahtaj.dm.delivery',
+            'view_mode': 'list,form',
+            'domain': [('delivery_man_id', '=', self.id)],
+            'context': {'default_delivery_man_id': self.id},
+            'target': 'current',
+        }
+
+    def action_shahtaj_dm_view_pending_orders(self):
+        """Compatibility alias → delivery jobs list."""
+        return self.action_shahtaj_dm_view_jobs()
 
     def action_shahtaj_view_tasks_today(self):
         self.ensure_one()

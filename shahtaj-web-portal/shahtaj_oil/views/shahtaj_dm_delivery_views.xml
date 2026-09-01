@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── LIST VIEW ── -->
+    <record id="view_shahtaj_dm_delivery_list" model="ir.ui.view">
+        <field name="name">shahtaj.dm.delivery.list</field>
+        <field name="model">shahtaj.dm.delivery</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'not_ready'"
+                  decoration-info="state == 'ready'"
+                  decoration-warning="state in ('picked', 'partial') or field_state in ('not_attended', 'failed')"
+                  decoration-success="state == 'delivered' or field_state == 'done'"
+                  decoration-danger="state == 'returned' or field_state == 'failed'">
+                <header>
+                    <button name="action_refresh_for_current_user" type="object"
+                            string="Refresh" class="btn-secondary" icon="fa-refresh"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                    <button name="action_bulk_pick_stock" type="object"
+                            string="Today's Load" class="btn-primary" icon="fa-truck"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                </header>
+                <field name="scheduled_date" optional="show"/>
+                <field name="scheduled_time" widget="float_time" optional="show"/>
+                <field name="sale_order_id"/>
+                <field name="partner_id"/>
+                <field name="order_booker_id"/>
+                <field name="delivery_man_id" optional="hide"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="assignment_mode" optional="hide"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="order_date" optional="hide"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="qty_assigned_total" string="Assigned Qty" optional="show"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="is_split_share" optional="hide"
+                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                <field name="state" string="Stock" widget="badge"
+                       decoration-danger="state in ('not_ready', 'returned')"
+                       decoration-info="state == 'ready'"
+                       decoration-warning="state in ('picked', 'partial')"
+                       decoration-success="state == 'delivered'"/>
+                <field name="field_state" string="Stop" widget="badge"
+                       decoration-muted="field_state == 'pending'"
+                       decoration-info="field_state == 'in_transit'"
+                       decoration-warning="field_state == 'not_attended'"
+                       decoration-danger="field_state == 'failed'"
+                       decoration-success="field_state == 'done'"/>
+                <button name="action_pick_stock" type="object"
+                        string="Pick Stock" icon="fa-cube"
+                        invisible="state not in ('ready', 'picked', 'partial')"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                <button name="action_field_in_transit" type="object"
+                        string="On the Way" icon="fa-road"
+                        invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                <button name="action_deliver_to_shop" type="object"
+                        string="Deliver" icon="fa-check"
+                        invisible="state not in ('picked', 'partial')"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                <button name="action_return_to_warehouse" type="object"
+                        string="Return WH" icon="fa-undo"
+                        invisible="state not in ('picked', 'partial')"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                <button name="action_print_invoice" type="object"
+                        string="Print Invoice" icon="fa-print"
+                        invisible="state == 'not_ready'"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── FORM VIEW ── -->
+    <record id="view_shahtaj_dm_delivery_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.delivery.form</field>
+        <field name="model">shahtaj.dm.delivery</field>
+        <field name="arch" type="xml">
+            <form string="Delivery Order">
+                <header>
+                    <button name="action_pick_stock" type="object"
+                            string="Pick Stock from Warehouse" class="oe_highlight"
+                            invisible="state not in ('ready', 'picked', 'partial')"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                    <button name="action_field_in_transit" type="object"
+                            string="On the Way" class="btn-secondary"
+                            invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                    <button name="action_field_not_attended" type="object"
+                            string="Shop Closed" class="btn-warning"
+                            invisible="state not in ('picked', 'partial') or field_state == 'done'"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"
+                            confirm="Mark shop closed / not attended? Add a note first if empty."/>
+                    <button name="action_field_failed" type="object"
+                            string="Could Not Deliver" class="btn-danger"
+                            invisible="state not in ('picked', 'partial') or field_state == 'done'"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"
+                            confirm="Mark could not deliver? Stock stays on the van. Add a note first if empty."/>
+                    <button name="action_deliver_to_shop" type="object"
+                            string="Deliver to Shop" class="oe_highlight"
+                            invisible="state not in ('picked', 'partial')"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                    <button name="action_return_to_warehouse" type="object"
+                            string="Return Undelivered to Warehouse" class="btn-warning"
+                            invisible="state not in ('picked', 'partial')"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"
+                            confirm="Return undelivered van stock for this shop back to the warehouse?"/>
+                    <button name="action_field_reset_pending" type="object"
+                            string="Reset Stop" class="btn-secondary"
+                            invisible="field_state not in ('in_transit', 'not_attended', 'failed') or state in ('delivered', 'returned')"
+                            groups="shahtaj_oil.group_shahtaj_distributor"/>
+                    <button name="action_print_invoice" type="object"
+                            string="Print Invoice" class="btn-secondary"
+                            invisible="state == 'not_ready'"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                    <button name="action_view_van_quants" type="object"
+                            string="Open Van Stock" class="btn-secondary"
+                            invisible="not van_location_id"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                    <button name="action_view_sale_order" type="object"
+                            string="View Sale Order" class="btn-secondary"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="not_ready,ready,picked,partial,delivered,returned"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="display_name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-info" role="alert">
+                        <b>Two statuses</b>
+                        <ul class="mb-0">
+                            <li><b>Stock</b> (top bar) — warehouse flow: pick → van → shop / return</li>
+                            <li><b>Stop</b> — field story: On the Way / Shop Closed / Could Not Deliver / Done</li>
+                            <li>Shop Closed and Could Not Deliver need a <b>note</b> below</li>
+                        </ul>
+                    </div>
+                    <group>
+                        <group string="Order Details">
+                            <field name="sale_order_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="order_booker_id" readonly="1"/>
+                            <field name="order_date" readonly="1"/>
+                        </group>
+                        <group string="Delivery Info">
+                            <field name="shahtaj_processing_locked" invisible="1"/>
+                            <field name="delivery_man_id"
+                                   readonly="shahtaj_processing_locked"/>
+                            <field name="scheduled_date"
+                                   readonly="shahtaj_processing_locked"/>
+                            <field name="scheduled_time" widget="float_time"
+                                   readonly="shahtaj_processing_locked"/>
+                            <field name="field_state" widget="badge"
+                                   decoration-muted="field_state == 'pending'"
+                                   decoration-info="field_state == 'in_transit'"
+                                   decoration-warning="field_state == 'not_attended'"
+                                   decoration-danger="field_state == 'failed'"
+                                   decoration-success="field_state == 'done'"
+                                   readonly="1"/>
+                            <field name="assignment_mode" readonly="1"
+                                   groups="shahtaj_oil.group_shahtaj_distributor"/>
+                            <field name="assigned_by_id" readonly="1"
+                                   groups="shahtaj_oil.group_shahtaj_distributor"
+                                   invisible="not assigned_by_id"/>
+                            <field name="amount_total" readonly="1"/>
+                            <field name="qty_assigned_total" readonly="1"/>
+                            <field name="is_split_share" readonly="1"
+                                   groups="shahtaj_oil.group_shahtaj_distributor"/>
+                            <field name="invoice_status" readonly="1"/>
+                            <field name="van_location_id" readonly="1"
+                                   invisible="not van_location_id"/>
+                            <field name="visit_task_id" readonly="1"
+                                   invisible="not visit_task_id"/>
+                            <field name="gps_verified" readonly="1"
+                                   invisible="not gps_verified"/>
+                            <field name="check_in_distance_m" readonly="1"
+                                   invisible="not check_in_distance_m"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"
+                               placeholder="Required for Shop Closed / Could Not Deliver (e.g. shop closed, customer refused)…"/>
+                    </group>
+                    <notebook>
+                        <page string="Products" name="lines">
+                            <div class="alert alert-info" role="alert"
+                                 invisible="not is_split_share">
+                                This job is a <b>split share</b> of the sales order.
+                                Pick and deliver only the <b>Assigned to DM</b> quantities.
+                            </div>
+                            <field name="line_ids" readonly="1">
+                                <list>
+                                    <field name="product_id"/>
+                                    <field name="qty_ordered" string="SO Ordered"/>
+                                    <field name="qty_assigned" string="Assigned to DM" sum="Assigned"/>
+                                    <field name="qty_to_pick" string="Still to Pick"/>
+                                    <field name="qty_picked" sum="Picked"/>
+                                    <field name="qty_delivered" sum="Delivered"/>
+                                    <field name="qty_remaining_on_van" sum="On van"/>
+                                    <field name="product_uom_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Van Stock" name="van_stock"
+                              invisible="not van_location_id">
+                            <div class="mb-3">
+                                <button name="action_view_van_quants" type="object"
+                                        string="Open Full Van Inventory" class="btn-primary"
+                                        icon="fa-cubes"
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                                <button name="action_pick_stock" type="object"
+                                        string="Pick More to Van" class="btn-secondary"
+                                        icon="fa-cube"
+                                        invisible="state not in ('ready', 'picked', 'partial')"
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                                <button name="action_return_to_warehouse" type="object"
+                                        string="Return Leftover to Warehouse" class="btn-warning"
+                                        icon="fa-undo"
+                                        invisible="state not in ('picked', 'partial')"
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man"
+                                        confirm="Return undelivered van stock for this shop back to the warehouse?"/>
+                            </div>
+                            <group string="This shop — quantities">
+                                <field name="line_ids" nolabel="1" readonly="1">
+                                    <list>
+                                        <field name="product_id"/>
+                                        <field name="qty_assigned" string="Assigned" sum="Assigned"/>
+                                        <field name="qty_picked" sum="Picked"/>
+                                        <field name="qty_delivered" sum="Delivered"/>
+                                        <field name="qty_remaining_on_van" sum="Left on van"/>
+                                        <field name="product_uom_id"/>
+                                    </list>
+                                </field>
+                            </group>
+                            <group string="Live van location + totals">
+                                <field name="van_stock_html" nolabel="1" colspan="2"/>
+                            </group>
+                        </page>
+                        <page string="Stock Transfers" name="transfers"
+                              invisible="not pick_picking_id and not delivery_picking_id and not return_picking_id">
+                            <group>
+                                <field name="pick_picking_id" readonly="1"/>
+                                <field name="delivery_picking_id" readonly="1"
+                                       invisible="not delivery_picking_id"/>
+                                <field name="return_picking_id" readonly="1"
+                                       invisible="not return_picking_id"/>
+                            </group>
+                        </page>
+                    </notebook>
+                    <field name="currency_id" invisible="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── SEARCH VIEW ── -->
+    <record id="view_shahtaj_dm_delivery_search" model="ir.ui.view">
+        <field name="name">shahtaj.dm.delivery.search</field>
+        <field name="model">shahtaj.dm.delivery</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="sale_order_id"/>
+                <field name="partner_id"/>
+                <field name="order_booker_id"/>
+                <field name="delivery_man_id"/>
+                <field name="scheduled_date"/>
+                <filter string="Today" name="today"
+                        domain="[('scheduled_date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="This Week" name="this_week"
+                        domain="[('scheduled_date', '&gt;=', ((context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d'))), ('scheduled_date', '&lt;=', ((context_today() + datetime.timedelta(days=6 - context_today().weekday())).strftime('%Y-%m-%d')))]"/>
+                <separator/>
+                <filter string="Manual Assign" name="manual_assign"
+                        domain="[('assignment_mode', '=', 'manual')]"/>
+                <filter string="Auto Assign" name="auto_assign"
+                        domain="[('assignment_mode', '=', 'auto')]"/>
+                <separator/>
+                <filter string="Waiting Invoice" name="not_ready"
+                        domain="[('state', '=', 'not_ready')]"/>
+                <filter string="Ready to Pick" name="ready"
+                        domain="[('state', '=', 'ready')]"/>
+                <filter string="Loaded on Van" name="picked"
+                        domain="[('state', '=', 'picked')]"/>
+                <filter string="Part Delivered" name="partial"
+                        domain="[('state', '=', 'partial')]"/>
+                <filter string="Delivered" name="delivered"
+                        domain="[('state', '=', 'delivered')]"/>
+                <filter string="Returned to WH" name="returned"
+                        domain="[('state', '=', 'returned')]"/>
+                <separator/>
+                <filter string="Not Started" name="stop_pending"
+                        domain="[('field_state', '=', 'pending')]"/>
+                <filter string="On the Way" name="stop_in_transit"
+                        domain="[('field_state', '=', 'in_transit')]"/>
+                <filter string="Shop Closed" name="stop_not_attended"
+                        domain="[('field_state', '=', 'not_attended')]"/>
+                <filter string="Could Not Deliver" name="stop_failed"
+                        domain="[('field_state', '=', 'failed')]"/>
+                <filter string="Stop Done" name="stop_done"
+                        domain="[('field_state', '=', 'done')]"/>
+                <filter string="Needs Attention" name="stop_attention"
+                        domain="[('field_state', 'in', ('not_attended', 'failed'))]"/>
+                <separator/>
+                <filter string="Stock" name="group_state"
+                        context="{'group_by': 'state'}"/>
+                <filter string="Stop" name="group_field_state"
+                        context="{'group_by': 'field_state'}"/>
+                <filter string="Day" name="group_day"
+                        context="{'group_by': 'scheduled_date'}"/>
+                <filter string="Open Jobs" name="open"
+                        domain="[('state', 'in', ('not_ready', 'ready', 'picked', 'partial'))]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── ACTIONS ── -->
+
+    <record id="action_shahtaj_dm_delivery_all" model="ir.actions.act_window">
+        <field name="name">DM Delivery Orders</field>
+        <field name="res_model">shahtaj.dm.delivery</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shahtaj_dm_delivery_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No delivery orders yet
+            </p>
+            <p>
+                Delivery jobs are assigned by the distributor (Assign Delivery Man),
+                or created automatically when an invoiced booker order has a linked DM.
+            </p>
+        </field>
+    </record>
+
+    <delete model="ir.actions.server" id="action_shahtaj_dm_my_deliveries"/>
+    <delete model="ir.actions.server" id="action_shahtaj_dm_all_delivery_orders"/>
+
+    <record id="action_shahtaj_dm_my_deliveries" model="ir.actions.act_window">
+        <field name="name">My Deliveries</field>
+        <field name="res_model">shahtaj.dm.delivery</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', '!=', 'not_ready')]</field>
+        <field name="context">{
+            'search_default_today': 1,
+        }</field>
+        <field name="search_view_id" ref="view_shahtaj_dm_delivery_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No deliveries for today
+            </p>
+            <p>
+                Jobs assigned to you appear here after the distributor assigns
+                a sales order (or after invoice sync). Use Today / This Week filters.
+                Stock: Ready → Loaded → Delivered. Stop: On the Way / Shop Closed / Done.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_dm_all_delivery_orders" model="ir.actions.act_window">
+        <field name="name">All My Orders</field>
+        <field name="res_model">shahtaj.dm.delivery</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shahtaj_dm_delivery_search"/>
+    </record>
+
+    <!-- Distributor: all DM jobs -->
+    <record id="action_shahtaj_dm_dispatch_jobs" model="ir.actions.act_window">
+        <field name="name">Delivery Jobs</field>
+        <field name="res_model">shahtaj.dm.delivery</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shahtaj_dm_delivery_search"/>
+        <field name="context">{'search_default_today': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No delivery jobs yet
+            </p>
+            <p>
+                Assign confirmed sales orders to delivery men from Field Sales
+                Orders or Dispatch Orders (Assign Delivery Man). Use Stop filters
+                (Shop Closed / Could Not Deliver) to see blocked stops.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_dm_my_van_stock" model="ir.actions.server">
+        <field name="name">Today Load</field>
+        <field name="model_id" ref="model_shahtaj_dm_delivery"/>
+        <field name="state">code</field>
+        <field name="code">action = env['shahtaj.dm.today.load'].action_open()</field>
+    </record>
+
+</odoo>

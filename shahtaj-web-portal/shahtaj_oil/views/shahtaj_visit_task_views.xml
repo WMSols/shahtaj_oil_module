@@ -10,7 +10,11 @@
                   decoration-warning="state == 'pending'"
                   decoration-info="state == 'in_progress'">
                 <field name="scheduled_date"/>
+                <field name="task_kind" string="OB / DM" widget="badge"
+                       decoration-info="task_kind == 'order_booker'"
+                       decoration-warning="task_kind == 'delivery_man'"/>
                 <field name="order_booker_id"/>
+                <field name="delivery_man_id" optional="show"/>
                 <field name="route_id"/>
                 <field name="zone_id" optional="show"/>
                 <field name="shop_id"/>
@@ -50,15 +54,26 @@
                 <sheet>
                     <group>
                         <group>
-                            <field name="scheduled_date" required="1"/>
-                            <field name="order_booker_id" required="1"/>
-                            <field name="route_id" required="1"/>
+                            <field name="shahtaj_planning_locked" invisible="1"/>
+                            <field name="scheduled_date" required="1"
+                                   readonly="shahtaj_planning_locked"/>
+                            <field name="task_kind" readonly="shahtaj_planning_locked"/>
+                            <field name="order_booker_id" required="1"
+                                   readonly="shahtaj_planning_locked"/>
+                            <field name="delivery_man_id"
+                                   invisible="task_kind != 'delivery_man'"
+                                   readonly="shahtaj_planning_locked"/>
+                            <field name="route_id" required="1"
+                                   readonly="shahtaj_planning_locked"/>
                         </group>
                         <group>
-                            <field name="zone_id"/>
+                            <field name="zone_id" readonly="shahtaj_planning_locked"/>
                             <field name="shop_id" required="1"
-                                   domain="[('is_shahtaj_shop', '=', True), ('shop_approval_state', '=', 'approved'), ('route_ids', 'in', [route_id])]"/>
+                                   domain="[('is_shahtaj_shop', '=', True), ('shop_approval_state', '=', 'approved'), ('route_ids', 'in', [route_id])]"
+                                   readonly="shahtaj_planning_locked"/>
                             <field name="weekly_schedule_id" readonly="1"/>
+                            <field name="dm_delivery_id" readonly="1"
+                                   invisible="task_kind != 'delivery_man'"/>
                         </group>
                     </group>
                     <group string="Notes">
@@ -166,8 +181,15 @@
                 <field name="shop_id"/>
                 <field name="route_id"/>
                 <field name="order_booker_id"/>
+                <field name="delivery_man_id"/>
+                <field name="task_kind"/>
                 <filter string="Today" name="today"
                         domain="[('scheduled_date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Order Booker" name="kind_ob"
+                        domain="[('task_kind', '=', 'order_booker')]"/>
+                <filter string="Delivery Man" name="kind_dm"
+                        domain="[('task_kind', '=', 'delivery_man')]"/>
+                <separator/>
                 <filter string="Pending" name="pending" domain="[('state', '=', 'pending')]"/>
                 <filter string="In Progress" name="in_progress" domain="[('state', '=', 'in_progress')]"/>
                 <filter string="Completed" name="completed" domain="[('state', '=', 'completed')]"/>
@@ -175,6 +197,8 @@
                 <filter string="Scheduled Date" name="group_date" context="{'group_by': 'scheduled_date'}"/>
                 <filter string="Route" name="group_route" context="{'group_by': 'route_id'}"/>
                 <filter string="Order Booker" name="group_booker" context="{'group_by': 'order_booker_id'}"/>
+                <filter string="Delivery Man" name="group_dm" context="{'group_by': 'delivery_man_id'}"/>
+                <filter string="Staff Type" name="group_kind" context="{'group_by': 'task_kind'}"/>
             </search>
         </field>
     </record>

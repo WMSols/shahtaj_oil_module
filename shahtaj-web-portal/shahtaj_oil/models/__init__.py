@@ -5,6 +5,7 @@ from . import shahtaj_territory_sync
 from . import shahtaj_zone
 from . import shahtaj_route
 from . import res_partner
+from . import shahtaj_shop_credit
 from . import shahtaj_weekly_schedule
 from . import shahtaj_visit_task
 from . import shahtaj_visit
@@ -22,6 +23,9 @@ from . import res_users
 from . import res_company
 from . import res_config_settings
 from . import shahtaj_accounting_hub
+from . import shahtaj_orders_hub
+from . import shahtaj_order_booker_hub
+from . import shahtaj_delivery_man_hub
 from . import shahtaj_pnl_dashboard
 from . import shahtaj_tax_ledger
 from . import shahtaj_expense
@@ -31,3 +35,4 @@ from . import ir_http
 from . import ir_ui_menu
 from . import shahtaj_dm_delivery
 from . import shahtaj_activity_log
+from . import stock_picking

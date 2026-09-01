@@ -32,6 +32,8 @@
                 <field name="name"/>
                 <field name="login" optional="show"/>
                 <field name="shahtaj_employee_code" optional="show"/>
+                <field name="shahtaj_is_order_booker" string="OB" optional="show"/>
+                <field name="shahtaj_is_delivery_man" string="DM" optional="show"/>
                 <field name="shahtaj_task_today_done" string="Today Done"/>
                 <field name="shahtaj_task_today_pending" string="Today Pending"/>
                 <field name="shahtaj_task_today_total" string="Today Total"/>
@@ -82,10 +84,13 @@
                         <page string="Today" name="today">
                             <field name="shahtaj_task_today_ids" readonly="1" nolabel="1"
                                    context="{'list_view_ref': 'shahtaj_oil.view_shahtaj_visit_task_embedded_list'}">
-                                <list decoration-muted="state in ('cancelled', 'skipped')"
-                                      decoration-success="state == 'completed'"
-                                      decoration-warning="state == 'pending'"
-                                      decoration-info="state == 'in_progress'">
+                <list decoration-muted="state in ('cancelled', 'skipped')"
+                      decoration-success="state == 'completed'"
+                      decoration-warning="state == 'pending'"
+                      decoration-info="state == 'in_progress'">
+                                    <field name="task_kind" string="OB/DM" widget="badge"
+                                           decoration-info="task_kind == 'order_booker'"
+                                           decoration-warning="task_kind == 'delivery_man'"/>
                                     <field name="route_id"/>
                                     <field name="shop_id"/>
                                     <field name="state" widget="badge"
@@ -145,7 +150,13 @@
                 <field name="name"/>
                 <field name="login"/>
                 <field name="shahtaj_employee_code"/>
+                <field name="shahtaj_is_order_booker"/>
+                <field name="shahtaj_is_delivery_man"/>
                 <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Order Booker" name="filter_ob"
+                        domain="[('shahtaj_is_order_booker', '=', True)]"/>
+                <filter string="Delivery Man" name="filter_dm"
+                        domain="[('shahtaj_is_delivery_man', '=', True)]"/>
             </search>
         </field>
     </record>
@@ -154,16 +165,16 @@
         <field name="name">Visit Tasks</field>
         <field name="res_model">res.users</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('shahtaj_is_order_booker', '=', True)]</field>
+        <field name="domain">['|', ('shahtaj_is_order_booker', '=', True), ('shahtaj_is_delivery_man', '=', True)]</field>
         <field name="context">{'search_default_active': 1}</field>
         <field name="search_view_id" ref="view_shahtaj_visit_hub_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Select an order booker to review visit progress
+                Select an order booker or delivery man to review visit progress
             </p>
             <p>
-                Each task is one scheduled shop visit. Track today's completions,
-                this week's progress, and past history per booker.
+                Visit tasks combine Order Booker shop visits and Delivery Man
+                delivery stops. Use the Order Booker / Delivery Man filters to focus.
             </p>
         </field>
     </record>
@@ -180,6 +191,54 @@
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_shahtaj_visit_hub_form"/>
         <field name="act_window_id" ref="action_shahtaj_visit_hub"/>
+    </record>
+
+    <!-- Order booker only: used from Order Booker Operations menu -->
+    <record id="action_shahtaj_visit_hub_ob" model="ir.actions.act_window">
+        <field name="name">Order Booker Visit Progress</field>
+        <field name="res_model">res.users</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('shahtaj_is_order_booker', '=', True)]</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="search_view_id" ref="view_shahtaj_visit_hub_search"/>
+    </record>
+
+    <record id="action_shahtaj_visit_hub_ob_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_visit_hub_list"/>
+        <field name="act_window_id" ref="action_shahtaj_visit_hub_ob"/>
+    </record>
+
+    <record id="action_shahtaj_visit_hub_ob_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shahtaj_visit_hub_form"/>
+        <field name="act_window_id" ref="action_shahtaj_visit_hub_ob"/>
+    </record>
+
+    <!-- Delivery man only: used from Delivery Man Operations menu -->
+    <record id="action_shahtaj_visit_hub_dm" model="ir.actions.act_window">
+        <field name="name">Delivery Man Visit Progress</field>
+        <field name="res_model">res.users</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('shahtaj_is_delivery_man', '=', True)]</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="search_view_id" ref="view_shahtaj_visit_hub_search"/>
+    </record>
+
+    <record id="action_shahtaj_visit_hub_dm_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_visit_hub_list"/>
+        <field name="act_window_id" ref="action_shahtaj_visit_hub_dm"/>
+    </record>
+
+    <record id="action_shahtaj_visit_hub_dm_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shahtaj_visit_hub_form"/>
+        <field name="act_window_id" ref="action_shahtaj_visit_hub_dm"/>
     </record>
 
 </odoo>

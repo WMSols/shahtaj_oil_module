@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_credit_override_wizard_form" model="ir.ui.view">
+        <field name="name">shahtaj.credit.override.wizard.form</field>
+        <field name="model">shahtaj.credit.override.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Credit Limit Exceeded">
+                <sheet>
+                    <div class="alert alert-danger" role="alert">
+                        <strong>Credit limit exceeded</strong>
+                        <p class="mb-0 mt-1">
+                            This order would push the shop above its credit limit.
+                            You can increase the credit limit below or proceed with an override note.
+                        </p>
+                    </div>
+                    <group string="Order">
+                        <group>
+                            <field name="sale_order_id"/>
+                            <field name="partner_id"/>
+                            <field name="action_type"/>
+                            <field name="order_amount" widget="monetary"/>
+                        </group>
+                        <group>
+                            <field name="credit_limit"/>
+                            <field name="posted_outstanding" widget="monetary"/>
+                            <field name="pending_order_exposure" widget="monetary"/>
+                            <field name="confirmed_uninvoiced_exposure" widget="monetary"/>
+                            <field name="effective_outstanding" widget="monetary" class="fw-bold"/>
+                            <field name="shortfall" widget="monetary" decoration-danger="shortfall &gt; 0"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Resolution">
+                        <field name="new_credit_limit"
+                               placeholder="Optional — set a higher shop credit limit"/>
+                        <field name="override_note"
+                               placeholder="Reason for approving above the credit limit (optional)"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Proceed Anyway" type="object" name="action_proceed" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

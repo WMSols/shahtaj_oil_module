@@ -51,6 +51,9 @@ KNOWN_OPERATIONS = (
     'visit.line.update',
     'visit.place_order',
     'visit.undo',
+    'order.update',
+    'delivery.update',
+    'task.update',
     'zone.archive',
     'zone.create',
     'zone.update',
@@ -65,6 +68,8 @@ OPERATION_GROUPS = (
     ('zone', 'Zones'),
     ('expense', 'Expenses'),
     ('target', 'Targets'),
+    ('order', 'Orders'),
+    ('delivery', 'Deliveries'),
     ('auth', 'Auth'),
 )
 
@@ -406,6 +411,74 @@ class ShahtajActivityLog(models.Model):
         except Exception:
             _logger.exception('shahtaj.activity.log log_system failed')
             return self.browse()
+
+    @api.model
+    def _format_field_value(self, record, field_name, value):
+        """Human-readable value for activity log messages."""
+        if value is False or value is None:
+            return '—'
+        field = record._fields.get(field_name)
+        if not field:
+            return str(value)
+        try:
+            if field.type == 'many2one':
+                if not value:
+                    return '—'
+                rec = record.env[field.comodel_name].browse(value)
+                return rec.display_name if rec.exists() else str(value)
+            if field.type == 'selection':
+                return dict(field.selection).get(value, value)
+            if field.type == 'float' and field_name == 'scheduled_time':
+                hours = int(value)
+                minutes = int(round((value - hours) * 60))
+                return f'{hours:02d}:{minutes:02d}'
+            if field.type in ('date', 'datetime'):
+                return str(value)
+        except Exception:
+            pass
+        return str(value)
+
+    @api.model
+    def log_model_field_changes(
+        self,
+        records,
+        operation,
+        title,
+        vals,
+        field_labels=None,
+        related_record=None,
+    ):
+        """Log before/after values for distributor planning edits."""
+        if not vals or not records:
+            return self.browse()
+        labels = field_labels or {}
+        logged = self.browse()
+        for record in records:
+            changes = []
+            for key, new_val in vals.items():
+                if key not in record._fields:
+                    continue
+                old_val = record[key]
+                if record._fields[key].type == 'many2one':
+                    old_cmp = old_val.id if old_val else False
+                    new_cmp = new_val
+                else:
+                    old_cmp, new_cmp = old_val, new_val
+                if old_cmp == new_cmp:
+                    continue
+                label = labels.get(key, record._fields[key].string or key)
+                old_text = self._format_field_value(record, key, old_cmp)
+                new_text = self._format_field_value(record, key, new_cmp)
+                changes.append(f'{label}: {old_text} → {new_text}')
+            if not changes:
+                continue
+            logged |= self.log_business(
+                operation=operation,
+                name=title,
+                related_record=related_record or record,
+                message=f'{record.display_name}: ' + '; '.join(changes),
+            )
+        return logged
 
     @api.model
     def known_operations_list(self):

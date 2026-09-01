@@ -147,14 +147,18 @@
         <field name="res_model">sale.order</field>
         <field name="view_mode">list,form,kanban,pivot,graph</field>
         <field name="domain">[('shahtaj_visit_id', '!=', False)]</field>
-        <field name="context">{'search_default_sales': 1}</field>
+        <field name="context">{
+            'search_default_sales': 1,
+            'search_default_this_week': 1,
+        }</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No field orders yet
             </p>
             <p>
                 Orders appear here when order bookers place orders during shop visits.
-                Create invoices from confirmed orders, then register customer payments.
+                Use <b>This Week</b> / <b>Today</b> filters. Create invoices from confirmed
+                orders, then register customer payments.
             </p>
         </field>
     </record>
@@ -174,9 +178,32 @@
                 No deliveries waiting
             </p>
             <p>
-                Open an order and click <b>Mark Delivery</b> (or the list <b>Deliver</b> button)
-                to ship full or partial quantity. Stock on hand and Delivered qty update automatically.
-                Then invoice from <b>Orders to Invoice</b> (delivered quantities).
+                Use <b>Assign DM</b> to plan who delivers and when. Use
+                <b>Mark Delivery</b> only for distributor-side stock confirmation
+                when needed. DM field pick/deliver runs from Delivery Jobs.
+            </p>
+        </field>
+    </record>
+
+    <!-- Distributor dispatch: confirmed SOs ready to assign to a DM -->
+    <record id="action_shahtaj_dm_dispatch_orders" model="ir.actions.act_window">
+        <field name="name">Dispatch Orders</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[
+            ('state', 'in', ('sale', 'done')),
+            ('shahtaj_delivery_status', 'in', ('pending', 'partial')),
+        ]</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No orders to dispatch
+            </p>
+            <p>
+                Confirmed sales orders still to deliver. Click
+                <b>Assign / Split</b> to give the order to one or more delivery
+                men with day, time, and product quantities.
+                One sales order stays one order; DM jobs are planned on top.
             </p>
         </field>
     </record>

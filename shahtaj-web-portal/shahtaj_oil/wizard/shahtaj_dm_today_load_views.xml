@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_dm_today_load_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.today.load.form</field>
+        <field name="model">shahtaj.dm.today.load</field>
+        <field name="arch" type="xml">
+            <form string="Today Load" create="false" delete="false">
+                <header>
+                    <button name="action_pick_today_load" type="object"
+                            string="Pick All to Van" class="oe_highlight"
+                            icon="fa-truck"
+                            confirm="Pick the quantities in Pick Now onto your van for today shops?"/>
+                    <button name="action_refresh" type="object"
+                            string="Refresh" class="btn-secondary" icon="fa-refresh"/>
+                    <button name="action_open_my_deliveries" type="object"
+                            string="Today Deliveries" class="btn-secondary"/>
+                    <button name="action_open_van_stock" type="object"
+                            string="Physical Van Qty" class="btn-secondary"
+                            icon="fa-cubes"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Today Load</h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="load_date"/>
+                            <field name="delivery_man_id"/>
+                        </group>
+                        <group>
+                            <field name="shop_count"/>
+                            <field name="total_still_to_pick"/>
+                        </group>
+                    </group>
+                    <field name="summary_html" nolabel="1" colspan="2"/>
+                    <div class="alert alert-info" role="alert">
+                        <b>Shop Progress</b> shows picked vs delivered per shop.
+                        <b>Pick Today Totals</b> lists product totals still needed —
+                        edit <b>Pick Now</b>, then use <b>Pick All to Van</b>
+                        (allocated across shops using each job's <b>assigned</b> qty).
+                        Per-shop pick/deliver remains available on each delivery.
+                    </div>
+                    <notebook>
+                        <page string="Shop Progress" name="shops">
+                            <field name="shop_line_ids" readonly="1">
+                                <list>
+                                    <field name="partner_id"/>
+                                    <field name="sale_order_id"/>
+                                    <field name="qty_ordered" string="Assigned" sum="Assigned"/>
+                                    <field name="qty_picked" sum="Picked"/>
+                                    <field name="qty_delivered" sum="Delivered"/>
+                                    <field name="qty_left_on_van" sum="On van"/>
+                                    <field name="qty_still_to_pick" sum="Still pick"/>
+                                    <field name="delivered_ratio"
+                                           string="Delivered %"/>
+                                    <field name="state" string="Stock" widget="badge"
+                                           decoration-danger="state in ('not_ready', 'returned')"
+                                           decoration-info="state == 'ready'"
+                                           decoration-warning="state in ('picked', 'partial')"
+                                           decoration-success="state == 'delivered'"/>
+                                    <field name="field_state" string="Stop" widget="badge"
+                                           decoration-muted="field_state == 'pending'"
+                                           decoration-info="field_state == 'in_transit'"
+                                           decoration-warning="field_state == 'not_attended'"
+                                           decoration-danger="field_state == 'failed'"
+                                           decoration-success="field_state == 'done'"/>
+                                    <button name="action_open_delivery" type="object"
+                                            string="Open" icon="fa-external-link"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Pick Today Totals" name="pick">
+                            <field name="pick_line_ids">
+                                <list editable="bottom" create="false" delete="false">
+                                    <field name="product_id" readonly="1" force_save="1"/>
+                                    <field name="qty_ordered" readonly="1" force_save="1" sum="Ordered"/>
+                                    <field name="qty_already_picked" readonly="1" force_save="1" sum="Picked"/>
+                                    <field name="qty_delivered" readonly="1" force_save="1" sum="Delivered"/>
+                                    <field name="qty_still_needed" readonly="1" force_save="1" sum="Needed"/>
+                                    <field name="qty_to_pick" force_save="1" sum="Pick now"/>
+                                    <field name="product_uom_id" readonly="1" force_save="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Use delivery model so action loads even if today.load ir.model xml id is late -->
+    <record id="action_shahtaj_dm_today_load" model="ir.actions.server">
+        <field name="name">Today Load</field>
+        <field name="model_id" ref="model_shahtaj_dm_delivery"/>
+        <field name="state">code</field>
+        <field name="code">action = env['shahtaj.dm.today.load'].action_open()</field>
+    </record>
+
+</odoo>

@@ -127,4 +127,19 @@
         <field name="target">self</field>
     </record>
 
+    <!-- Admin-only: under Settings, not the Shahtaj Oil app menu -->
+    <menuitem id="menu_shahtaj_activity_logs"
+              name="Shahtaj Activity Logs"
+              parent="base.menu_administration"
+              action="action_shahtaj_activity_logs_html"
+              sequence="95"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_shahtaj_activity_logs_list"
+              name="Shahtaj Activity Logs (List)"
+              parent="base.menu_administration"
+              action="action_shahtaj_activity_logs"
+              sequence="96"
+              groups="base.group_system"/>
+
 </odoo>

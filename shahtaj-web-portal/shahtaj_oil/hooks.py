@@ -124,19 +124,15 @@ def _enable_purchase_ok_on_storable_products(env):
         templates.write({'purchase_ok': True})
 
 
+def _sync_dm_accounting(env):
+    for company in env['res.company'].sudo().search([]):
+        company._shahtaj_ensure_dm_accounting()
+
+
 def post_init_hook(env):
-    env['ir.config_parameter'].sudo().set_param(
-        'base.enable_programmatic_api_keys', '1'
-    )
-    _sync_distributor_partner_rules(env)
-    _sync_distributor_booker_user_rule(env)
-    _recompute_shahtaj_order_booker_flags(env)
-    _enable_purchase_ok_on_storable_products(env)
-    env['res.users']._shahtaj_fix_financial_group_privilege()
-    env['res.users']._sync_all_shahtaj_ui_groups()
-    env['res.users']._clear_shahtaj_distributor_flags_on_non_distributors()
-    env['res.users']._sync_all_shahtaj_financial_groups()
-    env.registry.clear_cache('templates')
+    """Unified module installation/upgrade entry point."""
+    from .setup import run_all_setup_checks
+    run_all_setup_checks(env)
 
 
 def migrate_distributor_partner_rules(cr):

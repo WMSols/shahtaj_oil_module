@@ -9,3 +9,8 @@ from . import shahtaj_add_stock
 from . import shahtaj_mark_delivery
 from . import shahtaj_assign_shops_route
 from . import shahtaj_create_delivery_man
+from . import shahtaj_dm_pick_deliver
+from . import shahtaj_dm_today_load
+from . import shahtaj_dm_assign
+from . import shahtaj_order_reject
+from . import shahtaj_credit_override

@@ -31,6 +31,19 @@ TASK_STATES = [
 
 # Fields order bookers may edit on their own tasks (see write()).
 BOOKER_WRITABLE_FIELDS = frozenset({'state', 'notes', 'visit_id'})
+DISTRIBUTOR_PLANNING_FIELDS = frozenset({
+    'scheduled_date', 'route_id', 'shop_id', 'order_booker_id',
+    'delivery_man_id', 'task_kind', 'notes',
+})
+TASK_PLANNING_FIELD_LABELS = {
+    'scheduled_date': 'Scheduled Date',
+    'route_id': 'Route',
+    'shop_id': 'Shop',
+    'order_booker_id': 'Order Booker',
+    'delivery_man_id': 'Delivery Man',
+    'task_kind': 'Task Type',
+    'notes': 'Notes',
+}
 
 
 class ShahtajVisitTask(models.Model):
@@ -39,6 +52,29 @@ class ShahtajVisitTask(models.Model):
     _order = 'scheduled_date desc, route_id, shop_id'
 
     name = fields.Char(compute='_compute_name', store=True)
+    task_kind = fields.Selection(
+        [
+            ('order_booker', 'Order Booker'),
+            ('delivery_man', 'Delivery Man'),
+        ],
+        string='Staff Type',
+        default='order_booker',
+        required=True,
+        index=True,
+    )
+    delivery_man_id = fields.Many2one(
+        'res.users',
+        string='Delivery Man',
+        index=True,
+        ondelete='restrict',
+    )
+    dm_delivery_id = fields.Many2one(
+        'shahtaj.dm.delivery',
+        string='DM Delivery',
+        index=True,
+        ondelete='cascade',
+        copy=False,
+    )
     order_booker_id = fields.Many2one(
         'res.users',
         string='Order Booker',
@@ -115,10 +151,25 @@ class ShahtajVisitTask(models.Model):
         string='Visit Time (min)',
     )
     notes = fields.Text()
+    shahtaj_planning_locked = fields.Boolean(
+        string='Planning Locked',
+        compute='_compute_shahtaj_planning_locked',
+    )
 
-    _shop_date_booker_route_unique = models.Constraint(
-        'unique(shop_id, scheduled_date, order_booker_id, route_id)',
-        'A visit task for this shop, date, order booker, and route already exists.',
+    @api.depends(
+        'state', 'visit_id', 'visit_id.state',
+        'dm_delivery_id', 'dm_delivery_id.state',
+    )
+    def _compute_shahtaj_planning_locked(self):
+        for task in self:
+            task.shahtaj_planning_locked = task._shahtaj_is_planning_locked()
+
+    # Uniqueness for OB / DM tasks is enforced by partial SQL indexes
+    # (see migrations/19.0.1.1.72). Models.Constraint cannot express
+    # "only when task_kind = order_booker" cleanly with nullable DM.
+    _dm_delivery_task_unique = models.Constraint(
+        'unique(dm_delivery_id)',
+        'A visit task already exists for this delivery job.',
     )
 
     @api.depends('shop_id', 'scheduled_date', 'route_id')
@@ -132,6 +183,9 @@ class ShahtajVisitTask(models.Model):
     @api.constrains('shop_id', 'route_id')
     def _check_shop_on_route(self):
         for task in self:
+            # DM tasks are driven by invoiced SOs, not OB route assignment.
+            if task.task_kind == 'delivery_man':
+                continue
             if task.shop_id and task.shop_id.shop_approval_state != 'approved':
                 raise ValidationError(_(
                     'Shop "%(shop)s" is not approved. '
@@ -139,7 +193,10 @@ class ShahtajVisitTask(models.Model):
                     shop=task.shop_id.name,
                 ))
             if task.shop_id and task.route_id:
-                if task.route_id not in task.shop_id.route_ids:
+                shop_routes = task.shop_id.route_ids
+                if task.shop_id.route_id:
+                    shop_routes |= task.shop_id.route_id
+                if task.route_id not in shop_routes:
                     raise ValidationError(_(
                         'Shop "%(shop)s" is not on route "%(route)s". '
                         'Assign the shop to this route first.',
@@ -286,6 +343,19 @@ class ShahtajVisitTask(models.Model):
             and not user.has_group('base.group_system')
         )
 
+    def _shahtaj_is_planning_locked(self):
+        """Completed/cancelled visits or in-progress shop work cannot be rescheduled."""
+        self.ensure_one()
+        if self.state in ('completed', 'cancelled'):
+            return True
+        if self.state == 'in_progress':
+            return True
+        if self.visit_id and self.visit_id.state == 'in_progress':
+            return True
+        if self.dm_delivery_id and self.dm_delivery_id._shahtaj_is_processing_locked():
+            return True
+        return False
+
     def write(self, vals):
         # Bookers cannot edit distributor-only fields on tasks.
         if self._is_booker_only_user() and not self.env.context.get('shahtaj_system_visit_write'):
@@ -294,6 +364,28 @@ class ShahtajVisitTask(models.Model):
                 raise ValidationError(_(
                     'You can only update visit status and notes on your tasks.'
                 ))
+        planning_vals = DISTRIBUTOR_PLANNING_FIELDS.intersection(vals)
+        user = self.env.user
+        is_distributor = (
+            not self.env.context.get('shahtaj_system_visit_write')
+            and user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            and not user._is_public()
+        )
+        if planning_vals and is_distributor:
+            locked = self.filtered('_shahtaj_is_planning_locked')
+            if locked:
+                raise ValidationError(_(
+                    'Cannot reschedule %(names)s — the visit is completed, in progress, '
+                    'or delivery stock has already been picked.',
+                    names=', '.join(locked.mapped('display_name')),
+                ))
+            self.env['shahtaj.activity.log'].log_model_field_changes(
+                self,
+                operation='task.update',
+                title='Visit task updated',
+                vals={k: vals[k] for k in planning_vals},
+                field_labels=TASK_PLANNING_FIELD_LABELS,
+            )
         return super().write(vals)
 
     @api.model
@@ -411,6 +503,8 @@ class ShahtajVisitTask(models.Model):
         - Completed / in_progress / skipped: keep (history of work that day)
         """
         self.ensure_one()
+        if self.task_kind == 'delivery_man':
+            return False
         if self.state == 'cancelled':
             return False
         if not self._shahtaj_is_operational_for_booker():
@@ -426,8 +520,12 @@ class ShahtajVisitTask(models.Model):
         """Cancel pending tasks that no longer match any active weekly schedule.
 
         Does not touch completed, in_progress, or skipped tasks.
+        Does not touch Delivery Man tasks (managed from DM deliveries).
         """
-        domain = [('state', '=', 'pending')]
+        domain = [
+            ('state', '=', 'pending'),
+            ('task_kind', '=', 'order_booker'),
+        ]
         if order_booker:
             domain.append(('order_booker_id', '=', order_booker.id))
         if date_from:
@@ -516,6 +614,7 @@ class ShahtajVisitTask(models.Model):
                             ('scheduled_date', '=', day),
                             ('order_booker_id', '=', schedule.order_booker_id.id),
                             ('route_id', '=', schedule.route_id.id),
+                            ('task_kind', '=', 'order_booker'),
                         ], limit=1)
                         if existing:
                             if (
@@ -534,6 +633,7 @@ class ShahtajVisitTask(models.Model):
                                 skipped += 1
                             continue
                         created |= self.create({
+                            'task_kind': 'order_booker',
                             'order_booker_id': schedule.order_booker_id.id,
                             'route_id': schedule.route_id.id,
                             'shop_id': shop.id,
@@ -620,6 +720,7 @@ class ShahtajVisitTask(models.Model):
             ).id,
             'domain': [
                 ('order_booker_id', '=', user.id),
+                ('task_kind', '=', 'order_booker'),
                 ('state', 'not in', ['cancelled']),
             ],
             'context': {

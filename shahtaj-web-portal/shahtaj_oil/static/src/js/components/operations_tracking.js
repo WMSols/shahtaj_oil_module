@@ -22,7 +22,7 @@ export class OperationsTracking extends Component {
             
             itemsPerPage: 5,
             
-
+            
             selectedDelivery: null,
 
             isCreatingInvoice: false,
@@ -55,9 +55,9 @@ export class OperationsTracking extends Component {
             },
             filters: {
                 deliveries: { search: '', status: '' },
-                checkins: { search: '', status: '' },
-                orders: { search: '', status: '' },
-                schedules: { booker: 'all', day: 'all', dateFrom: '', dateTo: '' },
+                checkins: { search: '', status: '', booker: 'all', date: '' },
+                orders: { search: '', status: '', booker: 'all' },
+                schedules: { booker: 'all', day: 'all' },
                 targets: { booker: 'all', type: 'all' },
             },
         });
@@ -105,6 +105,117 @@ export class OperationsTracking extends Component {
         }
     }
 
+    /**
+     * Parse an Odoo Datetime (naive UTC, e.g. "2026-08-19 14:36:00") as a Date.
+     */
+    _parseOdooUtc(value) {
+        if (!value) {
+            return null;
+        }
+        const date = new Date(String(value).replace(' ', 'T') + 'Z');
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    /**
+     * Convert an Odoo UTC datetime string to Pakistan Standard Time for display.
+     * PKT is UTC+5 year-round (Asia/Karachi, no DST).
+     */
+    formatUtcToPkt(value) {
+        if (!value || value === 'Pending' || value === 'In Progress') {
+            return value;
+        }
+        const date = this._parseOdooUtc(value);
+        if (!date) {
+            return value;
+        }
+        const formatted = date.toLocaleString('en-GB', {
+            timeZone: 'Asia/Karachi',
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+        });
+        return `${formatted} PKT`;
+    }
+
+    /**
+     * Convert a Pakistan calendar date (YYYY-MM-DD) to Odoo UTC naive bounds.
+     * PKT day 2026-08-19 is 2026-08-18 19:00:00 UTC through 2026-08-19 18:59:59 UTC.
+     */
+    _pktDateToUtcBounds(dateStr) {
+        const start = new Date(`${dateStr}T00:00:00+05:00`);
+        const end = new Date(`${dateStr}T23:59:59+05:00`);
+        const toOdooUtc = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+        return { start: toOdooUtc(start), end: toOdooUtc(end) };
+    }
+
+    /**
+     * Odoo weekday key for today in Pakistan: '0' Monday … '6' Sunday.
+     */
+    _pktTodayWeekday() {
+        const weekday = new Date().toLocaleDateString('en-US', {
+            timeZone: 'Asia/Karachi',
+            weekday: 'short',
+        }).slice(0, 3);
+        const map = { Mon: '0', Tue: '1', Wed: '2', Thu: '3', Fri: '4', Sat: '5', Sun: '6' };
+        return map[weekday] || '0';
+    }
+
+    /**
+     * Distance from today along the week (0 = today, 1 = tomorrow, … 6 = yesterday).
+     */
+    _weekdayOffsetFromToday(dayRaw, todayDow = this._pktTodayWeekday()) {
+        const today = parseInt(todayDow, 10);
+        const day = parseInt(dayRaw, 10);
+        if (Number.isNaN(day) || Number.isNaN(today)) {
+            return 99;
+        }
+        return (day - today + 7) % 7;
+    }
+
+    _compareSchedulesByToday(a, b, todayDow = this._pktTodayWeekday()) {
+        const aOff = this._weekdayOffsetFromToday(a.day_of_week ?? a.day_raw, todayDow);
+        const bOff = this._weekdayOffsetFromToday(b.day_of_week ?? b.day_raw, todayDow);
+        if (aOff !== bOff) {
+            return aOff - bOff;
+        }
+        if (Boolean(a.active) !== Boolean(b.active)) {
+            return a.active ? -1 : 1;
+        }
+        return (b.id || 0) - (a.id || 0);
+    }
+
+    /**
+     * Page schedules with today (PKT weekday) first so pagination and the table agree.
+     */
+    async _fetchSchedulesSortedPage(domain, fields, pag) {
+        const context = { active_test: false };
+        const slim = await this.orm.searchRead(
+            'shahtaj.weekly.schedule',
+            domain,
+            ['id', 'day_of_week', 'active'],
+            { context, order: 'id desc', limit: 2000 },
+        );
+        const todayDow = this._pktTodayWeekday();
+        slim.sort((a, b) => this._compareSchedulesByToday(a, b, todayDow));
+        const total = slim.length;
+        const offset = (pag.page - 1) * pag.limit;
+        const pageIds = slim.slice(offset, offset + pag.limit).map((r) => r.id);
+        if (!pageIds.length) {
+            return { total, records: [] };
+        }
+        const records = await this.orm.read(
+            'shahtaj.weekly.schedule',
+            pageIds,
+            fields,
+            { context },
+        );
+        const byId = Object.fromEntries(records.map((r) => [r.id, r]));
+        return { total, records: pageIds.map((id) => byId[id]).filter(Boolean) };
+    }
+
    async loadDropdownData() {
         this.state.lookupBookers = await this.orm.searchRead('res.users', [['shahtaj_is_order_booker', '=', true]], ['id', 'name']);
         
@@ -135,6 +246,7 @@ export class OperationsTracking extends Component {
                 
                 if (tab === 'deliveries') domain.push(['state', 'in', ['sale', 'done']]);
                 if (filters.search) domain.push('|', '|', ['name', 'ilike', filters.search], ['partner_id.name', 'ilike', filters.search], ['user_id.name', 'ilike', filters.search]);
+                if (tab === 'orders' && filters.booker && filters.booker !== 'all') domain.push(['user_id', '=', parseInt(filters.booker)]);
                 if (filters.status) {
                     if (filters.status === 'Draft') domain.push(['state', '=', 'draft']);
                     else if (filters.status === 'Delivered') domain.push(['state', '=', 'done']);
@@ -146,6 +258,12 @@ export class OperationsTracking extends Component {
                 model = 'shahtaj.visit'; targetState = 'tableCheckins';
                 fields = ["id", "shop_id", "order_booker_id", "started_at", "ended_at", "state", "outcome", "visit_task_id", "sale_order_id", "notes"];
                 if (filters.search) domain.push('|', ['shop_id.name', 'ilike', filters.search], ['order_booker_id.name', 'ilike', filters.search]);
+                if (filters.booker && filters.booker !== 'all') domain.push(['order_booker_id', '=', parseInt(filters.booker)]);
+                if (filters.date) {
+                    const bounds = this._pktDateToUtcBounds(filters.date);
+                    domain.push(['started_at', '>=', bounds.start]);
+                    domain.push(['started_at', '<=', bounds.end]);
+                }
                 if (filters.status === 'Checked In') domain.push(['state', '=', 'in_progress']);
                 if (filters.status === 'Checked Out') domain.push(['state', '=', 'completed'], ['outcome', '!=', 'incomplete']);
                 if (filters.status === 'Skipped') domain.push(['outcome', '=', 'incomplete']);
@@ -156,8 +274,6 @@ export class OperationsTracking extends Component {
                 fields = ['id', 'name', 'day_of_week', 'route_id', 'zone_id', 'active', 'shop_count', 'week_tasks_planned', 'week_tasks_completed', 'week_tasks_skipped', 'week_tasks_progress', 'week_occurrence_date', 'order_booker_id'];
                 if (filters.booker !== 'all') domain.push(['order_booker_id', '=', parseInt(filters.booker)]);
                 if (filters.day !== 'all') domain.push(['day_of_week', '=', filters.day]);
-                if (filters.dateFrom) domain.push(['week_occurrence_date', '>=', filters.dateFrom]);
-                if (filters.dateTo) domain.push(['week_occurrence_date', '<=', filters.dateTo]);
             }
             else if (tab === 'targets') {
                 model = 'shahtaj.visit.target'; targetState = 'tableTargets';
@@ -176,17 +292,23 @@ export class OperationsTracking extends Component {
             if (tab === 'schedules' || tab === 'targets') {
                 queryKwargs.context = { active_test: false };
             }
-            if (tab === 'schedules') {
-                queryKwargs.order = 'day_of_week asc, active desc, id desc';
+            if (tab === 'checkins') {
+                queryKwargs.order = 'started_at desc, id desc';
             }
-            const [total, records] = await Promise.all([
-                this.orm.searchCount(
-                    model,
-                    domain,
-                    (tab === 'schedules' || tab === 'targets') ? { context: { active_test: false } } : {},
-                ),
-                this.orm.searchRead(model, domain, fields, queryKwargs),
-            ]);
+            let total;
+            let records;
+            if (tab === 'schedules') {
+                ({ total, records } = await this._fetchSchedulesSortedPage(domain, fields, pag));
+            } else {
+                [total, records] = await Promise.all([
+                    this.orm.searchCount(
+                        model,
+                        domain,
+                        tab === 'targets' ? { context: { active_test: false } } : {},
+                    ),
+                    this.orm.searchRead(model, domain, fields, queryKwargs),
+                ]);
+            }
 
             this.state.pagination[tab].total = total;
 
@@ -220,7 +342,7 @@ export class OperationsTracking extends Component {
                     else if (v.state === 'completed' && v.outcome === 'incomplete') { status = 'Skipped'; outcome = 'Incomplete / Auto-Skipped'; }
                     else if (v.state === 'completed') { status = 'Checked Out'; outcome = outcome === 'order' ? 'Order Placed' : 'No Order'; }
                     else if (v.state === 'cancelled') { status = 'Cancelled'; }
-                    return { id: v.id, shop: v.shop_id ? v.shop_id[1] : 'Unknown', shopId: v.shop_id ? v.shop_id[0] : false, booker: v.order_booker_id ? v.order_booker_id[1] : 'Unknown', bookerId: v.order_booker_id ? v.order_booker_id[0] : false, time: v.started_at || 'Pending', endTime: v.ended_at || 'In Progress', status, duration: durationStr, outcome, taskRef: v.visit_task_id ? v.visit_task_id[1] : 'Direct Visit', sale_order_id: v.sale_order_id, notes: v.notes || '' };
+                    return { id: v.id, shop: v.shop_id ? v.shop_id[1] : 'Unknown', shopId: v.shop_id ? v.shop_id[0] : false, booker: v.order_booker_id ? v.order_booker_id[1] : 'Unknown', bookerId: v.order_booker_id ? v.order_booker_id[0] : false, time: this.formatUtcToPkt(v.started_at) || 'Pending', endTime: this.formatUtcToPkt(v.ended_at) || 'In Progress', status, duration: durationStr, outcome, taskRef: v.visit_task_id ? v.visit_task_id[1] : 'Direct Visit', sale_order_id: v.sale_order_id, notes: v.notes || '' };
                 });
             }
             else if (tab === 'schedules') {
@@ -230,7 +352,7 @@ export class OperationsTracking extends Component {
                     day_raw: r.day_of_week, day: dayMap[r.day_of_week] || r.day_of_week, route: r.route_id ? r.route_id[1] : 'Unassigned', zone: r.zone_id ? r.zone_id[1] : 'Unassigned',
                     shops: r.shop_count, active: r.active, planned: r.week_tasks_planned, done: r.week_tasks_completed, skipped: r.week_tasks_skipped || 0,
                     progress: r.week_tasks_progress || 0, occurrenceDate: r.week_occurrence_date || ''
-                }));
+                })).sort((a, b) => this._compareSchedulesByToday(a, b, this._pktTodayWeekday()));
             }
             else if (tab === 'targets') {
                 this.state.tableTargets = records.map(r => ({
@@ -246,21 +368,7 @@ export class OperationsTracking extends Component {
             this.state.isLoadingList = false;
         }
     }
-    setSubTab(tabName) {
-        this.state.activeSubTab = tabName;
-        this.state.selectedOrder = null;
-        this.state.selectedCheckin = null;
-        this.state.selectedSchedule = null;
-        this.state.selectedTarget = null;
-        this.fetchActiveList(); // Trigger fetch on switch
-    }
-    setPerfSubTab(tabName) {
-        this.state.perfSubTab = tabName;
-        this.state.selectedSchedule = null;
-        this.state.selectedTarget = null;
-        this.fetchActiveList(); // Trigger fetch on switch
-    }
-   async refreshData() {
+    async refreshData() {
         this.state.isRefreshing = true;
         try {
             await this.loadDropdownData();
@@ -291,7 +399,7 @@ export class OperationsTracking extends Component {
         }
     }
 
-    
+  
     closeDelivery() { 
         this.state.selectedDelivery = null; 
     }
@@ -375,9 +483,9 @@ export class OperationsTracking extends Component {
         }
         const [taxes, prods] = await Promise.all([
             this.orm.searchRead(
-                "account.tax",
-                [["type_tax_use", "=", "sale"], ["active", "=", true]],
-                ["id", "name", "amount"]
+            "account.tax",
+            [["type_tax_use", "=", "sale"], ["active", "=", true]],
+            ["id", "name", "amount"]
             ),
             this.orm.searchRead("product.template", [
                 ["sale_ok", "=", true],
@@ -393,7 +501,7 @@ export class OperationsTracking extends Component {
     // 2. UPDATE THIS METHOD TO MAP TAX NAMES IN DELIVERIES
     async viewDelivery(dlv) {
         this.state.selectedDelivery = dlv;
-        this.state.isEditingDelivery = false;
+        this.state.isEditingDelivery = false; 
         // Need tax catalog so line tax labels resolve the same as before.
         await this.ensureCatalogData();
         
@@ -593,27 +701,53 @@ export class OperationsTracking extends Component {
     }
     // --- NAVIGATION & FILTERS ---
 
-  setSubTab(tabName) {
+    setSubTab(tabName) {
         this.state.activeSubTab = tabName;
-        
+
         // If we are programmatically jumping to a record, protect the view from being cleared
         if (this._preserveDetailsOnSwitch) {
-            this._preserveDetailsOnSwitch = false; // Consume the flag
+            this._preserveDetailsOnSwitch = false;
         } else {
-            // Otherwise, clear the views normally (standard sidebar click)
-            this.state.selectedOrder = null;
-            this.state.selectedCheckin = null;
-            this.state.selectedSchedule = null;
-            this.state.selectedTarget = null;
+        this.state.selectedOrder = null;
+        this.state.selectedCheckin = null;
+        this.state.selectedSchedule = null;
+        this.state.selectedTarget = null;
+            // Reset filters and pagination for the tab being entered so the UI
+            // and the backend query are always in sync after a tab switch.
+            this._resetTabFilters(tabName);
         }
-        
-        this.fetchActiveList(); 
+
+        this.fetchActiveList();
     }
     setPerfSubTab(tabName) {
         this.state.perfSubTab = tabName;
         this.state.selectedSchedule = null;
         this.state.selectedTarget = null;
-        this.fetchActiveList(); 
+        // Reset filters for the performance sub-tab being entered.
+        this._resetTabFilters(tabName);
+        this.fetchActiveList();
+    }
+    _resetTabFilters(tabName) {
+        const defaultFilters = {
+            deliveries: { search: '', status: '' },
+            checkins:   { search: '', status: '', booker: 'all', date: '' },
+            orders:     { search: '', status: '', booker: 'all' },
+            schedules:  { booker: 'all', day: 'all' },
+            targets:    { booker: 'all', type: 'all' },
+        };
+        if (defaultFilters[tabName]) {
+            this.state.filters[tabName] = { ...defaultFilters[tabName] };
+            this.state.pagination[tabName].page = 1;
+        }
+        // When entering the performance tab, reset both its sub-tabs
+        // so filters don't bleed across navigation.
+        if (tabName === 'performance') {
+            this.state.filters.schedules = { ...defaultFilters.schedules };
+            this.state.filters.targets   = { ...defaultFilters.targets };
+            this.state.pagination.schedules.page = 1;
+            this.state.pagination.targets.page   = 1;
+            this.state.perfSubTab = 'schedules';
+        }
     }
 
     viewSchedule(sched) { this.state.selectedSchedule = sched; }
@@ -680,7 +814,7 @@ export class OperationsTracking extends Component {
     viewCheckin(log) { this.state.selectedCheckin = log; }
     closeCheckin() { this.state.selectedCheckin = null; }
 
-  async viewOrderFromCheckin(log) {
+    async viewOrderFromCheckin(log) {
         if (!log.sale_order_id) return;
         
         try {

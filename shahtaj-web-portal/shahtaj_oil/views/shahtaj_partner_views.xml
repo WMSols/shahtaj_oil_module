@@ -258,7 +258,19 @@
                                    options="{'no_create': True}"/>
                         </group>
                         <group>
-                            <field name="outstanding_balance" string="Outstanding Balance (Rs)"
+                            <field name="outstanding_balance" string="Posted Outstanding (Rs)"
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                            <field name="shahtaj_pending_order_exposure" string="Pending Orders"
+                                   widget="monetary"
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                            <field name="shahtaj_uninvoiced_order_exposure" string="Confirmed (Not Invoiced)"
+                                   widget="monetary"
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                            <field name="shahtaj_effective_outstanding" string="Effective Outstanding"
+                                   widget="monetary" class="fw-bold"
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                            <field name="shahtaj_credit_remaining_effective" string="Credit Remaining"
+                                   widget="monetary"
                                    groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                             <field name="credit" string="Total Receivable (Odoo)"
                                    groups="account.group_account_invoice,account.group_account_readonly"/>

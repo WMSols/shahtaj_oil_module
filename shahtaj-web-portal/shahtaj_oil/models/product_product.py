@@ -1,12 +1,26 @@
 # -*- coding: utf-8 -*-
 """Bookable quantity for order bookers: on-hand minus open carts and undelivered SOs."""
-from odoo import _, api, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare
 
 
 class ProductProduct(models.Model):
     _inherit = 'product.product'
+
+    shahtaj_vendor_id = fields.Many2one(
+        'res.partner',
+        string='Primary Vendor',
+        related='product_tmpl_id.shahtaj_vendor_id',
+        readonly=True,
+        store=True,
+        index=True,
+    )
+    shahtaj_vendor_name = fields.Char(
+        string='Vendor',
+        related='product_tmpl_id.shahtaj_vendor_name',
+        readonly=True,
+    )
 
     def _shahtaj_needs_stock_qty_sudo(self):
         """Custom-portal distributors / bookers lack stock.move ACL for qty fields."""

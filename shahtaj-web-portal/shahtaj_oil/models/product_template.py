@@ -2,7 +2,7 @@
 """Simplified product defaults for Shahtaj distributors."""
 from odoo import _, api, fields, models, SUPERUSER_ID
 from odoo.exceptions import AccessError, UserError, ValidationError
-from odoo.tools import float_compare, float_is_zero
+from odoo.tools import float_compare, float_is_zero, float_round
 
 SHAHTAJ_SALE_UOMS = [
     ('kg', 'Kilogram (kg)'),
@@ -83,6 +83,35 @@ class ProductTemplate(models.Model):
         currency_field='currency_id',
         help='Lifetime stock received at frozen receipt cost (purchase value, not cash paid).',
     )
+    shahtaj_vendor_id = fields.Many2one(
+        'res.partner',
+        string='Primary Vendor',
+        domain=[('supplier_rank', '>', 0), ('is_shahtaj_shop', '=', False)],
+        index=True,
+        help='Primary vendor/manufacturer associated with this product.',
+    )
+    shahtaj_vendor_name = fields.Char(
+        string='Vendor',
+        related='shahtaj_vendor_id.name',
+        readonly=True,
+    )
+
+    def _sync_shahtaj_supplierinfo(self):
+        SupplierInfo = self.env['product.supplierinfo'].sudo()
+        for template in self:
+            vendor = template.shahtaj_vendor_id
+            if vendor:
+                existing = template.sudo().seller_ids.filtered(lambda s: s.partner_id == vendor)
+                if not existing:
+                    template.sudo().seller_ids.unlink()
+                    SupplierInfo.create({
+                        'product_tmpl_id': template.id,
+                        'partner_id': vendor.id,
+                        'min_qty': 1.0,
+                        'price': template.standard_price or 0.0,
+                    })
+            else:
+                template.sudo().seller_ids.unlink()
 
     @api.depends('list_price', 'standard_price')
     def _compute_shahtaj_margin(self):
@@ -317,7 +346,7 @@ class ProductTemplate(models.Model):
         vals.setdefault('purchase_ok', True)
         vals.setdefault('is_storable', True)
         vals.setdefault('tracking', 'none')
-        vals.setdefault('invoice_policy', 'delivery')
+        vals.setdefault('invoice_policy', 'order')
         vals.setdefault('purchase_method', 'receive')
         sale_uom = vals.get('shahtaj_sale_uom', 'piece')
         vals.setdefault('shahtaj_sale_uom', sale_uom)
@@ -364,6 +393,8 @@ class ProductTemplate(models.Model):
             ).filtered(lambda variant: not variant.active)
             if inactive_variants:
                 inactive_variants.write({'active': True})
+        if 'shahtaj_vendor_id' in vals:
+            self._sync_shahtaj_supplierinfo()
         return res
 
     @api.model_create_multi
@@ -397,6 +428,7 @@ class ProductTemplate(models.Model):
                     if uom:
                         vals['uom_id'] = uom.id
         products = super().create(vals_list)
+        products._sync_shahtaj_supplierinfo()
         # Portal create passes opening qty in context so stock is set in the same
         # request (avoids a fragile follow-up RPC after create).
         initial_qty = self.env.context.get('shahtaj_initial_on_hand')
@@ -413,7 +445,7 @@ class ProductTemplate(models.Model):
                     )
         return products
 
-    def _shahtaj_log_stock_receipt(self, qty, unit_cost=None, source='add_stock'):
+    def _shahtaj_log_stock_receipt(self, qty, unit_cost=None, source='add_stock', receipt_date=None):
         """Record manufacturer stock receipt with frozen unit cost."""
         self.ensure_one()
         if float_compare(qty, 0.0, precision_rounding=self.uom_id.rounding) <= 0:
@@ -431,8 +463,48 @@ class ProductTemplate(models.Model):
                 unit_cost if unit_cost is not None else (self.standard_price or 0.0)
             ),
             'source': source,
-            'receipt_date': fields.Date.context_today(self),
+            'receipt_date': receipt_date or fields.Date.context_today(self),
         })
+
+    def _shahtaj_apply_avco_receipt(self, incoming_qty, incoming_unit_cost, source='add_stock', receipt_date=None):
+        """Update product Weighted Average Cost (AVCO) and log stock receipt.
+
+        Formula:
+        New Cost = ((Current On-Hand Qty * Current Cost) + (Incoming Qty * Incoming Unit Price)) / (Current On-Hand Qty + Incoming Qty)
+        """
+        self.ensure_one()
+        rounding = self.uom_id.rounding or 0.01
+        if float_compare(incoming_qty, 0.0, precision_rounding=rounding) <= 0:
+            return
+        if incoming_unit_cost is None or incoming_unit_cost < 0:
+            incoming_unit_cost = self.standard_price or 0.0
+
+        current_qty = self.sudo().qty_available
+        # When called after stock move validation, current_qty already includes incoming_qty
+        on_hand_before = max(current_qty - incoming_qty, 0.0)
+        current_cost = self.standard_price or 0.0
+
+        if float_compare(on_hand_before, 0.0, precision_rounding=rounding) <= 0 or float_is_zero(current_cost, precision_digits=4):
+            new_cost = float(incoming_unit_cost)
+        else:
+            total_old_val = on_hand_before * current_cost
+            total_new_val = incoming_qty * float(incoming_unit_cost)
+            total_qty = on_hand_before + incoming_qty
+            if total_qty > 0:
+                new_cost = (total_old_val + total_new_val) / total_qty
+            else:
+                new_cost = float(incoming_unit_cost)
+
+        new_cost = float_round(new_cost, precision_digits=2)
+        if float_compare(new_cost, self.standard_price, precision_digits=2) != 0:
+            self.sudo().write({'standard_price': new_cost})
+
+        self._shahtaj_log_stock_receipt(
+            qty=incoming_qty,
+            unit_cost=incoming_unit_cost,
+            source=source,
+            receipt_date=receipt_date,
+        )
 
     def _shahtaj_distributor_needs_stock_sudo(self):
         """Custom-portal distributors lack Inventory app groups but must adjust stock."""
@@ -501,27 +573,40 @@ class ProductTemplate(models.Model):
                     ) else 'adjustment'
                 self._shahtaj_log_stock_receipt(delta, source=source)
 
-    def action_shahtaj_add_on_hand_qty(self, quantity):
-        """Increase on-hand quantity."""
+    def action_shahtaj_add_on_hand_qty(self, quantity, unit_cost=None):
+        """Increase on-hand quantity and update Weighted Average Cost if unit_cost is specified."""
         self.ensure_one()
         self._shahtaj_ensure_distributor_stock_access()
         if float_compare(quantity, 0.0, precision_rounding=self.uom_id.rounding) <= 0:
             raise UserError(_('Quantity to add must be greater than zero.'))
         # Read current qty with the same rights used for inventory apply.
         stock_self = self.sudo() if self._shahtaj_distributor_needs_stock_sudo() else self
-        self._shahtaj_log_stock_receipt(quantity, source='add_stock')
+        effective_cost = (
+            unit_cost
+            if (unit_cost is not None and float(unit_cost) > 0)
+            else (self.standard_price or 0.0)
+        )
         self.with_context(shahtaj_skip_receipt_log=True).action_shahtaj_set_on_hand_qty(
             stock_self.qty_available + quantity,
+        )
+        self._shahtaj_apply_avco_receipt(
+            incoming_qty=quantity,
+            incoming_unit_cost=effective_cost,
+            source='add_stock',
         )
         self.env['shahtaj.activity.log'].log_business(
             operation='stock.add',
             name='Stock added',
             related_record=self,
-            message=_('Added %(qty)s to %(product)s',
-                      qty=quantity,
-                      product=self.display_name),
+            message=_(
+                'Added %(qty)s to %(product)s (Cost: Rs. %(cost)s, New Avg: Rs. %(avg)s)',
+                qty=quantity,
+                product=self.display_name,
+                cost=effective_cost,
+                avg=self.standard_price,
+            ),
         )
 
-    def _shahtaj_add_on_hand_qty(self, quantity):
+    def _shahtaj_add_on_hand_qty(self, quantity, unit_cost=None):
         """Backward-compatible alias used by stock wizards."""
-        return self.action_shahtaj_add_on_hand_qty(quantity)
+        return self.action_shahtaj_add_on_hand_qty(quantity, unit_cost=unit_cost)

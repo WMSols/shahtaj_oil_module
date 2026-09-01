@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_delivery_man_list" model="ir.ui.view">
+        <field name="name">res.users.list.shahtaj.delivery.man</field>
+        <field name="model">res.users</field>
+        <field name="priority">51</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="not active">
+                <field name="id" string="ID" optional="show"/>
+                <field name="name"/>
+                <field name="login"/>
+                <field name="shahtaj_employee_code" string="DM Code" optional="show"/>
+                <field name="shahtaj_dm_job_count" string="Jobs" optional="show"/>
+                <field name="shahtaj_pending_delivery_count" string="Open" optional="show"/>
+                <field name="active" widget="boolean" readonly="1"/>
+                <button name="action_shahtaj_deactivate_delivery_man" type="object"
+                        string="Deactivate" icon="fa-ban" title="Deactivate"
+                        invisible="not active" readonly="0"/>
+                <button name="action_shahtaj_activate_delivery_man" type="object"
+                        string="Activate" icon="fa-check" title="Activate"
+                        invisible="active" readonly="0"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_delivery_man_form" model="ir.ui.view">
+        <field name="name">res.users.form.shahtaj.delivery.man</field>
+        <field name="model">res.users</field>
+        <field name="priority">51</field>
+        <field name="arch" type="xml">
+            <form string="Delivery Man">
+                <header>
+                    <button name="action_shahtaj_activate_delivery_man" type="object"
+                            string="Activate" class="oe_highlight"
+                            invisible="active" readonly="0"/>
+                    <button name="action_shahtaj_deactivate_delivery_man" type="object"
+                            string="Deactivate"
+                            invisible="not active" readonly="0"
+                            confirm="Deactivate this delivery man? They will not be able to log in."/>
+                    <button name="action_shahtaj_delete_delivery_man" type="object"
+                            string="Delete Permanently" class="btn-danger"
+                            readonly="0"
+                            confirm="Permanently delete this delivery man? This cannot be undone."/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_shahtaj_dm_view_jobs" type="object"
+                                class="oe_stat_button" icon="fa-truck">
+                            <field name="shahtaj_dm_job_count" widget="statinfo"
+                                   string="Delivery Jobs"/>
+                        </button>
+                        <button name="action_shahtaj_dm_view_jobs" type="object"
+                                class="oe_stat_button" icon="fa-clock-o"
+                                context="{'search_default_open': 1}">
+                            <field name="shahtaj_pending_delivery_count" widget="statinfo"
+                                   string="Open"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <group>
+                        <group string="Account">
+                            <field name="name" readonly="1"/>
+                            <field name="login" readonly="1"/>
+                            <field name="shahtaj_employee_code" string="DM Code"/>
+                            <field name="active" widget="boolean" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Assigned Orders" name="assigned_orders">
+                            <field name="shahtaj_dm_job_ids" nolabel="1"
+                                   mode="list"
+                                   context="{'default_delivery_man_id': id}"
+                                   readonly="1">
+                                <list create="0" delete="0" edit="0"
+                                      decoration-muted="state == 'not_ready'"
+                                      decoration-info="state == 'ready'"
+                                      decoration-warning="state in ('picked', 'partial')"
+                                      decoration-success="state == 'delivered'"
+                                      decoration-danger="state == 'returned'"
+                                      default_order="scheduled_date desc, scheduled_time, id desc">
+                                    <field name="scheduled_date" string="Delivery Day"/>
+                                    <field name="scheduled_time" widget="float_time" string="Time"/>
+                                    <field name="sale_order_id" string="Order"/>
+                                    <field name="partner_id" string="Shop"/>
+                                    <field name="order_booker_id" optional="show"/>
+                                    <field name="order_date" optional="hide"/>
+                                    <field name="amount_total" sum="Total"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="qty_assigned_total" string="Assigned Qty"/>
+                                    <field name="state" string="Stock" widget="badge"
+                                           decoration-danger="state in ('not_ready', 'returned')"
+                                           decoration-info="state == 'ready'"
+                                           decoration-warning="state in ('picked', 'partial')"
+                                           decoration-success="state == 'delivered'"/>
+                                    <field name="field_state" string="Stop" widget="badge"
+                                           decoration-muted="field_state == 'pending'"
+                                           decoration-info="field_state == 'in_transit'"
+                                           decoration-warning="field_state == 'not_attended'"
+                                           decoration-danger="field_state == 'failed'"
+                                           decoration-success="field_state == 'done'"/>
+                                    <field name="assignment_mode" optional="hide"/>
+                                    <field name="assigned_by_id" optional="hide"/>
+                                </list>
+                            </field>
+                            <div class="alert alert-info mt-2" role="alert">
+                                <b>Stock</b> = warehouse flow.
+                                <b>Stop</b> = field story (On the Way / Shop Closed / Could Not Deliver).
+                                Use <b>Assign / Split DM</b> on the sales order to set
+                                day/time and product quantities per delivery man.
+                            </div>
+                        </page>
+                    </notebook>
+                    <field name="shahtaj_is_delivery_man" invisible="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_delivery_man_search" model="ir.ui.view">
+        <field name="name">res.users.search.shahtaj.delivery.man</field>
+        <field name="model">res.users</field>
+        <field name="priority">51</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="login"/>
+                <field name="shahtaj_employee_code"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_delivery_man_management" model="ir.actions.act_window">
+        <field name="name">Delivery Men</field>
+        <field name="res_model">res.users</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('shahtaj_is_delivery_man', '=', True)]</field>
+        <field name="context">{'search_default_active': 1, 'active_test': False}</field>
+        <field name="search_view_id" ref="view_shahtaj_delivery_man_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first delivery man
+            </p>
+            <p>
+                Manage delivery staff logins. Assign orders from Dispatch Orders.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_delivery_man_management_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_delivery_man_list"/>
+        <field name="act_window_id" ref="action_shahtaj_delivery_man_management"/>
+    </record>
+
+    <record id="action_shahtaj_delivery_man_management_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shahtaj_delivery_man_form"/>
+        <field name="act_window_id" ref="action_shahtaj_delivery_man_management"/>
+    </record>
+
+    <!-- Legacy sale.order "pending by booker" actions removed — use Delivery Jobs / Dispatch. -->
+    <delete model="ir.actions.act_window" id="action_shahtaj_dm_my_pending_orders"/>
+    <delete model="ir.actions.act_window" id="action_shahtaj_dm_all_orders"/>
+
+</odoo>

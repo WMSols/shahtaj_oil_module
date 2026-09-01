@@ -154,9 +154,11 @@
                             <div class="d-flex gap-2">
                                 <select class="form-select form-select-sm shadow-sm" style="width: 150px;" t-model="this.state.routeFilterZone" t-on-change="() => this.onFilterChange('routes')">
                                 <option value="all">All Zones</option>
-                                <t t-foreach="this.state.areas.filter(a => a.active)" t-as="area" t-key="area.id">
-                                    <option t-att-value="area.id"><t t-esc="area.name"/></option>
-                                </t>
+                                <t t-foreach="this.state.areas.filter(a => a.active)" t-as="a" t-key="a.id">
+                                        <option t-att-value="a.id">
+                                            <t t-esc="a.name"/>
+                                        </option>
+                                    </t>
                             </select>
                             </div>
                             
@@ -301,10 +303,10 @@
                                         <span class="fs-5">Mapped Shops on this Route</span>
                                         <span class="badge bg-info text-white fs-5"><t t-esc="this.state.selectedRouteDetails.shop_count"/></span>
                                     </div>
-                                    <div class="d-flex justify-content-between align-items-center">
+                                    <!-- <div class="d-flex justify-content-between align-items-center">
                                         <span class="fs-5">Total Unassigned Shops</span>
                                         <span class="badge bg-warning text-dark fs-5"><t t-esc="this.state.selectedRouteDetails.unassigned_shop_count"/></span>
-                                    </div>
+                                    </div> -->
                                 </div>
                             </div>
                         </div>
@@ -532,10 +534,8 @@
                             </div>
                         </div>
                         <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
-                            <div class="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center">
-                                <strong class="text-dark small text-uppercase">Coordinates &amp; Field Verification</strong>
-                                <span t-if="this.state.selectedShopDetails.shahtaj_field_verified" class="badge bg-success text-white">Verified</span>
-                                <span t-else="" class="badge bg-warning text-dark">Unverified</span>
+                            <div class="px-3 py-2 bg-light border-bottom">
+                                <strong class="text-dark small text-uppercase">Coordinates</strong>
                             </div>
                             <div class="p-3">
                                 <div class="row g-3">
@@ -552,18 +552,6 @@
                                         </div>
                                     </div>
                                 </div>
-                                <t t-if="this.state.selectedShopDetails.shahtaj_field_verified">
-                                    <div class="mt-3 pt-2 border-top">
-                                        <button class="btn btn-sm btn-outline-warning w-100 fw-bold d-flex align-items-center justify-content-center gap-1"
-                                                t-on-click="() => this.resetShopVerification(this.state.selectedShopDetails.id)"
-                                                title="Reset verification and clear GPS coordinates so the booker can re-verify on site">
-                                            <i class="fa fa-undo"></i> Reset GPS &amp; Make Unverified
-                                        </button>
-                                        <small class="text-muted d-block mt-1 text-center" style="font-size: 11px;">
-                                            Allows order booker to recapture on-site GPS &amp; exterior photo.
-                                        </small>
-                                    </div>
-                                </t>
                             </div>
                         </div>
                     </div>
@@ -575,8 +563,8 @@
                                 <div class="text-muted small mb-2">Category</div>
                                 <div class="d-flex align-items-center flex-wrap gap-2">
                                     <select class="form-select form-select-sm" style="max-width: 140px;" t-model="this.state.shopCategoryEdit" title="Switching to Cash disables credit limits">
-                                        <option value="credit">Credit</option>
                                         <option value="cash">Cash</option>
+                                        <option value="credit">Credit</option>
                                     </select>
                                     <button class="btn btn-sm btn-primary fw-bold" t-on-click="saveShopCategory" title="Save changes to shop category">
                                         Save Category
@@ -653,7 +641,7 @@
                     </t>
                 </div>
                 <div class="col-md-3 text-center mb-3">
-                    <small class="fw-bold d-block mb-2">Shop Exterior</small>
+                    <small class="fw-bold d-block mb-2">Shop Exterior / PFA License Number</small>
                     <t t-if="this.state.selectedShopDetails.shop_exterior_photo">
                         <img t-att-src="'data:image/jpeg;base64,' + this.state.selectedShopDetails.shop_exterior_photo" class="img-fluid rounded border shadow-sm"/>
                     </t>
@@ -721,6 +709,11 @@
                     <option value="approved">Approved</option>
                     <option value="pending">Pending Review</option>
                     <option value="rejected">Rejected</option>
+                </select>
+                <select class="form-select form-select-sm shadow-sm" style="width: 155px;" t-model="this.state.shopFilterVerified" t-on-change="() => this.onFilterChange('shops')">
+                    <option value="all">All Verification</option>
+                    <option value="verified">On-site Verified</option>
+                    <option value="unverified">Not Verified</option>
                 </select>
                 <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.shopFilterBooker" t-on-change="() => this.onFilterChange('shops')">
                     <option value="all">All Order Bookers</option>
@@ -852,11 +845,6 @@
                                                 Edit
                                             </button>
                                         </li>
-                                        <li t-if="shop.shahtaj_visit_tag === 'visited'">
-                                            <button type="button" class="dropdown-item small py-2 text-warning fw-bold" t-on-click="() => this.onShopMenuResetVerification(shop)">
-                                                <i class="fa fa-undo me-1"></i> Reset Verification &amp; GPS
-                                            </button>
-                                        </li>
                                         <li><hr class="dropdown-divider my-1"/></li>
                                         <li>
                                             <button type="button" class="dropdown-item small py-2 text-danger" t-on-click="() => this.onShopMenuArchive(shop)">
@@ -950,8 +938,8 @@
                     <div class="col-md-4 mb-3">
                         <label class="small fw-bold">Shop Category</label>
                         <select class="form-select form-control" t-model="this.state.shopForm.shopCategory">
-                            <option value="credit">Credit (Requires Limit)</option>
                             <option value="cash">Cash (Immediate Payment)</option>
+                            <option value="credit">Credit (Requires Limit)</option>
                         </select>
                     </div>
                     <div class="col-md-4 mb-3" t-if="this.hasFinancialAccess and this.state.shopForm.shopCategory === 'credit'">
@@ -996,7 +984,7 @@
                         </t>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <label class="small fw-bold">Shop Exterior Photo</label>
+                        <label class="small fw-bold">Shop Exterior Photo / PFA License Number</label>
                         <div class="form-control form-control-sm bg-light text-muted" style="min-height: 38px;">
                             View only — captured by order booker on first visit (with GPS).
                         </div>
@@ -1007,57 +995,6 @@
                 </div>
             </div>
         </div>
-
-        <t t-if="this.state.editingShopId">
-            <div class="card border-0 shadow-sm mb-4 rounded-3">
-                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="fw-bold text-dark mb-0">4. GPS &amp; Field Verification Status</h6>
-                        <small class="text-muted d-block mt-1">Status of on-site GPS lock and order booker verification.</small>
-                    </div>
-                    <div>
-                        <span t-if="this.state.shopForm.is_field_verified" class="badge bg-success text-white px-3 py-2">Field Verified</span>
-                        <span t-else="" class="badge bg-warning text-dark px-3 py-2">Unverified / Pending Setup</span>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <div class="p-3 bg-light rounded-3 border">
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <div class="text-muted small">Current Latitude</div>
-                                        <div class="fw-bold text-dark"><t t-esc="this.state.shopForm.partner_latitude || '—'"/></div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="text-muted small">Current Longitude</div>
-                                        <div class="fw-bold text-dark"><t t-esc="this.state.shopForm.partner_longitude || '—'"/></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 text-md-end">
-                            <t t-if="this.state.shopForm.is_field_verified">
-                                <button type="button" class="btn btn-outline-warning fw-bold px-4 py-2"
-                                        t-on-click="() => this.resetShopVerification(this.state.editingShopId)"
-                                        title="Reset verification and clear coordinates so Order Booker can recapture live GPS">
-                                    <i class="fa fa-undo me-1"></i> Reset GPS &amp; Mark Unverified
-                                </button>
-                                <small class="text-muted d-block mt-1">
-                                    Clears current coordinates so the booker is prompted for fresh GPS on next visit.
-                                </small>
-                            </t>
-                            <t t-else="">
-                                <div class="text-muted small">
-                                    <i class="fa fa-info-circle me-1 text-primary"></i>
-                                    GPS coordinates will be captured on-site by the order booker during check-in.
-                                </div>
-                            </t>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </t>
 
         <div class="d-flex justify-content-end pb-4 mt-3">
             <button class="btn btn-outline-secondary px-4 me-2 fw-bold" t-on-click="cancelForms" t-att-disabled="this.state.isLoading">Discard Changes</button>

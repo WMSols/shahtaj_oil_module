@@ -353,12 +353,24 @@
         <!-- Shop Checkins Tab -->
         <t t-if="this.state.activeSubTab === 'checkins'">
             <t t-if="!this.state.selectedCheckin">
-                        <div class="p-3 bg-light border-bottom d-flex gap-2">
-                    <input type="text" class="form-control form-control-sm w-50" placeholder="Search by Shop Name or Booker..." 
+                        <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
+                    <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Search by Shop Name or Booker..." 
                            t-att-value="this.state.filters.checkins.search" 
                            t-on-input="(ev) => this.onSearchInput(ev, 'checkins')"/>
                      <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
-                    <select class="form-select form-select-sm w-25" 
+                    <select class="form-select form-select-sm" style="max-width: 200px;"
+                            t-model="this.state.filters.checkins.booker"
+                            t-on-change="() => this.onFilterChange('checkins')">
+                        <option value="all">All Order Bookers</option>
+                        <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
+                            <option t-att-value="b.id"><t t-esc="b.name"/></option>
+                        </t>
+                    </select>
+                    <input type="date" class="form-control form-control-sm" style="max-width: 160px;"
+                           t-model="this.state.filters.checkins.date"
+                           t-on-change="() => this.onFilterChange('checkins')"
+                           title="Filter check-ins by date"/>
+                    <select class="form-select form-select-sm" style="max-width: 240px;" 
                             t-model="this.state.filters.checkins.status" 
                             t-on-change="() => this.onFilterChange('checkins')">
                         <option value="">All Feed Statuses</option>
@@ -509,25 +521,27 @@
                 <!-- Orders Tab -->
  <t t-if="this.state.activeSubTab === 'orders'">
   <t t-if="!this.state.selectedOrder">
-                       <div class="p-3 bg-light border-bottom">
-                        <div class="row g-2">
-                            <div class="col-md-6">
-                                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search by Shop, Booker, or Order Ref..." 
-                                       t-att-value="this.state.filters.orders.search" 
-                                       t-on-input="(ev) => this.onSearchInput(ev, 'orders')"/>
-                            </div>
-                            <small class="fw-bold text-muted">Filters: </small>
-                            <div class="col-md-4">
-                                <select class="form-select form-select-sm" 
-                                        t-model="this.state.filters.orders.status" 
-                                        t-on-change="() => this.onFilterChange('orders')">
-                                    <option value="">All Order Statuses</option>
-                                    <option value="Draft">Draft</option>
-                                    <option value="To Invoice">To Invoice</option>
-                                    <option value="Delivered">Delivered</option>
-                                </select>
-                            </div>
-                        </div>
+                       <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
+                        <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Search by Shop, Booker, or Order Ref..." 
+                               t-att-value="this.state.filters.orders.search" 
+                               t-on-input="(ev) => this.onSearchInput(ev, 'orders')"/>
+                        <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
+                        <select class="form-select form-select-sm" style="max-width: 200px;"
+                                t-model="this.state.filters.orders.booker"
+                                t-on-change="() => this.onFilterChange('orders')">
+                            <option value="all">All Order Bookers</option>
+                            <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
+                                <option t-att-value="b.id"><t t-esc="b.name"/></option>
+                            </t>
+                        </select>
+                        <select class="form-select form-select-sm" style="max-width: 240px;" 
+                                t-model="this.state.filters.orders.status" 
+                                t-on-change="() => this.onFilterChange('orders')">
+                            <option value="">All Order Statuses</option>
+                            <option value="Draft">Draft</option>
+                            <option value="To Invoice">To Invoice</option>
+                            <option value="Delivered">Delivered</option>
+                        </select>
                     </div>
                     <div class="position-relative">
                         <t t-if="this.state.isLoadingList">
@@ -828,17 +842,6 @@
         <option value="5">Saturday</option>
         <option value="6">Sunday</option>
     </select>
-
-    <div class="d-flex align-items-center ms-auto gap-2">
-        <small class="text-muted fw-bold">Date Range:</small>
-        <input type="date" class="form-control form-control-sm shadow-sm" 
-               t-model="this.state.filters.schedules.dateFrom" 
-               t-on-change="() => this.onFilterChange('schedules')"/>
-        <span class="text-muted">-</span>
-        <input type="date" class="form-control form-control-sm shadow-sm" 
-               t-model="this.state.filters.schedules.dateTo" 
-               t-on-change="() => this.onFilterChange('schedules')"/>
-    </div>
 </div>
 <div class="position-relative">
     <t t-if="this.state.isLoadingList">
@@ -1110,7 +1113,7 @@
                 </p>
                 <p class="mb-2">
                     <span class="fw-bold text-dark">Metric Type:</span>
-                    <span class="ms-2 badge bg-primary">
+                    <span class="ms-2 badge bg-primary text-white">
                         <t t-esc="this.state.selectedTarget.displayType"/>
                     </span>
                 </p>
@@ -1152,7 +1155,7 @@
                     <span class="text-dark fw-bold">Goal Value:</span>
                     <span class="fw-bold fs-5">
                         <t t-esc="this.state.selectedTarget.targetValue"/>
-                        <small class="text-muted ms-1">
+                        <small class="text-muted ms-1" t-if="this.state.selectedTarget.type === 'collective_weight'">
                             <t t-esc="this.state.selectedTarget.weightUom"/>
                         </small>
                     </span>
@@ -1161,7 +1164,7 @@
                     <span class="text-dark fw-bold">Achieved So Far:</span>
                     <span class="text-success fw-bold fs-5">
                         <t t-esc="this.state.selectedTarget.achievedValue"/>
-                        <small class="text-muted ms-1">
+                        <small class="text-muted ms-1" t-if="this.state.selectedTarget.type === 'collective_weight'">
                             <t t-esc="this.state.selectedTarget.weightUom"/>
                         </small>
                     </span>
@@ -1170,7 +1173,7 @@
                     <span class="text-dark fw-bold">Remaining:</span>
                     <span class="text-warning fw-bold fs-5">
                         <t t-esc="this.state.selectedTarget.remainingValue"/>
-                        <small class="text-muted ms-1">
+                        <small class="text-muted ms-1" t-if="this.state.selectedTarget.type === 'collective_weight'">
                             <t t-esc="this.state.selectedTarget.weightUom"/>
                         </small>
                     </span>

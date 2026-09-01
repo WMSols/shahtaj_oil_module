@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================= -->
+    <!-- Verification Queue: List view highlighting discounts and actions -->
+    <!-- ================================================================= -->
+    <record id="view_shahtaj_orders_needing_verification_list" model="ir.ui.view">
+        <field name="name">sale.order.list.shahtaj.verification</field>
+        <field name="model">sale.order</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <list string="Orders Needing Verification"
+                  decoration-warning="shahtaj_approval_state == 'to_approve'"
+                  decoration-success="shahtaj_approval_state == 'approved'"
+                  decoration-danger="shahtaj_approval_state == 'rejected'"
+                  create="false">
+                <field name="name" string="Order #"/>
+                <field name="date_order" string="Order Date"/>
+                <field name="partner_id" string="Shop"/>
+                <field name="shahtaj_shop_category" string="Shop Type" widget="badge" optional="show"
+                       decoration-info="shahtaj_shop_category == 'credit'"
+                       decoration-success="shahtaj_shop_category == 'cash'"/>
+                <field name="shahtaj_shop_outstanding" string="Outstanding" widget="monetary" optional="show"
+                       decoration-danger="shahtaj_shop_outstanding &gt; 0"/>
+                <field name="shahtaj_shop_credit_remaining" string="Credit Left" widget="monetary" optional="show"
+                       decoration-warning="shahtaj_shop_credit_remaining &lt; shahtaj_total_discount_amount"/>
+                <field name="shahtaj_shop_past_discount_count" string="Past Discounts" optional="show"/>
+                <field name="shahtaj_order_booker_id" string="Order Booker"/>
+                <field name="shahtaj_approval_reasons_display" string="Verification Reasons" optional="show"/>
+                <field name="shahtaj_approval_reason_discount" string="Discount" widget="boolean" optional="show"/>
+                <field name="shahtaj_approval_reason_credit" string="Credit Limit" widget="boolean" optional="show"/>
+                <field name="shahtaj_catalog_amount_total" string="Catalog Total" widget="monetary" optional="show"/>
+                <field name="shahtaj_total_discount_amount" string="Discount Requested" widget="monetary"
+                       decoration-danger="shahtaj_total_discount_amount &gt; 0"/>
+                <field name="shahtaj_discount_reasons" string="Discount Reason" optional="show"/>
+                <field name="amount_total" string="Net Order Amount" widget="monetary" class="fw-bold"/>
+                <field name="shahtaj_approval_state" string="Verification" widget="badge"
+                       decoration-warning="shahtaj_approval_state == 'to_approve'"
+                       decoration-success="shahtaj_approval_state == 'approved'"
+                       decoration-danger="shahtaj_approval_state == 'rejected'"/>
+                <field name="state" string="Order Status" widget="badge"
+                       decoration-info="state in ('draft', 'sent')"
+                       decoration-success="state in ('sale', 'done')"
+                       decoration-danger="state == 'cancel'"/>
+                <button name="action_shahtaj_approve_order" type="object"
+                        string="Approve"
+                        icon="fa-check"
+                        class="btn-success"
+                        invisible="shahtaj_approval_state != 'to_approve' or state not in ('draft', 'sent')"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <button name="action_shahtaj_open_reject_wizard" type="object"
+                        string="Reject"
+                        icon="fa-times"
+                        class="btn-outline-danger"
+                        invisible="shahtaj_approval_state != 'to_approve' or state not in ('draft', 'sent')"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: Orders Needing Verification -->
+    <record id="action_shahtaj_orders_needing_verification" model="ir.actions.act_window">
+        <field name="name">Orders Needing Verification</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[
+            ('shahtaj_approval_state', '=', 'to_approve'),
+            ('state', 'in', ('draft', 'sent')),
+        ]</field>
+        <field name="view_id" ref="view_shahtaj_orders_needing_verification_list"/>
+        <field name="context">{
+            'search_default_to_approve': 1,
+            'default_shahtaj_approval_state': 'to_approve',
+            'create': False,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No orders pending verification
+            </p>
+            <p>
+                Orders appear here when an order booker applies a discount, or when the shop credit limit would be exceeded.
+                Review the verification reasons, modify quantities or prices if needed, then approve or reject the order.
+            </p>
+        </field>
+    </record>
+
+    <!-- Action: Rejected Orders -->
+    <record id="action_shahtaj_orders_rejected" model="ir.actions.act_window">
+        <field name="name">Rejected Orders</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[
+            ('shahtaj_approval_state', '=', 'rejected'),
+        ]</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No rejected orders
+            </p>
+            <p>
+                Orders that were rejected during the verification process appear here with their recorded reasons.
+            </p>
+        </field>
+    </record>
+
+    <!-- ================================================================= -->
+    <!-- Main Parent Screen: Orders & Dispatch Hub Form                     -->
+    <!-- ================================================================= -->
+    <record id="view_shahtaj_orders_hub_form" model="ir.ui.view">
+        <field name="name">shahtaj.orders.hub.form</field>
+        <field name="model">shahtaj.orders.hub</field>
+        <field name="arch" type="xml">
+            <form string="Orders &amp; Dispatch Hub" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Orders &amp; Dispatch</h1>
+                        <p class="text-muted">
+                            Verify order booker discounts and credit-limit exceptions, approve orders, and coordinate delivery dispatch.
+                        </p>
+                    </div>
+
+                    <group string="Queue &amp; Dispatch Overview">
+                        <group string="Verification &amp; Approvals">
+                            <field name="orders_to_approve_count" readonly="1" class="fw-bold text-warning"/>
+                            <field name="orders_confirmed_today_count" readonly="1"/>
+                            <field name="orders_rejected_count" readonly="1" class="text-danger"/>
+                        </group>
+                        <group string="Dispatch &amp; Delivery">
+                            <field name="orders_to_deliver_count" readonly="1" class="fw-bold text-primary"/>
+                            <field name="dm_jobs_active_count" readonly="1"/>
+                            <field name="orders_to_invoice_count" readonly="1"/>
+                            <field name="field_order_total_count" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-info" role="alert">
+                        <strong>Order Lifecycle &amp; Verification Flow</strong>
+                        <ol class="mb-0 mt-2">
+                            <li><b>Order Booker Field Sales:</b> Order bookers place orders during shop visits. Discounted lines or credit-limit exceedances route the order to the <b>Verification Queue</b>.</li>
+                            <li><b>Distributor Verification:</b> Review verification reasons in <b>Orders Needing Verification</b>. Modify quantities/prices if needed, then <b>Approve</b> or <b>Reject</b>. Standard full-price orders within credit auto-confirm immediately.</li>
+                            <li><b>Dispatch &amp; Delivery Planning:</b> Confirmed orders appear under <b>Dispatch Orders</b>. Use <b>Assign / Split DM</b> to allocate products to delivery men with dates.</li>
+                            <li><b>Van Stock &amp; Field Delivery:</b> Delivery men pick stock onto vans and deliver to shops via the DM portal.</li>
+                            <li><b>Invoicing &amp; Cash Collection:</b> Create invoices and collect cash/reconciliation under <b>Shop Accounting</b>.</li>
+                        </ol>
+                    </div>
+
+                    <group string="Action Shortcuts">
+                        <group string="Step 1 — Verification &amp; Order Management">
+                            <button name="action_open_orders_needing_verification" type="object"
+                                    string="Orders Needing Verification"
+                                    class="btn btn-warning mb-2 fw-bold"
+                                    icon="fa-shield"/>
+                            <button name="action_open_field_sales_orders" type="object"
+                                    string="All Field Sales Orders"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-shopping-cart"/>
+                            <button name="action_open_rejected_orders" type="object"
+                                    string="Rejected Orders"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-ban"/>
+                        </group>
+                        <group string="Step 2 — Dispatch &amp; Delivery">
+                            <button name="action_open_dispatch_orders" type="object"
+                                    string="Dispatch Orders (To Deliver)"
+                                    class="btn btn-primary mb-2 fw-bold"
+                                    icon="fa-truck"/>
+                            <button name="action_open_dm_dispatch_jobs" type="object"
+                                    string="Delivery Jobs (DM Trips)"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-list-alt"/>
+                            <button name="action_open_orders_to_invoice" type="object"
+                                    string="Orders to Invoice"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-file-text-o"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Server action to open the Orders & Dispatch Hub -->
+    <record id="action_shahtaj_orders_hub" model="ir.actions.server">
+        <field name="name">Orders &amp; Dispatch Overview</field>
+        <field name="model_id" ref="shahtaj_oil.model_shahtaj_orders_hub"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_orders_hub()
+        </field>
+    </record>
+
+</odoo>

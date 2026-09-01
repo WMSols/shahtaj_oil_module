@@ -104,6 +104,18 @@ class ResCompany(models.Model):
             ))
         return account
 
+    def _shahtaj_ensure_dm_accounting(self):
+        """Ensure DM Wallet (101410), Van Stock (110200), and DMCASH journal exist and are configured."""
+        self.ensure_one()
+        from ..setup import accounting_setup
+        return accounting_setup.ensure_dm_accounting(self).get(self.id, {})
+
+    @api.model
+    def _shahtaj_run_setup_checks(self):
+        """Called from data/shahtaj_user_access_sync.xml on every module upgrade."""
+        from ..setup import run_all_setup_checks
+        run_all_setup_checks(self.env)
+
     @api.model
     def shahtaj_get_company_profile(self):
         """Portal: company name, phone, and logo preview."""

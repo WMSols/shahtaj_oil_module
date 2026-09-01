@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_order_reject_wizard_form" model="ir.ui.view">
+        <field name="name">shahtaj.order.reject.wizard.form</field>
+        <field name="model">shahtaj.order.reject.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reject Field Order">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Order Rejection</strong>
+                        <p class="mb-0 mt-1">
+                            Rejecting this order will mark it as <b>Rejected</b> and cancel the sales order.
+                            The order booker and audit history will see the rejection reason.
+                        </p>
+                    </div>
+                    <group string="Order Summary">
+                        <group>
+                            <field name="sale_order_id"/>
+                            <field name="partner_id"/>
+                            <field name="order_booker_id"/>
+                        </group>
+                        <group>
+                            <field name="catalog_amount" widget="monetary"/>
+                            <field name="discount_amount" widget="monetary" decoration-danger="discount_amount &gt; 0"/>
+                            <field name="discount_reasons" invisible="not discount_reasons"/>
+                            <field name="amount_total" widget="monetary" class="fw-bold"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Shop Snapshot" invisible="not partner_id">
+                        <group string="Credit &amp; Balance">
+                            <field name="shop_category" widget="badge"
+                                   decoration-info="shop_category == 'credit'"
+                                   decoration-success="shop_category == 'cash'"/>
+                            <field name="shop_outstanding" widget="monetary"
+                                   decoration-danger="shop_outstanding &gt; 0"/>
+                            <field name="shop_credit_remaining" widget="monetary"
+                                   invisible="shop_category != 'credit'"
+                                   decoration-warning="shop_credit_remaining &lt; discount_amount"/>
+                        </group>
+                        <group string="Sales &amp; Discount History">
+                            <field name="shop_lifetime_sales" widget="monetary"/>
+                            <field name="shop_past_discount_total" widget="monetary"
+                                   decoration-danger="shop_past_discount_total &gt; 0"/>
+                            <field name="shop_past_discount_count"/>
+                        </group>
+                    </group>
+                    <group string="Rejection Details">
+                        <field name="rejection_reason" required="1" placeholder="Explain why this order or discount is rejected..."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Confirm Rejection" type="object" name="action_reject" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

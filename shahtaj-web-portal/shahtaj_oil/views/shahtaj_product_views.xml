@@ -9,6 +9,7 @@
         <field name="arch" type="xml">
             <list string="Products">
                 <field name="name"/>
+                <field name="shahtaj_vendor_id" string="Vendor" optional="show"/>
                 <field name="shahtaj_sale_uom" string="Unit"/>
                 <field name="standard_price" string="Cost"/>
                 <field name="list_price" string="Sales Price"/>
@@ -37,8 +38,11 @@
                         <h1><field name="name" placeholder="e.g. Cheese Burger"/></h1>
                     </div>
                     <group>
-                        <group string="Pricing">
-                            <field name="standard_price" string="Cost Price"/>
+                        <group string="Pricing &amp; Supplier">
+                            <field name="shahtaj_vendor_id" string="Primary Vendor"
+                                   domain="[('supplier_rank', '>', 0), ('is_shahtaj_shop', '=', False)]"
+                                   context="{'default_supplier_rank': 1, 'res_partner_search_mode': 'supplier'}"/>
+                            <field name="standard_price" string="Avg Cost Price" readonly="1" help="Weighted Average Cost (AVCO) computed automatically from Purchase Orders and Stock Receipts."/>
                             <field name="list_price" string="Sales Price"/>
                             <field name="shahtaj_unit_margin" string="Profit per Unit" readonly="1"/>
                             <field name="shahtaj_margin_percent" string="Margin %" readonly="1"/>

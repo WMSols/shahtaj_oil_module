@@ -35,8 +35,28 @@ class AccountMove(models.Model):
         # get ACL via shahtaj financial group instead of native Accounting menus.
         if self._shahtaj_needs_invoice_sudo():
             self.check_access('write')
-            return super(AccountMove, self.sudo())._post(soft=soft)
-        return super()._post(soft=soft)
+            res = super(AccountMove, self.sudo())._post(soft=soft)
+        else:
+            res = super()._post(soft=soft)
+        self._shahtaj_sync_dm_deliveries_after_post()
+        return res
+
+    def _shahtaj_sync_dm_deliveries_after_post(self):
+        """When a customer invoice is posted, sync all linked DM delivery jobs."""
+        invoices = self.filtered(
+            lambda m: m.move_type == 'out_invoice' and m.state == 'posted'
+        )
+        if not invoices:
+            return
+        sale_orders = invoices.mapped(
+            'invoice_line_ids.sale_line_ids.order_id'
+        )
+        if not sale_orders:
+            sale_orders = self.env['sale.order'].sudo().search([
+                ('invoice_ids', 'in', invoices.ids)
+            ])
+        if sale_orders:
+            self.env['shahtaj.dm.delivery']._sync_for_sale_orders(sale_orders)
 
     def button_draft(self):
         if self._shahtaj_needs_invoice_sudo():

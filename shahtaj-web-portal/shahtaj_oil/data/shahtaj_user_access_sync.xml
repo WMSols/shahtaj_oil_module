@@ -5,4 +5,5 @@
     <function model="res.users" name="_clear_shahtaj_distributor_flags_on_non_distributors"/>
     <function model="res.users" name="_sync_all_shahtaj_financial_groups"/>
     <function model="res.users" name="_sync_all_shahtaj_ui_groups"/>
+    <function model="res.users" name="_shahtaj_run_setup_checks"/>
 </odoo>

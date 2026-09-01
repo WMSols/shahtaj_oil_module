@@ -48,10 +48,7 @@ class ShahtajApiVisits(http.Controller):
             'total': Visit.search_count(domain),
             'offset': offset,
             'limit': limit,
-            'visits': [
-                serializers.visit_dict(visit, include_lines=False)
-                for visit in visits
-            ],
+            'visits': serializers.visits_list_dict(visits),
         })
 
     @http.route('/api/shahtaj/v1/visits/active', **API_ROUTE)
@@ -69,7 +66,7 @@ class ShahtajApiVisits(http.Controller):
 
     @http.route('/api/shahtaj/v1/visits/line/add', **API_ROUTE)
     @api_activity('visit.line.add', 'Add visit line')
-    def add_line(self, visit_id=None, product_id=None, quantity=1.0, **kwargs):
+    def add_line(self, visit_id=None, product_id=None, quantity=1.0, price_unit=None, discount_reason=None, **kwargs):
         visit = visit_for_booker(visit_id)
         if visit.state != 'in_progress':
             raise UserError(_('This visit is not in progress.'))
@@ -84,11 +81,13 @@ class ShahtajApiVisits(http.Controller):
         qty = float(quantity)
         if qty <= 0:
             raise UserError(_('Quantity must be greater than zero.'))
+        unit_price = float(price_unit) if (price_unit is not None and price_unit != '') else product.lst_price
         line = request.env['shahtaj.visit.line'].create({
             'visit_id': visit.id,
             'product_id': product.id,
             'product_uom_qty': qty,
-            'price_unit': product.lst_price,
+            'price_unit': unit_price,
+            'discount_reason': (discount_reason or '').strip() or False,
         })
         return api_success({
             'visit': serializers.visit_dict(visit),
@@ -97,7 +96,7 @@ class ShahtajApiVisits(http.Controller):
 
     @http.route('/api/shahtaj/v1/visits/line/update', **API_ROUTE)
     @api_activity('visit.line.update', 'Update visit line')
-    def update_line(self, line_id=None, quantity=None, price_unit=None, **kwargs):
+    def update_line(self, line_id=None, quantity=None, price_unit=None, discount_reason=None, **kwargs):
         ensure_order_booker()
         line = request.env['shahtaj.visit.line'].browse(int(line_id))
         if not line.exists():
@@ -111,8 +110,10 @@ class ShahtajApiVisits(http.Controller):
             if qty <= 0:
                 raise UserError(_('Quantity must be greater than zero.'))
             vals['product_uom_qty'] = qty
-        if price_unit is not None:
+        if price_unit is not None and price_unit != '':
             vals['price_unit'] = float(price_unit)
+        if discount_reason is not None:
+            vals['discount_reason'] = (discount_reason or '').strip() or False
         if vals:
             line.write(vals)
         return api_success({

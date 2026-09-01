@@ -249,7 +249,15 @@
         <field name="priority">60</field>
         <field name="arch" type="xml">
             <form string="Vendor">
+                <header>
+                    <button name="action_create_purchase_order" type="object" string="New Purchase Order" class="btn-primary"/>
+                </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_supplied_products" type="object" class="oe_stat_button" icon="fa-cubes">
+                            <field name="shahtaj_supplied_product_count" widget="statinfo" string="Products"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" placeholder="e.g. Shahtaj Industry"/></h1>
@@ -266,6 +274,19 @@
                             <field name="zip"/>
                         </group>
                     </group>
+                    <notebook>
+                        <page string="Supplied Products" name="supplied_products">
+                            <field name="shahtaj_supplied_product_ids" readonly="1">
+                                <list string="Products">
+                                    <field name="name"/>
+                                    <field name="shahtaj_sale_uom" string="Unit"/>
+                                    <field name="standard_price" string="Avg Cost"/>
+                                    <field name="list_price" string="Sales Price"/>
+                                    <field name="qty_available" string="On Hand"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                     <field name="company_type" invisible="1"/>
                     <field name="is_shahtaj_shop" invisible="1"/>
                     <field name="supplier_rank" invisible="1"/>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.ShahtajGeolocateButton">
+        <button type="button"
+                class="btn btn-primary"
+                t-att-disabled="state.busy"
+                t-on-click="onClick">
+            <i class="fa fa-map-marker me-1"/>
+            <t t-if="state.busy">Getting GPS…</t>
+            <t t-else="">Use My GPS</t>
+        </button>
+    </t>
+</templates>

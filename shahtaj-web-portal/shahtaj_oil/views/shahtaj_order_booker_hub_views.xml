@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_order_booker_hub_form" model="ir.ui.view">
+        <field name="name">shahtaj.order.booker.hub.form</field>
+        <field name="model">shahtaj.order.booker.hub</field>
+        <field name="arch" type="xml">
+            <form string="Order Booker Operations" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Order Booker Operations</h1>
+                        <p class="text-muted">
+                            Manage order bookers, weekly schedules, visit tasks, territory,
+                            shop visits, sales targets, and field order verification.
+                        </p>
+                    </div>
+                    <group string="Overview">
+                        <group>
+                            <field name="order_booker_count" readonly="1"/>
+                            <field name="schedule_line_count" readonly="1"/>
+                            <field name="visit_tasks_today_pending" readonly="1"/>
+                            <field name="visit_tasks_week_total" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="target_active_count" readonly="1"/>
+                            <field name="zone_count" readonly="1"/>
+                            <field name="route_count" readonly="1"/>
+                            <field name="shop_count" readonly="1"/>
+                            <field name="shops_pending_count" readonly="1"/>
+                            <field name="visits_today_count" readonly="1"/>
+                            <field name="orders_to_approve_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <strong>Typical workflow</strong>
+                        <ol class="mb-0 mt-2">
+                            <li>Create order bookers and assign them to <b>Zones</b> and <b>Routes</b>.</li>
+                            <li>Plan each booker's week under <b>Weekly Schedules</b> (visit tasks are auto-created).</li>
+                            <li>Set <b>Sales Targets</b> and monitor progress from visit tasks and shop visits.</li>
+                            <li>Review discounted field orders in <b>Orders Needing Verification</b>.</li>
+                        </ol>
+                    </div>
+                    <group string="Open a section">
+                        <group string="Staff">
+                            <button name="action_open_order_bookers" type="object"
+                                    string="Order Bookers"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-users"/>
+                            <button name="action_open_create_order_booker" type="object"
+                                    string="Create Order Booker"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-user-plus"/>
+                        </group>
+                        <group string="Schedules &amp; Tasks">
+                            <button name="action_open_weekly_schedules" type="object"
+                                    string="Weekly Schedules"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-calendar"/>
+                            <button name="action_open_visit_tasks_progress" type="object"
+                                    string="Visit Tasks Progress"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-tasks"/>
+                            <button name="action_open_all_visit_tasks" type="object"
+                                    string="All Visit Tasks"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-list"/>
+                            <button name="action_open_generate_tasks" type="object"
+                                    string="Generate Tasks"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-magic"/>
+                        </group>
+                        <group string="Visits &amp; Targets">
+                            <button name="action_open_shop_visits" type="object"
+                                    string="Shop Visits"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-map-marker"/>
+                            <button name="action_open_targets" type="object"
+                                    string="Sales Targets"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-bullseye"/>
+                        </group>
+                        <group string="Territory &amp; Shops">
+                            <button name="action_open_zones" type="object"
+                                    string="Zones"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-globe"/>
+                            <button name="action_open_routes" type="object"
+                                    string="Routes"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-road"/>
+                            <button name="action_open_shops" type="object"
+                                    string="All Shops"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-shopping-bag"/>
+                            <button name="action_open_shops_pending" type="object"
+                                    string="Pending Shop Approvals"
+                                    class="btn btn-warning mb-2"
+                                    icon="fa-hourglass-half"/>
+                            <button name="action_open_shops_unassigned" type="object"
+                                    string="Unassigned Shops"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-question-circle"/>
+                        </group>
+                        <group string="Field Orders">
+                            <button name="action_open_orders_hub" type="object"
+                                    string="Field Orders Overview"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-dashboard"/>
+                            <button name="action_open_orders_needing_verification" type="object"
+                                    string="Orders Needing Verification"
+                                    class="btn btn-warning mb-2 fw-bold"
+                                    icon="fa-shield"/>
+                            <button name="action_open_field_sales_orders" type="object"
+                                    string="All Field Sales Orders"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-shopping-cart"/>
+                            <button name="action_open_rejected_orders" type="object"
+                                    string="Rejected Orders"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-ban"/>
+                            <button name="action_open_orders_to_invoice" type="object"
+                                    string="Orders to Invoice"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-file-text-o"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_order_booker_hub" model="ir.actions.server">
+        <field name="name">Order Booker Overview</field>
+        <field name="model_id" ref="shahtaj_oil.model_shahtaj_order_booker_hub"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_order_booker_hub()
+        </field>
+    </record>
+
+</odoo>

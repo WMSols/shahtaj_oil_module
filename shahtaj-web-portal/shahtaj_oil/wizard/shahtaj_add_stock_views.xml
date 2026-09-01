@@ -10,6 +10,7 @@
                     <field name="product_id"/>
                     <field name="qty_on_hand"/>
                     <field name="qty_to_add"/>
+                    <field name="unit_cost" placeholder="Optional (defaults to current cost)"/>
                 </group>
                 <footer>
                     <button name="action_add_stock" type="object"
