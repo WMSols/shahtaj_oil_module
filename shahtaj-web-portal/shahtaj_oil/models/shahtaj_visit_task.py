@@ -372,7 +372,7 @@ class ShahtajVisitTask(models.Model):
             and not user._is_public()
         )
         if planning_vals and is_distributor:
-            locked = self.filtered('_shahtaj_is_planning_locked')
+            locked = self.filtered(lambda task: task._shahtaj_is_planning_locked())
             if locked:
                 raise ValidationError(_(
                     'Cannot reschedule %(names)s — the visit is completed, in progress, '

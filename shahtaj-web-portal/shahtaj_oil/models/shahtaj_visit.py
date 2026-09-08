@@ -524,33 +524,70 @@ class ShahtajVisit(models.Model):
     @api.model
     def _validate_check_in_coordinates(
         self, shop, latitude, longitude, purpose='start a visit',
+        log_purpose='check_in', visit_task=None, visit=None, dm_delivery=None,
     ):
-        """Reject if booker is outside company min/max shop GPS distance."""
+        """Reject if booker is outside company min/max shop GPS distance.
+
+        Always logs a ``shahtaj.gps.attempt`` row (success or blocked) before
+        returning or raising.
+        """
+        Attempt = self.env['shahtaj.gps.attempt']
+        limits = get_shop_distance_limits(self.env)
+        min_m = limits['min_m']
+        max_m = limits['max_m']
+        log_common = {
+            'purpose': log_purpose,
+            'shop': shop,
+            'latitude': latitude,
+            'longitude': longitude,
+            'min_distance_m': min_m,
+            'max_distance_m': max_m,
+            'visit_task': visit_task,
+            'visit': visit,
+            'dm_delivery': dm_delivery,
+        }
+
         if not shop.partner_latitude or not shop.partner_longitude:
-            raise UserError(_(
+            msg = _(
                 'Shop "%(shop)s" has no GPS coordinates. '
                 'Complete first-visit verification (shops/verify-on-site) '
                 'or ask the distributor to set latitude and longitude.',
                 shop=shop.name,
-            ))
+            )
+            Attempt.log_attempt(
+                result='blocked_missing_shop_gps',
+                message=msg,
+                **log_common,
+            )
+            raise UserError(msg)
         if latitude is None or longitude is None:
-            raise UserError(_(
+            msg = _(
                 'Your GPS coordinates are required to %(purpose)s.',
                 purpose=purpose,
-            ))
-        if not (-90 <= latitude <= 90):
-            raise ValidationError(_('GPS latitude must be between -90 and 90.'))
-        if not (-180 <= longitude <= 180):
+            )
+            Attempt.log_attempt(
+                result='blocked_missing_user_gps',
+                message=msg,
+                **log_common,
+            )
+            raise UserError(msg)
+        if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+            msg = _('GPS latitude/longitude values are out of range.')
+            Attempt.log_attempt(
+                result='blocked_invalid_coords',
+                message=msg,
+                **log_common,
+            )
+            if not (-90 <= latitude <= 90):
+                raise ValidationError(_('GPS latitude must be between -90 and 90.'))
             raise ValidationError(_('GPS longitude must be between -180 and 180.'))
-        limits = get_shop_distance_limits(self.env)
-        min_m = limits['min_m']
-        max_m = limits['max_m']
+
         distance = shahtaj_distance_meters(
             latitude, longitude,
             shop.partner_latitude, shop.partner_longitude,
         )
         if distance < min_m:
-            raise UserError(_(
+            msg = _(
                 'You are %(distance).0f m from shop "%(shop)s". '
                 'You must be at least %(min).0f m away to %(purpose)s '
                 '(current company setting).',
@@ -558,9 +595,16 @@ class ShahtajVisit(models.Model):
                 shop=shop.name,
                 min=min_m,
                 purpose=purpose,
-            ))
+            )
+            Attempt.log_attempt(
+                result='blocked_too_close',
+                distance_m=distance,
+                message=msg,
+                **log_common,
+            )
+            raise UserError(msg)
         if distance > max_m:
-            raise UserError(_(
+            msg = _(
                 'You are %(distance).0f m from shop "%(shop)s". '
                 'You must be within %(max).0f m to %(purpose)s '
                 '(current company setting).',
@@ -568,7 +612,21 @@ class ShahtajVisit(models.Model):
                 shop=shop.name,
                 max=max_m,
                 purpose=purpose,
-            ))
+            )
+            Attempt.log_attempt(
+                result='blocked_too_far',
+                distance_m=distance,
+                message=msg,
+                **log_common,
+            )
+            raise UserError(msg)
+
+        Attempt.log_attempt(
+            result='ok',
+            distance_m=distance,
+            message=_('Within range (%(dist).0f m / max %(max).0f m)', dist=distance, max=max_m),
+            **log_common,
+        )
         return distance
 
     @api.model
@@ -618,7 +676,11 @@ class ShahtajVisit(models.Model):
                 'Finish that visit before checking in here.',
                 shop=active.sudo().shop_id.name,
             ))
-        distance = self._validate_check_in_coordinates(shop, latitude, longitude)
+        distance = self._validate_check_in_coordinates(
+            shop, latitude, longitude,
+            log_purpose='check_in',
+            visit_task=task,
+        )
         now = fields.Datetime.now()
         visit = self.create({
             'visit_kind': 'order_booker',
@@ -634,6 +696,16 @@ class ShahtajVisit(models.Model):
             'state': 'in_progress',
             'outcome': 'none',
         })
+        # Link latest OK check-in attempt to this visit (best-effort).
+        attempt = self.env['shahtaj.gps.attempt'].sudo().search([
+            ('purpose', '=', 'check_in'),
+            ('result', '=', 'ok'),
+            ('user_id', '=', task.order_booker_id.id),
+            ('shop_id', '=', shop.id),
+            ('visit_id', '=', False),
+        ], order='id desc', limit=1)
+        if attempt:
+            attempt.write({'visit_id': visit.id, 'visit_task_id': task.id})
         task.with_context(shahtaj_system_visit_write=True).write({
             'state': 'in_progress',
             'visit_id': visit.id,
@@ -735,6 +807,9 @@ class ShahtajVisit(models.Model):
                 float(latitude),
                 float(longitude),
                 purpose='place an order',
+                log_purpose='place_order',
+                visit_task=self.visit_task_id,
+                visit=self,
             )
             self.with_context(shahtaj_system_visit_write=True).write({
                 'place_order_latitude': float(latitude),

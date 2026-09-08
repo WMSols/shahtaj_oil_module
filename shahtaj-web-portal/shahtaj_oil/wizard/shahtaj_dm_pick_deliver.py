@@ -125,6 +125,11 @@ class ShahtajDmDeliverWizard(models.TransientModel):
         readonly=True,
     )
     partner_id = fields.Many2one(related='delivery_id.partner_id', readonly=True)
+    shop_address = fields.Char(
+        string='Shop address',
+        related='partner_id.contact_address',
+        readonly=True,
+    )
     shop_latitude = fields.Float(
         string='Shop Latitude',
         digits=(10, 7),
@@ -235,37 +240,14 @@ class ShahtajDmDeliverWizard(models.TransientModel):
     def action_confirm_deliver(self):
         self.ensure_one()
         shop = self.partner_id.sudo()
-        if not shop.partner_latitude or not shop.partner_longitude:
-            raise UserError(_(
-                'Shop "%(shop)s" has no GPS coordinates. '
-                'Ask the distributor to set shop latitude/longitude before delivering.',
-                shop=shop.display_name,
-            ))
-        if not self.latitude or not self.longitude:
-            raise UserError(_(
-                'Your GPS is missing. Tap “Use My GPS” (or enter your real latitude '
-                'and longitude), then confirm.'
-            ))
-        if not (-90 <= self.latitude <= 90) or not (-180 <= self.longitude <= 180):
-            raise UserError(_('Latitude/longitude values are out of range.'))
-
-        # Reject silent “standing on shop pin” when coords are exactly the shop
-        # only if that was our old test path — real DM may be at the door.
-        # Exact match is allowed when GPS is genuine.
-
-        limits = get_shop_distance_limits(self.env)
-        max_m = float(limits.get('max_m') or 0.0)
-        distance = shahtaj_distance_meters(
-            self.latitude, self.longitude,
-            shop.partner_latitude, shop.partner_longitude,
+        distance = self.env['shahtaj.visit']._validate_check_in_coordinates(
+            shop,
+            self.latitude if self.latitude else None,
+            self.longitude if self.longitude else None,
+            purpose='confirm delivery',
+            log_purpose='deliver',
+            dm_delivery=self.delivery_id,
         )
-        if distance > max_m:
-            raise UserError(_(
-                'You are %(dist).0f m from the shop (max allowed %(max).0f m). '
-                'Move closer and tap “Use My GPS” again.',
-                dist=distance,
-                max=max_m,
-            ))
 
         qty_map = {}
         for line in self.line_ids:

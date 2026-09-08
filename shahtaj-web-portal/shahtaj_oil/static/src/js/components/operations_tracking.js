@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart,onWillUpdateProps  } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUpdateProps, useEffect, useRef } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { hasFinancialAccess } from "../shahtaj_access";
 
@@ -12,6 +12,8 @@ export class OperationsTracking extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         this.action = useService("action");
+        this.checkinMapRef = useRef("checkinMapContainer");
+        this.checkinMapInstance = null;
         const ITEMS_PER_PAGE = 10;
         this.state = useState({
             // Main Tab Navigation
@@ -55,7 +57,7 @@ export class OperationsTracking extends Component {
             },
             filters: {
                 deliveries: { search: '', status: '' },
-                checkins: { search: '', status: '', booker: 'all', date: '' },
+                checkins: { search: '', status: '', purpose: 'all', booker: 'all', date: '' },
                 orders: { search: '', status: '', booker: 'all' },
                 schedules: { booker: 'all', day: 'all' },
                 targets: { booker: 'all', type: 'all' },
@@ -81,6 +83,112 @@ export class OperationsTracking extends Component {
             if (hasFinancialAccess()) await this.loadTaxAndProductData();
             await this.fetchActiveList();
         });
+
+        useEffect(() => {
+            if (this.checkinMapInstance) {
+                this.checkinMapInstance.remove();
+                this.checkinMapInstance = null;
+            }
+
+            const mapEl = this.checkinMapRef.el;
+            const log = this.state.selectedCheckin;
+            if (!mapEl || !log) {
+                return () => {};
+            }
+
+            const shopLat = log.shop_latitude;
+            const shopLng = log.shop_longitude;
+            const attLat = log.attempt_latitude;
+            const attLng = log.attempt_longitude;
+            const hasShop = shopLat && shopLng;
+            const hasAttempt = attLat && attLng;
+
+            if (!hasShop && !hasAttempt) {
+                return () => {};
+            }
+
+            if (typeof L === 'undefined') {
+                console.warn("Leaflet library is missing! Check your __manifest__.py assets.");
+                return () => {};
+            }
+
+            const center = hasShop ? [shopLat, shopLng] : [attLat, attLng];
+            this.checkinMapInstance = L.map(mapEl).setView(center, 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap',
+            }).addTo(this.checkinMapInstance);
+
+            const bounds = [];
+            if (hasShop) {
+                L.circleMarker([shopLat, shopLng], {
+                    radius: 9,
+                    color: '#0d6efd',
+                    fillColor: '#0d6efd',
+                    fillOpacity: 0.95,
+                    weight: 2,
+                }).addTo(this.checkinMapInstance).bindPopup(`<b>${log.shop}</b><br/>Shop location`);
+                bounds.push([shopLat, shopLng]);
+                if (log.max_distance_m > 0) {
+                    L.circle([shopLat, shopLng], {
+                        radius: log.max_distance_m,
+                        color: '#0d6efd',
+                        fillColor: '#0d6efd',
+                        fillOpacity: 0.08,
+                        weight: 1,
+                        dashArray: '4 4',
+                    }).addTo(this.checkinMapInstance);
+                }
+            }
+            if (hasAttempt) {
+                const ok = log.isOk;
+                L.circleMarker([attLat, attLng], {
+                    radius: 9,
+                    color: ok ? '#198754' : '#dc3545',
+                    fillColor: ok ? '#198754' : '#dc3545',
+                    fillOpacity: 0.95,
+                    weight: 2,
+                }).addTo(this.checkinMapInstance).bindPopup(
+                    `<b>${ok ? 'GPS OK' : 'Blocked attempt'}</b><br/>${log.userLabel || log.booker}`
+                );
+                bounds.push([attLat, attLng]);
+            }
+            if (bounds.length > 1) {
+                this.checkinMapInstance.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 });
+            }
+
+            return () => {
+                if (this.checkinMapInstance) {
+                    this.checkinMapInstance.remove();
+                    this.checkinMapInstance = null;
+                }
+            };
+        }, () => [this.checkinMapRef.el, this.state.selectedCheckin]);
+    }
+
+    _gpsPurposeLabel(purpose) {
+        return ({ check_in: 'Check-in', place_order: 'Place Order', deliver: 'Deliver to Shop' })[purpose] || purpose || '—';
+    }
+
+    _gpsResultLabel(result) {
+        return ({
+            ok: 'GPS OK',
+            blocked_too_far: 'Blocked — Too Far',
+            blocked_too_close: 'Blocked — Too Close',
+            blocked_missing_shop_gps: 'Blocked — Shop GPS Missing',
+            blocked_missing_user_gps: 'Blocked — User GPS Missing',
+            blocked_invalid_coords: 'Blocked — Invalid Coordinates',
+        })[result] || result || 'Unknown';
+    }
+
+    _gpsStatusBadgeClass(result) {
+        if (result === 'ok') return 'bg-success text-white shadow-sm';
+        if (result === 'blocked_too_far' || result === 'blocked_too_close') return 'bg-danger text-white shadow-sm';
+        return 'bg-warning text-dark shadow-sm';
+    }
+
+    _gpsRoleLabel(role) {
+        return ({ order_booker: 'Order Booker', delivery_man: 'Delivery Man', other: 'Other' })[role] || role || '—';
     }
     // --- UNIVERSAL PAGINATION HANDLERS ---
     onSearchInput(ev, tabName) {
@@ -217,7 +325,15 @@ export class OperationsTracking extends Component {
     }
 
    async loadDropdownData() {
-        this.state.lookupBookers = await this.orm.searchRead('res.users', [['shahtaj_is_order_booker', '=', true]], ['id', 'name']);
+        const [bookers, deliveryMen] = await Promise.all([
+            this.orm.searchRead('res.users', [['shahtaj_is_order_booker', '=', true]], ['id', 'name']),
+            this.orm.searchRead('res.users', [['shahtaj_is_delivery_man', '=', true]], ['id', 'name']),
+        ]);
+        const byId = {};
+        for (const u of [...bookers, ...deliveryMen]) {
+            byId[u.id] = u;
+        }
+        this.state.lookupBookers = Object.values(byId).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         
         // FIXED: Using .call() to safely execute read_group
         const types = await this.orm.call('shahtaj.visit.target', 'read_group', [[], ['target_type'], ['target_type']]);
@@ -255,19 +371,35 @@ export class OperationsTracking extends Component {
                 }
             } 
             else if (tab === 'checkins') {
-                model = 'shahtaj.visit'; targetState = 'tableCheckins';
-                fields = ["id", "shop_id", "order_booker_id", "started_at", "ended_at", "state", "outcome", "visit_task_id", "sale_order_id", "notes"];
-                if (filters.search) domain.push('|', ['shop_id.name', 'ilike', filters.search], ['order_booker_id.name', 'ilike', filters.search]);
-                if (filters.booker && filters.booker !== 'all') domain.push(['order_booker_id', '=', parseInt(filters.booker)]);
+                model = 'shahtaj.gps.attempt'; targetState = 'tableCheckins';
+                fields = [
+                    'id', 'create_date', 'user_id', 'role', 'purpose', 'result', 'message',
+                    'shop_id', 'shop_latitude', 'shop_longitude',
+                    'attempt_latitude', 'attempt_longitude',
+                    'distance_m', 'min_distance_m', 'max_distance_m',
+                    'visit_task_id', 'visit_id', 'dm_delivery_id',
+                ];
+                if (filters.search) {
+                    domain.push('|', '|',
+                        ['shop_id.name', 'ilike', filters.search],
+                        ['user_id.name', 'ilike', filters.search],
+                        ['message', 'ilike', filters.search],
+                    );
+                }
+                if (filters.booker && filters.booker !== 'all') domain.push(['user_id', '=', parseInt(filters.booker)]);
                 if (filters.date) {
                     const bounds = this._pktDateToUtcBounds(filters.date);
-                    domain.push(['started_at', '>=', bounds.start]);
-                    domain.push(['started_at', '<=', bounds.end]);
+                    domain.push(['create_date', '>=', bounds.start]);
+                    domain.push(['create_date', '<=', bounds.end]);
                 }
-                if (filters.status === 'Checked In') domain.push(['state', '=', 'in_progress']);
-                if (filters.status === 'Checked Out') domain.push(['state', '=', 'completed'], ['outcome', '!=', 'incomplete']);
-                if (filters.status === 'Skipped') domain.push(['outcome', '=', 'incomplete']);
-                if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancelled']);
+                if (filters.purpose && filters.purpose !== 'all') domain.push(['purpose', '=', filters.purpose]);
+                if (filters.status === 'ok') domain.push(['result', '=', 'ok']);
+                else if (filters.status === 'blocked') domain.push(['result', '!=', 'ok']);
+                else if (filters.status === 'blocked_too_far') domain.push(['result', '=', 'blocked_too_far']);
+                else if (filters.status === 'blocked_too_close') domain.push(['result', '=', 'blocked_too_close']);
+                else if (filters.status === 'blocked_missing') {
+                    domain.push(['result', 'in', ['blocked_missing_shop_gps', 'blocked_missing_user_gps', 'blocked_invalid_coords']]);
+                }
             }
             else if (tab === 'schedules') {
                 model = 'shahtaj.weekly.schedule'; targetState = 'tableSchedules';
@@ -293,7 +425,7 @@ export class OperationsTracking extends Component {
                 queryKwargs.context = { active_test: false };
             }
             if (tab === 'checkins') {
-                queryKwargs.order = 'started_at desc, id desc';
+                queryKwargs.order = 'create_date desc, id desc';
             }
             let total;
             let records;
@@ -334,15 +466,47 @@ export class OperationsTracking extends Component {
                 });
             }
             else if (tab === 'checkins') {
-                this.state.tableCheckins = records.map(v => {
-                    let durationStr = "Active Now";
-                    if (v.started_at && v.ended_at) durationStr = `${Math.round((new Date(v.ended_at.replace(' ', 'T') + "Z") - new Date(v.started_at.replace(' ', 'T') + "Z")) / 60000)} mins`;
-                    let status = 'Unknown'; let outcome = v.outcome;
-                    if (v.state === 'in_progress') { status = 'Checked In'; outcome = 'In Progress'; }
-                    else if (v.state === 'completed' && v.outcome === 'incomplete') { status = 'Skipped'; outcome = 'Incomplete / Auto-Skipped'; }
-                    else if (v.state === 'completed') { status = 'Checked Out'; outcome = outcome === 'order' ? 'Order Placed' : 'No Order'; }
-                    else if (v.state === 'cancelled') { status = 'Cancelled'; }
-                    return { id: v.id, shop: v.shop_id ? v.shop_id[1] : 'Unknown', shopId: v.shop_id ? v.shop_id[0] : false, booker: v.order_booker_id ? v.order_booker_id[1] : 'Unknown', bookerId: v.order_booker_id ? v.order_booker_id[0] : false, time: this.formatUtcToPkt(v.started_at) || 'Pending', endTime: this.formatUtcToPkt(v.ended_at) || 'In Progress', status, duration: durationStr, outcome, taskRef: v.visit_task_id ? v.visit_task_id[1] : 'Direct Visit', sale_order_id: v.sale_order_id, notes: v.notes || '' };
+                this.state.tableCheckins = records.map(a => {
+                    const isOk = a.result === 'ok';
+                    const status = this._gpsResultLabel(a.result);
+                    const purposeLabel = this._gpsPurposeLabel(a.purpose);
+                    const distLabel = a.distance_m
+                        ? `${Math.round(a.distance_m)} m`
+                        : (isOk ? '—' : 'n/a');
+                    return {
+                        id: a.id,
+                        shop: a.shop_id ? a.shop_id[1] : 'Unknown shop',
+                        shopId: a.shop_id ? a.shop_id[0] : false,
+                        booker: a.user_id ? a.user_id[1] : 'Unknown',
+                        bookerId: a.user_id ? a.user_id[0] : false,
+                        userLabel: a.user_id ? a.user_id[1] : 'Unknown',
+                        role: a.role,
+                        roleLabel: this._gpsRoleLabel(a.role),
+                        purpose: a.purpose,
+                        purposeLabel,
+                        result: a.result,
+                        isOk,
+                        status,
+                        time: this.formatUtcToPkt(a.create_date) || '—',
+                        distance_m: a.distance_m || 0,
+                        min_distance_m: a.min_distance_m || 0,
+                        max_distance_m: a.max_distance_m || 0,
+                        distLabel,
+                        message: a.message || '',
+                        shop_latitude: a.shop_latitude || 0,
+                        shop_longitude: a.shop_longitude || 0,
+                        attempt_latitude: a.attempt_latitude || 0,
+                        attempt_longitude: a.attempt_longitude || 0,
+                        taskRef: a.visit_task_id ? a.visit_task_id[1] : (a.dm_delivery_id ? a.dm_delivery_id[1] : '—'),
+                        visit_id: a.visit_id || false,
+                        visit_task_id: a.visit_task_id || false,
+                        dm_delivery_id: a.dm_delivery_id || false,
+                        sale_order_id: false,
+                        notes: '',
+                        endTime: '',
+                        duration: distLabel,
+                        outcome: purposeLabel,
+                    };
                 });
             }
             else if (tab === 'schedules') {
@@ -730,7 +894,7 @@ export class OperationsTracking extends Component {
     _resetTabFilters(tabName) {
         const defaultFilters = {
             deliveries: { search: '', status: '' },
-            checkins:   { search: '', status: '', booker: 'all', date: '' },
+            checkins:   { search: '', status: '', purpose: 'all', booker: 'all', date: '' },
             orders:     { search: '', status: '', booker: 'all' },
             schedules:  { booker: 'all', day: 'all' },
             targets:    { booker: 'all', type: 'all' },
@@ -811,7 +975,50 @@ export class OperationsTracking extends Component {
     
     closeOrder() { this.state.selectedOrder = null; }
 
-    viewCheckin(log) { this.state.selectedCheckin = log; }
+    async viewCheckin(log) {
+        this.state.selectedCheckin = {
+            ...log,
+            notes: log.notes || '',
+            sale_order_id: log.sale_order_id || false,
+            endTime: log.endTime || '',
+            visitOutcome: '',
+        };
+        const visitId = log.visit_id && log.visit_id[0];
+        if (!visitId) {
+            return;
+        }
+        try {
+            const visits = await this.orm.read(
+                'shahtaj.visit',
+                [visitId],
+                ['started_at', 'ended_at', 'outcome', 'state', 'sale_order_id', 'notes'],
+            );
+            if (!visits.length || !this.state.selectedCheckin || this.state.selectedCheckin.id !== log.id) {
+                return;
+            }
+            const v = visits[0];
+            let visitOutcome = v.outcome || '';
+            if (v.state === 'in_progress') visitOutcome = 'In Progress';
+            else if (v.state === 'completed' && v.outcome === 'incomplete') visitOutcome = 'Incomplete / Auto-Skipped';
+            else if (v.state === 'completed') visitOutcome = v.outcome === 'order' ? 'Order Placed' : 'No Order';
+            else if (v.state === 'cancelled') visitOutcome = 'Cancelled';
+
+            let durationStr = '';
+            if (v.started_at && v.ended_at) {
+                durationStr = `${Math.round((new Date(v.ended_at.replace(' ', 'T') + 'Z') - new Date(v.started_at.replace(' ', 'T') + 'Z')) / 60000)} mins`;
+            }
+
+            this.state.selectedCheckin.notes = v.notes || '';
+            this.state.selectedCheckin.sale_order_id = v.sale_order_id || false;
+            this.state.selectedCheckin.endTime = this.formatUtcToPkt(v.ended_at) || '';
+            this.state.selectedCheckin.visitOutcome = visitOutcome;
+            if (durationStr) {
+                this.state.selectedCheckin.duration = durationStr;
+            }
+        } catch (error) {
+            // GPS detail still useful without visit enrichment.
+        }
+    }
     closeCheckin() { this.state.selectedCheckin = null; }
 
     async viewOrderFromCheckin(log) {
