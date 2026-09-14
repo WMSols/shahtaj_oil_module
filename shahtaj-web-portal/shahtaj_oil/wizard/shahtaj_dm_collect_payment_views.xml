@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_dm_collect_payment_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.collect.payment.form</field>
+        <field name="model">shahtaj.dm.collect.payment</field>
+        <field name="arch" type="xml">
+            <form string="Collect Payment (DM Wallet)">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Cash collected here goes into the <b>DM Wallet</b> (DMCASH / 101410)
+                        until the distributor settles it to the bank.
+                    </div>
+                    <group>
+                        <group string="Shop">
+                            <field name="delivery_id" readonly="1" invisible="not delivery_id"/>
+                            <field name="partner_id"
+                                   readonly="delivery_id"/>
+                            <field name="shop_outstanding" readonly="1"
+                                   decoration-danger="shop_outstanding &gt; 0"/>
+                        </group>
+                        <group string="Wallet">
+                            <field name="delivery_man_id"
+                                   readonly="context.get('lock_delivery_man')"
+                                   groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            <field name="delivery_man_id" readonly="1"
+                                   groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                            <field name="wallet_balance" readonly="1"/>
+                            <field name="amount_total" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" placeholder="Optional note for the shopkeeper / office…"/>
+                    </group>
+                    <separator string="Open invoices — enter Collect Now (or Fill Full)"/>
+                    <field name="line_ids">
+                        <list editable="bottom" create="false" delete="false">
+                            <field name="move_id" readonly="1" force_save="1"/>
+                            <field name="invoice_date" readonly="1"/>
+                            <field name="payment_state" widget="badge" readonly="1"
+                                   decoration-danger="payment_state == 'not_paid'"
+                                   decoration-warning="payment_state == 'partial'"/>
+                            <field name="amount_residual" sum="Remaining" readonly="1" force_save="1"/>
+                            <field name="amount" sum="Collect"/>
+                            <field name="currency_id" column_invisible="1" force_save="1"/>
+                        </list>
+                    </field>
+                </sheet>
+                <footer>
+                    <button name="action_fill_full_residuals" type="object"
+                            string="Fill Full Remaining" class="btn-secondary"/>
+                    <button name="action_confirm" type="object"
+                            string="Collect to Wallet" class="btn-primary"
+                            confirm="Post cash collection into the DM wallet?"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_dm_collect_payment" model="ir.actions.act_window">
+        <field name="name">Collect Payment</field>
+        <field name="res_model">shahtaj.dm.collect.payment</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'lock_delivery_man': True}</field>
+    </record>
+
+    <record id="view_shahtaj_dm_wallet_settle_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.wallet.settle.form</field>
+        <field name="model">shahtaj.dm.wallet.settle</field>
+        <field name="arch" type="xml">
+            <form string="Settle DM Wallet to Bank">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        Moves cash from <b>101410 DM Wallet</b> into the selected bank/cash journal.
+                        Use this when the delivery man deposits collections at the office.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="delivery_man_id"/>
+                            <field name="wallet_balance" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="amount"/>
+                            <field name="bank_journal_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Settle to Bank" class="btn-primary"
+                            confirm="Post wallet settlement to the bank journal?"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_dm_wallet_settle" model="ir.actions.act_window">
+        <field name="name">Settle DM Wallet</field>
+        <field name="res_model">shahtaj.dm.wallet.settle</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="view_shahtaj_dm_wallet_settlement_list" model="ir.ui.view">
+        <field name="name">shahtaj.dm.wallet.settlement.list</field>
+        <field name="model">shahtaj.dm.wallet.settlement</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false">
+                <field name="settlement_date"/>
+                <field name="delivery_man_id"/>
+                <field name="amount" sum="Total"/>
+                <field name="bank_journal_id"/>
+                <field name="settled_by_id"/>
+                <field name="move_id"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_dm_wallet_collection_list" model="ir.ui.view">
+        <field name="name">account.payment.list.shahtaj.dm.wallet</field>
+        <field name="model">account.payment</field>
+        <field name="priority">90</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false"
+                  decoration-success="state in ('paid', 'in_process')">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="partner_id" string="Shop"/>
+                <field name="amount" sum="Collected"/>
+                <field name="shahtaj_collected_by_dm_id" string="DM"/>
+                <field name="shahtaj_dm_delivery_id" optional="show"/>
+                <field name="shahtaj_payment_notes" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Lightweight form: avoids Accounting-only fields (bank statement lines, etc.) -->
+    <record id="view_shahtaj_dm_wallet_collection_form" model="ir.ui.view">
+        <field name="name">account.payment.form.shahtaj.dm.wallet</field>
+        <field name="model">account.payment</field>
+        <field name="priority">90</field>
+        <field name="arch" type="xml">
+            <form string="Wallet Collection" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Collection">
+                            <field name="date" readonly="1"/>
+                            <field name="partner_id" string="Shop" readonly="1"/>
+                            <field name="amount" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="state" widget="badge" readonly="1"/>
+                        </group>
+                        <group string="DM Wallet">
+                            <field name="shahtaj_collected_by_dm_id" string="Collected By" readonly="1"/>
+                            <field name="shahtaj_dm_delivery_id" readonly="1"/>
+                            <field name="journal_id" readonly="1"/>
+                            <field name="shahtaj_payment_channel" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="shahtaj_payment_notes" readonly="1"/>
+                        <field name="memo" readonly="1" invisible="not memo"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_dm_my_wallet_collections" model="ir.actions.act_window">
+        <field name="name">My Wallet Collections</field>
+        <field name="res_model">account.payment</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('shahtaj_is_dm_wallet_collection', '=', True), ('shahtaj_collected_by_dm_id', '=', uid)]</field>
+        <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_shahtaj_dm_wallet_collection_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_shahtaj_dm_wallet_collection_form')})]"/>
+    </record>
+
+    <record id="action_shahtaj_dm_wallet_collections_all" model="ir.actions.act_window">
+        <field name="name">DM Wallet Collections</field>
+        <field name="res_model">account.payment</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('shahtaj_is_dm_wallet_collection', '=', True)]</field>
+        <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_shahtaj_dm_wallet_collection_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_shahtaj_dm_wallet_collection_form')})]"/>
+    </record>
+
+    <record id="action_shahtaj_dm_wallet_settlements" model="ir.actions.act_window">
+        <field name="name">DM Wallet Settlements</field>
+        <field name="res_model">shahtaj.dm.wallet.settlement</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

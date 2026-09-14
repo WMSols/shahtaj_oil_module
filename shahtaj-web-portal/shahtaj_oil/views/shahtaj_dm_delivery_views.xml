@@ -1,6 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- Read-only invoice list for DM / distributor shop balance sharing -->
+    <record id="view_shahtaj_dm_shop_invoice_list" model="ir.ui.view">
+        <field name="name">account.move.list.shahtaj.dm.shop</field>
+        <field name="model">account.move</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <list string="Shop Invoices" create="false" edit="false" delete="false"
+                  decoration-danger="payment_state == 'not_paid'"
+                  decoration-warning="payment_state == 'partial'"
+                  decoration-info="payment_state == 'in_payment'"
+                  decoration-success="payment_state == 'paid'"
+                  default_order="payment_state, invoice_date desc">
+                <field name="name" string="Number"/>
+                <field name="partner_id" string="Shop"/>
+                <field name="move_type" string="Type"/>
+                <field name="invoice_date" string="Date"/>
+                <field name="invoice_date_due" string="Due"/>
+                <field name="amount_total_signed" string="Total" sum="Total"/>
+                <field name="amount_residual_signed" string="Remaining" sum="Remaining"/>
+                <field name="payment_state" string="Payment" widget="badge"
+                       decoration-danger="payment_state == 'not_paid'"
+                       decoration-warning="payment_state == 'partial'"
+                       decoration-info="payment_state == 'in_payment'"
+                       decoration-success="payment_state == 'paid'"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_dm_shop_invoice_search" model="ir.ui.view">
+        <field name="name">account.move.search.shahtaj.dm.shop</field>
+        <field name="model">account.move</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <search string="Shop Invoices">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <filter name="unpaid" string="Unpaid"
+                        domain="[('payment_state', '=', 'not_paid')]"/>
+                <filter name="partial" string="Partial"
+                        domain="[('payment_state', '=', 'partial')]"/>
+                <filter name="in_payment" string="In Payment"
+                        domain="[('payment_state', '=', 'in_payment')]"/>
+                <filter name="paid" string="Fully Paid"
+                        domain="[('payment_state', '=', 'paid')]"/>
+                <filter name="open_due" string="Still Due"
+                        domain="[('payment_state', 'in', ('not_paid', 'partial', 'in_payment'))]"/>
+                <separator/>
+                <filter name="group_payment_state" string="Group by Payment"
+                        context="{'group_by': 'payment_state'}"/>
+                <filter name="group_partner" string="Group by Shop"
+                        context="{'group_by': 'partner_id'}"/>
+            </search>
+        </field>
+    </record>
+
     <!-- ── LIST VIEW ── -->
     <record id="view_shahtaj_dm_delivery_list" model="ir.ui.view">
         <field name="name">shahtaj.dm.delivery.list</field>
@@ -20,7 +77,8 @@
                             groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 </header>
                 <field name="scheduled_date" optional="show"/>
-                <field name="scheduled_time" widget="float_time" optional="show"/>
+                <field name="picked_at" optional="hide"/>
+                <field name="delivered_at" optional="show"/>
                 <field name="sale_order_id"/>
                 <field name="partner_id"/>
                 <field name="order_booker_id"/>
@@ -30,6 +88,11 @@
                        groups="shahtaj_oil.group_shahtaj_distributor"/>
                 <field name="order_date" optional="hide"/>
                 <field name="amount_total" sum="Total"/>
+                <field name="shop_outstanding_balance" string="Shop Due" optional="show"
+                       decoration-danger="shop_outstanding_balance &gt; 0"
+                       groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                <field name="shop_unpaid_invoice_count" string="Open Inv." optional="hide"
+                       groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <field name="qty_assigned_total" string="Assigned Qty" optional="show"
                        groups="shahtaj_oil.group_shahtaj_distributor"/>
                 <field name="is_split_share" optional="hide"
@@ -48,23 +111,31 @@
                 <button name="action_pick_stock" type="object"
                         string="Pick Stock" icon="fa-cube"
                         invisible="state not in ('ready', 'picked', 'partial')"
-                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <button name="action_field_in_transit" type="object"
                         string="On the Way" icon="fa-road"
                         invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 <button name="action_deliver_to_shop" type="object"
-                        string="Deliver" icon="fa-check"
+                        string="Deliver (GPS)" icon="fa-map-marker"
                         invisible="state not in ('picked', 'partial')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 <button name="action_return_to_warehouse" type="object"
                         string="Return WH" icon="fa-undo"
                         invisible="state not in ('picked', 'partial')"
-                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <button name="action_print_invoice" type="object"
                         string="Print Invoice" icon="fa-print"
                         invisible="state == 'not_ready'"
                         groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                <button name="action_view_shop_invoices" type="object"
+                        string="Shop Due" icon="fa-money"
+                        invisible="not partner_id"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                <button name="action_collect_shop_payment" type="object"
+                        string="Collect" icon="fa-university"
+                        invisible="not partner_id"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
             </list>
         </field>
     </record>
@@ -79,7 +150,7 @@
                     <button name="action_pick_stock" type="object"
                             string="Pick Stock from Warehouse" class="oe_highlight"
                             invisible="state not in ('ready', 'picked', 'partial')"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_field_in_transit" type="object"
                             string="On the Way" class="btn-secondary"
                             invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
@@ -95,13 +166,13 @@
                             groups="shahtaj_oil.group_shahtaj_delivery_man"
                             confirm="Mark could not deliver? Stock stays on the van. Add a note first if empty."/>
                     <button name="action_deliver_to_shop" type="object"
-                            string="Deliver to Shop" class="oe_highlight"
+                            string="Deliver to Shop (GPS)" class="oe_highlight"
                             invisible="state not in ('picked', 'partial')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                     <button name="action_return_to_warehouse" type="object"
                             string="Return Undelivered to Warehouse" class="btn-warning"
                             invisible="state not in ('picked', 'partial')"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
                             confirm="Return undelivered van stock for this shop back to the warehouse?"/>
                     <button name="action_field_reset_pending" type="object"
                             string="Reset Stop" class="btn-secondary"
@@ -111,16 +182,40 @@
                             string="Print Invoice" class="btn-secondary"
                             invisible="state == 'not_ready'"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                    <button name="action_view_shop_invoices" type="object"
+                            string="Shop Invoices &amp; Balance" class="btn-secondary"
+                            icon="fa-money"
+                            invisible="not partner_id"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                    <button name="action_collect_shop_payment" type="object"
+                            string="Collect Payment" class="oe_highlight"
+                            icon="fa-university"
+                            invisible="not partner_id"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_view_van_quants" type="object"
                             string="Open Van Stock" class="btn-secondary"
                             invisible="not van_location_id"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_view_sale_order" type="object"
                             string="View Sale Order" class="btn-secondary"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="not_ready,ready,picked,partial,delivered,returned"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_shop_invoices" type="object"
+                                class="oe_stat_button" icon="fa-file-text-o"
+                                invisible="not partner_id"
+                                groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="shop_unpaid_invoice_count" nolabel="1"/>
+                                    / <field name="shop_invoice_count" nolabel="1"/>
+                                </span>
+                                <span class="o_stat_text">Open / All Inv.</span>
+                            </div>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <h1><field name="display_name" readonly="1"/></h1>
                     </div>
@@ -129,7 +224,9 @@
                         <ul class="mb-0">
                             <li><b>Stock</b> (top bar) — warehouse flow: pick → van → shop / return</li>
                             <li><b>Stop</b> — field story: On the Way / Shop Closed / Could Not Deliver / Done</li>
+                            <li><b>Deliver to Shop (GPS)</b> — at the shop: Use My GPS → set qty → confirm</li>
                             <li>Shop Closed and Could Not Deliver need a <b>note</b> below</li>
+                            <li><b>Shop Balance</b> tab — outstanding + unpaid / partial / paid invoices to share with the shopkeeper</li>
                         </ul>
                     </div>
                     <group>
@@ -147,6 +244,10 @@
                                    readonly="shahtaj_processing_locked"/>
                             <field name="scheduled_time" widget="float_time"
                                    readonly="shahtaj_processing_locked"/>
+                            <field name="picked_at" readonly="1"
+                                   invisible="not picked_at"/>
+                            <field name="delivered_at" readonly="1"
+                                   invisible="not delivered_at"/>
                             <field name="field_state" widget="badge"
                                    decoration-muted="field_state == 'pending'"
                                    decoration-info="field_state == 'in_transit'"
@@ -168,10 +269,37 @@
                                    invisible="not van_location_id"/>
                             <field name="visit_task_id" readonly="1"
                                    invisible="not visit_task_id"/>
-                            <field name="gps_verified" readonly="1"
-                                   invisible="not gps_verified"/>
-                            <field name="check_in_distance_m" readonly="1"
-                                   invisible="not check_in_distance_m"/>
+                        </group>
+                    </group>
+                    <group string="Shop Balance (share with shopkeeper)"
+                           invisible="not partner_id">
+                        <group>
+                            <field name="shop_category" readonly="1"/>
+                            <field name="shop_outstanding_balance" readonly="1"
+                                   decoration-danger="shop_outstanding_balance &gt; 0"/>
+                            <field name="shop_unpaid_invoice_amount" readonly="1"
+                                   decoration-warning="shop_unpaid_invoice_amount &gt; 0"/>
+                        </group>
+                        <group>
+                            <field name="shop_credit_limit" readonly="1"
+                                   invisible="shop_category != 'credit'"/>
+                            <field name="shop_unpaid_invoice_count" readonly="1"/>
+                            <field name="shop_invoice_count" readonly="1"/>
+                            <button name="action_view_shop_invoices" type="object"
+                                    string="Open Invoice List" class="btn-link"
+                                    icon="fa-external-link"
+                                    groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                        </group>
+                    </group>
+                    <group string="Last GPS deliver" invisible="not gps_verified">
+                        <group>
+                            <field name="gps_verified" readonly="1"/>
+                            <field name="delivered_at" string="Delivered At" readonly="1"/>
+                            <field name="check_in_distance_m" string="Distance (m)" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="check_in_latitude" string="Deliver lat" readonly="1"/>
+                            <field name="check_in_longitude" string="Deliver lng" readonly="1"/>
                         </group>
                     </group>
                     <group string="Notes">
@@ -198,23 +326,74 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Shop Balance" name="shop_balance"
+                              invisible="not partner_id">
+                            <div class="alert alert-secondary" role="alert">
+                                Read-only invoice list — use <b>Collect Payment</b> in the header
+                                to take cash into the DM wallet (DMCASH).
+                            </div>
+                            <div class="mb-3">
+                                <button name="action_collect_shop_payment" type="object"
+                                        string="Collect Payment to Wallet" class="btn-primary"
+                                        icon="fa-university"
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            </div>
+                            <group>
+                                <group string="Summary">
+                                    <field name="partner_id" readonly="1" string="Shop"/>
+                                    <field name="shop_outstanding_balance" readonly="1"
+                                           decoration-danger="shop_outstanding_balance &gt; 0"/>
+                                    <field name="shop_unpaid_invoice_amount" readonly="1"/>
+                                </group>
+                                <group string="Counts">
+                                    <field name="shop_unpaid_invoice_count" readonly="1"/>
+                                    <field name="shop_invoice_count" readonly="1"/>
+                                    <field name="shop_credit_limit" readonly="1"
+                                           invisible="shop_category != 'credit'"/>
+                                </group>
+                            </group>
+                            <separator string="Invoices (Unpaid → Partial → Paid)"/>
+                            <field name="shop_invoice_ids" readonly="1" nolabel="1"
+                                   context="{'list_view_ref': 'shahtaj_oil.view_shahtaj_dm_shop_invoice_list'}">
+                                <list create="false" edit="false" delete="false"
+                                      decoration-danger="payment_state == 'not_paid'"
+                                      decoration-warning="payment_state == 'partial'"
+                                      decoration-info="payment_state == 'in_payment'"
+                                      decoration-success="payment_state == 'paid'">
+                                    <field name="name" string="Number"/>
+                                    <field name="move_type" string="Type"/>
+                                    <field name="invoice_date" string="Date"/>
+                                    <field name="invoice_date_due" string="Due"/>
+                                    <field name="amount_total_signed" string="Total" sum="Total"/>
+                                    <field name="amount_residual_signed" string="Remaining" sum="Remaining"/>
+                                    <field name="payment_state" string="Payment" widget="badge"
+                                           decoration-danger="payment_state == 'not_paid'"
+                                           decoration-warning="payment_state == 'partial'"
+                                           decoration-info="payment_state == 'in_payment'"
+                                           decoration-success="payment_state == 'paid'"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                            <separator string="Printable summary"/>
+                            <field name="shop_invoices_html" nolabel="1" colspan="2"/>
+                        </page>
                         <page string="Van Stock" name="van_stock"
                               invisible="not van_location_id">
                             <div class="mb-3">
                                 <button name="action_view_van_quants" type="object"
                                         string="Open Full Van Inventory" class="btn-primary"
                                         icon="fa-cubes"
-                                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                                 <button name="action_pick_stock" type="object"
                                         string="Pick More to Van" class="btn-secondary"
                                         icon="fa-cube"
                                         invisible="state not in ('ready', 'picked', 'partial')"
-                                        groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                                 <button name="action_return_to_warehouse" type="object"
                                         string="Return Leftover to Warehouse" class="btn-warning"
                                         icon="fa-undo"
                                         invisible="state not in ('picked', 'partial')"
-                                        groups="shahtaj_oil.group_shahtaj_delivery_man"
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
                                         confirm="Return undelivered van stock for this shop back to the warehouse?"/>
                             </div>
                             <group string="This shop — quantities">

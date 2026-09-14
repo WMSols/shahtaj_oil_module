@@ -406,9 +406,9 @@
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn btn-light border shadow-sm text-center px-4 py-3 rounded-4" t-on-click="openJournalEntries" style="min-width: 150px;">
-                                <div class="fw-bold fs-3 text-primary lh-1 mb-1"><t t-esc="this.state.entryCount"/></div>
-                                <small class="text-muted fw-bold text-uppercase">Journal Entries</small>
+                            <button class="btn btn-primary border shadow-sm text-center px-4 py-3 rounded-4" t-on-click="openJournalEntries" style="min-width: 150px;">
+                                <div class="fw-bold fs-3 text-white lh-1 mb-1"><t t-esc="this.state.entryCount"/></div>
+                                <small class="text-white fw-bold text-uppercase">Journal Entries</small>
                             </button>
                         </div>
                         <t t-if="this.isLiquidityJournal and this.state.journalForm.id">

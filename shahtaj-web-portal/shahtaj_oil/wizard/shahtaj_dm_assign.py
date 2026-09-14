@@ -146,12 +146,15 @@ class ShahtajDmAssignWizard(models.TransientModel):
                 job_cmds.append((0, 0, {
                     'delivery_man_id': job.delivery_man_id.id,
                     'scheduled_date': job.scheduled_date or fields.Date.context_today(self),
-                    'scheduled_time': job.scheduled_time or 9.0,
+                    'scheduled_time': job.scheduled_time or 0.0,
                     'existing_job_id': job.id,
                     'line_ids': line_cmds,
                 }))
         else:
-            dm = order.shahtaj_delivery_man_id
+            dm = (
+                self.env.context.get('shahtaj_default_delivery_man_id')
+                or (order.shahtaj_delivery_man_id.id if order.shahtaj_delivery_man_id else False)
+            )
             line_cmds = [
                 (0, 0, {
                     'sale_order_line_id': sol.id,
@@ -163,9 +166,9 @@ class ShahtajDmAssignWizard(models.TransientModel):
                 for sol in sale_lines
             ]
             job_cmds.append((0, 0, {
-                'delivery_man_id': dm.id if dm else False,
+                'delivery_man_id': dm,
                 'scheduled_date': fields.Date.context_today(self),
-                'scheduled_time': 9.0,
+                'scheduled_time': 0.0,
                 'line_ids': line_cmds,
             }))
         res['job_ids'] = job_cmds
@@ -202,7 +205,7 @@ class ShahtajDmAssignWizard(models.TransientModel):
         Job.create({
             'wizard_id': self.id,
             'scheduled_date': fields.Date.context_today(self),
-            'scheduled_time': 9.0,
+            'scheduled_time': 0.0,
             'line_ids': line_cmds,
         })
         return {
@@ -294,7 +297,7 @@ class ShahtajDmAssignWizardJob(models.TransientModel):
     )
     scheduled_time = fields.Float(
         string='Time',
-        default=9.0,
+        default=0.0,
     )
     line_ids = fields.One2many(
         'shahtaj.dm.assign.wizard.line',

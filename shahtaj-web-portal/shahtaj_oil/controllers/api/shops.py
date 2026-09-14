@@ -48,8 +48,17 @@ class ShahtajApiShops(http.Controller):
             raise UserError(_(
                 'name, owner_name, owner_phone, latitude, and longitude are required.'
             ))
-        if not owner_cnic_number:
-            raise UserError(_('owner_cnic_number is required for on-site shop registration.'))
+        shop_category = (
+            kwargs.get('shop_category')
+            or kwargs.get('shahtaj_shop_category')
+            or 'credit'
+        )
+        if shop_category not in ('credit', 'cash'):
+            raise UserError(_('shop_category must be "credit" or "cash".'))
+        if shop_category == 'credit' and not owner_cnic_number:
+            raise UserError(_(
+                'owner_cnic_number is required when registering a credit shop.'
+            ))
         if not photo_vals.get('shop_exterior_photo'):
             raise UserError(_(
                 'shop_exterior_photo is required for on-site shop registration.'
@@ -60,7 +69,7 @@ class ShahtajApiShops(http.Controller):
             'name': name,
             'owner_name': owner_name,
             'owner_phone': owner_phone,
-            'owner_cnic_number': owner_cnic_number,
+            'owner_cnic_number': owner_cnic_number or False,
             'shop_license_number': shop_license_number or False,
             'partner_latitude': float(latitude),
             'partner_longitude': float(longitude),
@@ -69,15 +78,8 @@ class ShahtajApiShops(http.Controller):
             'registered_by_id': request.env.user.id,
             'company_type': 'company',
             'customer_rank': 1,
+            'shahtaj_shop_category': shop_category,
         }
-        shop_category = (
-            kwargs.get('shop_category')
-            or kwargs.get('shahtaj_shop_category')
-            or 'credit'
-        )
-        if shop_category not in ('credit', 'cash'):
-            raise UserError(_('shop_category must be "credit" or "cash".'))
-        vals['shahtaj_shop_category'] = shop_category
         if kwargs.get('zone_id'):
             vals['zone_id'] = int(kwargs['zone_id'])
         if kwargs.get('route_id'):
@@ -153,13 +155,14 @@ class ShahtajApiShops(http.Controller):
     @http.route('/api/shahtaj/v1/shops/verify-on-site', **API_ROUTE)
     @api_activity('shop.field_verify', 'Verify shop on site')
     def verify_on_site(self, **kwargs):
-        """First visit: save GPS + exterior photo + CNIC number (+ optional gaps).
+        """First visit: save GPS + exterior photo (+ CNIC for credit shops).
 
         Required: shop_id, task_id, latitude, longitude, shop_exterior_photo,
-                  owner_cnic_number (unless already on the shop)
+                  owner_cnic_number for credit shops (unless already on the shop)
         Optional: shop_license_number (alias license_number), owner_photo,
                   owner_cnic_front/back, owner_name, owner_phone,
-                  shop_category, legacy_balance (if distributor left empty)
+                  shop_category, legacy_balance (if distributor left empty);
+                  owner_cnic_number for cash shops
         """
         shop_id = kwargs.get('shop_id')
         task_id = kwargs.get('task_id')

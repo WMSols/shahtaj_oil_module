@@ -1,10 +1,41 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUpdateProps, onWillUnmount } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { hasFinancialAccess } from "../shahtaj_access";
 import { ConfirmModal } from "./confirm_modal"; // FIXED: Missing import
 import { BankTransactions } from "./bank_transactions";
+
+/** Survives FinancialsInvoicing unmount when jumping here from Warehouse. */
+let pendingPoPrefill = null;
+
+function storePendingPoPrefill(detail) {
+    if (!detail) {
+        pendingPoPrefill = null;
+        return;
+    }
+    const vendorId = detail.vendorId ? parseInt(detail.vendorId, 10) : null;
+    const productId = detail.productId ? parseInt(detail.productId, 10) : null;
+    const productTmplId = detail.productTmplId ? parseInt(detail.productTmplId, 10) : null;
+    if (!vendorId && !productId && !productTmplId) {
+        pendingPoPrefill = null;
+        return;
+    }
+    pendingPoPrefill = {
+        vendorId: vendorId || null,
+        productId: productId || null,
+        productTmplId: productTmplId || null,
+        productName: detail.productName || '',
+        vendorName: detail.vendorName || '',
+    };
+}
+
+if (typeof window !== "undefined" && !window.__shahtajPoPrefillBound) {
+    window.__shahtajPoPrefillBound = true;
+    window.addEventListener("shahtaj-open-create-po", (ev) => {
+        storePendingPoPrefill(ev.detail || {});
+    });
+}
 
 export class FinancialsInvoicing extends Component {
     static components = { ConfirmModal, BankTransactions };
@@ -202,10 +233,13 @@ export class FinancialsInvoicing extends Component {
                 lines: [],
             },
         });
-        // Global listener to open PO form directly when a product is registered
-        window.addEventListener('shahtaj-open-create-po', (ev) => {
-            const { vendorId, productId, productName } = ev.detail || {};
-            this.openPurchaseOrderFormWithProduct({ vendorId, productId, productName });
+        this._onOpenCreatePo = (ev) => {
+            storePendingPoPrefill(ev.detail || {});
+            this._consumePendingPoPrefill();
+        };
+        window.addEventListener('shahtaj-open-create-po', this._onOpenCreatePo);
+        onWillUnmount(() => {
+            window.removeEventListener('shahtaj-open-create-po', this._onOpenCreatePo);
         });
         // Universal Debouncer to protect the server from rapid keystrokes
         this.debounceSearch = (func, wait) => {
@@ -217,33 +251,34 @@ export class FinancialsInvoicing extends Component {
         // Bind the fetch method to the debouncer
         this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
         
-     // 3. SMART PROP LISTENER FOR 2-LEVEL TABS
         onWillUpdateProps((nextProps) => {
-            if (nextProps.requestedSubTab) {
-                const req = nextProps.requestedSubTab;
-                
-                if (['credit', 'pnl', 'money', 'cash', 'tax_ledger', 'expenses', 'po_management'].includes(req)) {
-                    this.state.activeSubTab = req;
-                    if (req === 'credit') {
-                        this.state.creditSubView = 'risk';
-                        this.state.selectedShopBalance = null;
-                    }
-                    if (req === 'money') this.loadMoneyOverview();
-                    if (req === 'cash') this.state.cashDirection = 'all';
-                    if (req === 'pnl') this.fetchPnlData();
-                    if (req === 'tax_ledger') this.fetchTaxLedgerData();
-                    if (req === 'expenses') this.setExpenseSubTab('expenses');
-                    if (req === 'po_management') this.setPoSubTab('purchase_orders');
-                    this.fetchActiveList();
-                } else if (['purchase_orders', 'receipts', 'vendor_bills', 'vendors'].includes(req)) {
-                    this.state.activeSubTab = 'po_management';
-                    this.setPoSubTab(req);
-                } else {
-                    this.state.activeSubTab = 'invoices';
-                    const childTab = (req === 'invoices') ? 'all_orders' : req;
-                    this.setInvoiceSubTab(childTab);
-                }
+            if (!nextProps.requestedSubTab || nextProps.requestedSubTab === this.props.requestedSubTab) {
+                return;
             }
+            const req = nextProps.requestedSubTab;
+            
+            if (['credit', 'pnl', 'money', 'cash', 'tax_ledger', 'expenses', 'po_management'].includes(req)) {
+                this.state.activeSubTab = req;
+                if (req === 'credit') {
+                    this.state.creditSubView = 'risk';
+                    this.state.selectedShopBalance = null;
+                }
+                if (req === 'money') this.loadMoneyOverview();
+                if (req === 'cash') this.state.cashDirection = 'all';
+                if (req === 'pnl') this.fetchPnlData();
+                if (req === 'tax_ledger') this.fetchTaxLedgerData();
+                if (req === 'expenses') this.setExpenseSubTab('expenses');
+                if (req === 'po_management') this.setPoSubTab('purchase_orders');
+                this.fetchActiveList();
+            } else if (['purchase_orders', 'receipts', 'vendor_bills', 'vendors'].includes(req)) {
+                this.state.activeSubTab = 'po_management';
+                this.setPoSubTab(req);
+            } else {
+                this.state.activeSubTab = 'invoices';
+                const childTab = (req === 'invoices') ? 'all_orders' : req;
+                this.setInvoiceSubTab(childTab);
+            }
+            this._consumePendingPoPrefill();
         });
 
         onWillStart(async () => {
@@ -261,6 +296,7 @@ export class FinancialsInvoicing extends Component {
                 await this.loadExpenseLookups();
             }
             await this.fetchActiveList();
+            await this._consumePendingPoPrefill();
         });
     }
     get paginatedPnlLines() {
@@ -327,8 +363,12 @@ export class FinancialsInvoicing extends Component {
     }
 
     setPoSubTab(subTabName) {
+        const preservePoForm = this._preservePoForm;
+        this._preservePoForm = false;
         this.state.poSubTab = subTabName;
-        this.resetDetailViews();
+        if (!preservePoForm) {
+            this.resetDetailViews();
+        }
         const stateKeyMap = {
             purchase_orders: 'purchaseOrders',
             receipts: 'receipts',
@@ -2115,7 +2155,9 @@ export class FinancialsInvoicing extends Component {
         for (const line of this.state.purchaseOrderForm.lines) {
             if (line.product_id) {
                 if (associated.length > 0) {
-                    const isAssociated = associated.some((p) => p.id == line.product_id);
+                    const isAssociated = associated.some((p) =>
+                        String(p.id) === String(line.product_id) || String(p.product_tmpl_id) === String(line.product_id)
+                    );
                     if (!isAssociated) {
                         line.product_id = '';
                         line.price_unit = 0;
@@ -2573,37 +2615,119 @@ export class FinancialsInvoicing extends Component {
 
     openPoForSelectedVendor() {
         if (!this.state.selectedVendor) return;
-        const vendorId = this.state.selectedVendor.id;
-        this.resetPurchaseOrderForm();
-        this.state.purchaseOrderForm.partner_id = vendorId.toString();
-        this.state.selectedVendor = null;
-        this.state.activeSubTab = 'po_management';
-        this.state.poSubTab = 'purchase_orders';
-        this.state.showPurchaseOrderForm = true;
+        const vendor = this.state.selectedVendor;
+        this.openPurchaseOrderFormWithProduct({
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+        });
     }
 
     openPoForSpecificProduct(product, vendor = null) {
         const v = vendor || this.state.selectedVendor;
-        const vendorId = v ? v.id : null;
         this.openPurchaseOrderFormWithProduct({
-            vendorId: vendorId,
+            vendorId: v ? v.id : null,
+            vendorName: v ? v.name : '',
             productId: product.id,
+            productTmplId: product.product_tmpl_id || product.id,
             productName: product.name,
         });
     }
 
-    async openPurchaseOrderFormWithProduct({ vendorId, productId, productName }) {
-        this.resetPurchaseOrderForm();
-        if (vendorId) {
-            this.state.purchaseOrderForm.partner_id = vendorId.toString();
+    _findPoProduct(productId, productTmplId) {
+        const products = this.state.products || [];
+        const variantId = productId ? parseInt(productId, 10) : null;
+        const tmplId = productTmplId ? parseInt(productTmplId, 10) : null;
+        if (variantId) {
+            const byVariant = products.find((p) => p.id === variantId);
+            if (byVariant) return byVariant;
+            const byTmplFromVariant = products.find((p) => p.product_tmpl_id === variantId);
+            if (byTmplFromVariant) return byTmplFromVariant;
         }
+        if (tmplId) {
+            return products.find((p) => p.product_tmpl_id === tmplId || p.id === tmplId) || null;
+        }
+        return null;
+    }
+
+    _mapFetchedPoProduct(p) {
+        let vendorId = false;
+        if (p.shahtaj_vendor_id) {
+            vendorId = Array.isArray(p.shahtaj_vendor_id) ? p.shahtaj_vendor_id[0] : p.shahtaj_vendor_id;
+        }
+        return {
+            id: p.id,
+            name: p.display_name || p.name,
+            uom_po_id: p.uom_id ? p.uom_id[0] : false,
+            standard_price: p.standard_price || 0,
+            supplier_tax_id: (p.supplier_taxes_id && p.supplier_taxes_id[0]) || '',
+            product_tmpl_id: p.product_tmpl_id ? p.product_tmpl_id[0] : false,
+            vendor_id: vendorId,
+        };
+    }
+
+    async _ensurePoProduct(productId, productTmplId) {
+        let product = this._findPoProduct(productId, productTmplId);
+        if (product) return product;
+        const domain = [];
         if (productId) {
+            domain.push("|", ["id", "=", parseInt(productId, 10)], ["product_tmpl_id", "=", parseInt(productId, 10)]);
+        } else if (productTmplId) {
+            domain.push(["product_tmpl_id", "=", parseInt(productTmplId, 10)]);
+        } else {
+            return null;
+        }
+        try {
+            const recs = await this.orm.searchRead(
+                "product.product",
+                domain,
+                ["id", "name", "display_name", "uom_id", "standard_price", "supplier_taxes_id", "product_tmpl_id", "shahtaj_vendor_id"],
+                { limit: 1 }
+            );
+            if (!recs.length) return null;
+            product = this._mapFetchedPoProduct(recs[0]);
+            this.state.products = [...(this.state.products || []), product];
+            this.state.poLookups.products = this.state.products;
+            return product;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    _ensurePoVendor(vendorId, vendorName) {
+        if (!vendorId) return;
+        const id = parseInt(vendorId, 10);
+        const vendors = this.state.poLookups.vendors || [];
+        if (!vendors.some((v) => v.id === id)) {
+            this.state.poLookups.vendors = [...vendors, { id, name: vendorName || `Vendor #${id}` }];
+        }
+    }
+
+    async _consumePendingPoPrefill() {
+        const pending = pendingPoPrefill;
+        if (!pending) return;
+        pendingPoPrefill = null;
+        await this.openPurchaseOrderFormWithProduct(pending);
+    }
+
+    async openPurchaseOrderFormWithProduct({ vendorId, productId, productTmplId, productName, vendorName } = {}) {
+        this.resetPurchaseOrderForm();
+        const parsedVendorId = vendorId ? parseInt(vendorId, 10) : null;
+        if (parsedVendorId) {
+            this._ensurePoVendor(parsedVendorId, vendorName);
+            this.state.purchaseOrderForm.partner_id = String(parsedVendorId);
+        }
+        const product = await this._ensurePoProduct(productId, productTmplId);
+        if (product) {
             const line = this._emptyPurchaseOrderLine();
-            line.product_id = productId.toString();
+            line.product_id = String(product.id);
+            line.product = product.name || productName || 'Product';
+            this.state.purchaseOrderForm.lines = [line];
+            await this.onPurchaseProductChange(line, parsedVendorId);
+        } else if (productId || productTmplId) {
+            const line = this._emptyPurchaseOrderLine();
+            line.product_id = String(productId || productTmplId);
             line.product = productName || 'Product';
             this.state.purchaseOrderForm.lines = [line];
-            // Resolve line details if possible
-            await this.onPurchaseProductChange(line, vendorId);
         }
         this.state.selectedVendor = null;
         this.state.activeSubTab = 'po_management';

@@ -35,53 +35,73 @@
         </field>
     </record>
 
-    <!-- Deliver wizard -->
+    <!-- Deliver wizard — GPS procedure -->
     <record id="view_shahtaj_dm_deliver_wizard_form" model="ir.ui.view">
         <field name="name">shahtaj.dm.deliver.wizard.form</field>
         <field name="model">shahtaj.dm.deliver.wizard</field>
         <field name="arch" type="xml">
-            <form string="Deliver to Shop">
+            <form string="Deliver to Shop Procedure">
+                <div class="alert alert-info" role="alert">
+                    <b>Deliver to Shop Procedure</b>
+                    <ol class="mb-0 ps-3">
+                        <li><b>Step 1 — GPS:</b> tap <b>Use My GPS</b> and wait until status is OK</li>
+                        <li><b>Step 2 — Qty:</b> set how much to hand over from the van</li>
+                        <li><b>Step 3 — Confirm:</b> only enabled when GPS is OK</li>
+                    </ol>
+                </div>
                 <group>
                     <group string="Shop">
                         <field name="delivery_id"/>
                         <field name="partner_id"/>
-                        <field name="shop_latitude"/>
-                        <field name="shop_longitude"/>
+                        <field name="shop_address" readonly="1"
+                               invisible="not shop_address"/>
+                        <field name="shop_latitude" string="Shop lat"/>
+                        <field name="shop_longitude" string="Shop lng"/>
                     </group>
-                    <group string="My Location">
+                    <group string="Step 1 — My GPS">
                         <div colspan="2" class="mb-2">
                             <widget name="shahtaj_geolocate"
                                     latitude_field="latitude"
                                     longitude_field="longitude"/>
                         </div>
-                        <field name="latitude"/>
-                        <field name="longitude"/>
-                        <field name="distance_m"/>
-                        <field name="max_distance_m"/>
+                        <field name="latitude" string="My lat"/>
+                        <field name="longitude" string="My lng"/>
+                        <field name="distance_m" string="Distance (m)"/>
+                        <field name="max_distance_m" string="Max allowed (m)"/>
                         <field name="gps_ok" invisible="1"/>
-                        <field name="gps_hint" readonly="1"/>
+                        <field name="gps_hint" string="GPS status" readonly="1"/>
                     </group>
                 </group>
                 <div class="alert alert-warning" role="alert" invisible="gps_ok">
-                    You must be near the shop. Tap <b>Use My GPS</b>, wait for the
-                    status to show OK, then confirm. Stock will not move if you are too far.
+                    <b>Step 1 incomplete.</b> You must be near the shop.
+                    Tap <b>Use My GPS</b>, wait for OK, then confirm.
+                    Stock will not move if you are too far or GPS is missing.
                 </div>
                 <div class="alert alert-success" role="alert" invisible="not gps_ok">
-                    GPS OK — set <b>Deliver Now</b> quantities and confirm.
+                    <b>Step 1 OK.</b> Set <b>Deliver qty (Step 2)</b> below, then
+                    <b>Step 3 — Confirm Delivery</b>.
                 </div>
-                <field name="line_ids">
-                    <list editable="bottom" create="false" delete="false">
-                        <field name="delivery_line_id" column_invisible="1" force_save="1"/>
-                        <field name="product_id" readonly="1"/>
-                        <field name="qty_on_van" readonly="1" force_save="1"/>
-                        <field name="qty_already_delivered" readonly="1" force_save="1"/>
-                        <field name="qty_to_deliver" force_save="1"/>
-                        <field name="product_uom_id" readonly="1"/>
-                    </list>
-                </field>
+                <group string="Step 2 — Quantities from van">
+                    <field name="line_ids" nolabel="1" colspan="2">
+                        <list editable="bottom" create="false" delete="false">
+                            <field name="delivery_line_id" column_invisible="1" force_save="1"/>
+                            <field name="product_id" readonly="1" force_save="1"/>
+                            <field name="qty_on_van" string="On van" readonly="1" force_save="1"/>
+                            <field name="qty_already_delivered" string="Already delivered"
+                                   readonly="1" force_save="1"/>
+                            <field name="qty_to_deliver" string="Deliver qty (Step 2)"
+                                   force_save="1"/>
+                            <field name="product_uom_id" readonly="1" force_save="1"/>
+                        </list>
+                    </field>
+                </group>
                 <footer>
                     <button name="action_confirm_deliver" type="object"
-                            string="Confirm Delivery" class="btn-primary"/>
+                            string="Step 3 — Confirm Delivery" class="btn-primary"
+                            invisible="not gps_ok"
+                            confirm="Confirm delivery at this GPS location? Stock will move from van to shop."/>
+                    <button string="Step 3 — Waiting for GPS" class="btn-secondary"
+                            invisible="gps_ok" disabled="1"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>
             </form>

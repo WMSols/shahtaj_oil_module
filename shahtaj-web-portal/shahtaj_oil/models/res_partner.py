@@ -1039,20 +1039,45 @@ class ResPartner(models.Model):
         return False
 
     @api.model
+    def _shahtaj_cnic_required_for_category(self, category):
+        """CNIC is mandatory for credit shops only (cash is optional)."""
+        return (category or 'credit') == 'credit'
+
+    @api.model
+    def _shahtaj_normalize_cnic(self, value):
+        if isinstance(value, str):
+            return value.strip()
+        return value or ''
+
+    @api.constrains('is_shahtaj_shop', 'shahtaj_shop_category', 'owner_cnic_number')
+    def _check_shahtaj_credit_shop_cnic(self):
+        """All users: credit shops must have an owner CNIC number."""
+        for partner in self:
+            if not partner.is_shahtaj_shop:
+                continue
+            if not partner._shahtaj_cnic_required_for_category(
+                partner.shahtaj_shop_category
+            ):
+                continue
+            if not self._shahtaj_normalize_cnic(partner.owner_cnic_number):
+                raise ValidationError(_(
+                    'Owner ID card number is required for credit shops.'
+                ))
+
+    @api.model
     def _shahtaj_validate_booker_onsite_register_vals(self, vals):
-        """Booker on-site register requires GPS + exterior photo + CNIC number."""
+        """Booker on-site register requires GPS + exterior photo; CNIC if credit."""
         lat = vals.get('partner_latitude')
         lng = vals.get('partner_longitude')
         if not lat or not lng:
             raise ValidationError(_(
                 'GPS latitude and longitude are required when registering a shop on site.'
             ))
-        cnic = (vals.get('owner_cnic_number') or '').strip() if isinstance(
-            vals.get('owner_cnic_number'), str
-        ) else vals.get('owner_cnic_number')
-        if not cnic:
+        category = vals.get('shahtaj_shop_category') or 'credit'
+        cnic = self._shahtaj_normalize_cnic(vals.get('owner_cnic_number'))
+        if self._shahtaj_cnic_required_for_category(category) and not cnic:
             raise ValidationError(_(
-                'Owner ID card number is required when registering a shop on site.'
+                'Owner ID card number is required when registering a credit shop.'
             ))
         if not vals.get('shop_exterior_photo'):
             raise ValidationError(_(
@@ -1072,7 +1097,7 @@ class ResPartner(models.Model):
     def _shahtaj_missing_first_visit_fields(self):
         """Fields the app should collect on first on-site verification.
 
-        Required: GPS + shop exterior photo + owner CNIC number.
+        Required: GPS + shop exterior photo; CNIC required only for credit shops.
         Optional: license number, other images, and empty profile gaps.
         """
         self.ensure_one()
@@ -1100,10 +1125,13 @@ class ResPartner(models.Model):
             'source': 'camera',
         })
         if not (self.owner_cnic_number or '').strip():
+            cnic_required = self._shahtaj_cnic_required_for_category(
+                self.shahtaj_shop_category,
+            )
             missing.append({
                 'key': 'owner_cnic_number',
                 'label': 'Owner ID Card Number',
-                'required': True,
+                'required': cnic_required,
                 'type': 'string',
                 'source': 'form',
             })
@@ -1223,27 +1251,32 @@ class ResPartner(models.Model):
                 'Shop exterior photo is required for first-visit verification.'
             ))
 
-        cnic = (
-            vals.get('owner_cnic_number')
-            or self.owner_cnic_number
-            or ''
+        shop_category = vals.get('shop_category') or vals.get('shahtaj_shop_category')
+        if shop_category and shop_category not in ('credit', 'cash'):
+            raise UserError(_('shop_category must be "credit" or "cash".'))
+        effective_category = (
+            shop_category or self.shahtaj_shop_category or 'credit'
         )
-        if isinstance(cnic, str):
-            cnic = cnic.strip()
-        if not cnic:
+
+        cnic = self._shahtaj_normalize_cnic(
+            vals.get('owner_cnic_number') or self.owner_cnic_number,
+        )
+        if self._shahtaj_cnic_required_for_category(effective_category) and not cnic:
             raise UserError(_(
-                'Owner ID card number is required for first-visit verification.'
+                'Owner ID card number is required for first-visit verification '
+                'of credit shops.'
             ))
 
         write_vals = {
             'partner_latitude': latitude,
             'partner_longitude': longitude,
             'shop_exterior_photo': exterior,
-            'owner_cnic_number': cnic,
             'shahtaj_field_verified': True,
             'shahtaj_field_verified_at': fields.Datetime.now(),
             'shahtaj_field_verified_by_id': (verified_by or self.env.user).id,
         }
+        if cnic:
+            write_vals['owner_cnic_number'] = cnic
         for key in ('owner_photo', 'owner_cnic_front', 'owner_cnic_back',
                     'owner_name', 'owner_phone'):
             if vals.get(key):
@@ -1254,10 +1287,7 @@ class ResPartner(models.Model):
         if license_number:
             write_vals['shop_license_number'] = license_number
 
-        shop_category = vals.get('shop_category') or vals.get('shahtaj_shop_category')
         if shop_category:
-            if shop_category not in ('credit', 'cash'):
-                raise UserError(_('shop_category must be "credit" or "cash".'))
             write_vals['shahtaj_shop_category'] = shop_category
 
         # Optional opening balance from booker (only if never posted).

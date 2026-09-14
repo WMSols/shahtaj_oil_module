@@ -12,7 +12,14 @@
                 <field name="login"/>
                 <field name="shahtaj_employee_code" string="DM Code" optional="show"/>
                 <field name="shahtaj_dm_job_count" string="Jobs" optional="show"/>
+                <field name="shahtaj_dm_jobs_today_count" string="Today" optional="show"/>
                 <field name="shahtaj_pending_delivery_count" string="Open" optional="show"/>
+                <field name="shahtaj_van_qty_on_hand" string="On Van" optional="show"/>
+                <field name="shahtaj_dm_wallet_balance" string="Wallet" optional="show"/>
+                <field name="shahtaj_van_sku_count" string="SKUs" optional="hide"/>
+                <field name="shahtaj_dm_on_van_for_shops" string="Loaded" optional="hide"/>
+                <field name="shahtaj_dm_picked_today" string="Picked Today" optional="hide"/>
+                <field name="shahtaj_dm_delivered_today" string="Delivered Today" optional="hide"/>
                 <field name="active" widget="boolean" readonly="1"/>
                 <button name="action_shahtaj_deactivate_delivery_man" type="object"
                         string="Deactivate" icon="fa-ban" title="Deactivate"
@@ -38,6 +45,13 @@
                             string="Deactivate"
                             invisible="not active" readonly="0"
                             confirm="Deactivate this delivery man? They will not be able to log in."/>
+                    <button name="action_shahtaj_dm_collect_payment" type="object"
+                            string="Collect Payment" class="btn-secondary"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                    <button name="action_shahtaj_dm_settle_wallet" type="object"
+                            string="Settle Wallet to Bank" class="btn-primary"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
+                            confirm="Settle this delivery man's wallet cash to the bank?"/>
                     <button name="action_shahtaj_delete_delivery_man" type="object"
                             string="Delete Permanently" class="btn-danger"
                             readonly="0"
@@ -50,11 +64,39 @@
                             <field name="shahtaj_dm_job_count" widget="statinfo"
                                    string="Delivery Jobs"/>
                         </button>
-                        <button name="action_shahtaj_dm_view_jobs" type="object"
-                                class="oe_stat_button" icon="fa-clock-o"
-                                context="{'search_default_open': 1}">
+                        <button name="action_shahtaj_dm_view_jobs_today" type="object"
+                                class="oe_stat_button" icon="fa-calendar-check-o">
+                            <field name="shahtaj_dm_jobs_today_count" widget="statinfo"
+                                   string="Jobs Today"/>
+                        </button>
+                        <button name="action_shahtaj_dm_view_open_jobs" type="object"
+                                class="oe_stat_button" icon="fa-clock-o">
                             <field name="shahtaj_pending_delivery_count" widget="statinfo"
-                                   string="Open"/>
+                                   string="Open Jobs"/>
+                        </button>
+                        <button name="action_shahtaj_open_van_stock" type="object"
+                                class="oe_stat_button" icon="fa-cubes">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="shahtaj_van_qty_on_hand" nolabel="1"/>
+                                </span>
+                                <span class="o_stat_text">On Van</span>
+                            </div>
+                        </button>
+                        <button name="action_shahtaj_open_dispatch_orders" type="object"
+                                class="oe_stat_button" icon="fa-shopping-cart">
+                            <field name="shahtaj_dm_dispatchable_order_count" widget="statinfo"
+                                   string="To Dispatch"/>
+                        </button>
+                        <button name="action_shahtaj_dm_view_wallet_collections" type="object"
+                                class="oe_stat_button" icon="fa-money"
+                                groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="shahtaj_dm_wallet_balance" nolabel="1" widget="monetary"/>
+                                </span>
+                                <span class="o_stat_text">DM Wallet</span>
+                            </div>
                         </button>
                     </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
@@ -66,9 +108,23 @@
                             <field name="shahtaj_employee_code" string="DM Code"/>
                             <field name="active" widget="boolean" readonly="1"/>
                         </group>
+                        <group string="Van Snapshot (Today)">
+                            <field name="shahtaj_van_location_id" readonly="1"/>
+                            <field name="shahtaj_van_sku_count" readonly="1"/>
+                            <field name="shahtaj_van_qty_on_hand" readonly="1"/>
+                            <field name="shahtaj_dm_on_van_for_shops" readonly="1"/>
+                            <field name="shahtaj_dm_picked_today" readonly="1"/>
+                            <field name="shahtaj_dm_delivered_today" readonly="1"/>
+                            <field name="company_currency_id" invisible="1"/>
+                            <field name="shahtaj_dm_wallet_balance" readonly="1"
+                                   decoration-info="shahtaj_dm_wallet_balance &gt; 0"/>
+                        </group>
+                    </group>
+                    <group string="Coverage">
+                        <field name="shahtaj_assigned_booker_ids" widget="many2many_tags"/>
                     </group>
                     <notebook>
-                        <page string="Assigned Orders" name="assigned_orders">
+                        <page string="Assigned Jobs" name="assigned_jobs">
                             <field name="shahtaj_dm_job_ids" nolabel="1"
                                    mode="list"
                                    context="{'default_delivery_man_id': id}"
@@ -79,9 +135,8 @@
                                       decoration-warning="state in ('picked', 'partial')"
                                       decoration-success="state == 'delivered'"
                                       decoration-danger="state == 'returned'"
-                                      default_order="scheduled_date desc, scheduled_time, id desc">
+                                      default_order="scheduled_date desc, id desc">
                                     <field name="scheduled_date" string="Delivery Day"/>
-                                    <field name="scheduled_time" widget="float_time" string="Time"/>
                                     <field name="sale_order_id" string="Order"/>
                                     <field name="partner_id" string="Shop"/>
                                     <field name="order_booker_id" optional="show"/>
@@ -109,6 +164,68 @@
                                 <b>Stop</b> = field story (On the Way / Shop Closed / Could Not Deliver).
                                 Use <b>Assign / Split DM</b> on the sales order to set
                                 day/time and product quantities per delivery man.
+                            </div>
+                        </page>
+                        <page string="Orders to Dispatch" name="dispatch_orders">
+                            <div class="mb-2">
+                                <button name="action_shahtaj_open_dispatch_orders" type="object"
+                                        string="Open Full Dispatch List" class="btn btn-primary"
+                                        icon="fa-external-link"/>
+                            </div>
+                            <field name="shahtaj_dm_dispatchable_order_ids" nolabel="1"
+                                   mode="list" readonly="1"
+                                   context="{'shahtaj_default_delivery_man_id': id}">
+                                <list create="0" delete="0" edit="0"
+                                      default_order="date_order desc">
+                                    <field name="name" string="Order"/>
+                                    <field name="partner_id" string="Shop"/>
+                                    <field name="shahtaj_order_booker_id" string="Booker"/>
+                                    <field name="date_order"/>
+                                    <field name="amount_total" sum="Total"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="shahtaj_delivery_status" widget="badge"
+                                           decoration-warning="shahtaj_delivery_status == 'pending'"
+                                           decoration-info="shahtaj_delivery_status == 'partial'"
+                                           decoration-success="shahtaj_delivery_status == 'done'"/>
+                                    <field name="state" column_invisible="1"/>
+                                    <button name="action_shahtaj_assign_dm" type="object"
+                                            string="Assign / Split"
+                                            icon="fa-truck"/>
+                                </list>
+                            </field>
+                            <div class="alert alert-info mt-2" role="alert">
+                                Confirmed orders still to deliver. If this delivery man has
+                                assigned order bookers, only their shops are listed.
+                                Use <b>Assign / Split</b> to plan day, time, and quantities.
+                            </div>
+                        </page>
+                        <page string="Van Stock" name="van_stock">
+                            <div class="mb-2">
+                                <button name="action_shahtaj_open_van_stock" type="object"
+                                        string="Van Stock Procedure" class="btn btn-primary"
+                                        icon="fa-exchange"/>
+                                <button name="action_shahtaj_open_today_load" type="object"
+                                        string="Today Load (Job Pick)" class="btn btn-secondary"
+                                        icon="fa-truck"/>
+                                <button name="action_shahtaj_dm_view_open_jobs" type="object"
+                                        string="Delivery Jobs" class="btn btn-secondary"
+                                        icon="fa-list-alt"/>
+                                <button name="action_shahtaj_open_van_inventory_quants" type="object"
+                                        string="Raw Inventory" class="btn btn-secondary"
+                                        icon="fa-cubes"/>
+                            </div>
+                            <field name="shahtaj_van_stock_html" nolabel="1"/>
+                            <div class="alert alert-info mt-2" role="alert">
+                                <b>Van Stock Procedure</b> = free Warehouse ↔ Van steps
+                                (does not change job picked/delivered qty).
+                                <b>Today Load / Jobs</b> = shop-order pick &amp; deliver procedure.
+                            </div>
+                        </page>
+                        <page string="Recent Pick &amp; Deliver" name="recent_activity">
+                            <field name="shahtaj_dm_recent_activity_html" nolabel="1"/>
+                            <div class="alert alert-secondary mt-2" role="alert">
+                                Shows the latest jobs with pick or deliver quantities.
+                                <b>On Van</b> = picked minus delivered for that stop.
                             </div>
                         </page>
                     </notebook>

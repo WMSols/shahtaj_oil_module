@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_dm_van_transfer_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.van.transfer.form</field>
+        <field name="model">shahtaj.dm.van.transfer</field>
+        <field name="arch" type="xml">
+            <form string="Van Stock Procedure" create="false" delete="false">
+                <header>
+                    <button name="action_load_to_van" type="object"
+                            string="Step 1 — Load Warehouse → Van" class="oe_highlight"
+                            icon="fa-arrow-right"
+                            confirm="Step 1: move Load qty from warehouse onto the van?"/>
+                    <button name="action_return_to_warehouse" type="object"
+                            string="Step 2 — Return Van → Warehouse" class="btn-warning"
+                            icon="fa-undo"
+                            confirm="Step 2: move Return qty from the van back to the warehouse? Job pick quantities will NOT change."/>
+                    <button name="action_return_all_to_warehouse" type="object"
+                            string="Step 3 — Empty Van (Return All)" class="btn-secondary"
+                            icon="fa-reply-all"
+                            confirm="Step 3: return ALL stock on this van to the warehouse? This does not update job picked quantities. Continue only if you intend to empty the van."/>
+                    <button name="action_refresh" type="object"
+                            string="Refresh" class="btn-secondary" icon="fa-refresh"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Van Stock Procedure</h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="actor_role" string="Acting as"/>
+                            <field name="delivery_man_id"/>
+                            <field name="van_location_id"/>
+                            <field name="warehouse_location_id"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_qty_total" string="Warehouse (listed)"/>
+                            <field name="van_qty_total" string="On van (total)"/>
+                            <field name="open_picked_job_count" string="Open picked jobs"/>
+                        </group>
+                    </group>
+                    <field name="procedure_html" nolabel="1" colspan="2"/>
+                    <group string="Stock movement lines">
+                        <field name="line_ids" nolabel="1" colspan="2">
+                            <list editable="bottom">
+                                <field name="product_id" force_save="1"/>
+                                <field name="qty_warehouse" string="In Warehouse" sum="Warehouse"
+                                       readonly="1" force_save="1"/>
+                                <field name="qty_on_van" string="On Van" sum="On Van"
+                                       readonly="1" force_save="1"/>
+                                <field name="qty_load" string="Load qty (Step 1)" sum="Load"
+                                       force_save="1"/>
+                                <field name="qty_return" string="Return qty (Step 2)" sum="Return"
+                                       force_save="1"/>
+                                <field name="product_uom_id" readonly="1" force_save="1"/>
+                            </list>
+                        </field>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_dm_van_transfer" model="ir.actions.server">
+        <field name="name">Van Stock Procedure</field>
+        <field name="model_id" ref="model_shahtaj_dm_delivery"/>
+        <field name="state">code</field>
+        <field name="code">action = env['shahtaj.dm.van.transfer'].action_open()</field>
+    </record>
+
+</odoo>

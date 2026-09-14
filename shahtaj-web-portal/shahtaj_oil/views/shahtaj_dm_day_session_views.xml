@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_dm_day_session_list" model="ir.ui.view">
+        <field name="name">shahtaj.dm.day.session.list</field>
+        <field name="model">shahtaj.dm.day.session</field>
+        <field name="arch" type="xml">
+            <list string="DM Day Sessions" create="false" delete="false">
+                <field name="session_date"/>
+                <field name="delivery_man_id"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'office'"
+                       decoration-success="state == 'on_the_way'"
+                       decoration-muted="state == 'ended'"/>
+                <field name="departed_at"/>
+                <field name="ended_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_dm_day_session_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.day.session.form</field>
+        <field name="model">shahtaj.dm.day.session</field>
+        <field name="arch" type="xml">
+            <form string="DM Day Session" create="false" delete="false">
+                <header>
+                    <button name="action_depart" type="object"
+                            string="On the Way" class="oe_highlight"
+                            invisible="state != 'office'"
+                            confirm="Mark your day as On the Way? Loaded open stops will move to In Transit."/>
+                    <button name="action_end_day" type="object"
+                            string="End Day"
+                            invisible="state == 'ended'"
+                            confirm="End your day session?"/>
+                    <button name="action_reset_office" type="object"
+                            string="Reset to Office"
+                            invisible="state == 'office'"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="office,on_the_way,ended"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="alert"
+                         invisible="state != 'office'">
+                        Load stock first (Today Load / Pick), then press <b>On the Way</b> when you leave the office.
+                    </div>
+                    <div class="alert alert-success" role="alert"
+                         invisible="state != 'on_the_way'">
+                        You are <b>On the Way</b>. Open stops are in transit. Use <b>My Deliveries</b> for shop stops.
+                    </div>
+                    <div class="alert alert-secondary" role="alert"
+                         invisible="state != 'ended'">
+                        Day ended. Ask a distributor to reset if you need to reopen today's session.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="delivery_man_id" readonly="1"/>
+                            <field name="session_date" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="departed_at" readonly="1"/>
+                            <field name="ended_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" placeholder="Optional day notes…"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_dm_day_session" model="ir.actions.act_window">
+        <field name="name">DM Day Sessions</field>
+        <field name="res_model">shahtaj.dm.day.session</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Opens today's session form — does NOT auto-depart -->
+    <record id="action_shahtaj_dm_my_day_session" model="ir.actions.server">
+        <field name="name">My Day Session</field>
+        <field name="model_id" ref="model_shahtaj_dm_day_session"/>
+        <field name="state">code</field>
+        <field name="code"><![CDATA[
+session = env['shahtaj.dm.day.session'].get_or_create_today()
+action = {
+    'type': 'ir.actions.act_window',
+    'name': 'My Day Session',
+    'res_model': 'shahtaj.dm.day.session',
+    'res_id': session.id,
+    'view_mode': 'form',
+    'views': [(False, 'form')],
+    'target': 'current',
+}
+]]></field>
+    </record>
+
+    <!-- Keep for explicit use (e.g. button); chains into My Deliveries -->
+    <record id="action_shahtaj_dm_my_session_depart" model="ir.actions.server">
+        <field name="name">Start Day — On the Way</field>
+        <field name="model_id" ref="model_shahtaj_dm_day_session"/>
+        <field name="state">code</field>
+        <field name="code"><![CDATA[
+session = env['shahtaj.dm.day.session'].get_or_create_today()
+session.action_depart()
+action = {
+    'type': 'ir.actions.client',
+    'tag': 'display_notification',
+    'params': {
+        'title': 'On the Way',
+        'message': 'Your day session is now On the Way. Open stops are marked in transit.',
+        'type': 'success',
+        'sticky': False,
+        'next': {
+            'type': 'ir.actions.act_window',
+            'name': 'My Deliveries',
+            'res_model': 'shahtaj.dm.delivery',
+            'view_mode': 'list,form',
+            'views': [(False, 'list'), (False, 'form')],
+            'target': 'current',
+            'context': {'search_default_today': 1},
+        },
+    },
+}
+]]></field>
+    </record>
+
+    <menuitem id="menu_shahtaj_dm_day_sessions"
+              name="DM Day Sessions"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_day_session"
+              sequence="25"
+              groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <!-- Intentionally NOT first: app home must be My Deliveries (seq 28 in menus.xml) -->
+    <menuitem id="menu_shahtaj_dm_my_day_session"
+              name="My Day Session"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_dm_my_day_session"
+              sequence="34"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
+    <!-- Remove old auto-depart menu that broke DM app home -->
+    <delete model="ir.ui.menu" id="menu_shahtaj_dm_start_on_the_way"/>
+
+</odoo>

@@ -36,5 +36,8 @@ from . import shahtaj_manufacturer_summary
 from . import ir_http
 from . import ir_ui_menu
 from . import shahtaj_dm_delivery
+from . import shahtaj_dm_day_session
+from . import shahtaj_dm_recovery
+from . import shahtaj_dm_api
 from . import shahtaj_activity_log
 from . import stock_picking

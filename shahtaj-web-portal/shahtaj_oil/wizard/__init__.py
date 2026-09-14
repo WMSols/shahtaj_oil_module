@@ -11,6 +11,8 @@ from . import shahtaj_assign_shops_route
 from . import shahtaj_create_delivery_man
 from . import shahtaj_dm_pick_deliver
 from . import shahtaj_dm_today_load
+from . import shahtaj_dm_van_transfer
 from . import shahtaj_dm_assign
+from . import shahtaj_dm_collect_payment
 from . import shahtaj_order_reject
 from . import shahtaj_credit_override

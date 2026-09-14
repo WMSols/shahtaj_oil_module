@@ -455,6 +455,20 @@ export class WarehouseInventory extends Component {
             const createdId = Array.isArray(res) ? res[0] : res;
             const createdName = this.state.productForm.name;
             const createdVendorId = this.state.productForm.vendor_id;
+            let createdVariantId = createdId;
+            try {
+                const variants = await this.orm.searchRead(
+                    "product.product",
+                    [["product_tmpl_id", "=", createdId]],
+                    ["id"],
+                    { limit: 1 }
+                );
+                if (variants.length) {
+                    createdVariantId = variants[0].id;
+                }
+            } catch (_error) {
+                createdVariantId = createdId;
+            }
 
             await this.loadDropdownData();
             await this.fetchActiveList();
@@ -464,7 +478,8 @@ export class WarehouseInventory extends Component {
             
             // Set newly created product info for quick PO creation prompt
             this.state.createdProductPrompt = {
-                id: createdId,
+                id: createdVariantId,
+                templateId: createdId,
                 name: createdName,
                 vendor_id: createdVendorId,
             };
@@ -480,10 +495,12 @@ export class WarehouseInventory extends Component {
         const prod = this.state.createdProductPrompt;
         this.state.createdProductPrompt = null;
         if (!prod) return;
+        const vendorId = prod.vendor_id ? parseInt(prod.vendor_id, 10) : null;
         window.dispatchEvent(new CustomEvent('shahtaj-open-create-po', {
             detail: {
-                vendorId: prod.vendor_id ? parseInt(prod.vendor_id, 10) : null,
+                vendorId: vendorId || null,
                 productId: prod.id,
+                productTmplId: prod.templateId || prod.id,
                 productName: prod.name,
             }
         }));

@@ -15,6 +15,8 @@ export class OperationsTracking extends Component {
         this.checkinMapRef = useRef("checkinMapContainer");
         this.checkinMapInstance = null;
         const ITEMS_PER_PAGE = 10;
+        const today = new Date();
+        this.todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         this.state = useState({
             // Main Tab Navigation
             activeSubTab: this.props.requestedSubTab || 'orders', // 'checkins', 'orders', 'performance'
@@ -28,9 +30,36 @@ export class OperationsTracking extends Component {
             selectedDelivery: null,
 
             isCreatingInvoice: false,
+            isConfirmingOrder: false,
+            isSavingSaleOrder: false,
             isEditingDelivery: false,
             allProducts: [], // To list all products in a dropdown
             saleTaxes: [],   // To list all taxes in a dropdown
+            lookupShops: [],
+            saleProducts: [],
+            showSaleOrderForm: false,
+            saleOrderForm: this._emptySaleOrderForm(),
+            ordersSubTab: 'live', // 'live' | 'verification'
+            shopSnapshotOpen: false,
+            verificationCount: 0,
+            isApprovingOrder: false,
+            isProcessingOverride: false,
+            isRejectingOrder: false,
+            showRejectModal: false,
+            rejectReason: '',
+            showCreditOverride: false,
+            creditOverride: {
+                orderId: null,
+                shop: '',
+                orderAmount: 0,
+                creditLimit: 0,
+                outstanding: 0,
+                effective: 0,
+                shortfall: 0,
+                newLimit: '',
+                note: '',
+                actionType: 'approve',
+            },
             // --- NEW: Custom Delivery Modal States ---
             showDeliveryModal: false,
             deliveryWizardId: null,
@@ -45,13 +74,14 @@ export class OperationsTracking extends Component {
             isLoadingList: false,
             searchTimeout: null,
             
-            tableDeliveries: [], tableCheckins: [], tableOrders: [], tableSchedules: [], tableTargets: [],
+            tableDeliveries: [], tableCheckins: [], tableOrders: [], tableVerification: [], tableSchedules: [], tableTargets: [],
             lookupBookers: [], lookupTargetTypes: [],
             
             pagination: {
                 deliveries: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
                 checkins: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
                 orders: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                verification: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
                 schedules: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
                 targets: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
             },
@@ -59,6 +89,7 @@ export class OperationsTracking extends Component {
                 deliveries: { search: '', status: '' },
                 checkins: { search: '', status: '', purpose: 'all', booker: 'all', date: '' },
                 orders: { search: '', status: '', booker: 'all' },
+                verification: { search: '', booker: 'all', reason: 'all' },
                 schedules: { booker: 'all', day: 'all' },
                 targets: { booker: 'all', type: 'all' },
             },
@@ -79,9 +110,13 @@ export class OperationsTracking extends Component {
         this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
 
         onWillStart(async () => {
-            await this.loadDropdownData();
-            if (hasFinancialAccess()) await this.loadTaxAndProductData();
-            await this.fetchActiveList();
+            // Catalogs are large on production; do not block Live Orders on them.
+            await Promise.all([
+                this.loadDropdownData(),
+                this.fetchActiveList(),
+            ]);
+            this.loadSaleOrderCatalog();
+            if (hasFinancialAccess()) this.loadTaxAndProductData();
         });
 
         useEffect(() => {
@@ -166,29 +201,22 @@ export class OperationsTracking extends Component {
         }, () => [this.checkinMapRef.el, this.state.selectedCheckin]);
     }
 
-    _gpsPurposeLabel(purpose) {
-        return ({ check_in: 'Check-in', place_order: 'Place Order', deliver: 'Deliver to Shop' })[purpose] || purpose || '—';
+    _emptySaleOrderLine() {
+        return {
+            id: `new_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            product_id: '',
+            qty: 1,
+            price: 0,
+            tax_id: '',
+        };
     }
 
-    _gpsResultLabel(result) {
-        return ({
-            ok: 'GPS OK',
-            blocked_too_far: 'Blocked — Too Far',
-            blocked_too_close: 'Blocked — Too Close',
-            blocked_missing_shop_gps: 'Blocked — Shop GPS Missing',
-            blocked_missing_user_gps: 'Blocked — User GPS Missing',
-            blocked_invalid_coords: 'Blocked — Invalid Coordinates',
-        })[result] || result || 'Unknown';
-    }
-
-    _gpsStatusBadgeClass(result) {
-        if (result === 'ok') return 'bg-success text-white shadow-sm';
-        if (result === 'blocked_too_far' || result === 'blocked_too_close') return 'bg-danger text-white shadow-sm';
-        return 'bg-warning text-dark shadow-sm';
-    }
-
-    _gpsRoleLabel(role) {
-        return ({ order_booker: 'Order Booker', delivery_man: 'Delivery Man', other: 'Other' })[role] || role || '—';
+    _emptySaleOrderForm() {
+        return {
+            partner_id: '',
+            date_order: this.todayStr,
+            lines: [this._emptySaleOrderLine()],
+        };
     }
     // --- UNIVERSAL PAGINATION HANDLERS ---
     onSearchInput(ev, tabName) {
@@ -259,6 +287,31 @@ export class OperationsTracking extends Component {
         return { start: toOdooUtc(start), end: toOdooUtc(end) };
     }
 
+    _gpsPurposeLabel(purpose) {
+        return ({ check_in: 'Check-in', place_order: 'Place Order', deliver: 'Deliver to Shop' })[purpose] || purpose || '—';
+    }
+
+    _gpsResultLabel(result) {
+        return ({
+            ok: 'GPS OK',
+            blocked_too_far: 'Blocked — Too Far',
+            blocked_too_close: 'Blocked — Too Close',
+            blocked_missing_shop_gps: 'Blocked — Shop GPS Missing',
+            blocked_missing_user_gps: 'Blocked — User GPS Missing',
+            blocked_invalid_coords: 'Blocked — Invalid Coordinates',
+        })[result] || result || 'Unknown';
+    }
+
+    _gpsStatusBadgeClass(result) {
+        if (result === 'ok') return 'bg-success text-white shadow-sm';
+        if (result === 'blocked_too_far' || result === 'blocked_too_close') return 'bg-danger text-white shadow-sm';
+        return 'bg-warning text-dark shadow-sm';
+    }
+
+    _gpsRoleLabel(role) {
+        return ({ order_booker: 'Order Booker', delivery_man: 'Delivery Man', other: 'Other' })[role] || role || '—';
+    }
+
     /**
      * Odoo weekday key for today in Pakistan: '0' Monday … '6' Sunday.
      */
@@ -325,28 +378,252 @@ export class OperationsTracking extends Component {
     }
 
    async loadDropdownData() {
-        const [bookers, deliveryMen] = await Promise.all([
-            this.orm.searchRead('res.users', [['shahtaj_is_order_booker', '=', true]], ['id', 'name']),
-            this.orm.searchRead('res.users', [['shahtaj_is_delivery_man', '=', true]], ['id', 'name']),
-        ]);
-        const byId = {};
-        for (const u of [...bookers, ...deliveryMen]) {
-            byId[u.id] = u;
+        try {
+            const bookers = await this.orm.searchRead(
+                'res.users',
+                [['shahtaj_is_order_booker', '=', true]],
+                ['id', 'name'],
+            );
+            let deliveryMen = [];
+            try {
+                deliveryMen = await this.orm.searchRead(
+                    'res.users',
+                    [['shahtaj_is_delivery_man', '=', true]],
+                    ['id', 'name'],
+                );
+            } catch (error) {
+                // GPS/DM filter is optional; Live Orders must still load.
+            }
+            const byId = new Map();
+            for (const user of [...bookers, ...deliveryMen]) {
+                byId.set(user.id, user);
+            }
+            this.state.lookupBookers = [...byId.values()].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        } catch (error) {
+            this.state.lookupBookers = [];
         }
-        this.state.lookupBookers = Object.values(byId).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        
-        // FIXED: Using .call() to safely execute read_group
-        const types = await this.orm.call('shahtaj.visit.target', 'read_group', [[], ['target_type'], ['target_type']]);
-        this.state.lookupTargetTypes = types.map(t => ({
-            value: t.target_type, 
-            label: t.target_type ? t.target_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown'
-        })).filter(t => t.value);
+
+        try {
+            const types = await this.orm.call('shahtaj.visit.target', 'read_group', [[], ['target_type'], ['target_type']]);
+            this.state.lookupTargetTypes = types.map(t => ({
+                value: t.target_type, 
+                label: t.target_type ? t.target_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown'
+            })).filter(t => t.value);
+        } catch (error) {
+            this.state.lookupTargetTypes = [];
+        }
+    }
+
+    async loadSaleOrderCatalog() {
+        try {
+            const [shops, products, taxes] = await Promise.all([
+                this.orm.searchRead(
+                    'res.partner',
+                    [['is_shahtaj_shop', '=', true], ['shop_approval_state', '=', 'approved'], ['active', '=', true]],
+                    ['id', 'name', 'phone', 'email']
+                ),
+                this.orm.searchRead(
+                    'product.product',
+                    [['sale_ok', '=', true], ['active', '=', true], ['product_tmpl_id.active', '=', true], ['default_code', '!=', 'SHAHTAJ-LEGACY']],
+                    ['id', 'name', 'display_name', 'list_price', 'taxes_id', 'uom_id']
+                ),
+                hasFinancialAccess()
+                    ? this.orm.searchRead('account.tax', [['type_tax_use', '=', 'sale'], ['active', '=', true]], ['id', 'name', 'amount'])
+                    : Promise.resolve(this.state.saleTaxes || []),
+            ]);
+            this.state.lookupShops = shops || [];
+            this.state.saleProducts = (products || []).map((p) => ({
+                id: p.id,
+                name: p.display_name || p.name,
+                list_price: p.list_price || 0,
+                tax_id: (p.taxes_id && p.taxes_id[0]) || '',
+                uom_id: p.uom_id ? p.uom_id[0] : false,
+            }));
+            if (taxes && taxes.length) {
+                this.state.saleTaxes = taxes;
+            }
+        } catch (error) {
+            this.notification.add("Failed to load shops/products for sales orders: " + (error.data?.message || error.message), { type: "danger" });
+        }
+    }
+
+    _formatRs(value) {
+        return `Rs. ${(parseFloat(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    _formatSnapshotDate(value) {
+        if (!value) return '';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return value;
+        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    _verificationLabel(state) {
+        return ({
+            none: 'Standard',
+            to_approve: 'Verification Required',
+            approved: 'Verified',
+            rejected: 'Rejected',
+        })[state] || 'Standard';
+    }
+
+    _m2oId(value) {
+        if (!value) return false;
+        return Array.isArray(value) ? value[0] : value;
+    }
+
+    _applyShopSnapshot(snap, target = null) {
+        const record = target || this.state.selectedOrder;
+        if (!record || !snap) return;
+        record.shopCategory = snap.shahtaj_shop_category || '';
+        record.creditLimit = snap.shahtaj_shop_credit_limit || 0;
+        record.outstanding = snap.shahtaj_shop_outstanding || 0;
+        record.pendingExposure = snap.shahtaj_shop_pending_exposure || 0;
+        record.uninvoicedExposure = snap.shahtaj_shop_uninvoiced_exposure || 0;
+        record.effectiveOutstanding = snap.shahtaj_shop_effective_outstanding || 0;
+        record.creditRemaining = snap.shahtaj_shop_credit_remaining || 0;
+        record.creditWouldExceed = !!snap.shahtaj_shop_credit_would_exceed;
+        record.creditShortfall = snap.shahtaj_shop_credit_shortfall || 0;
+        record.lifetimeSales = snap.shahtaj_shop_lifetime_sales || 0;
+        record.confirmedOrderCount = snap.shahtaj_shop_confirmed_order_count || 0;
+        record.pastDiscountTotal = snap.shahtaj_shop_past_discount_total || 0;
+        record.pastDiscountCount = snap.shahtaj_shop_past_discount_count || 0;
+        record.lastDiscountDate = this._formatSnapshotDate(snap.shahtaj_shop_last_discount_date);
+        record.lastDiscountAmount = snap.shahtaj_shop_last_discount_amount || 0;
+        record.paymentTerms = snap.payment_term_id ? snap.payment_term_id[1] : 'Immediate';
+        record.approvalState = snap.shahtaj_approval_state || record.approvalState || 'none';
+        record.verificationLabel = this._verificationLabel(record.approvalState);
+    }
+
+    async _enrichCheckinRows(records) {
+        const visitIds = [...new Set(records.map((a) => this._m2oId(a.visit_id)).filter(Boolean))];
+        const taskIds = [...new Set(records.map((a) => this._m2oId(a.visit_task_id)).filter(Boolean))];
+        const visitsById = {};
+        const tasksById = {};
+        try {
+            if (visitIds.length) {
+                const visits = await this.orm.read(
+                    'shahtaj.visit',
+                    visitIds,
+                    ['notes', 'sale_order_id', 'outcome', 'state'],
+                );
+                visits.forEach((v) => { visitsById[v.id] = v; });
+            }
+            if (taskIds.length) {
+                const tasks = await this.orm.read('shahtaj.visit.task', taskIds, ['notes']);
+                tasks.forEach((t) => { tasksById[t.id] = t; });
+            }
+        } catch (_error) {
+            // List still renders GPS rows if visit/task notes cannot be read.
+        }
+        return { visitsById, tasksById };
+    }
+
+    async _loadCheckinShopSnapshot(checkin) {
+        if (!checkin) return;
+        const orderId = this._m2oId(checkin.sale_order_id);
+        if (orderId) {
+            try {
+                const snaps = await this.orm.read(
+                    'sale.order',
+                    [orderId],
+                    [
+                        'shahtaj_shop_category', 'shahtaj_shop_credit_limit', 'shahtaj_shop_outstanding',
+                        'shahtaj_shop_pending_exposure', 'shahtaj_shop_uninvoiced_exposure',
+                        'shahtaj_shop_effective_outstanding', 'shahtaj_shop_credit_remaining',
+                        'shahtaj_shop_credit_would_exceed', 'shahtaj_shop_credit_shortfall',
+                        'shahtaj_shop_lifetime_sales', 'shahtaj_shop_confirmed_order_count',
+                        'shahtaj_shop_past_discount_total', 'shahtaj_shop_past_discount_count',
+                        'shahtaj_shop_last_discount_date', 'shahtaj_shop_last_discount_amount',
+                        'payment_term_id', 'shahtaj_approval_state',
+                    ],
+                );
+                if (snaps.length) {
+                    this._applyShopSnapshot(snaps[0], this.state.selectedCheckin);
+                    return;
+                }
+            } catch (error) {
+                this.notification.add("Could not load shop snapshot: " + (error.data?.message || error.message), { type: "warning" });
+            }
+        }
+        if (!checkin.shopId) return;
+        try {
+            const partners = await this.orm.read(
+                'res.partner',
+                [checkin.shopId],
+                ['shahtaj_shop_category', 'credit_limit', 'outstanding_balance', 'property_payment_term_id', 'shop_approval_state'],
+            );
+            if (!partners.length) return;
+            const p = partners[0];
+            this._applyShopSnapshot({
+                shahtaj_shop_category: p.shahtaj_shop_category,
+                shahtaj_shop_credit_limit: p.credit_limit,
+                shahtaj_shop_outstanding: p.outstanding_balance,
+                shahtaj_shop_pending_exposure: 0,
+                shahtaj_shop_uninvoiced_exposure: 0,
+                shahtaj_shop_effective_outstanding: p.outstanding_balance,
+                shahtaj_shop_credit_remaining: Math.max((p.credit_limit || 0) - (p.outstanding_balance || 0), 0),
+                shahtaj_shop_credit_would_exceed: false,
+                shahtaj_shop_credit_shortfall: 0,
+                shahtaj_shop_lifetime_sales: 0,
+                shahtaj_shop_confirmed_order_count: 0,
+                shahtaj_shop_past_discount_total: 0,
+                shahtaj_shop_past_discount_count: 0,
+                shahtaj_shop_last_discount_date: false,
+                shahtaj_shop_last_discount_amount: 0,
+                payment_term_id: p.property_payment_term_id,
+                shahtaj_approval_state: p.shop_approval_state === 'approved' ? 'approved' : 'none',
+            }, this.state.selectedCheckin);
+        } catch (error) {
+            this.notification.add("Could not load shop snapshot: " + (error.data?.message || error.message), { type: "warning" });
+        }
+    }
+
+    _mapSaleOrderRow(o, lines) {
+        const myLines = (lines || []).filter(l => l.order_id && l.order_id[0] === o.id);
+        const totalOrd = myLines.reduce((sum, l) => sum + l.product_uom_qty, 0);
+        const totalDel = myLines.reduce((sum, l) => sum + l.qty_delivered, 0);
+        let status = 'Draft';
+        if (o.shahtaj_approval_state === 'to_approve') status = 'Needs Verification';
+        else if (o.shahtaj_approval_state === 'rejected') status = 'Rejected';
+        else if (o.state === 'sale') status = o.invoice_status === 'invoiced' ? 'Invoiced' : 'To Invoice';
+        else if (o.state === 'done') status = 'Delivered';
+        else if (o.state === 'cancel') status = 'Cancelled';
+        return {
+            odoo_id: o.id, id: o.name, shop: o.partner_id ? o.partner_id[1] : 'Unknown', partner_id: o.partner_id,
+            shopId: o.partner_id ? o.partner_id[0] : false,
+            booker: o.user_id ? o.user_id[1] : 'Unknown', bookerId: o.user_id ? o.user_id[0] : false,
+            date: o.date_order ? String(o.date_order).split(" ")[0] : 'Unknown', items: (o.order_line || []).length,
+            total: this._formatRs(o.amount_total),
+            tax: this._formatRs(o.amount_tax),
+            rawAmount: o.amount_total || 0,
+            catalogTotal: this._formatRs(o.shahtaj_catalog_amount_total),
+            rawCatalogTotal: o.shahtaj_catalog_amount_total || 0,
+            discountAmount: this._formatRs(o.shahtaj_total_discount_amount),
+            rawDiscountAmount: o.shahtaj_total_discount_amount || 0,
+            discountReasons: o.shahtaj_discount_reasons || '',
+            approvalState: o.shahtaj_approval_state || 'none',
+            verificationLabel: this._verificationLabel(o.shahtaj_approval_state || 'none'),
+            needsDiscount: !!o.shahtaj_approval_reason_discount,
+            needsCredit: !!o.shahtaj_approval_reason_credit,
+            approvalReasons: o.shahtaj_approval_reasons_display || '',
+            shopCategory: o.shahtaj_shop_category || '',
+            creditLimit: o.shahtaj_shop_credit_limit || 0,
+            outstanding: o.shahtaj_shop_outstanding || 0,
+            creditRemaining: o.shahtaj_shop_credit_remaining || 0,
+            creditShortfall: o.shahtaj_shop_credit_shortfall || 0,
+            effectiveOutstanding: o.shahtaj_shop_effective_outstanding || 0,
+            pastDiscountCount: o.shahtaj_shop_past_discount_count || 0,
+            status: status, invoice_status: o.invoice_status,
+            is_fully_delivered: totalOrd > 0 && totalDel >= totalOrd, line_ids: o.order_line, lines: []
+        };
     }
 
     // --- THE MASTER DATA ENGINE ---
     async fetchActiveList() {
         let tab = this.state.activeSubTab;
         if (tab === 'performance') tab = this.state.perfSubTab;
+        if (tab === 'orders' && this.state.ordersSubTab === 'verification') tab = 'verification';
         
         this.state.isLoadingList = true;
         try {
@@ -355,15 +632,40 @@ export class OperationsTracking extends Component {
             let domain = []; let model = ''; let fields = []; let targetState = '';
 
             // 1. DOMAIN MAPPINGS
-            if (tab === 'deliveries' || tab === 'orders') {
-                model = 'sale.order'; targetState = tab === 'deliveries' ? 'tableDeliveries' : 'tableOrders';
-                fields = ["name", "partner_id", "user_id", "date_order", "amount_total","amount_tax", "state", "order_line", "invoice_status"];
-                domain.push(['shahtaj_visit_id', '!=', false]);
+            if (tab === 'deliveries' || tab === 'orders' || tab === 'verification') {
+                model = 'sale.order';
+                targetState = tab === 'deliveries' ? 'tableDeliveries' : (tab === 'verification' ? 'tableVerification' : 'tableOrders');
+                fields = ["name", "partner_id", "user_id", "date_order", "amount_total", "amount_tax", "amount_untaxed", "state", "order_line", "invoice_status"];
+                if (tab !== 'deliveries') {
+                    // Stored fields only. Credit/history snapshot fields are computed
+                    // and stall this list on a production database — load them in viewOrder.
+                    fields.push(
+                        "shahtaj_approval_state", "shahtaj_approval_reason_discount", "shahtaj_approval_reason_credit",
+                        "shahtaj_approval_reasons_display", "shahtaj_catalog_amount_total", "shahtaj_total_discount_amount",
+                        "shahtaj_discount_reasons",
+                    );
+                }
+                domain.push('|', ['shahtaj_visit_id', '!=', false], ['partner_id.is_shahtaj_shop', '=', true]);
                 
                 if (tab === 'deliveries') domain.push(['state', 'in', ['sale', 'done']]);
+                if (tab === 'verification') {
+                    domain.push(['shahtaj_approval_state', '=', 'to_approve']);
+                    domain.push(['state', 'in', ['draft', 'sent']]);
+                }
+                if (tab === 'orders') {
+                    domain.push(['shahtaj_approval_state', '!=', 'to_approve']);
+                }
                 if (filters.search) domain.push('|', '|', ['name', 'ilike', filters.search], ['partner_id.name', 'ilike', filters.search], ['user_id.name', 'ilike', filters.search]);
-                if (tab === 'orders' && filters.booker && filters.booker !== 'all') domain.push(['user_id', '=', parseInt(filters.booker)]);
-                if (filters.status) {
+                if ((tab === 'orders' || tab === 'verification') && filters.booker && filters.booker !== 'all') domain.push(['user_id', '=', parseInt(filters.booker)]);
+                if (tab === 'verification' && filters.reason && filters.reason !== 'all') {
+                    if (filters.reason === 'discount') domain.push(['shahtaj_approval_reason_discount', '=', true]);
+                    if (filters.reason === 'credit') domain.push(['shahtaj_approval_reason_credit', '=', true]);
+                    if (filters.reason === 'both') {
+                        domain.push(['shahtaj_approval_reason_discount', '=', true]);
+                        domain.push(['shahtaj_approval_reason_credit', '=', true]);
+                    }
+                }
+                if (tab === 'orders' && filters.status) {
                     if (filters.status === 'Draft') domain.push(['state', '=', 'draft']);
                     else if (filters.status === 'Delivered') domain.push(['state', '=', 'done']);
                     else if (filters.status === 'To Invoice') domain.push(['state', '=', 'sale'], ['invoice_status', '!=', 'invoiced']);
@@ -377,7 +679,7 @@ export class OperationsTracking extends Component {
                     'shop_id', 'shop_latitude', 'shop_longitude',
                     'attempt_latitude', 'attempt_longitude',
                     'distance_m', 'min_distance_m', 'max_distance_m',
-                    'visit_task_id', 'visit_id', 'dm_delivery_id',
+                    'visit_task_id', 'visit_id', 'dm_delivery_id', 'sale_order_id',
                 ];
                 if (filters.search) {
                     domain.push('|', '|',
@@ -445,27 +747,13 @@ export class OperationsTracking extends Component {
             this.state.pagination[tab].total = total;
 
             // 3. MAP RESULTS
-            if (tab === 'deliveries' || tab === 'orders') {
+            if (tab === 'deliveries' || tab === 'orders' || tab === 'verification') {
                 const orderIds = records.map(o => o.id);
                 const lines = orderIds.length ? await this.orm.searchRead("sale.order.line", [["order_id", "in", orderIds]], ["order_id", "product_uom_qty", "qty_delivered"]) : [];
-                this.state[targetState] = records.map(o => {
-                    const myLines = lines.filter(l => l.order_id[0] === o.id);
-                    const totalOrd = myLines.reduce((sum, l) => sum + l.product_uom_qty, 0);
-                    const totalDel = myLines.reduce((sum, l) => sum + l.qty_delivered, 0);
-                    let status = 'Draft';
-                    if (o.state === 'sale') status = o.invoice_status === 'invoiced' ? 'Invoiced' : 'To Invoice';
-                    else if (o.state === 'done') status = 'Delivered';
-                    return {
-                        odoo_id: o.id, id: o.name, shop: o.partner_id ? o.partner_id[1] : 'Unknown', partner_id: o.partner_id,
-                        booker: o.user_id ? o.user_id[1] : 'Unknown', date: o.date_order || 'Unknown', items: o.order_line.length,
-                        total: `Rs. ${o.amount_total.toLocaleString(undefined, {minimumFractionDigits: 2})}`,
-                        tax: `Rs. ${(o.amount_tax || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`,
-                        status: status, invoice_status: o.invoice_status,
-                        is_fully_delivered: totalOrd > 0 && totalDel >= totalOrd, line_ids: o.order_line, lines: [] 
-                    };
-                });
+                this.state[targetState] = records.map(o => this._mapSaleOrderRow(o, lines));
             }
             else if (tab === 'checkins') {
+                const { visitsById, tasksById } = await this._enrichCheckinRows(records);
                 this.state.tableCheckins = records.map(a => {
                     const isOk = a.result === 'ok';
                     const status = this._gpsResultLabel(a.result);
@@ -473,6 +761,11 @@ export class OperationsTracking extends Component {
                     const distLabel = a.distance_m
                         ? `${Math.round(a.distance_m)} m`
                         : (isOk ? '—' : 'n/a');
+                    const visit = visitsById[this._m2oId(a.visit_id)] || null;
+                    const task = tasksById[this._m2oId(a.visit_task_id)] || null;
+                    const saleOrder = a.sale_order_id || (visit && visit.sale_order_id) || false;
+                    const hasOrder = Boolean(this._m2oId(saleOrder));
+                    const notes = ((visit && visit.notes) || (task && task.notes) || '').trim();
                     return {
                         id: a.id,
                         shop: a.shop_id ? a.shop_id[1] : 'Unknown shop',
@@ -497,12 +790,14 @@ export class OperationsTracking extends Component {
                         shop_longitude: a.shop_longitude || 0,
                         attempt_latitude: a.attempt_latitude || 0,
                         attempt_longitude: a.attempt_longitude || 0,
-                        taskRef: a.visit_task_id ? a.visit_task_id[1] : (a.dm_delivery_id ? a.dm_delivery_id[1] : '—'),
+                        taskRef: a.visit_task_id ? a.visit_task_id[1] : (a.dm_delivery_id ? a.dm_delivery_id[1] : (saleOrder ? saleOrder[1] : '—')),
                         visit_id: a.visit_id || false,
                         visit_task_id: a.visit_task_id || false,
                         dm_delivery_id: a.dm_delivery_id || false,
-                        sale_order_id: false,
-                        notes: '',
+                        sale_order_id: saleOrder,
+                        hasOrder,
+                        orderLabel: hasOrder ? 'Order Placed' : 'No Order',
+                        notes,
                         endTime: '',
                         duration: distLabel,
                         outcome: purposeLabel,
@@ -526,6 +821,21 @@ export class OperationsTracking extends Component {
                     product: r.product_id ? r.product_id[1] : null, currency: r.currency_id ? r.currency_id[1] : null, weightUom: r.target_weight_uom || '', active: r.active
                 }));
             }
+            if (this.state.activeSubTab === 'orders') {
+                if (tab === 'verification') {
+                    this.state.verificationCount = total;
+                } else {
+                    try {
+                        this.state.verificationCount = await this.orm.searchCount('sale.order', [
+                            '|', ['shahtaj_visit_id', '!=', false], ['partner_id.is_shahtaj_shop', '=', true],
+                            ['shahtaj_approval_state', '=', 'to_approve'],
+                            ['state', 'in', ['draft', 'sent']],
+                        ]);
+                    } catch (error) {
+                        this.state.verificationCount = 0;
+                    }
+                }
+            }
         } catch (error) {
             this.notification.add("Failed to fetch data: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
@@ -536,6 +846,7 @@ export class OperationsTracking extends Component {
         this.state.isRefreshing = true;
         try {
             await this.loadDropdownData();
+            await this.loadSaleOrderCatalog();
             await this.fetchActiveList();
         } finally {
             this.state.isRefreshing = false;
@@ -645,21 +956,25 @@ export class OperationsTracking extends Component {
         if (!hasFinancialAccess()) {
             return;
         }
-        const [taxes, prods] = await Promise.all([
-            this.orm.searchRead(
-            "account.tax",
-            [["type_tax_use", "=", "sale"], ["active", "=", true]],
-            ["id", "name", "amount"]
-            ),
-            this.orm.searchRead("product.template", [
-                ["sale_ok", "=", true],
-                ["active", "=", true],
-                ["default_code", "!=", "SHAHTAJ-LEGACY"],
-            ], ["id", "name"]),
-        ]);
-        this.state.saleTaxes = taxes;
-        this.state.allProducts = prods;
-        this._catalogsLoaded = true;
+        try {
+            const [taxes, prods] = await Promise.all([
+                this.orm.searchRead(
+                "account.tax",
+                [["type_tax_use", "=", "sale"], ["active", "=", true]],
+                ["id", "name", "amount"]
+                ),
+                this.orm.searchRead("product.template", [
+                    ["sale_ok", "=", true],
+                    ["active", "=", true],
+                    ["default_code", "!=", "SHAHTAJ-LEGACY"],
+                ], ["id", "name"]),
+            ]);
+            this.state.saleTaxes = taxes;
+            this.state.allProducts = prods;
+            this._catalogsLoaded = true;
+        } catch (error) {
+            this.notification.add("Failed to load product catalog: " + (error.data?.message || error.message), { type: "warning" });
+        }
     }
 
     // 2. UPDATE THIS METHOD TO MAP TAX NAMES IN DELIVERIES
@@ -872,10 +1187,14 @@ export class OperationsTracking extends Component {
         if (this._preserveDetailsOnSwitch) {
             this._preserveDetailsOnSwitch = false;
         } else {
-        this.state.selectedOrder = null;
-        this.state.selectedCheckin = null;
-        this.state.selectedSchedule = null;
-        this.state.selectedTarget = null;
+            this.state.selectedOrder = null;
+            this.state.selectedCheckin = null;
+            this.state.selectedSchedule = null;
+            this.state.selectedTarget = null;
+            this.state.showSaleOrderForm = false;
+            this.state.showRejectModal = false;
+            this.state.showCreditOverride = false;
+            this.state.isProcessingOverride = false;
             // Reset filters and pagination for the tab being entered so the UI
             // and the backend query are always in sync after a tab switch.
             this._resetTabFilters(tabName);
@@ -896,6 +1215,7 @@ export class OperationsTracking extends Component {
             deliveries: { search: '', status: '' },
             checkins:   { search: '', status: '', purpose: 'all', booker: 'all', date: '' },
             orders:     { search: '', status: '', booker: 'all' },
+            verification: { search: '', booker: 'all', reason: 'all' },
             schedules:  { booker: 'all', day: 'all' },
             targets:    { booker: 'all', type: 'all' },
         };
@@ -912,6 +1232,22 @@ export class OperationsTracking extends Component {
             this.state.pagination.targets.page   = 1;
             this.state.perfSubTab = 'schedules';
         }
+        if (tabName === 'orders') {
+            this.state.ordersSubTab = 'live';
+            this.state.filters.verification = { search: '', booker: 'all', reason: 'all' };
+            this.state.pagination.verification.page = 1;
+        }
+    }
+
+    setOrdersSubTab(tabName) {
+        this.state.ordersSubTab = tabName;
+        this.state.selectedOrder = null;
+        this.state.shopSnapshotOpen = false;
+        this.state.showSaleOrderForm = false;
+        this.state.showRejectModal = false;
+        this.state.showCreditOverride = false;
+        this.state.isProcessingOverride = false;
+        this.fetchActiveList();
     }
 
     viewSchedule(sched) { this.state.selectedSchedule = sched; }
@@ -923,7 +1259,8 @@ export class OperationsTracking extends Component {
     // --- ORDER ACTIONS (EXISTING) ---
     async viewOrder(order) { 
         // 1. Assign to state FIRST to wrap it in Owl's reactive proxy
-        this.state.selectedOrder = order; 
+        this.state.selectedOrder = order;
+        this.state.shopSnapshotOpen = false;
         
         // FIX: Initialize the contact fields so the "Loading..." check triggers the DB fetch
         if (!this.state.selectedOrder.phone) {
@@ -936,7 +1273,7 @@ export class OperationsTracking extends Component {
             const lines = await this.orm.searchRead(
                 "sale.order.line",
                 [["id", "in", this.state.selectedOrder.line_ids]],
-                ["name", "product_uom_qty", "product_uom_id", "price_unit", "price_subtotal", "tax_ids"] 
+                ["name", "product_uom_qty", "product_uom_id", "price_unit", "price_subtotal", "tax_ids", "shahtaj_catalog_price", "shahtaj_has_discount", "shahtaj_unit_discount", "shahtaj_total_discount", "shahtaj_discount_reason"] 
             );
             
             // 2. Assign strictly to the reactive proxy so the UI repaints instantly
@@ -951,6 +1288,11 @@ export class OperationsTracking extends Component {
                     qty: l.product_uom_qty,
                     unit: l.product_uom_id ? l.product_uom_id[1] : 'Units',
                     price: l.price_unit.toLocaleString(undefined, {minimumFractionDigits: 2}),
+                    catalogPrice: (l.shahtaj_catalog_price || l.price_unit).toLocaleString(undefined, {minimumFractionDigits: 2}),
+                    hasDiscount: !!l.shahtaj_has_discount,
+                    unitDiscount: (l.shahtaj_unit_discount || 0).toLocaleString(undefined, {minimumFractionDigits: 2}),
+                    totalDiscount: (l.shahtaj_total_discount || 0).toLocaleString(undefined, {minimumFractionDigits: 2}),
+                    discountReason: l.shahtaj_discount_reason || '',
                     taxes: taxNames || 'None',
                     subtotal: l.price_subtotal.toLocaleString(undefined, {minimumFractionDigits: 2})
                 };
@@ -971,55 +1313,317 @@ export class OperationsTracking extends Component {
                 this.state.selectedOrder.address = [p.street, p.city].filter(Boolean).join(', ') || 'No address provided';
             }
         }
+
+        if (this.state.selectedOrder.odoo_id) {
+            try {
+                const snaps = await this.orm.read(
+                    "sale.order",
+                    [this.state.selectedOrder.odoo_id],
+                    [
+                        "shahtaj_shop_category", "shahtaj_shop_credit_limit", "shahtaj_shop_outstanding",
+                        "shahtaj_shop_pending_exposure", "shahtaj_shop_uninvoiced_exposure",
+                        "shahtaj_shop_effective_outstanding", "shahtaj_shop_credit_remaining",
+                        "shahtaj_shop_credit_would_exceed", "shahtaj_shop_credit_shortfall",
+                        "shahtaj_shop_lifetime_sales", "shahtaj_shop_confirmed_order_count",
+                        "shahtaj_shop_past_discount_total", "shahtaj_shop_past_discount_count",
+                        "shahtaj_shop_last_discount_date", "shahtaj_shop_last_discount_amount",
+                        "payment_term_id", "shahtaj_approval_state",
+                    ]
+                );
+                if (snaps && snaps.length) {
+                    this._applyShopSnapshot(snaps[0]);
+                }
+            } catch (error) {
+                this.notification.add("Could not load shop snapshot: " + (error.data?.message || error.message), { type: "warning" });
+            }
+        }
+    }
+
+    toggleShopSnapshot() {
+        this.state.shopSnapshotOpen = !this.state.shopSnapshotOpen;
     }
     
-    closeOrder() { this.state.selectedOrder = null; }
+    closeOrder() {
+        this.state.selectedOrder = null;
+        this.state.shopSnapshotOpen = false;
+    }
+
+    async openSaleOrderForm() {
+        this.state.selectedOrder = null;
+        this.state.saleOrderForm = this._emptySaleOrderForm();
+        this.state.showSaleOrderForm = true;
+        if (!this.state.lookupShops.length || !this.state.saleProducts.length) {
+            await this.loadSaleOrderCatalog();
+        }
+    }
+
+    closeSaleOrderForm() {
+        this.state.showSaleOrderForm = false;
+        this.state.saleOrderForm = this._emptySaleOrderForm();
+    }
+
+    addSaleOrderLine() {
+        this.state.saleOrderForm.lines.push(this._emptySaleOrderLine());
+    }
+
+    removeSaleOrderLine(lineId) {
+        if (this.state.saleOrderForm.lines.length <= 1) {
+            this.notification.add("A sales order must have at least one product line.", { type: "warning" });
+            return;
+        }
+        this.state.saleOrderForm.lines = this.state.saleOrderForm.lines.filter((line) => line.id !== lineId);
+    }
+
+    onSaleOrderProductChange(line) {
+        const product = this.state.saleProducts.find((p) => String(p.id) === String(line.product_id));
+        if (!product) {
+            line.price = 0;
+            line.tax_id = '';
+            return;
+        }
+        line.price = product.list_price || 0;
+        line.tax_id = product.tax_id ? String(product.tax_id) : '';
+    }
+
+    async saveSaleOrder() {
+        const form = this.state.saleOrderForm;
+        if (!form.partner_id) {
+            this.notification.add("Please select a shop.", { type: "warning" });
+            return;
+        }
+        if (!form.lines.length) {
+            this.notification.add("Please add at least one product line.", { type: "warning" });
+            return;
+        }
+        this.state.isSavingSaleOrder = true;
+        try {
+            const orderLines = [];
+            for (const line of form.lines) {
+                if (!line.product_id) {
+                    this.notification.add("Please select a product for every order line.", { type: "warning" });
+                    this.state.isSavingSaleOrder = false;
+                    return;
+                }
+                const product = this.state.saleProducts.find((p) => String(p.id) === String(line.product_id));
+                const lineVals = {
+                    product_id: parseInt(line.product_id, 10),
+                    product_uom_qty: parseFloat(line.qty) || 1,
+                    name: product?.name || 'Product',
+                };
+                if (hasFinancialAccess()) {
+                    lineVals.price_unit = parseFloat(line.price) || 0;
+                    lineVals.tax_ids = line.tax_id ? [[6, 0, [parseInt(line.tax_id, 10)]]] : [[5, 0, 0]];
+                }
+                orderLines.push([0, 0, lineVals]);
+            }
+            await this.orm.create("sale.order", [{
+                partner_id: parseInt(form.partner_id, 10),
+                date_order: form.date_order,
+                origin: "Distributor Portal",
+                order_line: orderLines,
+            }]);
+            this.closeSaleOrderForm();
+            await this.fetchActiveList();
+            this.notification.add("Sales order created successfully.", { type: "success" });
+        } catch (error) {
+            this.notification.add("Failed to create sales order: " + (error.data?.message || error.message), { type: "danger" });
+        } finally {
+            this.state.isSavingSaleOrder = false;
+        }
+    }
+
+    async confirmSelectedOrder() {
+        if (!this.state.selectedOrder || this.state.isConfirmingOrder) return;
+        this.state.isConfirmingOrder = true;
+        try {
+            const result = await this.orm.call("sale.order", "action_confirm", [[this.state.selectedOrder.odoo_id]]);
+            if (result && result.type === "ir.actions.act_window") {
+                this._openCreditOverride(this.state.selectedOrder, 'confirm');
+                return;
+            }
+            this.state.selectedOrder.status = "To Invoice";
+            this.notification.add("Sales order confirmed.", { type: "success" });
+            await this.fetchActiveList();
+        } catch (error) {
+            this.notification.add(error.data?.message || "Failed to confirm sales order.", { type: "danger" });
+        } finally {
+            this.state.isConfirmingOrder = false;
+        }
+    }
+
+    openRejectModal() {
+        if (!this.state.selectedOrder) return;
+        this.state.rejectReason = '';
+        this.state.showRejectModal = true;
+    }
+
+    closeRejectModal() {
+        this.state.showRejectModal = false;
+        this.state.rejectReason = '';
+    }
+
+    closeCreditOverride() {
+        this.state.showCreditOverride = false;
+        this.state.isApprovingOrder = false;
+        this.state.isProcessingOverride = false;
+    }
+
+    _openCreditOverride(order, actionType = 'approve') {
+        this.state.isApprovingOrder = false;
+        this.state.isProcessingOverride = false;
+        this.state.creditOverride = {
+            orderId: order.odoo_id,
+            shop: order.shop,
+            orderAmount: order.rawAmount || 0,
+            creditLimit: order.creditLimit || 0,
+            outstanding: order.outstanding || 0,
+            effective: order.effectiveOutstanding || 0,
+            shortfall: order.creditShortfall || 0,
+            newLimit: '',
+            note: '',
+            actionType,
+        };
+        this.state.showCreditOverride = true;
+    }
+
+    async approveSelectedOrder() {
+        if (!this.state.selectedOrder || this.state.isApprovingOrder) return;
+        this.state.isApprovingOrder = true;
+        try {
+            const result = await this.orm.call("sale.order", "action_shahtaj_approve_order", [[this.state.selectedOrder.odoo_id]]);
+            if (result && result.type === "ir.actions.act_window") {
+                this._openCreditOverride(this.state.selectedOrder);
+                return;
+            }
+            this.notification.add("Order approved and confirmed.", { type: "success" });
+            this.state.selectedOrder = null;
+            await this.fetchActiveList();
+        } catch (error) {
+            this.notification.add(error.data?.message || "Failed to approve order.", { type: "danger" });
+        } finally {
+            this.state.isApprovingOrder = false;
+        }
+    }
+
+    async proceedCreditOverride() {
+        const form = this.state.creditOverride;
+        if (!form.orderId || this.state.isProcessingOverride) return;
+        this.state.isProcessingOverride = true;
+        try {
+            const vals = {
+                sale_order_id: form.orderId,
+                action_type: form.actionType || 'approve',
+                override_note: (form.note || '').trim() || false,
+            };
+            if (form.newLimit && parseFloat(form.newLimit) > 0) {
+                vals.new_credit_limit = parseFloat(form.newLimit);
+            }
+            const ids = await this.orm.create("shahtaj.credit.override.wizard", [vals], {
+                context: { default_sale_order_id: form.orderId, default_action_type: form.actionType || 'approve' },
+            });
+            const wizardId = Array.isArray(ids) ? ids[0] : ids;
+            await this.orm.call("shahtaj.credit.override.wizard", "action_proceed", [[wizardId]]);
+            this.state.showCreditOverride = false;
+            this.notification.add("Order approved with credit override.", { type: "success" });
+            this.state.selectedOrder = null;
+            await this.fetchActiveList();
+        } catch (error) {
+            this.notification.add(error.data?.message || "Failed to complete credit override.", { type: "danger" });
+        } finally {
+            this.state.isProcessingOverride = false;
+        }
+    }
+
+    async rejectSelectedOrder() {
+        if (!this.state.selectedOrder || this.state.isRejectingOrder) return;
+        const reason = (this.state.rejectReason || '').trim();
+        if (!reason) {
+            this.notification.add("Please enter a rejection reason.", { type: "warning" });
+            return;
+        }
+        this.state.isRejectingOrder = true;
+        try {
+            await this.orm.call("sale.order", "action_shahtaj_reject_order", [[this.state.selectedOrder.odoo_id]], { reason });
+            this.closeRejectModal();
+            this.notification.add("Order rejected.", { type: "info" });
+            this.state.selectedOrder = null;
+            await this.fetchActiveList();
+        } catch (error) {
+            this.notification.add(error.data?.message || "Failed to reject order.", { type: "danger" });
+        } finally {
+            this.state.isRejectingOrder = false;
+        }
+    }
 
     async viewCheckin(log) {
+        this.state.shopSnapshotOpen = false;
         this.state.selectedCheckin = {
             ...log,
             notes: log.notes || '',
             sale_order_id: log.sale_order_id || false,
+            hasOrder: !!log.hasOrder,
+            orderLabel: log.orderLabel || (log.hasOrder ? 'Order Placed' : 'No Order'),
             endTime: log.endTime || '',
-            visitOutcome: '',
+            visitOutcome: log.orderLabel || '',
         };
-        const visitId = log.visit_id && log.visit_id[0];
-        if (!visitId) {
-            return;
-        }
+        let visitId = this._m2oId(log.visit_id);
+        const taskId = this._m2oId(log.visit_task_id);
         try {
-            const visits = await this.orm.read(
-                'shahtaj.visit',
-                [visitId],
-                ['started_at', 'ended_at', 'outcome', 'state', 'sale_order_id', 'notes'],
-            );
-            if (!visits.length || !this.state.selectedCheckin || this.state.selectedCheckin.id !== log.id) {
-                return;
+            if (!visitId && taskId) {
+                const found = await this.orm.searchRead(
+                    'shahtaj.visit',
+                    [['visit_task_id', '=', taskId]],
+                    ['started_at', 'ended_at', 'outcome', 'state', 'sale_order_id', 'notes'],
+                    { limit: 1, order: 'id desc' },
+                );
+                if (found.length) visitId = found[0].id;
             }
-            const v = visits[0];
-            let visitOutcome = v.outcome || '';
-            if (v.state === 'in_progress') visitOutcome = 'In Progress';
-            else if (v.state === 'completed' && v.outcome === 'incomplete') visitOutcome = 'Incomplete / Auto-Skipped';
-            else if (v.state === 'completed') visitOutcome = v.outcome === 'order' ? 'Order Placed' : 'No Order';
-            else if (v.state === 'cancelled') visitOutcome = 'Cancelled';
+            if (visitId) {
+                const visits = await this.orm.read(
+                    'shahtaj.visit',
+                    [visitId],
+                    ['started_at', 'ended_at', 'outcome', 'state', 'sale_order_id', 'notes'],
+                );
+                if (visits.length && this.state.selectedCheckin && this.state.selectedCheckin.id === log.id) {
+                    const v = visits[0];
+                    let visitOutcome = v.outcome || '';
+                    if (v.state === 'in_progress') visitOutcome = 'In Progress';
+                    else if (v.state === 'completed' && v.outcome === 'incomplete') visitOutcome = 'Incomplete / Auto-Skipped';
+                    else if (v.state === 'completed') visitOutcome = v.outcome === 'order' ? 'Order Placed' : 'No Order';
+                    else if (v.state === 'cancelled') visitOutcome = 'Cancelled';
 
-            let durationStr = '';
-            if (v.started_at && v.ended_at) {
-                durationStr = `${Math.round((new Date(v.ended_at.replace(' ', 'T') + 'Z') - new Date(v.started_at.replace(' ', 'T') + 'Z')) / 60000)} mins`;
+                    let durationStr = '';
+                    if (v.started_at && v.ended_at) {
+                        durationStr = `${Math.round((new Date(v.ended_at.replace(' ', 'T') + 'Z') - new Date(v.started_at.replace(' ', 'T') + 'Z')) / 60000)} mins`;
+                    }
+
+                    const visitNotes = (v.notes || '').trim();
+                    if (visitNotes) this.state.selectedCheckin.notes = visitNotes;
+                    this.state.selectedCheckin.sale_order_id = v.sale_order_id || this.state.selectedCheckin.sale_order_id || false;
+                    this.state.selectedCheckin.hasOrder = Boolean(this._m2oId(this.state.selectedCheckin.sale_order_id));
+                    this.state.selectedCheckin.orderLabel = this.state.selectedCheckin.hasOrder ? 'Order Placed' : 'No Order';
+                    this.state.selectedCheckin.endTime = this.formatUtcToPkt(v.ended_at) || '';
+                    this.state.selectedCheckin.visitOutcome = visitOutcome;
+                    if (durationStr) {
+                        this.state.selectedCheckin.duration = durationStr;
+                    }
+                }
             }
-
-            this.state.selectedCheckin.notes = v.notes || '';
-            this.state.selectedCheckin.sale_order_id = v.sale_order_id || false;
-            this.state.selectedCheckin.endTime = this.formatUtcToPkt(v.ended_at) || '';
-            this.state.selectedCheckin.visitOutcome = visitOutcome;
-            if (durationStr) {
-                this.state.selectedCheckin.duration = durationStr;
+            if (!(this.state.selectedCheckin.notes || '').trim() && taskId) {
+                const tasks = await this.orm.read('shahtaj.visit.task', [taskId], ['notes']);
+                if (tasks.length && (tasks[0].notes || '').trim()) {
+                    this.state.selectedCheckin.notes = tasks[0].notes.trim();
+                }
             }
         } catch (error) {
             // GPS detail still useful without visit enrichment.
         }
+        await this._loadCheckinShopSnapshot(this.state.selectedCheckin);
     }
-    closeCheckin() { this.state.selectedCheckin = null; }
+    closeCheckin() {
+        this.state.selectedCheckin = null;
+        this.state.shopSnapshotOpen = false;
+    }
 
     async viewOrderFromCheckin(log) {
         if (!log.sale_order_id) return;
@@ -1043,7 +1647,7 @@ export class OperationsTracking extends Component {
 
                 const targetOrder = {
                     odoo_id: o.id, id: o.name, shop: o.partner_id ? o.partner_id[1] : 'Unknown', partner_id: o.partner_id,
-                    booker: o.user_id ? o.user_id[1] : 'Unknown', date: o.date_order || 'Unknown', items: o.order_line.length,
+                    booker: o.user_id ? o.user_id[1] : 'Unknown', date: o.date_order ? String(o.date_order).split(" ")[0] : 'Unknown', items: o.order_line.length,
                     total: `Rs. ${o.amount_total.toLocaleString(undefined, {minimumFractionDigits: 2})}`,
                     tax: `Rs. ${(o.amount_tax || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`,
                     status: status, invoice_status: o.invoice_status,

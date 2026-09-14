@@ -8,16 +8,16 @@
             <form string="Today Load" create="false" delete="false">
                 <header>
                     <button name="action_pick_today_load" type="object"
-                            string="Pick All to Van" class="oe_highlight"
+                            string="Pick to Van" class="oe_highlight"
                             icon="fa-truck"
-                            confirm="Pick the quantities in Pick Now onto your van for today shops?"/>
+                            confirm="Move the Pick Now quantities from warehouse onto the van?"/>
                     <button name="action_refresh" type="object"
                             string="Refresh" class="btn-secondary" icon="fa-refresh"/>
                     <button name="action_open_my_deliveries" type="object"
-                            string="Today Deliveries" class="btn-secondary"/>
-                    <button name="action_open_van_stock" type="object"
-                            string="Physical Van Qty" class="btn-secondary"
-                            icon="fa-cubes"/>
+                            string="Today's Jobs" class="btn-secondary"/>
+                    <button name="action_open_van_transfer" type="object"
+                            string="Van Stock Procedure" class="btn-secondary"
+                            icon="fa-exchange"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -27,21 +27,45 @@
                         <group>
                             <field name="load_date"/>
                             <field name="delivery_man_id"/>
+                            <field name="shop_count"/>
                         </group>
                         <group>
-                            <field name="shop_count"/>
-                            <field name="total_still_to_pick"/>
+                            <field name="warehouse_qty_available" string="Warehouse available"/>
+                            <field name="van_qty_on_hand" string="On van"/>
+                            <field name="total_still_to_pick" string="Still to pick"/>
                         </group>
                     </group>
                     <field name="summary_html" nolabel="1" colspan="2"/>
+                    <group string="Stock right now (Warehouse vs Van)">
+                        <field name="stock_summary_html" nolabel="1" colspan="2"/>
+                    </group>
                     <div class="alert alert-info" role="alert">
-                        <b>Shop Progress</b> shows picked vs delivered per shop.
-                        <b>Pick Today Totals</b> lists product totals still needed —
-                        edit <b>Pick Now</b>, then use <b>Pick All to Van</b>
-                        (allocated across shops using each job's <b>assigned</b> qty).
-                        Per-shop pick/deliver remains available on each delivery.
+                        <b>Warehouse</b> = free to pick · <b>On Van</b> = already loaded ·
+                        Edit <b>Pick Now</b>, then <b>Pick to Van</b>. Click <b>Refresh</b> after other picks.
                     </div>
                     <notebook>
+                        <page string="Load Van" name="pick">
+                            <field name="pick_line_ids">
+                                <list editable="bottom" create="false" delete="false">
+                                    <field name="product_id" readonly="1" force_save="1"/>
+                                    <field name="qty_warehouse_available" string="Warehouse"
+                                           readonly="1" force_save="1" sum="Warehouse"/>
+                                    <field name="qty_on_van" string="On Van"
+                                           readonly="1" force_save="1" sum="On Van"/>
+                                    <field name="qty_still_needed" string="Still Need"
+                                           readonly="1" force_save="1" sum="Still Need"/>
+                                    <field name="qty_to_pick" string="Pick Now"
+                                           force_save="1" sum="Pick Now"/>
+                                    <field name="qty_ordered" string="Assigned" optional="hide"
+                                           readonly="1" force_save="1"/>
+                                    <field name="qty_already_picked" string="Picked" optional="hide"
+                                           readonly="1" force_save="1"/>
+                                    <field name="qty_delivered" string="Delivered" optional="hide"
+                                           readonly="1" force_save="1"/>
+                                    <field name="product_uom_id" readonly="1" force_save="1"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Shop Progress" name="shops">
                             <field name="shop_line_ids" readonly="1">
                                 <list>
@@ -50,10 +74,8 @@
                                     <field name="qty_ordered" string="Assigned" sum="Assigned"/>
                                     <field name="qty_picked" sum="Picked"/>
                                     <field name="qty_delivered" sum="Delivered"/>
-                                    <field name="qty_left_on_van" sum="On van"/>
-                                    <field name="qty_still_to_pick" sum="Still pick"/>
-                                    <field name="delivered_ratio"
-                                           string="Delivered %"/>
+                                    <field name="qty_left_on_van" string="On van" sum="On van"/>
+                                    <field name="qty_still_to_pick" string="Still pick" sum="Still pick"/>
                                     <field name="state" string="Stock" widget="badge"
                                            decoration-danger="state in ('not_ready', 'returned')"
                                            decoration-info="state == 'ready'"
@@ -65,21 +87,13 @@
                                            decoration-warning="field_state == 'not_attended'"
                                            decoration-danger="field_state == 'failed'"
                                            decoration-success="field_state == 'done'"/>
+                                    <button name="action_deliver_to_shop" type="object"
+                                            string="Deliver (GPS)"
+                                            icon="fa-map-marker"
+                                            invisible="state not in ('picked', 'partial')"
+                                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                                     <button name="action_open_delivery" type="object"
                                             string="Open" icon="fa-external-link"/>
-                                </list>
-                            </field>
-                        </page>
-                        <page string="Pick Today Totals" name="pick">
-                            <field name="pick_line_ids">
-                                <list editable="bottom" create="false" delete="false">
-                                    <field name="product_id" readonly="1" force_save="1"/>
-                                    <field name="qty_ordered" readonly="1" force_save="1" sum="Ordered"/>
-                                    <field name="qty_already_picked" readonly="1" force_save="1" sum="Picked"/>
-                                    <field name="qty_delivered" readonly="1" force_save="1" sum="Delivered"/>
-                                    <field name="qty_still_needed" readonly="1" force_save="1" sum="Needed"/>
-                                    <field name="qty_to_pick" force_save="1" sum="Pick now"/>
-                                    <field name="product_uom_id" readonly="1" force_save="1"/>
                                 </list>
                             </field>
                         </page>

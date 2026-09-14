@@ -751,18 +751,22 @@ class SaleOrder(models.Model):
             raise UserError(_(
                 'Confirm the sales order before assigning a delivery man.'
             ))
+        ctx = {
+            'active_id': self.id,
+            'active_ids': self.ids,
+            'active_model': 'sale.order',
+            'default_sale_order_id': self.id,
+        }
+        default_dm = self.env.context.get('shahtaj_default_delivery_man_id')
+        if default_dm:
+            ctx['shahtaj_default_delivery_man_id'] = default_dm
         return {
             'type': 'ir.actions.act_window',
             'name': _('Assign / Split Delivery — %s', self.name),
             'res_model': 'shahtaj.dm.assign.wizard',
             'view_mode': 'form',
             'target': 'new',
-            'context': {
-                'active_id': self.id,
-                'active_ids': self.ids,
-                'active_model': 'sale.order',
-                'default_sale_order_id': self.id,
-            },
+            'context': ctx,
         }
 
     def action_shahtaj_view_dm_deliveries(self):

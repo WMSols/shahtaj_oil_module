@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_gps_attempt_list" model="ir.ui.view">
+        <field name="name">shahtaj.gps.attempt.list</field>
+        <field name="model">shahtaj.gps.attempt</field>
+        <field name="arch" type="xml">
+            <list string="Shop GPS Attempts" create="false" edit="false" delete="false" default_order="create_date desc">
+                <field name="create_date"/>
+                <field name="user_id"/>
+                <field name="role"/>
+                <field name="purpose"/>
+                <field name="shop_id"/>
+                <field name="result"/>
+                <field name="distance_m"/>
+                <field name="min_distance_m" optional="hide"/>
+                <field name="max_distance_m" optional="show"/>
+                <field name="message" optional="show"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_gps_attempt_form" model="ir.ui.view">
+        <field name="name">shahtaj.gps.attempt.form</field>
+        <field name="model">shahtaj.gps.attempt</field>
+        <field name="arch" type="xml">
+            <form string="Shop GPS Attempt" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="What Happened">
+                            <field name="create_date"/>
+                            <field name="purpose"/>
+                            <field name="result"/>
+                            <field name="message"/>
+                            <field name="role"/>
+                            <field name="user_id"/>
+                        </group>
+                        <group string="Distance">
+                            <field name="shop_id"/>
+                            <field name="distance_m"/>
+                            <field name="min_distance_m"/>
+                            <field name="max_distance_m"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group string="Coordinates">
+                        <group>
+                            <field name="shop_latitude"/>
+                            <field name="shop_longitude"/>
+                        </group>
+                        <group>
+                            <field name="attempt_latitude"/>
+                            <field name="attempt_longitude"/>
+                        </group>
+                    </group>
+                    <group string="Links">
+                        <field name="visit_task_id"/>
+                        <field name="visit_id"/>
+                        <field name="dm_delivery_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_gps_attempt_search" model="ir.ui.view">
+        <field name="name">shahtaj.gps.attempt.search</field>
+        <field name="model">shahtaj.gps.attempt</field>
+        <field name="arch" type="xml">
+            <search string="Search Shop GPS Attempts">
+                <field name="user_id"/>
+                <field name="shop_id"/>
+                <field name="message"/>
+                <field name="purpose"/>
+                <field name="result"/>
+                <field name="role"/>
+                <separator/>
+                <filter name="ok" string="GPS OK" domain="[('result', '=', 'ok')]"/>
+                <filter name="blocked" string="All Blocked" domain="[('result', '!=', 'ok')]"/>
+                <filter name="blocked_too_far" string="Blocked — Too Far" domain="[('result', '=', 'blocked_too_far')]"/>
+                <filter name="blocked_too_close" string="Blocked — Too Close" domain="[('result', '=', 'blocked_too_close')]"/>
+                <filter name="blocked_missing" string="Blocked — Missing / Invalid GPS"
+                        domain="[('result', 'in', ['blocked_missing_shop_gps', 'blocked_missing_user_gps', 'blocked_invalid_coords'])]"/>
+                <separator/>
+                <filter name="purpose_check_in" string="Check-in" domain="[('purpose', '=', 'check_in')]"/>
+                <filter name="purpose_place_order" string="Place Order" domain="[('purpose', '=', 'place_order')]"/>
+                <filter name="purpose_deliver" string="Deliver" domain="[('purpose', '=', 'deliver')]"/>
+                <separator/>
+                <filter name="role_booker" string="Order Booker" domain="[('role', '=', 'order_booker')]"/>
+                <filter name="role_dm" string="Delivery Man" domain="[('role', '=', 'delivery_man')]"/>
+                <filter name="create_date" string="Attempt Time" date="create_date"/>
+                <separator/>
+                <filter name="group_result" string="Group by Result" context="{'group_by': 'result'}"/>
+                <filter name="group_purpose" string="Group by Purpose" context="{'group_by': 'purpose'}"/>
+                <filter name="group_user" string="Group by User" context="{'group_by': 'user_id'}"/>
+                <filter name="group_shop" string="Group by Shop" context="{'group_by': 'shop_id'}"/>
+                <filter name="group_role" string="Group by Role" context="{'group_by': 'role'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_gps_attempt" model="ir.actions.act_window">
+        <field name="name">Shop GPS Attempts</field>
+        <field name="res_model">shahtaj.gps.attempt</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_shahtaj_gps_attempt_list"/>
+        <field name="search_view_id" ref="view_shahtaj_gps_attempt_search"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No GPS attempts yet</p>
+            <p>
+                Every shop GPS check (check-in, place-order, deliver) is logged here —
+                both successful and blocked. Blocked rows survive the failed transaction
+                so you can audit invalid ranges and missing coordinates.
+            </p>
+        </field>
+    </record>
+
+    <!-- Admin: under Settings → Administration (same area as Activity Logs) -->
+    <menuitem id="menu_shahtaj_gps_attempts_admin"
+              name="Shahtaj Shop GPS Attempts"
+              parent="base.menu_administration"
+              action="action_shahtaj_gps_attempt"
+              sequence="97"
+              groups="base.group_system"/>
+
+    <!-- Distributor native UI: keep under Shahtaj Oil app -->
+    <menuitem id="menu_shahtaj_gps_attempts"
+              name="Shop GPS Attempts"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_gps_attempt"
+              sequence="95"
+              groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+</odoo>

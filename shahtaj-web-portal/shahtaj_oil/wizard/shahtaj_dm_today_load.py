@@ -43,35 +43,147 @@ class ShahtajDmTodayLoad(models.TransientModel):
         digits='Product Unit of Measure',
         readonly=True,
     )
+    van_qty_on_hand = fields.Float(
+        string='On Van',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Total units currently on this delivery man van.',
+    )
+    warehouse_qty_available = fields.Float(
+        string='Warehouse Available',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Free qty in the company warehouse for products needed today (plus anything already on van).',
+    )
+    stock_summary_html = fields.Html(
+        string='Stock Summary',
+        sanitize=False,
+        readonly=True,
+    )
+
+    def _shahtaj_resolve_delivery_man(self):
+        """Current user for DM; context override when distributor opens for a DM."""
+        user = self.env.user
+        ctx_dm = self.env.context.get('shahtaj_delivery_man_id')
+        if ctx_dm and user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            return self.env['res.users'].browse(ctx_dm)
+        if user.shahtaj_is_delivery_man:
+            return user
+        if ctx_dm:
+            return self.env['res.users'].browse(ctx_dm)
+        return user
+
+    def _shahtaj_get_van_location_for_dm(self, dm):
+        return dm._shahtaj_get_van_location()
+
+    def _shahtaj_get_warehouse_stock_location(self):
+        warehouse = self.env['stock.warehouse'].search([
+            ('company_id', '=', self.env.company.id),
+        ], limit=1)
+        return warehouse.lot_stock_id if warehouse else self.env['stock.location']
+
+    def _shahtaj_qty_by_product_at_location(self, location, product_ids=None, free_qty=False):
+        """Sum stock.quant by product at one location. free_qty uses available_quantity."""
+        if not location:
+            return {}
+        domain = [
+            ('location_id', '=', location.id),
+            ('quantity', '!=', 0),
+        ]
+        if product_ids:
+            domain.append(('product_id', 'in', list(product_ids)))
+        quants = self.env['stock.quant'].sudo().search(domain)
+        totals = defaultdict(float)
+        for quant in quants:
+            qty = quant.available_quantity if free_qty else quant.quantity
+            if qty:
+                totals[quant.product_id.id] += qty
+        return dict(totals)
+
+    def _shahtaj_build_stock_summary_html(self, van_by_product, wh_by_product):
+        """Compact two-column summary: Warehouse vs Van."""
+        product_ids = sorted(set(van_by_product) | set(wh_by_product))
+        if not product_ids:
+            return (
+                '<p class="text-muted mb-0">'
+                'No warehouse or van stock for today\'s products yet.'
+                '</p>'
+            )
+        Product = self.env['product.product'].sudo()
+        rows = []
+        for pid in product_ids:
+            product = Product.browse(pid)
+            wh = wh_by_product.get(pid, 0.0)
+            van = van_by_product.get(pid, 0.0)
+            if not wh and not van:
+                continue
+            rows.append(
+                f'<tr>'
+                f'<td>{product.display_name}</td>'
+                f'<td class="text-end">{wh:g}</td>'
+                f'<td class="text-end">{van:g}</td>'
+                f'<td>{product.uom_id.name}</td>'
+                f'</tr>'
+            )
+        if not rows:
+            return (
+                '<p class="text-muted mb-0">'
+                'No warehouse or van stock for today\'s products yet.'
+                '</p>'
+            )
+        return (
+            '<table class="table table-sm table-striped mb-0">'
+            '<thead><tr>'
+            '<th>Product</th>'
+            '<th class="text-end">Warehouse</th>'
+            '<th class="text-end">On Van</th>'
+            '<th>UoM</th>'
+            '</tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody></table>'
+        )
+
+    def _shahtaj_today_load_delivery_domain(self, dm, day):
+        """Jobs shown on Today Load: today, unscheduled, overdue, or still open."""
+        return [
+            ('delivery_man_id', '=', dm.id),
+            ('state', '!=', 'not_ready'),
+            '|', '|', '|',
+            ('scheduled_date', '=', day),
+            ('scheduled_date', '=', False),
+            ('scheduled_date', '<', day),
+            ('state', 'in', ('ready', 'picked', 'partial')),
+        ]
 
     @api.model
     def action_open(self):
         """Menu / list header: open Today's Load for the current user."""
-        wizard = self.create({})
+        dm = self._shahtaj_resolve_delivery_man()
+        wizard = self.create({'delivery_man_id': dm.id})
         wizard.action_refresh()
+        title = _("Today's Load")
+        if dm != self.env.user:
+            title = _("Today's Load — %s", dm.name)
         return {
             'type': 'ir.actions.act_window',
-            'name': _("Today's Load"),
+            'name': title,
             'res_model': self._name,
             'res_id': wizard.id,
             'view_mode': 'form',
             'views': [(False, 'form')],
             'target': 'current',
+            'context': dict(self.env.context, shahtaj_delivery_man_id=dm.id),
         }
 
     def action_refresh(self):
         self.ensure_one()
         Delivery = self.env['shahtaj.dm.delivery']
         day = self.load_date or fields.Date.context_today(self)
-        dm = self.delivery_man_id or self.env.user
+        dm = self.delivery_man_id or self._shahtaj_resolve_delivery_man()
 
-        deliveries = Delivery.search([
-            ('delivery_man_id', '=', dm.id),
-            ('state', '!=', 'not_ready'),
-            '|',
-            ('scheduled_date', '=', day),
-            ('scheduled_date', '=', False),
-        ], order='partner_id, id')
+        deliveries = Delivery.search(
+            self._shahtaj_today_load_delivery_domain(dm, day),
+            order='scheduled_date, partner_id, id',
+        )
 
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
@@ -127,10 +239,34 @@ class ShahtajDmTodayLoad(models.TransientModel):
 
         pick_vals = []
         total_still = 0.0
-        for pid, agg in product_agg.items():
+        product_ids = set(product_agg.keys())
+
+        van_loc = self._shahtaj_get_van_location_for_dm(dm)
+        wh_loc = self._shahtaj_get_warehouse_stock_location()
+        # Include anything already sitting on the van even if not needed today
+        van_by_product = self._shahtaj_qty_by_product_at_location(van_loc, free_qty=False)
+        product_ids |= set(van_by_product.keys())
+        wh_by_product = self._shahtaj_qty_by_product_at_location(
+            wh_loc, product_ids=product_ids, free_qty=True,
+        )
+
+        for pid in sorted(product_ids):
+            agg = product_agg.get(pid) or {
+                'product_id': pid,
+                'product_uom_id': self.env['product.product'].browse(pid).uom_id.id,
+                'qty_ordered': 0.0,
+                'qty_picked': 0.0,
+                'qty_delivered': 0.0,
+                'qty_still_needed': 0.0,
+            }
             still = agg['qty_still_needed']
             total_still += still
-            if still <= 0 and agg['qty_picked'] <= 0 and agg['qty_ordered'] <= 0:
+            if (
+                still <= 0
+                and agg['qty_picked'] <= 0
+                and agg['qty_ordered'] <= 0
+                and van_by_product.get(pid, 0.0) <= 0
+            ):
                 continue
             pick_vals.append((0, 0, {
                 'product_id': agg['product_id'],
@@ -140,18 +276,22 @@ class ShahtajDmTodayLoad(models.TransientModel):
                 'qty_delivered': agg['qty_delivered'],
                 'qty_still_needed': still,
                 'qty_to_pick': still,
+                'qty_warehouse_available': wh_by_product.get(pid, 0.0),
+                'qty_on_van': van_by_product.get(pid, 0.0),
             }))
 
         shops_done = len(deliveries.filtered(lambda d: d.delivery_progress == 'done'))
         shops_partial = len(deliveries.filtered(lambda d: d.delivery_progress == 'partial'))
         summary = (
             f'<p class="mb-0">'
-            f'<b>{len(shop_vals)}</b> shop(s) today · '
+            f'<b>{len(shop_vals)}</b> shops · '
             f'<b>{shops_partial}</b> partial · '
-            f'<b>{shops_done}</b> done · '
-            f'still to pick (sum of lines): <b>{total_still:g}</b>'
+            f'<b>{shops_done}</b> done'
             f'</p>'
         )
+
+        van_total = sum(van_by_product.values())
+        wh_total = sum(wh_by_product.get(pid, 0.0) for pid in product_ids)
 
         self.write({
             'shop_line_ids': shop_vals,
@@ -159,6 +299,11 @@ class ShahtajDmTodayLoad(models.TransientModel):
             'shop_count': len(shop_vals),
             'total_still_to_pick': total_still,
             'summary_html': summary,
+            'van_qty_on_hand': van_total,
+            'warehouse_qty_available': wh_total,
+            'stock_summary_html': self._shahtaj_build_stock_summary_html(
+                van_by_product, wh_by_product,
+            ),
         })
         return True
 
@@ -167,7 +312,7 @@ class ShahtajDmTodayLoad(models.TransientModel):
         self.ensure_one()
         Delivery = self.env['shahtaj.dm.delivery']
         day = self.load_date or fields.Date.context_today(self)
-        dm = self.delivery_man_id or self.env.user
+        dm = self.delivery_man_id or self._shahtaj_resolve_delivery_man()
 
         # Snapshot edited pick qty before any sync that might confuse UI
         pick_by_product = {}
@@ -192,9 +337,10 @@ class ShahtajDmTodayLoad(models.TransientModel):
         deliveries = Delivery.search([
             ('delivery_man_id', '=', dm.id),
             ('state', 'in', ('ready', 'picked', 'partial')),
-            '|',
+            '|', '|',
             ('scheduled_date', '=', day),
             ('scheduled_date', '=', False),
+            ('scheduled_date', '<', day),
         ], order='id')
 
         for delivery in deliveries:
@@ -267,10 +413,6 @@ class ShahtajDmTodayLoad(models.TransientModel):
             },
         }
 
-    def action_open_van_stock(self):
-        self.ensure_one()
-        return self.env['shahtaj.dm.delivery'].action_open_my_van_stock()
-
     def action_open_my_deliveries(self):
         return {
             'type': 'ir.actions.act_window',
@@ -284,6 +426,14 @@ class ShahtajDmTodayLoad(models.TransientModel):
             ],
             'target': 'current',
         }
+
+    def action_open_van_transfer(self):
+        """Open free WH ↔ van transfer for the same delivery man."""
+        self.ensure_one()
+        dm = self.delivery_man_id or self._shahtaj_resolve_delivery_man()
+        return self.env['shahtaj.dm.van.transfer'].with_context(
+            shahtaj_delivery_man_id=dm.id,
+        ).action_open()
 
 
 class ShahtajDmTodayLoadShop(models.TransientModel):
@@ -338,6 +488,13 @@ class ShahtajDmTodayLoadShop(models.TransientModel):
             'target': 'current',
         }
 
+    def action_deliver_to_shop(self):
+        """Open GPS deliver procedure for this shop job."""
+        self.ensure_one()
+        if not self.delivery_id:
+            raise UserError(_('Missing delivery job.'))
+        return self.delivery_id.action_deliver_to_shop()
+
 
 class ShahtajDmTodayLoadPick(models.TransientModel):
     _name = 'shahtaj.dm.today.load.pick'
@@ -351,8 +508,20 @@ class ShahtajDmTodayLoadPick(models.TransientModel):
     )
     product_id = fields.Many2one('product.product', string='Product', readonly=True)
     product_uom_id = fields.Many2one('uom.uom', string='UoM', readonly=True)
-    qty_ordered = fields.Float(string='Ordered Today', digits='Product Unit of Measure', readonly=True)
-    qty_already_picked = fields.Float(string='Already Picked', digits='Product Unit of Measure', readonly=True)
+    qty_warehouse_available = fields.Float(
+        string='Warehouse',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Free quantity available in the warehouse to pick onto the van.',
+    )
+    qty_on_van = fields.Float(
+        string='On Van',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Physical quantity currently on this delivery man van.',
+    )
+    qty_ordered = fields.Float(string='Assigned', digits='Product Unit of Measure', readonly=True)
+    qty_already_picked = fields.Float(string='Picked', digits='Product Unit of Measure', readonly=True)
     qty_delivered = fields.Float(string='Delivered', digits='Product Unit of Measure', readonly=True)
-    qty_still_needed = fields.Float(string='Still Needed', digits='Product Unit of Measure', readonly=True)
+    qty_still_needed = fields.Float(string='Still Need', digits='Product Unit of Measure', readonly=True)
     qty_to_pick = fields.Float(string='Pick Now', digits='Product Unit of Measure')

@@ -207,6 +207,27 @@
               sequence="22"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_dm_wallet_collections_dist"
+              name="DM Wallet Collections"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_wallet_collections_all"
+              sequence="26"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_dm_wallet_settle_dist"
+              name="Settle DM Wallet"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_wallet_settle"
+              sequence="27"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_dm_wallet_settlements_dist"
+              name="DM Wallet Settlements"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_wallet_settlements"
+              sequence="28"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_dm_visit_tasks_progress"
               name="DM Visit Tasks Progress"
               parent="menu_shahtaj_delivery_man_ops"
@@ -415,11 +436,12 @@
               groups="shahtaj_oil.group_shahtaj_order_booker"/>
 
     <!-- ── Delivery Man menus (visible only when logged in as delivery man) ── -->
+    <!-- Lowest sequence among DM menus so Shahtaj app opens My Deliveries, not a server action -->
     <menuitem id="menu_shahtaj_dm_pending"
               name="My Deliveries"
               parent="menu_shahtaj_root"
               action="action_shahtaj_dm_my_deliveries"
-              sequence="30"
+              sequence="28"
               groups="shahtaj_oil.group_shahtaj_delivery_man"/>
 
     <menuitem id="menu_shahtaj_dm_all_orders"
@@ -434,6 +456,27 @@
               parent="menu_shahtaj_root"
               action="action_shahtaj_dm_today_load"
               sequence="32"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
+    <menuitem id="menu_shahtaj_dm_van_transfer"
+              name="My Van Procedure"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_dm_van_transfer"
+              sequence="33"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
+    <menuitem id="menu_shahtaj_dm_collect_payment"
+              name="Collect Payment"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_dm_collect_payment"
+              sequence="35"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
+    <menuitem id="menu_shahtaj_dm_my_wallet"
+              name="My Wallet Collections"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_dm_my_wallet_collections"
+              sequence="36"
               groups="shahtaj_oil.group_shahtaj_delivery_man"/>
 
     <!-- Legacy top-level Orders &amp; Dispatch folder (replaced by OB/DM parents) -->

@@ -3,7 +3,7 @@
 import logging
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tools import float_compare, float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
@@ -131,8 +131,20 @@ class ShahtajDmDelivery(models.Model):
         help='Day this delivery is planned for (My Deliveries / Today Load).',
     )
     scheduled_time = fields.Float(
-        string='Delivery Time',
+        string='Planned Delivery Time',
         help='Planned time of day (distributor assignment).',
+    )
+    picked_at = fields.Datetime(
+        string='Picked At',
+        readonly=True,
+        copy=False,
+        help='When stock was first loaded onto the van for this job.',
+    )
+    delivered_at = fields.Datetime(
+        string='Delivered At',
+        readonly=True,
+        copy=False,
+        help='When stock was last delivered to the shop (updated on each successful deliver).',
     )
     assigned_by_id = fields.Many2one(
         'res.users',
@@ -225,6 +237,49 @@ class ShahtajDmDelivery(models.Model):
         compute='_compute_is_split_share',
         help='True when this sales order has more than one delivery job.',
     )
+    # ── Shop balance (share with shopkeeper at the stop) ──────────────
+    shop_outstanding_balance = fields.Monetary(
+        string='Shop Outstanding',
+        compute='_compute_shop_balance_info',
+        currency_field='currency_id',
+        help='Posted receivable the shop currently owes (AR).',
+    )
+    shop_unpaid_invoice_amount = fields.Monetary(
+        string='Unpaid / Partial Invoices',
+        compute='_compute_shop_balance_info',
+        currency_field='currency_id',
+        help='Sum of remaining amounts on unpaid and partially paid invoices.',
+    )
+    shop_invoice_count = fields.Integer(
+        string='Shop Invoices',
+        compute='_compute_shop_balance_info',
+    )
+    shop_unpaid_invoice_count = fields.Integer(
+        string='Open Invoices',
+        compute='_compute_shop_balance_info',
+    )
+    shop_credit_limit = fields.Monetary(
+        string='Shop Credit Limit',
+        compute='_compute_shop_balance_info',
+        currency_field='currency_id',
+    )
+    shop_category = fields.Selection(
+        related='partner_id.shahtaj_shop_category',
+        string='Shop Category',
+        readonly=True,
+    )
+    shop_invoice_ids = fields.Many2many(
+        'account.move',
+        string='Shop Invoices',
+        compute='_compute_shop_balance_info',
+        help='Posted customer invoices / credit notes for this shop.',
+    )
+    shop_invoices_html = fields.Html(
+        string='Shop Invoice Summary',
+        compute='_compute_shop_balance_info',
+        sanitize=False,
+    )
+
     visit_task_id = fields.Many2one(
         'shahtaj.visit.task',
         string='Visit Task',
@@ -255,6 +310,129 @@ class ShahtajDmDelivery(models.Model):
     def _compute_is_split_share(self):
         for rec in self:
             rec.is_split_share = len(rec.sale_order_id.shahtaj_dm_delivery_ids) > 1
+
+    @api.depends('partner_id', 'sale_order_id.company_id')
+    def _compute_shop_balance_info(self):
+        """Shop AR + invoice payment status for field sharing (DM / distributor)."""
+        Move = self.env['account.move'].sudo()
+        payment_labels = {
+            'not_paid': _('Unpaid'),
+            'partial': _('Partial'),
+            'in_payment': _('In Payment'),
+            'paid': _('Fully Paid'),
+            'reversed': _('Reversed'),
+            'invoicing_legacy': _('Legacy'),
+        }
+        type_labels = {
+            'out_invoice': _('Invoice'),
+            'out_refund': _('Credit Note'),
+        }
+        for rec in self:
+            shop = rec.partner_id
+            if not shop:
+                rec.shop_outstanding_balance = 0.0
+                rec.shop_unpaid_invoice_amount = 0.0
+                rec.shop_invoice_count = 0
+                rec.shop_unpaid_invoice_count = 0
+                rec.shop_credit_limit = 0.0
+                rec.shop_invoice_ids = False
+                rec.shop_invoices_html = (
+                    '<p class="text-muted mb-0">No shop linked to this delivery.</p>'
+                )
+                continue
+
+            shop_sudo = shop.sudo()
+            company = rec.sale_order_id.company_id or self.env.company
+            commercial = shop_sudo.commercial_partner_id
+            invoices = Move.search([
+                ('move_type', 'in', ('out_invoice', 'out_refund')),
+                ('state', '=', 'posted'),
+                ('partner_id', 'child_of', commercial.id),
+                ('company_id', '=', company.id),
+            ], order='invoice_date desc, name desc', limit=100)
+
+            # Unpaid / partial first, then paid, keep date order within groups.
+            rank = {
+                'not_paid': 0,
+                'partial': 1,
+                'in_payment': 2,
+                'paid': 3,
+                'reversed': 4,
+                'invoicing_legacy': 5,
+            }
+            invoices = invoices.sorted(
+                key=lambda m: (
+                    rank.get(m.payment_state, 9),
+                    -(m.invoice_date.toordinal() if m.invoice_date else 0),
+                    -m.id,
+                ),
+            )
+
+            unpaid = invoices.filtered(
+                lambda m: m.payment_state in ('not_paid', 'partial', 'in_payment')
+            )
+            # Residual: invoices positive, credit notes reduce owed display carefully.
+            unpaid_amount = 0.0
+            for inv in unpaid:
+                residual = abs(inv.amount_residual)
+                if inv.move_type == 'out_refund':
+                    unpaid_amount -= residual
+                else:
+                    unpaid_amount += residual
+
+            rec.shop_outstanding_balance = shop_sudo.credit or 0.0
+            rec.shop_credit_limit = (
+                shop_sudo.credit_limit
+                if shop_sudo.use_partner_credit_limit
+                else 0.0
+            )
+            rec.shop_invoice_ids = invoices
+            rec.shop_invoice_count = len(invoices)
+            rec.shop_unpaid_invoice_count = len(unpaid)
+            rec.shop_unpaid_invoice_amount = unpaid_amount
+
+            if not invoices:
+                rec.shop_invoices_html = (
+                    '<p class="text-muted mb-0">No posted invoices for this shop yet.</p>'
+                )
+                continue
+
+            rows = []
+            for inv in invoices:
+                state = inv.payment_state or ''
+                label = payment_labels.get(state, state or '—')
+                badge = {
+                    'not_paid': '#dc3545',
+                    'partial': '#fd7e14',
+                    'in_payment': '#0d6efd',
+                    'paid': '#198754',
+                    'reversed': '#6c757d',
+                }.get(state, '#6c757d')
+                inv_date = inv.invoice_date.isoformat() if inv.invoice_date else '—'
+                due = inv.invoice_date_due.isoformat() if inv.invoice_date_due else '—'
+                rows.append(
+                    '<tr>'
+                    f'<td>{inv.name or "—"}</td>'
+                    f'<td>{type_labels.get(inv.move_type, inv.move_type)}</td>'
+                    f'<td>{inv_date}</td>'
+                    f'<td>{due}</td>'
+                    f'<td style="text-align:right;">{inv.amount_total:,.2f}</td>'
+                    f'<td style="text-align:right;">{inv.amount_residual:,.2f}</td>'
+                    f'<td><span style="background:{badge};color:#fff;padding:2px 8px;'
+                    f'border-radius:4px;font-size:12px;">{label}</span></td>'
+                    '</tr>'
+                )
+            rec.shop_invoices_html = (
+                '<div class="table-responsive">'
+                '<table class="table table-sm table-striped mb-0">'
+                '<thead><tr>'
+                '<th>Number</th><th>Type</th><th>Date</th><th>Due</th>'
+                '<th style="text-align:right;">Total</th>'
+                '<th style="text-align:right;">Remaining</th>'
+                '<th>Payment</th>'
+                '</tr></thead>'
+                f'<tbody>{"".join(rows)}</tbody></table></div>'
+            )
 
     @api.depends('state', 'line_ids.qty_picked', 'line_ids.qty_delivered')
     def _compute_delivery_progress(self):
@@ -391,7 +569,7 @@ class ShahtajDmDelivery(models.Model):
             and not user._is_public()
         )
         if planning_vals and is_distributor:
-            locked = self.filtered('_shahtaj_is_processing_locked')
+            locked = self.filtered(lambda rec: rec._shahtaj_is_processing_locked())
             if locked:
                 raise UserError(_(
                     'Cannot change delivery planning for %(names)s — '
@@ -941,8 +1119,12 @@ class ShahtajDmDelivery(models.Model):
             raise UserError(_('No warehouse found.'))
         return warehouse
 
-    def _ensure_van_location(self):
-        dm = self.delivery_man_id
+    @api.model
+    def _ensure_van_location_for_dm(self, dm):
+        """Create/find the transit van location for a delivery man (no job required)."""
+        dm.ensure_one()
+        if not dm.shahtaj_is_delivery_man:
+            raise UserError(_('%(user)s is not a delivery man.', user=dm.display_name))
         company = self.env.company
         acc_info = company._shahtaj_ensure_dm_accounting()
         van_stock_acc = acc_info.get('van_stock_acc')
@@ -984,6 +1166,101 @@ class ShahtajDmDelivery(models.Model):
         if van_stock_acc and hasattr(Location, 'valuation_account_id'):
             child_vals['valuation_account_id'] = van_stock_acc.id
         return Location.create(child_vals)
+
+    def _ensure_van_location(self):
+        self.ensure_one()
+        return self._ensure_van_location_for_dm(self.delivery_man_id)
+
+    @api.model
+    def _shahtaj_free_wh_van_transfer(self, dm, qty_by_product, direction):
+        """Free WH ↔ van internal transfer (does not update delivery job lines).
+
+        :param dm: res.users delivery man
+        :param qty_by_product: {product_id: qty}
+        :param direction: 'to_van' (WH→van) or 'to_wh' (van→WH)
+        """
+        dm.ensure_one()
+        user = self.env.user
+        if not dm.shahtaj_is_delivery_man:
+            raise UserError(_('%(user)s is not a delivery man.', user=dm.display_name))
+        if user.shahtaj_is_delivery_man and user.id != dm.id:
+            if not (
+                user.has_group('shahtaj_oil.group_shahtaj_distributor')
+                or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
+            ):
+                raise AccessError(_('You can only move stock on your own van.'))
+        if direction not in ('to_van', 'to_wh'):
+            raise UserError(_('Invalid transfer direction.'))
+
+        warehouse = self._get_warehouse()
+        picking_type = warehouse.int_type_id
+        if not picking_type:
+            raise UserError(_('No internal transfer type found for the warehouse.'))
+
+        van = self._ensure_van_location_for_dm(dm)
+        wh = warehouse.lot_stock_id
+        if direction == 'to_van':
+            location_id, location_dest_id = wh, van
+            origin = f'DM Free Load: {dm.name}'
+        else:
+            location_id, location_dest_id = van, wh
+            origin = f'DM Free Return: {dm.name}'
+
+        Product = self.env['product.product'].sudo()
+        move_vals_list = []
+        for product_id, qty in qty_by_product.items():
+            qty = float(qty or 0.0)
+            if qty <= 0:
+                continue
+            product = Product.browse(product_id)
+            if not product.exists():
+                continue
+            move_vals_list.append({
+                'product_id': product.id,
+                'product_uom_qty': qty,
+                'product_uom': product.uom_id.id,
+                'location_id': location_id.id,
+                'location_dest_id': location_dest_id.id,
+            })
+        if not move_vals_list:
+            raise UserError(_('Set a quantity on at least one product.'))
+
+        # Validate stock availability before moving
+        Quant = self.env['stock.quant'].sudo()
+        for move in move_vals_list:
+            quants = Quant.search([
+                ('product_id', '=', move['product_id']),
+                ('location_id', '=', move['location_id']),
+            ])
+            if direction == 'to_wh':
+                available = sum(quants.mapped('quantity'))
+            else:
+                available = sum(quants.mapped('available_quantity'))
+            if available + 1e-6 < move['product_uom_qty']:
+                product = Product.browse(move['product_id'])
+                place = _('van') if direction == 'to_wh' else _('warehouse')
+                raise UserError(_(
+                    'Not enough stock of %(product)s on the %(place)s '
+                    '(need %(need)s, available %(avail)s).',
+                    product=product.display_name,
+                    place=place,
+                    need=move['product_uom_qty'],
+                    avail=available,
+                ))
+
+        picking = self._create_stock_picking(
+            picking_type=picking_type,
+            location_id=location_id,
+            location_dest_id=location_dest_id,
+            origin=origin,
+            move_vals_list=move_vals_list,
+        )
+        picking.action_confirm()
+        picking.action_assign()
+        for move in picking.move_ids:
+            move.quantity = move.product_uom_qty
+        picking.with_context(skip_backorder=True, skip_sms=True).button_validate()
+        return picking
 
     def _retarget_sale_outgoing_to_van(self, van_location):
         """Point open SO outgoing moves at the van so deliver uses van stock."""
@@ -1136,12 +1413,17 @@ class ShahtajDmDelivery(models.Model):
 
         self._retarget_sale_outgoing_to_van(van_location)
         today = fields.Date.context_today(self)
-        self.write({
+        now = fields.Datetime.now()
+        pick_vals = {
             'state': 'partial' if any(l.qty_delivered > 0 for l in self.line_ids) else 'picked',
             'pick_picking_id': picking.id,
             'van_location_id': van_location.id,
             'scheduled_date': self.scheduled_date or today,
-        })
+        }
+        # Keep the first load timestamp; later top-ups do not overwrite.
+        if not self.picked_at:
+            pick_vals['picked_at'] = now
+        self.write(pick_vals)
         self._ensure_visit_task()
         if not reload_form:
             return True
@@ -1220,7 +1502,7 @@ class ShahtajDmDelivery(models.Model):
             raise UserError(_('No stock on the van for this shop. Pick stock first.'))
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Deliver to Shop'),
+            'name': _('Deliver to Shop Procedure'),
             'res_model': 'shahtaj.dm.deliver.wizard',
             'view_mode': 'form',
             'target': 'new',
@@ -1306,6 +1588,7 @@ class ShahtajDmDelivery(models.Model):
             line.qty_to_pick = max(line.qty_assigned - line.qty_picked, 0.0)
 
         new_state = self._compute_dm_state()
+        now = fields.Datetime.now()
         vals = {
             'state': new_state,
             'delivery_picking_id': picking.id,
@@ -1313,6 +1596,7 @@ class ShahtajDmDelivery(models.Model):
             'check_in_longitude': longitude or 0.0,
             'check_in_distance_m': distance_m or 0.0,
             'gps_verified': True,
+            'delivered_at': now,
         }
         if new_state == 'delivered':
             vals['field_state'] = 'done'
@@ -1326,9 +1610,10 @@ class ShahtajDmDelivery(models.Model):
             self._ensure_visit_task()
         if reload_form:
             return self._reload_form(
-                title=_('Delivered'),
+                title=_('Deliver to Shop — done'),
                 message=_(
-                    'Stock delivered to %(shop)s from the van.',
+                    'GPS verified (%(dist).0f m). Stock delivered to %(shop)s from the van.',
+                    dist=distance_m or 0.0,
                     shop=self.partner_id.display_name,
                 ),
             )
@@ -1415,8 +1700,8 @@ class ShahtajDmDelivery(models.Model):
                 'state': 'completed',
                 'outcome': 'order',
                 'sale_order_id': rec.sale_order_id.id,
-                'started_at': fields.Datetime.now(),
-                'ended_at': fields.Datetime.now(),
+                'started_at': rec.picked_at or rec.delivered_at or fields.Datetime.now(),
+                'ended_at': rec.delivered_at or fields.Datetime.now(),
             }
             if visit:
                 visit.with_context(shahtaj_system_visit_write=True).write(vals)
@@ -1433,6 +1718,56 @@ class ShahtajDmDelivery(models.Model):
             'res_id': self.sale_order_id.id,
             'view_mode': 'form',
             'target': 'current',
+        }
+
+    def action_view_shop_invoices(self):
+        """Open all posted shop invoices (unpaid / partial / paid) for field sharing."""
+        self.ensure_one()
+        if not self.partner_id:
+            raise UserError(_('No shop linked to this delivery.'))
+        commercial = self.partner_id.commercial_partner_id
+        company = self.sale_order_id.company_id or self.env.company
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Shop Invoices — %s', self.partner_id.display_name),
+            'res_model': 'account.move',
+            'view_mode': 'list,form',
+            'views': [
+                (self.env.ref('shahtaj_oil.view_shahtaj_dm_shop_invoice_list').id, 'list'),
+                (False, 'form'),
+            ],
+            'search_view_id': self.env.ref('shahtaj_oil.view_shahtaj_dm_shop_invoice_search').id,
+            'domain': [
+                ('move_type', 'in', ('out_invoice', 'out_refund')),
+                ('state', '=', 'posted'),
+                ('partner_id', 'child_of', commercial.id),
+                ('company_id', '=', company.id),
+            ],
+            'context': {
+                'create': False,
+                'edit': False,
+                'delete': False,
+            },
+            'target': 'current',
+        }
+
+    def action_collect_shop_payment(self):
+        """Open recovery wizard for this stop's shop → DM wallet."""
+        self.ensure_one()
+        if not self.partner_id:
+            raise UserError(_('No shop linked to this delivery.'))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Collect Payment — %s', self.partner_id.display_name),
+            'res_model': 'shahtaj.dm.collect.payment',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_delivery_id': self.id,
+                'default_partner_id': self.partner_id.id,
+                'default_delivery_man_id': self.delivery_man_id.id,
+                'lock_delivery_man': True,
+            },
         }
 
     def action_print_invoice(self):
@@ -1457,8 +1792,8 @@ class ShahtajDmDelivery(models.Model):
             'context': {
                 # Do NOT set search_default_internal_loc — vans are transit locations
                 # and that filter would hide every row.
+                # Do NOT use inventory_report_mode — that shows counted qty, not on-hand.
                 'default_location_id': van_location.id,
-                'inventory_report_mode': True,
             },
         }
 

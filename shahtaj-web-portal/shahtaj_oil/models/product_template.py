@@ -346,7 +346,8 @@ class ProductTemplate(models.Model):
         vals.setdefault('purchase_ok', True)
         vals.setdefault('is_storable', True)
         vals.setdefault('tracking', 'none')
-        vals.setdefault('invoice_policy', 'order')
+        # DM flow invoices confirmed orders before physical delivery — always ordered qty.
+        vals['invoice_policy'] = 'order'
         vals.setdefault('purchase_method', 'receive')
         sale_uom = vals.get('shahtaj_sale_uom', 'piece')
         vals.setdefault('shahtaj_sale_uom', sale_uom)
@@ -427,6 +428,9 @@ class ProductTemplate(models.Model):
                     uom = self._shahtaj_uom_for_sale_uom(vals['shahtaj_sale_uom'])
                     if uom:
                         vals['uom_id'] = uom.id
+        # Enforce ordered-qty invoicing on every product create (portal / native / import).
+        for vals in vals_list:
+            vals['invoice_policy'] = 'order'
         products = super().create(vals_list)
         products._sync_shahtaj_supplierinfo()
         # Portal create passes opening qty in context so stock is set in the same

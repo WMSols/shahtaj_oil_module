@@ -54,6 +54,15 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
         digits=(10, 7),
     )
     owner_cnic_number = fields.Char(string='Owner ID Card Number')
+    shop_category = fields.Selection(
+        related='visit_task_id.shop_id.shahtaj_shop_category',
+        readonly=True,
+        string='Shop Category',
+    )
+    cnic_required = fields.Boolean(
+        string='CNIC Required',
+        compute='_compute_cnic_required',
+    )
     shop_license_number = fields.Char(string='License Number')
     shop_exterior_photo = fields.Image(
         string='Shop Exterior Photo',
@@ -86,6 +95,18 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
             shop = wiz.shop_id
             wiz.needs_shop_setup = bool(
                 shop and shop.is_shahtaj_shop and not shop.shahtaj_field_verified
+            )
+
+    @api.depends('needs_shop_setup', 'shop_category', 'shop_id.owner_cnic_number')
+    def _compute_cnic_required(self):
+        Partner = self.env['res.partner']
+        for wiz in self:
+            wiz.cnic_required = bool(
+                wiz.needs_shop_setup
+                and Partner._shahtaj_cnic_required_for_category(wiz.shop_category)
+                and not Partner._shahtaj_normalize_cnic(
+                    wiz.shop_id.owner_cnic_number if wiz.shop_id else ''
+                )
             )
 
     @api.depends(
@@ -138,16 +159,23 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
                     'Shop exterior photo is required for first-visit verification.'
                 ))
             cnic = (self.owner_cnic_number or '').strip()
-            if not cnic:
+            category = shop.shahtaj_shop_category or 'credit'
+            if (
+                shop._shahtaj_cnic_required_for_category(category)
+                and not cnic
+                and not (shop.owner_cnic_number or '').strip()
+            ):
                 raise UserError(_(
-                    'Owner ID card number is required for first-visit verification.'
+                    'Owner ID card number is required for first-visit verification '
+                    'of credit shops.'
                 ))
             verify_vals = {
                 'latitude': self.booker_latitude,
                 'longitude': self.booker_longitude,
                 'shop_exterior_photo': self.shop_exterior_photo,
-                'owner_cnic_number': cnic,
             }
+            if cnic:
+                verify_vals['owner_cnic_number'] = cnic
             if self.owner_photo:
                 verify_vals['owner_photo'] = self.owner_photo
             if self.owner_cnic_front:

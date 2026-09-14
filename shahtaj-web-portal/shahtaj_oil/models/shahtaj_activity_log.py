@@ -12,6 +12,19 @@ RETENTION_DAYS = 2
 # Known operation codes for filters / HTML meta (even before any rows exist).
 KNOWN_OPERATIONS = (
     'auth.login',
+    'dm.auth.login',
+    'dm.free_deliver',
+    'dm.job.deliver',
+    'dm.job.failed',
+    'dm.job.notes',
+    'dm.job.pick',
+    'dm.job.return',
+    'dm.job.shop_closed',
+    'dm.load.pick',
+    'dm.session.depart',
+    'dm.session.end',
+    'dm.van.load',
+    'dm.van.return',
     'expense.cancel',
     'expense.create',
     'expense.delete',
@@ -103,6 +116,8 @@ class ShahtajActivityLog(models.Model):
         [
             ('order_booker_api', 'Order Booker API'),
             ('order_booker_ui', 'Order Booker UI'),
+            ('delivery_man_api', 'Delivery Man API'),
+            ('delivery_man_ui', 'Delivery Man UI'),
             ('distributor_ui', 'Distributor UI'),
             ('admin_ui', 'Admin UI'),
             ('system', 'System'),
@@ -146,6 +161,7 @@ class ShahtajActivityLog(models.Model):
             ('admin', 'Admin'),
             ('distributor', 'Distributor'),
             ('order_booker', 'Order Booker'),
+            ('delivery_man', 'Delivery Man'),
             ('system', 'System'),
             ('other', 'Other User'),
         ],
@@ -184,6 +200,8 @@ class ShahtajActivityLog(models.Model):
                 return 'admin'
             if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
                 return 'distributor'
+            if user.has_group('shahtaj_oil.group_shahtaj_delivery_man'):
+                return 'delivery_man'
             if user.has_group('shahtaj_oil.group_shahtaj_order_booker'):
                 return 'order_booker'
         except Exception:
@@ -213,6 +231,8 @@ class ShahtajActivityLog(models.Model):
         try:
             meta = self._get_request_meta()
             path = meta.get('request_path') or ''
+            if '/api/shahtaj/v1/dm/' in path:
+                return 'delivery_man_api'
             if '/api/shahtaj/' in path:
                 return 'order_booker_api'
             user = self.env.user
@@ -222,6 +242,8 @@ class ShahtajActivityLog(models.Model):
                 return 'admin_ui'
             if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
                 return 'distributor_ui'
+            if user.has_group('shahtaj_oil.group_shahtaj_delivery_man'):
+                return 'delivery_man_ui'
             if user.has_group('shahtaj_oil.group_shahtaj_order_booker'):
                 return 'order_booker_ui'
         except Exception:
@@ -361,7 +383,7 @@ class ShahtajActivityLog(models.Model):
         """Log distributor/native UI actions; skip when order-booker API logs separately."""
         try:
             source = self._detect_source()
-            if skip_api and source == 'order_booker_api':
+            if skip_api and source in ('order_booker_api', 'delivery_man_api'):
                 return self.browse()
             return self.log_event(
                 name=name,

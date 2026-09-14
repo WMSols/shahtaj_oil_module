@@ -43,7 +43,7 @@
     },
     {
       path: '/api/shahtaj/v1/shops/verify-on-site',
-      purpose: 'First-visit: GPS + exterior + CNIC# → verify + start visit',
+      purpose: 'First-visit: GPS + exterior (+ CNIC for credit) → verify + start visit',
       auth: true,
       params: [
         { name: 'shop_id', required: true, type: 'int' },
@@ -51,7 +51,7 @@
         { name: 'latitude', required: true, type: 'float' },
         { name: 'longitude', required: true, type: 'float' },
         { name: 'shop_exterior_photo', required: true, type: 'base64', note: 'Booker-only; captured with GPS' },
-        { name: 'owner_cnic_number', required: true, type: 'string', note: 'Required unless already on shop' },
+        { name: 'owner_cnic_number', required: true, type: 'string', note: 'Required for credit shops unless already on shop; optional for cash' },
         { name: 'shop_license_number', required: false, type: 'string', note: 'Optional; alias license_number' },
         { name: 'owner_photo', required: false, type: 'base64' },
         { name: 'owner_cnic_front', required: false, type: 'base64' },
@@ -192,13 +192,13 @@
     },
     {
       path: '/api/shahtaj/v1/shops/register',
-      purpose: 'Register shop on-site (GPS + exterior + CNIC# → Visited)',
+      purpose: 'Register shop on-site (GPS + exterior; CNIC required for credit)',
       auth: true,
       params: [
         { name: 'name', required: true, type: 'string' },
         { name: 'owner_name', required: true, type: 'string' },
         { name: 'owner_phone', required: true, type: 'string' },
-        { name: 'owner_cnic_number', required: true, type: 'string' },
+        { name: 'owner_cnic_number', required: false, type: 'string', note: 'Required for credit shops; optional for cash' },
         { name: 'shop_license_number', required: false, type: 'string', note: 'Optional; alias license_number' },
         { name: 'latitude', required: true, type: 'float', note: 'On-site GPS → field-verified (Visited)' },
         { name: 'longitude', required: true, type: 'float' },
@@ -207,7 +207,7 @@
         { name: 'route_id', required: false, type: 'int' },
         { name: 'credit_limit', required: false, type: 'float' },
         { name: 'legacy_balance', required: false, type: 'float' },
-        { name: 'shop_category', required: false, type: 'string', note: 'credit|cash — accepted on register (defaults to credit). Returned on all shop payloads with credit_limit, outstanding_balance, credit_remaining.' },
+        { name: 'shop_category', required: false, type: 'string', note: 'credit|cash — accepted on register (defaults to credit). CNIC required only for credit. Returned on all shop payloads with credit_limit, outstanding_balance, credit_remaining.' },
         { name: 'owner_cnic_front', required: false, type: 'base64' },
         { name: 'owner_cnic_back', required: false, type: 'base64' },
         { name: 'owner_photo', required: false, type: 'base64' },
@@ -585,9 +585,17 @@
       : 'Shop GPS: (empty — needs first-visit capture)';
     gpsBox.innerHTML = `${gpsLine} · approval: ${shop.approval_state}`
       + ` · visit tag: <b>${tag}</b>`
+      + ` · category: <b>${shop.shop_category || 'credit'}</b>`
       + (shop.needs_shop_setup
         ? ' <span class="warn">→ first-visit setup required</span>'
         : '');
+    const verifyCnicLbl = $('lbl-verify-cnic');
+    if (verifyCnicLbl) {
+      const cashShop = (shop.shop_category || 'credit') === 'cash';
+      verifyCnicLbl.firstChild.textContent = cashShop
+        ? 'Owner CNIC number (optional for cash) '
+        : 'Owner CNIC number (required for credit) ';
+    }
     const hasVisit = !!state.selectedTask.visit_id;
     $('btn-checkin').classList.toggle('hidden', hasVisit);
     $('btn-continue-visit').classList.toggle('hidden', !hasVisit);
@@ -657,15 +665,20 @@
       alert('Enter latitude/longitude first (device GPS or typed).');
       return;
     }
+    const cnic = ($('inp-verify-cnic') && $('inp-verify-cnic').value.trim()) || '';
+    const isCash = (shop.shop_category || 'credit') === 'cash';
+    if (!cnic && !isCash) {
+      alert('Owner CNIC number is required for credit shops.');
+      return;
+    }
     const body = {
       shop_id: shop.shop_id || shop.id,
       task_id: state.selectedTask.id,
       latitude: lat,
       longitude: lng,
       shop_exterior_photo: TINY_PNG_B64,
-      owner_cnic_number: ($('inp-verify-cnic') && $('inp-verify-cnic').value.trim())
-        || '35202-1234567-1',
     };
+    if (cnic) body.owner_cnic_number = cnic;
     const verifyLicense = $('inp-verify-license') && $('inp-verify-license').value.trim();
     if (verifyLicense) {
       body.shop_license_number = verifyLicense;
@@ -1072,20 +1085,35 @@
     });
   });
 
+  function syncRegCnicLabel() {
+    const cat = $('reg-shop-category') && $('reg-shop-category').value;
+    const lbl = $('lbl-reg-cnic');
+    if (!lbl) return;
+    lbl.firstChild.textContent = cat === 'cash'
+      ? 'Owner ID card no. (optional for cash) '
+      : 'Owner ID card no. (required for credit) ';
+  }
+  if ($('reg-shop-category')) {
+    $('reg-shop-category').addEventListener('change', syncRegCnicLabel);
+    syncRegCnicLabel();
+  }
+
   $('btn-register-shop').onclick = async () => {
+    const shopCategory = ($('reg-shop-category') && $('reg-shop-category').value) || 'credit';
     const ownerCnicNumber = $('reg-owner-cnic-number').value.trim();
-    if (!ownerCnicNumber) {
-      alert('Owner CNIC number is required for on-site register.');
+    if (!ownerCnicNumber && shopCategory !== 'cash') {
+      alert('Owner CNIC number is required for credit shops.');
       return;
     }
     const body = {
       name: $('reg-name').value.trim(),
       owner_name: $('reg-owner').value.trim(),
       owner_phone: $('reg-phone').value.trim(),
-      owner_cnic_number: ownerCnicNumber,
       latitude: parseFloat($('reg-lat').value),
       longitude: parseFloat($('reg-lng').value),
+      shop_category: shopCategory,
     };
+    if (ownerCnicNumber) body.owner_cnic_number = ownerCnicNumber;
     const credit = $('reg-credit').value;
     const legacy = $('reg-legacy').value;
     const zone = $('reg-zone').value;
@@ -1111,7 +1139,7 @@
     }
     try {
       await api('/api/shahtaj/v1/shops/register', body);
-      alert('Shop submitted for approval (Visited if GPS + exterior + CNIC sent).');
+      alert('Shop submitted for approval (Visited if GPS + exterior sent; CNIC required for credit).');
       await loadMyShops();
     } catch (e) {
       alert(e.message);

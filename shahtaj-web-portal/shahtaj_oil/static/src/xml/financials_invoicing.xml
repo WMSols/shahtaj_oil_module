@@ -186,7 +186,9 @@
                                     <button class="btn btn-sm btn-dark fw-bold text-white" t-on-click="() => this.openCashActivity('all')">Cash Activity</button>
                                     <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="openCreditNotesFromMoney">Credit Notes</button>
                                     <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.requestTabSwitch('financials', 'credit')">Credit Risk</button>
+                                    <!-- Hidden for now; uncomment to restore
                                     <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.requestTabSwitch('financials', 'pnl')">Profit &amp; Loss</button>
+                                    -->
                                 </div>
                                 <p class="small text-muted mt-3 mb-0">
                                     Flow: Sold (invoices) → Collected (cash in) → Still with shops → Paid back (cash out).
@@ -1743,7 +1745,7 @@
                                     <select class="form-select" t-model="this.state.purchaseOrderForm.partner_id" t-on-change="() => this.onPoVendorChange()">
                                         <option value="">-- Select Vendor --</option>
                                         <t t-foreach="this.state.poLookups.vendors" t-as="vendor" t-key="vendor.id">
-                                            <option t-att-value="vendor.id"><t t-esc="vendor.name"/></option>
+                                            <option t-att-value="vendor.id" t-att-selected="vendor.id == this.state.purchaseOrderForm.partner_id"><t t-esc="vendor.name"/></option>
                                         </t>
                                     </select>
                                     <t t-if="this.poSelectedVendorId">
@@ -1807,18 +1809,18 @@
                                                         <t t-if="!this.poSelectedVendorId">
                                                             <option value="">-- Select a Vendor above first --</option>
                                                             <t t-foreach="this.state.products" t-as="product" t-key="product.id">
-                                                                <option t-att-value="product.id"><t t-esc="product.name"/></option>
+                                                                <option t-att-value="product.id" t-att-selected="product.id == line.product_id"><t t-esc="product.name"/></option>
                                                             </t>
                                                         </t>
                                                         <t t-elif="this.poAssociatedProducts.length &gt; 0">
                                                             <option value="">-- Select Associated Product (<t t-esc="this.poAssociatedProducts.length"/> available) --</option>
                                                             <t t-foreach="this.poAssociatedProducts" t-as="product" t-key="product.id">
-                                                                <option t-att-value="product.id"><t t-esc="product.name"/></option>
+                                                                <option t-att-value="product.id" t-att-selected="product.id == line.product_id"><t t-esc="product.name"/></option>
                                                             </t>
                                                             <t t-if="this.poOtherProducts.length &gt; 0">
                                                                 <optgroup label="Other Catalog Products">
                                                                     <t t-foreach="this.poOtherProducts" t-as="product" t-key="product.id">
-                                                                        <option t-att-value="product.id"><t t-esc="product.name"/></option>
+                                                                        <option t-att-value="product.id" t-att-selected="product.id == line.product_id"><t t-esc="product.name"/></option>
                                                                     </t>
                                                                 </optgroup>
                                                             </t>
@@ -1827,7 +1829,7 @@
                                                             <option value="">-- Select Product (None linked yet) --</option>
                                                             <optgroup label="All Catalog Products">
                                                                 <t t-foreach="this.state.products" t-as="product" t-key="product.id">
-                                                                    <option t-att-value="product.id"><t t-esc="product.name"/></option>
+                                                                    <option t-att-value="product.id" t-att-selected="product.id == line.product_id"><t t-esc="product.name"/></option>
                                                                 </t>
                                                             </optgroup>
                                                         </t>

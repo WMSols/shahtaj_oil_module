@@ -68,7 +68,9 @@
         <code>needs_shop_setup: true</code>.
         <br/><br/>
         <b>Required on verify:</b> GPS (captured with exterior photo) +
-        <code>shop_exterior_photo</code> + <code>owner_cnic_number</code>.
+        <code>shop_exterior_photo</code>.
+        <code>owner_cnic_number</code> is required for <b>credit</b> shops,
+        optional for <b>cash</b>.
         <br/>
         <b>Optional:</b> owner photo, CNIC images, owner name/phone, shop_category,
         <code>legacy_balance</code> if empty — same <code>missing_fields</code> list with
@@ -84,7 +86,7 @@
         <div class="grid-2">
           <label>Your latitude<input id="inp-lat" type="number" step="any"/></label>
           <label>Your longitude<input id="inp-lng" type="number" step="any"/></label>
-          <label>Owner CNIC number (required on verify)
+          <label id="lbl-verify-cnic">Owner CNIC number (required for credit)
             <input id="inp-verify-cnic" type="text" placeholder="e.g. 35202-1234567-1" value="35202-1234567-1"/>
           </label>
           <label>License number (optional)
@@ -109,7 +111,8 @@
         </div>
         <p class="endpoint-tag">
           check-in → if needs_shop_setup → shops/verify-on-site
-          (required: task_id, shop_id, lat/lng, shop_exterior_photo, owner_cnic_number;
+          (required: task_id, shop_id, lat/lng, shop_exterior_photo;
+          CNIC required for credit shops only;
           optional: shop_license_number, owner_photo, CNIC images, owner_name, owner_phone, shop_category)
         </p>
       </div>
@@ -214,7 +217,8 @@
       </div>
       <div class="alert alert-warn">
         <strong>Field verification:</strong>
-        Booker <code>shops/register</code> requires <b>GPS + exterior photo + CNIC number</b>
+        Booker <code>shops/register</code> requires <b>GPS + exterior photo</b>
+        (and <b>CNIC number</b> for credit shops; optional for cash)
         and marks the shop <b>Visited</b> immediately.
         Distributor-created shops can omit GPS and stay <b>Not Visited</b> until
         <code>shops/verify-on-site</code> (or native booker check-in verify).
@@ -225,11 +229,17 @@
           <label>Shop name<input id="reg-name" type="text"/></label>
           <label>Owner name<input id="reg-owner" type="text"/></label>
           <label>Owner phone<input id="reg-phone" type="text"/></label>
-          <label>Owner ID card no. (required)
+          <label id="lbl-reg-cnic">Owner ID card no. (required for credit)
             <input id="reg-owner-cnic-number" type="text" placeholder="e.g. 35202-1234567-1" value="35202-1234567-1"/>
           </label>
           <label>License number (optional)
             <input id="reg-shop-license" type="text" placeholder="e.g. TRADE-12345"/>
+          </label>
+          <label>Shop category
+            <select id="reg-shop-category">
+              <option value="credit" selected>Credit</option>
+              <option value="cash">Cash</option>
+            </select>
           </label>
           <label>Credit limit (Rs)<input id="reg-credit" type="number" step="any"/></label>
           <label>Legacy balance (Rs)<input id="reg-legacy" type="number" step="any"/></label>
@@ -280,6 +290,6 @@
     </section>
   </div>
 
-  <script src="./app.js?v=13"></script>
+  <script src="./app.js?v=15"></script>
 </body>
 </html>

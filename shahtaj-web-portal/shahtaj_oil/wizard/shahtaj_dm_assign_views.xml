@@ -28,7 +28,6 @@
                     <list>
                         <field name="delivery_man_id"/>
                         <field name="scheduled_date"/>
-                        <field name="scheduled_time" widget="float_time"/>
                         <field name="qty_assigned_total" sum="Assigned"/>
                         <field name="existing_job_id" optional="hide"/>
                     </list>
@@ -36,7 +35,6 @@
                         <group>
                             <field name="delivery_man_id"/>
                             <field name="scheduled_date"/>
-                            <field name="scheduled_time" widget="float_time"/>
                             <field name="existing_job_id" readonly="1"
                                    invisible="not existing_job_id"/>
                         </group>

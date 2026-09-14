@@ -197,7 +197,9 @@
                         <group string="Owner">
                             <field name="owner_name" placeholder="Optional"/>
                             <field name="owner_phone" widget="phone" placeholder="Optional"/>
-                            <field name="owner_cnic_number" placeholder="Optional"/>
+                            <field name="owner_cnic_number"
+                                   required="shahtaj_shop_category == 'credit'"
+                                   placeholder="Required for credit shops"/>
                             <field name="shop_license_number" placeholder="Optional"/>
                         </group>
                         <group string="Registration">
@@ -386,11 +388,15 @@
                                    placeholder="03xx xxxxxxx"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                             <field name="owner_cnic_number"
-                                   required="1"
-                                   placeholder="Required for on-site register"
+                                   required="shahtaj_shop_category == 'credit'"
+                                   placeholder="Required for credit shops"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                             <field name="shop_license_number"
                                    placeholder="Optional"
+                                   readonly="shop_approval_state in ('approved', 'rejected')"/>
+                            <field name="shahtaj_shop_category" widget="radio"
+                                   options="{'horizontal': true}"
+                                   required="1"
                                    readonly="shop_approval_state in ('approved', 'rejected')"/>
                         </group>
                         <group string="Routes (read-only)"
@@ -421,8 +427,9 @@
                         </group>
                         <group>
                             <div class="alert alert-info" role="alert">
-                                On-site register requires GPS, exterior photo, and CNIC number.
-                                The shop is marked <b>Visited</b> immediately.
+                                On-site register requires GPS and exterior photo.
+                                Owner CNIC is required for <b>credit</b> shops only
+                                (optional for cash). The shop is marked <b>Visited</b> immediately.
                             </div>
                         </group>
                     </group>
@@ -430,7 +437,8 @@
                            invisible="shop_approval_state in ('approved', 'rejected')">
                         <group>
                             <field name="credit_limit" string="Credit Limit (Rs)"
-                                   placeholder="Optional"/>
+                                   placeholder="Optional"
+                                   invisible="shahtaj_shop_category != 'credit'"/>
                             <field name="legacy_balance" string="Legacy Balance (Rs)"
                                    placeholder="Optional"/>
                         </group>

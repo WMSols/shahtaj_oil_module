@@ -59,6 +59,28 @@ class AccountPayment(models.Model):
         copy=False,
         tracking=True,
     )
+    shahtaj_is_dm_wallet_collection = fields.Boolean(
+        string='DM Wallet Collection',
+        default=False,
+        copy=False,
+        index=True,
+        help='Cash collected by a delivery man into the DM wallet (DMCASH).',
+    )
+    shahtaj_collected_by_dm_id = fields.Many2one(
+        'res.users',
+        string='Collected By (DM)',
+        copy=False,
+        index=True,
+        ondelete='set null',
+        domain="[('shahtaj_is_delivery_man', '=', True)]",
+    )
+    shahtaj_dm_delivery_id = fields.Many2one(
+        'shahtaj.dm.delivery',
+        string='Delivery Job',
+        copy=False,
+        index=True,
+        ondelete='set null',
+    )
 
     @api.onchange('journal_id')
     def _onchange_shahtaj_journal_payment_details(self):

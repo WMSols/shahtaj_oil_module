@@ -399,6 +399,10 @@
                                 <span t-attf-class="badge #{this.state.selectedShopDetails.shop_approval_state === 'approved' ? 'bg-success text-white' : (this.state.selectedShopDetails.shop_approval_state === 'rejected' ? 'bg-danger text-white' : 'bg-warning text-dark')}">
                                     <t t-esc="(this.state.selectedShopDetails.shop_approval_state || '').toUpperCase()"/>
                                 </span>
+                                <span t-attf-class="badge #{this.state.selectedShopDetails.shahtaj_field_verified ? 'bg-success text-white' : 'bg-warning text-dark'}"
+                                      t-att-title="this.state.selectedShopDetails.shahtaj_field_verified ? 'On-site GPS and exterior photo verified' : 'Waiting for order booker on-site verification'">
+                                    <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified ? 'On-site Verified' : 'Not Verified'"/>
+                                </span>
                             </h4>
                             <small class="text-muted">
                             Shop ID: <strong>
@@ -554,6 +558,46 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
+                            <div class="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                                <strong class="text-dark small text-uppercase mb-0">On-site Verification</strong>
+                                <span t-attf-class="badge #{this.state.selectedShopDetails.shahtaj_field_verified ? 'bg-success text-white' : 'bg-warning text-dark'}">
+                                    <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified ? 'Verified' : 'Not Verified'"/>
+                                </span>
+                            </div>
+                            <div class="p-3">
+                                <t t-if="this.state.selectedShopDetails.shahtaj_field_verified">
+                                    <div class="small text-muted mb-1">Verified at</div>
+                                    <div class="fw-bold text-dark mb-2">
+                                        <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified_at || '—'"/>
+                                    </div>
+                                    <div class="small text-muted mb-1">Verified by</div>
+                                    <div class="fw-bold text-dark mb-3">
+                                        <t t-if="this.state.selectedShopDetails.shahtaj_field_verified_by_id">
+                                            <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified_by_id[1]"/>
+                                        </t>
+                                        <t t-else="">—</t>
+                                    </div>
+                                    <p class="small text-muted mb-3 mb-md-3">
+                                        Use this if GPS was captured incorrectly or the shop moved.
+                                        Resetting clears coordinates so the booker re-verifies on the next visit.
+                                    </p>
+                                    <button class="btn btn-sm btn-outline-warning fw-bold d-flex align-items-center"
+                                            t-on-click="confirmResetSelectedShopVerification"
+                                            t-att-disabled="this.state.isResettingShopVerification"
+                                            title="Clear GPS and mark shop as not verified">
+                                        <span t-if="this.state.isResettingShopVerification" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        <i t-else="" class="fa fa-map-marker me-1"></i>
+                                        Reset Verification &amp; GPS
+                                    </button>
+                                </t>
+                                <t t-else="">
+                                    <p class="small text-muted mb-0">
+                                        Not verified on site yet. The order booker will capture GPS and an exterior photo on the first visit.
+                                    </p>
+                                </t>
+                            </div>
+                        </div>
                     </div>
 
                     <div>
@@ -603,8 +647,14 @@
                     </h6>
                     <div t-ref="mapContainer" class="w-100 rounded-3 shadow-sm border border-2" style="height: 300px; z-index: 1; position: relative; background-color: #f8f9fa;">
                         <t t-if="!this.state.selectedShopDetails.partner_latitude or !this.state.selectedShopDetails.partner_longitude">
-                            <div class="d-flex h-100 justify-content-center align-items-center text-muted fw-bold">
-                                        No valid GPS coordinates found for this shop. Please edit the shop to add Latitude and Longitude.
+                            <div class="d-flex flex-column h-100 justify-content-center align-items-center text-muted px-4 text-center gap-1">
+                                <strong>No valid GPS coordinates for this shop.</strong>
+                                <small t-if="this.state.selectedShopDetails.shahtaj_field_verified">
+                                    Edit latitude/longitude, or reset verification so the booker can re-capture on site.
+                                </small>
+                                <small t-else="">
+                                    The order booker will set GPS during on-site verification.
+                                </small>
                             </div>
                         </t>
                     </div>
@@ -658,12 +708,24 @@
                     </t>
                     <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'approved'">
                         <small class="text-success fw-bold">This shop is approved and available for schedules and visits.</small>
+                        <small t-if="this.state.selectedShopDetails.shahtaj_field_verified" class="text-muted d-block mt-1">
+                            On-site GPS is locked. Reset verification only if the pin is wrong or the shop relocated.
+                        </small>
                     </t>
                     <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'rejected'">
                         <small class="text-danger fw-bold">This shop was rejected. You can approve it if the application should proceed.</small>
                     </t>
                 </div>
                <div class="d-flex gap-2 flex-wrap justify-content-md-end">
+                    <t t-if="this.state.selectedShopDetails.shahtaj_field_verified">
+                        <button class="btn btn-outline-warning fw-bold d-flex align-items-center"
+                                t-on-click="confirmResetSelectedShopVerification"
+                                t-att-disabled="this.state.isResettingShopVerification"
+                                title="Clear GPS and require on-site re-verification">
+                            <span t-if="this.state.isResettingShopVerification" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Unverify GPS
+                        </button>
+                    </t>
                     <t t-if="this.state.selectedShopDetails.shop_approval_state === 'pending'">
                         <button class="btn btn-outline-danger fw-bold d-flex align-items-center" t-on-click="rejectSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Reject this shop application">
                             <span t-if="this.state.isRejectingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -843,6 +905,12 @@
                                         <li>
                                             <button type="button" class="dropdown-item small py-2" t-on-click="() => this.onShopMenuEdit(shop)">
                                                 Edit
+                                            </button>
+                                        </li>
+                                        <li t-if="shop.shahtaj_visit_tag === 'visited'">
+                                            <button type="button" class="dropdown-item small py-2 text-warning"
+                                                    t-on-click="() => this.onShopMenuResetVerification(shop)">
+                                                Reset Verification &amp; GPS
                                             </button>
                                         </li>
                                         <li><hr class="dropdown-divider my-1"/></li>

@@ -174,19 +174,19 @@
                                     </t>
                                 </select>
                             </div>
-                            <div class="col-md-4 d-flex align-items-end pb-2">
+                            <div class="col-md-4">
+                                <label class="small fw-bold d-block mb-2">Inventory Tracking</label>
                                 <div class="form-check form-switch pt-1" title="Turn this on to actively count physical units in your warehouse">
                                     <input class="form-check-input cursor-pointer" type="checkbox" id="editTrackInv" t-model="this.state.currentProduct.is_storable"/>
                                     <label class="form-check-label small fw-bold cursor-pointer ms-1" for="editTrackInv">Track Inventory</label>
                                 </div>
                             </div>
-
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="small fw-bold text-muted">Cost Price (Rs.)</label>
                                 <input type="text" class="form-control bg-light text-muted" t-att-value="'Rs. ' + ((this.state.currentProduct.standard_price || 0)).toLocaleString()" disabled="1" title="Weighted average cost auto-calculated from purchase orders"/>
                                 <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">Auto-calculated from POs</small>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="small fw-bold text-success">Sales Price (Rs.)</label>
                                 <input type="number" class="form-control border-success" t-model="this.state.currentProduct.list_price" title="Selling price to customers and shops"/>
                             </div>

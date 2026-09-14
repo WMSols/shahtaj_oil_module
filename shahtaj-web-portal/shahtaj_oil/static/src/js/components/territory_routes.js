@@ -28,6 +28,7 @@ export class TerritoryRoutes extends Component {
             selectedShopDetails: null,
             shopCategoryEdit: 'credit',
             shopActionMenuId: null,
+            isResettingShopVerification: false,
 
             editingAreaId: null,
             editingRouteId: null,
@@ -1143,7 +1144,9 @@ export class TerritoryRoutes extends Component {
                 "shahtaj_shop_category", "credit_limit", "legacy_balance", "outstanding_balance",
                 "route_ids", "shahtaj_routes_display", "shahtaj_route_tag", "registered_by_id",
                 "owner_cnic_front", "owner_cnic_back", "owner_photo", "shop_exterior_photo",
-                "shop_approval_state"
+                "shop_approval_state",
+                "shahtaj_field_verified", "shahtaj_field_verified_at", "shahtaj_field_verified_by_id",
+                "shahtaj_visit_tag",
             ]
         );
         if (details.length > 0) {
@@ -1230,6 +1233,57 @@ export class TerritoryRoutes extends Component {
     rejectSelectedShop() {
         if (!this.state.selectedShopDetails) return;
         this.confirmRejectShop(this.state.selectedShopDetails.id);
+    }
+
+    confirmResetShopVerification(shopId, shopName = '') {
+        const label = shopName ? `“${shopName}”` : 'this shop';
+        this.showConfirm(
+            'Reset Verification & GPS',
+            `Reset on-site verification for ${label}? GPS coordinates will be cleared. The order booker must re-verify location and capture an exterior photo on the next visit.`,
+            () => this.resetShopFieldVerification(shopId),
+        );
+    }
+
+    async resetShopFieldVerification(shopId) {
+        this.state.isResettingShopVerification = true;
+        this.closeShopActionMenu();
+        try {
+            await this.orm.call(
+                'res.partner',
+                'action_shahtaj_reset_field_verification',
+                [[shopId]],
+            );
+            await this.fetchDashboardData();
+            if (this.state.selectedShopDetails && this.state.selectedShopDetails.id === shopId) {
+                await this.viewShopDetails(shopId);
+            }
+            await this.fetchActiveList();
+            this.notification.add(
+                'Shop unmarked as verified. GPS cleared — booker must re-verify on site.',
+                { type: 'warning' },
+            );
+        } catch (error) {
+            this.notification.add(
+                'Failed to reset verification: ' + (error.data?.message || error.message),
+                { type: 'danger' },
+            );
+        } finally {
+            this.state.isResettingShopVerification = false;
+        }
+    }
+
+    confirmResetSelectedShopVerification() {
+        if (!this.state.selectedShopDetails) return;
+        this.confirmResetShopVerification(
+            this.state.selectedShopDetails.id,
+            this.state.selectedShopDetails.name,
+        );
+    }
+
+    onShopMenuResetVerification(shop) {
+        this.closeShopActionMenu();
+        if (!shop || !shop.id) return;
+        this.confirmResetShopVerification(shop.id, shop.name);
     }
 
     editArea(area) {
