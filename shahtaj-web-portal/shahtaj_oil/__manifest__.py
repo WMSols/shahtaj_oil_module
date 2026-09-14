@@ -131,6 +131,8 @@
     'shahtaj_oil/static/src/xml/*.xml',
     'shahtaj_oil/static/src/lib/leaflet/leaflet.css',
     'shahtaj_oil/static/src/lib/leaflet/leaflet.js',
+    'shahtaj_oil/static/src/js/components/accounting.js',
+
 ],
     },
     'application': True,
