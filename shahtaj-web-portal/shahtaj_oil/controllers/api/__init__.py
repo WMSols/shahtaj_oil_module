@@ -10,3 +10,4 @@ from . import visits
 from . import zones
 from . import dm_auth
 from . import dm_ops
+from . import dm_recovery

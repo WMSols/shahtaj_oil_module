@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_visit_day_progress_form" model="ir.ui.view">
+        <field name="name">shahtaj.visit.day.progress.form</field>
+        <field name="model">shahtaj.visit.day.progress</field>
+        <field name="arch" type="xml">
+            <form string="Day Progress" create="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Apply Filter"
+                            class="oe_highlight" icon="fa-refresh"/>
+                    <button name="action_preset_this_week" type="object" string="This Week"/>
+                    <button name="action_preset_this_month" type="object" string="This Month"/>
+                    <button name="action_preset_last_7_days" type="object" string="Last 7 Days"/>
+                    <button name="action_open_all_tasks" type="object" string="Open All Tasks"/>
+                    <button name="action_back_to_visit_hub" type="object" string="Back to Visit Hub"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="staff_name" readonly="1" class="oe_inline"/>
+                            — Day Progress
+                        </h1>
+                        <p class="text-muted">
+                            Day-wise visit completion from existing visit tasks.
+                            Change dates (or use a preset) and click <b>Apply Filter</b>.
+                            Open a day row to see that day's shops.
+                        </p>
+                    </div>
+                    <group string="Date Filter">
+                        <group>
+                            <field name="staff_user_id" readonly="1"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group string="Range Summary">
+                            <field name="progress_percent" widget="progressbar" readonly="1"/>
+                            <field name="planned_total" readonly="1"/>
+                            <field name="done_total" readonly="1"/>
+                            <field name="skipped_total" readonly="1"/>
+                            <field name="pending_total" readonly="1"/>
+                            <field name="in_progress_total" readonly="1"/>
+                            <field name="is_order_booker" invisible="1"/>
+                            <field name="is_delivery_man" invisible="1"/>
+                        </group>
+                    </group>
+                    <separator string="Progress by Day"/>
+                    <field name="line_ids" nolabel="1">
+                        <list create="false" delete="false" edit="false"
+                              decoration-success="progress_percent &gt;= 100"
+                              decoration-warning="progress_percent &gt; 0 and progress_percent &lt; 100"
+                              decoration-muted="progress_percent == 0">
+                            <field name="day_date"/>
+                            <field name="weekday_label" string="Weekday"/>
+                            <field name="planned"/>
+                            <field name="done"/>
+                            <field name="skipped"/>
+                            <field name="pending"/>
+                            <field name="in_progress" optional="hide"/>
+                            <field name="progress_percent" widget="progressbar"/>
+                            <button name="action_open_day_tasks" type="object"
+                                    string="Tasks" icon="fa-list"
+                                    title="Open this day's visit tasks"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

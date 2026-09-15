@@ -55,6 +55,12 @@
         <field name="priority">40</field>
         <field name="arch" type="xml">
             <form string="Visit Tasks">
+                <header>
+                    <button name="action_shahtaj_open_day_progress" type="object"
+                            string="Day Progress by Date"
+                            class="oe_highlight"
+                            invisible="not shahtaj_is_order_booker and not shahtaj_is_delivery_man"/>
+                </header>
                 <sheet>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
@@ -118,6 +124,18 @@
                             </field>
                         </page>
                         <page string="History" name="history">
+                            <div class="alert alert-info" role="alert">
+                                For past days with a date or month filter and day-wise progress bars,
+                                use <b>Day Progress by Date</b> (header button).
+                                The list below is all tasks scheduled before this week.
+                            </div>
+                            <group>
+                                <button name="action_shahtaj_open_day_progress" type="object"
+                                        string="Open Day Progress Filter"
+                                        class="btn-primary"
+                                        invisible="not shahtaj_is_order_booker and not shahtaj_is_delivery_man"/>
+                            </group>
+                            <separator string="Tasks before this week"/>
                             <field name="shahtaj_task_history_ids" readonly="1" nolabel="1">
                                 <list decoration-muted="state in ('cancelled', 'skipped')"
                                       decoration-success="state == 'completed'"
@@ -136,6 +154,7 @@
                         </page>
                     </notebook>
                     <field name="shahtaj_is_order_booker" invisible="1"/>
+                    <field name="shahtaj_is_delivery_man" invisible="1"/>
                 </sheet>
             </form>
         </field>

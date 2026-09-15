@@ -158,4 +158,8 @@ access_account_payment_shahtaj_dm,account.payment.shahtaj.dm,account.model_accou
 access_account_journal_shahtaj_dm,account.journal.shahtaj.dm,account.model_account_journal,group_shahtaj_delivery_man,1,0,0,0
 access_account_payment_method_line_shahtaj_dm,account.payment.method.line.shahtaj.dm,account.model_account_payment_method_line,group_shahtaj_delivery_man,1,0,0,0
 access_account_bank_statement_line_shahtaj_dm,account.bank.statement.line.shahtaj.dm,account.model_account_bank_statement_line,group_shahtaj_delivery_man,1,0,0,0
+access_shahtaj_visit_day_progress_dist,shahtaj.visit.day.progress.dist,model_shahtaj_visit_day_progress,group_shahtaj_distributor,1,1,1,1
+access_shahtaj_visit_day_progress_native,shahtaj.visit.day.progress.native,model_shahtaj_visit_day_progress,group_shahtaj_native_distributor_ui,1,1,1,1
+access_shahtaj_visit_day_progress_line_dist,shahtaj.visit.day.progress.line.dist,model_shahtaj_visit_day_progress_line,group_shahtaj_distributor,1,1,1,1
+access_shahtaj_visit_day_progress_line_native,shahtaj.visit.day.progress.line.native,model_shahtaj_visit_day_progress_line,group_shahtaj_native_distributor_ui,1,1,1,1
 

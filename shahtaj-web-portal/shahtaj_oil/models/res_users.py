@@ -1334,3 +1334,8 @@ class ResUsers(models.Model):
             ],
             'target': 'current',
         }
+
+    def action_shahtaj_open_day_progress(self):
+        """Open day-wise visit progress with date / month filters."""
+        self.ensure_one()
+        return self.env['shahtaj.visit.day.progress'].action_open_for_user(self)

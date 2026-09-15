@@ -548,3 +548,87 @@ class ShahtajDmApiService(models.AbstractModel):
                 'longitude': s.partner_longitude or 0.0,
             } for s in shops],
         }
+
+    # ── Recovery / wallet (independent of check-in) ───────────────────
+
+    @api.model
+    def _recovery_service(self):
+        return self.env['shahtaj.dm.recovery.service']
+
+    @api.model
+    def _resolve_recovery_shop(self, shop_id, dm=None):
+        """Resolve shop by shop_id only. No GPS / delivery job required."""
+        if not shop_id:
+            raise UserError(_('shop_id is required.'))
+        shop = self.env['res.partner'].sudo().browse(int(shop_id))
+        if not shop.exists():
+            raise UserError(_('Shop not found.'))
+        return shop
+
+    @api.model
+    def recovery_shop(self, shop_id=None, dm=None):
+        dm = dm or self._dm_user()
+        shop = self._resolve_recovery_shop(shop_id, dm=dm)
+        return self._recovery_service().shop_recovery_payload(
+            shop, delivery_man=dm,
+        )
+
+    @api.model
+    def recovery_collect(self, shop_id=None, allocations=None, notes='', dm=None):
+        """Collect cash into DM wallet. Independent of check-in / delivery state."""
+        dm = dm or self._dm_user()
+        shop = self._resolve_recovery_shop(shop_id, dm=dm)
+        Service = self._recovery_service()
+        open_invoices = Service._open_customer_invoices(shop)
+        open_ids = set(open_invoices.ids)
+
+        cleaned = []
+        for row in allocations or []:
+            if not isinstance(row, dict):
+                continue
+            inv_id = int(row.get('invoice_id') or 0)
+            amount = float(row.get('amount') or 0.0)
+            if not inv_id or amount <= 0:
+                continue
+            if inv_id not in open_ids:
+                raise UserError(_(
+                    'Invoice %(id)s is not an open receivable for this shop.',
+                    id=inv_id,
+                ))
+            cleaned.append({'invoice_id': inv_id, 'amount': amount})
+
+        payments = Service.collect_payments(
+            delivery_man=dm,
+            allocations=cleaned,
+            notes=notes or '',
+            delivery=None,
+        )
+        return {
+            'shop_id': shop.id,
+            'shop_name': shop.display_name,
+            'collected_amount': sum(payments.mapped('amount')),
+            'payment_ids': payments.ids,
+            'payments': [{
+                'payment_id': p.id,
+                'name': p.name,
+                'amount': p.amount,
+                'date': str(p.date) if p.date else False,
+            } for p in payments],
+            'wallet': Service.wallet_summary(dm),
+            'shop': Service.shop_recovery_payload(shop, delivery_man=dm),
+        }
+
+    @api.model
+    def wallet_get(self, dm=None):
+        dm = dm or self._dm_user()
+        return self._recovery_service().wallet_summary(dm)
+
+    @api.model
+    def wallet_collections(self, date_from=None, date_to=None, limit=50, dm=None):
+        dm = dm or self._dm_user()
+        return self._recovery_service().list_collections(
+            dm,
+            date_from=date_from or None,
+            date_to=date_to or None,
+            limit=limit,
+        )

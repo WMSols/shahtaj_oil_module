@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.1.118',
+    'version': '19.0.1.1.121',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -70,6 +70,7 @@
         # ── 6. HUB + USER MANAGEMENT VIEWS ──
         'views/shahtaj_schedule_hub_views.xml',
         'views/shahtaj_visit_hub_views.xml',
+        'views/shahtaj_visit_day_progress_views.xml',
         'views/shahtaj_order_booker_users_views.xml',
         'views/shahtaj_delivery_man_users_views.xml',
         'views/shahtaj_dm_delivery_views.xml',

@@ -77,27 +77,161 @@ class ShahtajDmRecoveryService(models.AbstractModel):
         ], order='invoice_date asc, id asc')
 
     @api.model
-    def wallet_balance(self, delivery_man, company=None):
-        """Cash still held by this DM (collections − settlements)."""
+    def _collection_domain(self, delivery_man, company=None, extra=None):
         company = company or self.env.company
-        Payment = self.env['account.payment'].sudo()
-        Settlement = self.env['shahtaj.dm.wallet.settlement'].sudo()
         journal = self._dmcash_journal(company)
-        collections = Payment.search([
+        domain = [
             ('shahtaj_is_dm_wallet_collection', '=', True),
             ('shahtaj_collected_by_dm_id', '=', delivery_man.id),
             ('journal_id', '=', journal.id),
             ('company_id', '=', company.id),
             ('state', 'in', ('paid', 'in_process')),
             ('payment_type', '=', 'inbound'),
-        ])
-        collected = sum(collections.mapped('amount'))
-        settled = sum(Settlement.search([
-            ('delivery_man_id', '=', delivery_man.id),
-            ('company_id', '=', company.id),
-            ('state', '=', 'posted'),
-        ]).mapped('amount'))
+        ]
+        if extra:
+            domain.extend(extra)
+        return domain
+
+    @api.model
+    def _sum_amount(self, model_name, domain, field='amount'):
+        rows = self.env[model_name].sudo().read_group(domain, [f'{field}:sum'], [])
+        if not rows:
+            return 0.0
+        return float(rows[0].get(f'{field}') or 0.0)
+
+    @api.model
+    def wallet_balance(self, delivery_man, company=None):
+        """Cash still held by this DM (collections − settlements)."""
+        company = company or self.env.company
+        collected = self._sum_amount(
+            'account.payment',
+            self._collection_domain(delivery_man, company),
+        )
+        settled = self._sum_amount(
+            'shahtaj.dm.wallet.settlement',
+            [
+                ('delivery_man_id', '=', delivery_man.id),
+                ('company_id', '=', company.id),
+                ('state', '=', 'posted'),
+            ],
+        )
         return collected - settled
+
+    @api.model
+    def wallet_summary(self, delivery_man, company=None):
+        """Balance + collected today + lifetime collected/settled (one-pass aggregates)."""
+        company = company or self.env.company
+        today = fields.Date.context_today(self)
+        collected_total = self._sum_amount(
+            'account.payment',
+            self._collection_domain(delivery_man, company),
+        )
+        collected_today = self._sum_amount(
+            'account.payment',
+            self._collection_domain(delivery_man, company, extra=[
+                ('date', '=', today),
+            ]),
+        )
+        settled_total = self._sum_amount(
+            'shahtaj.dm.wallet.settlement',
+            [
+                ('delivery_man_id', '=', delivery_man.id),
+                ('company_id', '=', company.id),
+                ('state', '=', 'posted'),
+            ],
+        )
+        balance = collected_total - settled_total
+        return {
+            'delivery_man_id': delivery_man.id,
+            'currency': company.currency_id.name,
+            'balance': balance,
+            'collected_today': collected_today,
+            'collected_total': collected_total,
+            'settled_total': settled_total,
+            'as_of': str(today),
+        }
+
+    @api.model
+    def shop_recovery_payload(self, shop, delivery_man=None, company=None):
+        """Open invoices + outstanding for Recovery screen (no check-in required)."""
+        company = company or self.env.company
+        if not shop or not shop.exists():
+            raise UserError(_('Shop not found.'))
+        if not shop.is_shahtaj_shop:
+            raise UserError(_('Recovery is only available for Shahtaj shops.'))
+
+        invoices = self._open_customer_invoices(shop, company)
+        invoice_rows = [{
+            'invoice_id': inv.id,
+            'name': inv.name,
+            'invoice_date': str(inv.invoice_date) if inv.invoice_date else False,
+            'amount_total': inv.amount_total,
+            'amount_residual': abs(inv.amount_residual),
+            'payment_state': inv.payment_state,
+            'is_legacy_balance': bool(getattr(inv, 'shahtaj_is_legacy_balance', False)),
+        } for inv in invoices]
+        outstanding = sum(row['amount_residual'] for row in invoice_rows)
+
+        snap = {}
+        if hasattr(shop, '_shahtaj_get_credit_snapshot'):
+            snap = shop._shahtaj_get_credit_snapshot()
+
+        payload = {
+            'shop_id': shop.id,
+            'shop_name': shop.display_name,
+            'shop_category': shop.shahtaj_shop_category or False,
+            'outstanding': outstanding,
+            'posted_receivable': float(snap.get('posted_outstanding', shop.sudo().credit or 0.0)),
+            'effective_outstanding': float(snap.get('effective_outstanding', outstanding)),
+            'credit_limit': float(snap.get('credit_limit', shop.credit_limit or 0.0)),
+            'credit_remaining': float(snap.get('credit_remaining', 0.0)),
+            'invoices': invoice_rows,
+            'invoice_count': len(invoice_rows),
+        }
+        if delivery_man:
+            payload['wallet_balance'] = self.wallet_balance(delivery_man, company)
+        return payload
+
+    @api.model
+    def list_collections(
+        self,
+        delivery_man,
+        date_from=None,
+        date_to=None,
+        limit=50,
+        company=None,
+    ):
+        """DM wallet collection history for Flutter wallet screen."""
+        company = company or self.env.company
+        limit = max(1, min(int(limit or 50), 200))
+        extra = []
+        if date_from:
+            extra.append(('date', '>=', date_from))
+        if date_to:
+            extra.append(('date', '<=', date_to))
+        payments = self.env['account.payment'].sudo().search(
+            self._collection_domain(delivery_man, company, extra=extra),
+            order='date desc, id desc',
+            limit=limit,
+        )
+        rows = []
+        for pay in payments:
+            invoice_names = pay.reconciled_invoice_ids.mapped('name')
+            rows.append({
+                'payment_id': pay.id,
+                'name': pay.name,
+                'date': str(pay.date) if pay.date else False,
+                'amount': pay.amount,
+                'shop_id': pay.partner_id.id if pay.partner_id else False,
+                'shop_name': pay.partner_id.display_name if pay.partner_id else '',
+                'invoices': invoice_names,
+                'notes': pay.shahtaj_payment_notes or '',
+            })
+        return {
+            'collections': rows,
+            'count': len(rows),
+            'wallet_balance': self.wallet_balance(delivery_man, company),
+        }
 
     @api.model
     def collect_payments(

@@ -54,12 +54,16 @@ Login
   → For each stop:
         plan/job
         job/deliver (GPS + lines)  OR  shop-closed / failed
+        optional: recovery/shop + recovery/collect  (no check-in required)
   → Optional: shops/search + deliver/free
   → Optional: van/return leftover, job/return-undelivered
+  → Optional: wallet/get / wallet/collections
   → session/end
 ```
 
 **Important UX:** **On the Way** is **one day-level session**, not a per-job toggle. Departing syncs open loaded jobs’ `field_state` toward field work.
+
+**Recovery** is independent of GPS check-in: cash against open shop invoices → DM wallet.
 
 ---
 
@@ -482,23 +486,116 @@ App should **always surface the server error message**.
 | POST | `/api/shahtaj/v1/dm/job/return-undelivered` | Bearer | Return leftover |
 | POST | `/api/shahtaj/v1/dm/shops/search` | Bearer | Find shop |
 | POST | `/api/shahtaj/v1/dm/deliver/free` | Bearer | Free GPS deliver |
+| POST | `/api/shahtaj/v1/dm/recovery/shop` | Bearer | Shop open invoices (Recovery) |
+| POST | `/api/shahtaj/v1/dm/recovery/collect` | Bearer | Collect cash → DM wallet |
+| POST | `/api/shahtaj/v1/dm/wallet/get` | Bearer | Wallet balance summary |
+| POST | `/api/shahtaj/v1/dm/wallet/collections` | Bearer | My wallet collection history |
 
 ---
 
-## 13. Source files (backend)
+## 13. Recovery / wallet (cash collection)
+
+Recovery is **independent of check-in / GPS deliver**. Put a **Recovery** button on each shop (today plan or shop card). Cash goes into the DM wallet (`DMCASH` / account `101410`). **Settle wallet → bank** stays on distributor web only.
+
+### App flow
+
+```
+plan/today (or shop card)
+  → Recovery
+  → recovery/shop   (open invoices + outstanding)
+  → enter amounts (full / partial per invoice)
+  → recovery/collect
+  → optional wallet/get + wallet/collections
+```
+
+### `POST /recovery/shop`
+
+Params:
+
+| Param | Required | Notes |
+|-------|----------|--------|
+| `shop_id` | **yes** | Shahtaj shop id |
+
+Example response `data`:
+
+```json
+{
+  "shop_id": 42,
+  "shop_name": "Ali Store",
+  "shop_category": "credit",
+  "outstanding": 15000.0,
+  "posted_receivable": 15000.0,
+  "effective_outstanding": 18000.0,
+  "credit_limit": 50000.0,
+  "credit_remaining": 32000.0,
+  "invoice_count": 2,
+  "invoices": [
+    {
+      "invoice_id": 101,
+      "name": "INV/2026/0001",
+      "invoice_date": "2026-09-01",
+      "amount_total": 10000.0,
+      "amount_residual": 10000.0,
+      "payment_state": "not_paid",
+      "is_legacy_balance": false
+    }
+  ],
+  "wallet_balance": 2500.0
+}
+```
+
+### `POST /recovery/collect`
+
+Params:
+
+| Param | Required | Notes |
+|-------|----------|--------|
+| `shop_id` | **yes** | Shahtaj shop id |
+| `allocations` | yes | `[{ "invoice_id": 101, "amount": 5000 }, ...]` |
+| `notes` | no | Optional note |
+
+Returns collected amount, payment ids, refreshed `wallet` summary and `shop` recovery payload.
+
+### `POST /wallet/get`
+
+No params. Returns:
+
+```json
+{
+  "delivery_man_id": 7,
+  "currency": "PKR",
+  "balance": 2500.0,
+  "collected_today": 1000.0,
+  "collected_total": 8000.0,
+  "settled_total": 5500.0,
+  "as_of": "2026-09-15"
+}
+```
+
+### `POST /wallet/collections`
+
+Params: optional `date_from`, `date_to`, `limit` (default 50, max 200).
+
+Returns `{ collections: [...], count, wallet_balance }`.
+
+---
+
+## 14. Source files (backend)
 
 | Area | Path |
 |------|------|
 | Auth | `controllers/api/dm_auth.py` |
 | Ops routes | `controllers/api/dm_ops.py` |
+| Recovery routes | `controllers/api/dm_recovery.py` |
 | Helpers | `controllers/api/dm_base.py` |
 | Service / payloads | `models/shahtaj_dm_api.py` |
+| Recovery accounting | `models/shahtaj_dm_recovery.py` |
 | Day session | `models/shahtaj_dm_day_session.py` |
 | Jobs / stock | `models/shahtaj_dm_delivery.py` |
 
 ---
 
-## 14. Quick test plan
+## 15. Quick test plan
 
 1. Login as a delivery man user → store `api_key` + check `session.state == office`
 2. `load/today` → pick some `pick_lines` via `load/pick`
@@ -508,9 +605,10 @@ App should **always surface the server error message**.
 6. Far from shop → `job/deliver` fails with distance error
 7. Near shop → `job/deliver` succeeds; job quantities update
 8. `shops/search` + `deliver/free` with van stock
-9. `session/end`
+9. **Recovery:** `recovery/shop` with `shop_id` → enter amounts → `recovery/collect` → `wallet/get`
+10. `session/end`
 
 ---
 
-*Module: `shahtaj_oil` · API prefix `/api/shahtaj/v1/dm` · Document aligned with implementation as of module `19.0.1.1.109+`*
+*Module: `shahtaj_oil` · API prefix `/api/shahtaj/v1/dm` · Document aligned with implementation as of module `19.0.1.1.121`*
 +
