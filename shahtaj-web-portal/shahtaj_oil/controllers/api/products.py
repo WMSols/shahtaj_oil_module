@@ -40,15 +40,8 @@ class ShahtajApiProducts(http.Controller):
             'total': total,
             'offset': offset,
             'limit': limit,
-            'products': [
-                brief
-                for brief in (
-                    serializers.product_brief(
-                        product,
-                        visit_line_ids=exclude_lines,
-                    )
-                    for product in products
-                )
-                if brief
-            ],
+            'products': serializers.product_briefs(
+                products,
+                visit_line_ids=exclude_lines,
+            ),
         })

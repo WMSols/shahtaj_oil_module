@@ -12,6 +12,18 @@ class StockPicking(models.Model):
         default=False,
         copy=False,
     )
+    shahtaj_receiver_name = fields.Char(
+        string='Receiver Name',
+        copy=False,
+        help='Person who received stock (DM delivery / free deliver proof).',
+    )
+    shahtaj_delivery_proof_image = fields.Image(
+        string='Delivery Proof Photo',
+        max_width=1920,
+        max_height=1920,
+        copy=False,
+        help='Photo of delivered stock handoff (DM delivery proof).',
+    )
 
     def button_validate(self):
         res = super().button_validate()

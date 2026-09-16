@@ -8,8 +8,10 @@
             <form string="Collect Payment (DM Wallet)">
                 <sheet>
                     <div class="alert alert-info" role="alert">
-                        Cash collected here goes into the <b>DM Wallet</b> (DMCASH / 101410)
-                        until the distributor settles it to the bank.
+                        Collections go into the <b>DM Wallet</b> (DMCASH / 101410)
+                        until the distributor settles to the bank.
+                        Choose <b>Cash</b> or <b>Cheque</b> — cheque needs number + photo
+                        (supporting details only; accounting journal stays the same).
                     </div>
                     <group>
                         <group string="Shop">
@@ -28,6 +30,21 @@
                             <field name="wallet_balance" readonly="1"/>
                             <field name="amount_total" readonly="1"/>
                             <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Payment method">
+                        <group>
+                            <field name="payment_method" widget="radio"/>
+                            <field name="cheque_number"
+                                   invisible="payment_method != 'cheque'"
+                                   required="payment_method == 'cheque'"
+                                   placeholder="Cheque number / serial"/>
+                        </group>
+                        <group>
+                            <field name="cheque_image" widget="image"
+                                   invisible="payment_method != 'cheque'"
+                                   required="payment_method == 'cheque'"
+                                   options="{'size': [128, 128]}"/>
                         </group>
                     </group>
                     <group>
@@ -52,7 +69,7 @@
                             string="Fill Full Remaining" class="btn-secondary"/>
                     <button name="action_confirm" type="object"
                             string="Collect to Wallet" class="btn-primary"
-                            confirm="Post cash collection into the DM wallet?"/>
+                            confirm="Post this collection into the DM wallet?"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>
             </form>
@@ -136,6 +153,9 @@
                 <field name="name"/>
                 <field name="partner_id" string="Shop"/>
                 <field name="amount" sum="Collected"/>
+                <field name="shahtaj_payment_channel" string="Method"/>
+                <field name="shahtaj_instrument_reference" string="Cheque #" optional="show"/>
+                <field name="shahtaj_has_cheque_image" string="Cheque photo" optional="hide"/>
                 <field name="shahtaj_collected_by_dm_id" string="DM"/>
                 <field name="shahtaj_dm_delivery_id" optional="show"/>
                 <field name="shahtaj_payment_notes" optional="show"/>
@@ -169,7 +189,17 @@
                             <field name="shahtaj_dm_delivery_id" readonly="1"/>
                             <field name="journal_id" readonly="1"/>
                             <field name="shahtaj_payment_channel" readonly="1"/>
+                            <field name="shahtaj_instrument_reference" string="Cheque Number"
+                                   readonly="1"
+                                   invisible="shahtaj_payment_channel != 'cheque'"/>
+                            <field name="shahtaj_has_cheque_image" invisible="1"/>
                         </group>
+                    </group>
+                    <group string="Cheque photo"
+                           invisible="shahtaj_payment_channel != 'cheque' or not shahtaj_has_cheque_image">
+                        <field name="shahtaj_cheque_image" widget="image" readonly="1"
+                               nolabel="1" colspan="2"
+                               options="{'size': [256, 256]}"/>
                     </group>
                     <group>
                         <field name="shahtaj_payment_notes" readonly="1"/>

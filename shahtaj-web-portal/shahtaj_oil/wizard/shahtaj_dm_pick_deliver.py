@@ -172,6 +172,16 @@ class ShahtajDmDeliverWizard(models.TransientModel):
         'wizard_id',
         string='Products',
     )
+    receiver_name = fields.Char(
+        string='Receiver Name',
+        help='Person who received the stock at the shop.',
+    )
+    delivery_proof_image = fields.Image(
+        string='Delivery Proof Photo',
+        max_width=1920,
+        max_height=1920,
+        help='Photo of delivered stock / handoff.',
+    )
 
     @api.depends('latitude', 'longitude', 'shop_latitude', 'shop_longitude', 'max_distance_m')
     def _compute_distance_m(self):
@@ -271,6 +281,8 @@ class ShahtajDmDeliverWizard(models.TransientModel):
             latitude=self.latitude,
             longitude=self.longitude,
             distance_m=distance,
+            receiver_name=self.receiver_name,
+            delivery_proof_image=self.delivery_proof_image,
         )
 
 

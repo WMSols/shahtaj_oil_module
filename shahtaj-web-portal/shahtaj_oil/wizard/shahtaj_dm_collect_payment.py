@@ -43,11 +43,38 @@ class ShahtajDmCollectPayment(models.TransientModel):
         currency_field='currency_id',
     )
     notes = fields.Text(string='Notes')
+    payment_method = fields.Selection(
+        [
+            ('cash', 'Cash'),
+            ('cheque', 'Cheque'),
+        ],
+        string='Payment Method',
+        default='cash',
+        required=True,
+        help='Supporting detail only — both methods still post into the DM wallet.',
+    )
+    cheque_number = fields.Char(
+        string='Cheque Number',
+        help='Required when payment method is Cheque.',
+    )
+    cheque_image = fields.Image(
+        string='Cheque Photo',
+        max_width=1920,
+        max_height=1920,
+        help='Required when payment method is Cheque.',
+    )
     line_ids = fields.One2many(
         'shahtaj.dm.collect.payment.line',
         'wizard_id',
         string='Invoices',
     )
+
+    @api.onchange('payment_method')
+    def _onchange_payment_method(self):
+        if self.payment_method == 'cash':
+            self.cheque_number = False
+            self.cheque_image = False
+
 
     @api.depends('line_ids.amount')
     def _compute_amount_total(self):
@@ -155,6 +182,9 @@ class ShahtajDmCollectPayment(models.TransientModel):
             allocations=allocations,
             notes=self.notes or '',
             delivery=self.delivery_id,
+            payment_method=self.payment_method or 'cash',
+            cheque_number=self.cheque_number,
+            cheque_image=self.cheque_image,
         )
         return {
             'type': 'ir.actions.client',
@@ -162,8 +192,11 @@ class ShahtajDmCollectPayment(models.TransientModel):
             'params': {
                 'title': _('Collected to DM Wallet'),
                 'message': _(
-                    'Recorded %(amount).2f into %(dm)s wallet (%(count)s payment(s)).',
+                    'Recorded %(amount).2f (%(method)s) into %(dm)s wallet (%(count)s payment(s)).',
                     amount=sum(payments.mapped('amount')),
+                    method=dict(self._fields['payment_method'].selection).get(
+                        self.payment_method, self.payment_method,
+                    ),
                     dm=self.delivery_man_id.display_name,
                     count=len(payments),
                 ),

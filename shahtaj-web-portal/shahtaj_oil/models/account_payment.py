@@ -54,6 +54,19 @@ class AccountPayment(models.Model):
         tracking=True,
         help='Cheque number, online transaction ID, deposit slip, or other reference.',
     )
+    shahtaj_cheque_image = fields.Image(
+        string='Cheque Photo',
+        max_width=1920,
+        max_height=1920,
+        copy=False,
+        help='Supporting photo of the cheque (DM wallet collections).',
+    )
+    shahtaj_has_cheque_image = fields.Boolean(
+        string='Has Cheque Photo',
+        compute='_compute_shahtaj_has_cheque_image',
+        store=True,
+        index=True,
+    )
     shahtaj_payment_notes = fields.Text(
         string='Payment Notes',
         copy=False,
@@ -82,6 +95,11 @@ class AccountPayment(models.Model):
         ondelete='set null',
     )
 
+    @api.depends('shahtaj_cheque_image')
+    def _compute_shahtaj_has_cheque_image(self):
+        for payment in self:
+            payment.shahtaj_has_cheque_image = bool(payment.shahtaj_cheque_image)
+
     @api.onchange('journal_id')
     def _onchange_shahtaj_journal_payment_details(self):
         for payment in self:
@@ -90,6 +108,7 @@ class AccountPayment(models.Model):
                 payment.shahtaj_payer_bank_name = False
                 payment.shahtaj_payer_account_number = False
                 payment.shahtaj_instrument_reference = False
+                payment.shahtaj_cheque_image = False
             elif (
                 payment.journal_id.type in ('bank', 'credit')
                 and payment.shahtaj_payment_channel == 'cash'

@@ -72,6 +72,11 @@
                        invisible="partner_type != 'customer' or shahtaj_journal_type not in ('bank', 'credit') or shahtaj_payment_channel == 'cash'"
                        readonly="state != 'draft'"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <field name="shahtaj_cheque_image" widget="image"
+                       invisible="partner_type != 'customer' or shahtaj_payment_channel != 'cheque'"
+                       readonly="state != 'draft'"
+                       options="{'size': [128, 128]}"
+                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_payment_notes"
                        invisible="partner_type != 'customer'"
                        placeholder="Collection or refund notes..."

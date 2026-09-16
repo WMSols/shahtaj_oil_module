@@ -36,11 +36,16 @@ class ShahtajDmApiRecovery(http.Controller):
         shop_id=None,
         allocations=None,
         notes='',
+        payment_method='cash',
+        cheque_number=None,
+        cheque_image=None,
         **kwargs,
     ):
-        """Post cash collection into DM wallet (DMCASH / 101410).
+        """Post collection into DM wallet (DMCASH / 101410).
 
         ``allocations``: ``[{invoice_id, amount}, ...]``
+        ``payment_method``: ``cash`` (default) or ``cheque``.
+        Cheque requires ``cheque_number`` + ``cheque_image`` (base64).
         Requires ``shop_id``. Independent of check-in / deliver.
         """
         ensure_delivery_man()
@@ -52,6 +57,9 @@ class ShahtajDmApiRecovery(http.Controller):
             shop_id=shop_id,
             allocations=allocations,
             notes=notes or '',
+            payment_method=payment_method or 'cash',
+            cheque_number=cheque_number,
+            cheque_image=cheque_image,
         ))
 
     @http.route('/api/shahtaj/v1/dm/wallet/get', **DM_API_ROUTE)

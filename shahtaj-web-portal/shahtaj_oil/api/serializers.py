@@ -58,6 +58,15 @@ def _m2o(record):
     return {'id': record.id, 'name': record.display_name}
 
 
+def gps_criteria(env):
+    """Company GPS check-in/deliver distance limits for mobile offline cache."""
+    limits = env['res.company'].shahtaj_get_shop_distance_limits()
+    return {
+        'min_m': float(limits.get('min_m') or 0.0),
+        'max_m': float(limits.get('max_m') or 0.0),
+    }
+
+
 def user_brief(user):
     last_seen = user.shahtaj_last_seen_at
     return {
@@ -71,7 +80,7 @@ def user_brief(user):
     }
 
 
-def task_dict(task):
+def task_dict(task, shop_payload=None):
     operational = task._shahtaj_is_operational_for_booker()
     return {
         'id': task.id,
@@ -81,7 +90,7 @@ def task_dict(task):
         'is_operational': operational,
         'route': _m2o(task.route_id),
         'zone': _m2o(task.zone_id),
-        'shop': shop_brief(task.shop_id),
+        'shop': shop_payload if shop_payload is not None else shop_brief(task.shop_id),
         'shop_id': task.shop_id.id,
         'visit_id': task.visit_id.id or False,
         'visit_duration_minutes': task.visit_duration_minutes,
@@ -89,14 +98,36 @@ def task_dict(task):
     }
 
 
-def shop_brief(partner):
+def tasks_list_dict(tasks):
+    """Serialize today's tasks with one batch credit pass for all shops."""
+    if not tasks:
+        return []
+    shops = tasks.mapped('shop_id')
+    # Prefetch common relations used by task_dict / shop_brief.
+    tasks.mapped('route_id')
+    tasks.mapped('zone_id')
+    tasks.mapped('visit_id')
+    shops.sudo().mapped('route_ids')
+    credit_map = shops.env['res.partner']._shahtaj_credit_snapshots_for_api(shops)
+    shop_payloads = {
+        shop.id: shop_brief(shop, credit_info=credit_map.get(shop.id))
+        for shop in shops
+    }
+    return [
+        task_dict(task, shop_payload=shop_payloads.get(task.shop_id.id))
+        for task in tasks
+    ]
+
+
+def shop_brief(partner, credit_info=None):
     if not partner:
         return None
     # Always read shop fields via sudo: bookers may lack partner ACL in edge
     # cases (schedule removed, distributor-created shop) while still owning
     # the visit task. Callers must already authorize the shop/task context.
     shop = partner.sudo()
-    credit_info = shop._shahtaj_credit_snapshot_for_api()
+    if credit_info is None:
+        credit_info = shop._shahtaj_credit_snapshot_for_api()
     category = shop.shahtaj_shop_category or 'credit'
     credit_limit = credit_info['credit_limit']
     outstanding = credit_info['outstanding_balance']
@@ -136,6 +167,19 @@ def shop_brief(partner):
     }
 
 
+def shop_briefs(partners):
+    """Serialize many shops with one batched credit snapshot query."""
+    if not partners:
+        return []
+    partners = partners.exists()
+    partners.sudo().mapped('route_ids')
+    credit_map = partners.env['res.partner']._shahtaj_credit_snapshots_for_api(partners)
+    return [
+        shop_brief(shop, credit_info=credit_map.get(shop.id))
+        for shop in partners
+    ]
+
+
 def shop_detail(partner, include_photos=False):
     data = shop_brief(partner)
     if include_photos and partner:
@@ -143,10 +187,11 @@ def shop_detail(partner, include_photos=False):
     return data
 
 
-def visit_line_dict(line):
-    bookable = line.product_id._get_shahtaj_bookable_qty(
-        exclude_visit_line_ids=line.visit_id.line_ids.ids,
-    )
+def visit_line_dict(line, bookable_qty=None):
+    if bookable_qty is None and line.product_id:
+        bookable_qty = line.product_id._get_shahtaj_bookable_qty(
+            exclude_visit_line_ids=line.visit_id.line_ids.ids,
+        )
     catalog_price = line.product_id.lst_price if line.product_id else 0.0
     price_unit = line.price_unit or 0.0
     unit_discount = max(0.0, catalog_price - price_unit) if (price_unit < catalog_price - 0.001) else 0.0
@@ -154,7 +199,7 @@ def visit_line_dict(line):
     discount_pct = round(((catalog_price - price_unit) / catalog_price * 100.0), 2) if (unit_discount > 0 and catalog_price > 0) else 0.0
     return {
         'id': line.id,
-        'product': product_brief(line.product_id, bookable_qty=bookable),
+        'product': product_brief(line.product_id, bookable_qty=bookable_qty),
         'quantity': line.product_uom_qty,
         'catalog_price': catalog_price,
         'price_unit': line.price_unit,
@@ -165,6 +210,25 @@ def visit_line_dict(line):
         'discount_reason': line.discount_reason or '',
         'subtotal': line.subtotal,
     }
+
+
+def visit_lines_dicts(lines):
+    """Serialize visit cart lines with one bookable-qty map for the visit."""
+    if not lines:
+        return []
+    products = lines.mapped('product_id')
+    exclude_ids = lines.mapped('visit_id').mapped('line_ids').ids
+    bookable_map = lines.env['product.product']._get_shahtaj_bookable_qty_map(
+        products,
+        exclude_visit_line_ids=exclude_ids,
+    )
+    return [
+        visit_line_dict(
+            line,
+            bookable_qty=bookable_map.get(line.product_id.id) if line.product_id else None,
+        )
+        for line in lines
+    ]
 
 
 def product_brief(product, bookable_qty=None, visit_line_ids=None):
@@ -196,6 +260,28 @@ def product_brief(product, bookable_qty=None, visit_line_ids=None):
             'amount_type': tax.amount_type,
         } for tax in tmpl.taxes_id],
     }
+
+
+def product_briefs(products, visit_line_ids=None):
+    """Serialize product list with one bookable-qty map for the page."""
+    if not products:
+        return []
+    bookable_map = products.env['product.product']._get_shahtaj_bookable_qty_map(
+        products,
+        exclude_visit_line_ids=visit_line_ids or [],
+    )
+    # Prefetch template relations used by product_brief.
+    products.mapped('product_tmpl_id.taxes_id')
+    products.mapped('uom_id')
+    briefs = []
+    for product in products:
+        brief = product_brief(
+            product,
+            bookable_qty=bookable_map.get(product.id),
+        )
+        if brief:
+            briefs.append(brief)
+    return briefs
 
 
 def visit_order_summary_dict(visit):
@@ -252,7 +338,7 @@ def visit_order_summary_dict(visit):
     return payload
 
 
-def visit_dict(visit, include_lines=True):
+def visit_dict(visit, include_lines=True, shop_payload=None):
     order = visit_order_summary_dict(visit)
     order_reasons = order.get('approval_reasons', []) if order else []
     data = {
@@ -266,7 +352,7 @@ def visit_dict(visit, include_lines=True):
         'place_order_distance_m': visit.place_order_distance_m,
         'notes': visit.notes or '',
         'task_id': visit.visit_task_id.id,
-        'shop': shop_brief(visit.shop_id),
+        'shop': shop_payload if shop_payload is not None else shop_brief(visit.shop_id),
         'shop_id': visit.shop_id.id,
         'order_booker_id': visit.order_booker_id.id,
         'route': _m2o(visit.route_id),
@@ -283,16 +369,31 @@ def visit_dict(visit, include_lines=True):
         'total_discount_amount': order['discount_amount'] if order else 0.0,
     }
     if include_lines:
-        data['lines'] = [visit_line_dict(line) for line in visit.line_ids]
+        data['lines'] = visit_lines_dicts(visit.line_ids)
     return data
 
 
 def visits_list_dict(visits):
-    """Serialize visit history with one prefetch pass for linked sales orders."""
+    """Serialize visit history with batched credit + one SO prefetch."""
     visits = visits.sudo()
-    if visits:
-        visits.mapped('sale_order_id')
-    return [visit_dict(visit, include_lines=False) for visit in visits]
+    if not visits:
+        return []
+    visits.mapped('sale_order_id')
+    visits.mapped('route_id')
+    shops = visits.mapped('shop_id')
+    credit_map = shops.env['res.partner']._shahtaj_credit_snapshots_for_api(shops)
+    shop_payloads = {
+        shop.id: shop_brief(shop, credit_info=credit_map.get(shop.id))
+        for shop in shops
+    }
+    return [
+        visit_dict(
+            visit,
+            include_lines=False,
+            shop_payload=shop_payloads.get(visit.shop_id.id),
+        )
+        for visit in visits
+    ]
 
 
 def zone_brief(zone):

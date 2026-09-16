@@ -138,11 +138,17 @@ No Bearer required.
     "ended_at": false
   },
   "online_status": "online",
-  "last_seen_at": "2026-09-08 12:00:00"
+  "last_seen_at": "2026-09-08 12:00:00",
+  "gps_criteria": {
+    "min_m": 0.0,
+    "max_m": 100.0
+  }
 }
 ```
 
 Store `api_key` securely and send it on every later call.
+
+`gps_criteria` is the company shop GPS distance policy (metres). Cache it locally for offline check-in/deliver validation; refresh from `plan/today`.
 
 ---
 
@@ -316,6 +322,10 @@ Refresh often — distributor can assign/split jobs while the DM is out.
 {
   "date": "2026-09-08",
   "session": { "id": 1, "state": "on_the_way", "departed_at": "...", "ended_at": false },
+  "gps_criteria": {
+    "min_m": 0.0,
+    "max_m": 100.0
+  },
   "jobs": [
     {
       "job_id": 10,
@@ -337,6 +347,8 @@ Refresh often — distributor can assign/split jobs while the DM is out.
 ```
 
 Open jobs are listed before finished ones.
+
+Refresh `gps_criteria` into local storage whenever this endpoint is called (same shape as login).
 
 ### `POST /api/shahtaj/v1/dm/plan/job`
 
@@ -383,9 +395,13 @@ GPS-verified delivery for an **assigned job**.
 | `latitude` | float | yes |
 | `longitude` | float | yes |
 | `lines` | `[{ line_id, qty }]` | yes (at least one qty &gt; 0) |
+| `receiver_name` | string | **yes** — person who received stock |
+| `delivery_proof_image` | string (base64 / data-URL) | **yes** — photo of delivered stock |
 | `notes` | string | no |
 
 Uses the **same company GPS min/max range** as order booker check-in (default max **100 m**). Failed GPS is logged server-side and the call errors; show the backend message to the user.
+
+Proof is stored on the delivery job (latest handoff overwrites previous). Plan payloads return `receiver_name` + `has_delivery_proof` only (no image bytes) for performance.
 
 **Success `data`:** `{ distance_m, job }`
 
@@ -436,11 +452,13 @@ Only **approved** Shahtaj shops.
 | `latitude` | float | yes |
 | `longitude` | float | yes |
 | `lines` | `[{ product_id, qty }]` | yes |
+| `receiver_name` | string | **yes** |
+| `delivery_proof_image` | string (base64 / data-URL) | **yes** |
 | `notes` | string | no |
 
-GPS rules same as job deliver. Stock must exist on the DM’s van.
+GPS rules same as job deliver. Stock must exist on the DM’s van. Proof is stored on the stock picking.
 
-**Success `data`:** `{ distance_m, shop_id, shop_name, notes, van }`
+**Success `data`:** `{ distance_m, shop_id, shop_name, notes, receiver_name, has_delivery_proof, picking_id, van }`
 
 ---
 
@@ -552,9 +570,36 @@ Params:
 |-------|----------|--------|
 | `shop_id` | **yes** | Shahtaj shop id |
 | `allocations` | yes | `[{ "invoice_id": 101, "amount": 5000 }, ...]` |
+| `payment_method` | no | `"cash"` (default) or `"cheque"` — supporting metadata; journal stays DMCASH |
+| `cheque_number` | if cheque | Cheque serial / number string |
+| `cheque_image` | if cheque | Base64 or `data:image/...;base64,...` photo |
 | `notes` | no | Optional note |
 
-Returns collected amount, payment ids, refreshed `wallet` summary and `shop` recovery payload.
+**Cash example**
+
+```json
+{
+  "shop_id": 42,
+  "payment_method": "cash",
+  "allocations": [{ "invoice_id": 101, "amount": 5000 }]
+}
+```
+
+**Cheque example**
+
+```json
+{
+  "shop_id": 42,
+  "payment_method": "cheque",
+  "cheque_number": "CHK-458921",
+  "cheque_image": "<base64>",
+  "allocations": [{ "invoice_id": 101, "amount": 5000 }]
+}
+```
+
+Returns collected amount, `payment_method`, `cheque_number`, `has_cheque_image`, payment ids, refreshed `wallet` summary and `shop` recovery payload.
+
+`wallet/collections` rows also include `payment_method`, `cheque_number`, `has_cheque_image` (no image bytes).
 
 ### `POST /wallet/get`
 
@@ -610,5 +655,5 @@ Returns `{ collections: [...], count, wallet_balance }`.
 
 ---
 
-*Module: `shahtaj_oil` · API prefix `/api/shahtaj/v1/dm` · Document aligned with implementation as of module `19.0.1.1.121`*
+*Module: `shahtaj_oil` · API prefix `/api/shahtaj/v1/dm` · Document aligned with implementation as of module `19.0.1.1.125`*
 +

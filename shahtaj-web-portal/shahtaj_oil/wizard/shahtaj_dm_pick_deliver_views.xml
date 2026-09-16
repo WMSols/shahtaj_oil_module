@@ -46,7 +46,8 @@
                     <ol class="mb-0 ps-3">
                         <li><b>Step 1 — GPS:</b> tap <b>Use My GPS</b> and wait until status is OK</li>
                         <li><b>Step 2 — Qty:</b> set how much to hand over from the van</li>
-                        <li><b>Step 3 — Confirm:</b> only enabled when GPS is OK</li>
+                        <li><b>Step 3 — Proof:</b> receiver name + photo of delivered stock</li>
+                        <li><b>Step 4 — Confirm:</b> only enabled when GPS is OK</li>
                     </ol>
                 </div>
                 <group>
@@ -95,12 +96,22 @@
                         </list>
                     </field>
                 </group>
+                <group string="Step 3 — Receiver &amp; proof">
+                    <group>
+                        <field name="receiver_name"
+                               placeholder="Name of person receiving stock"/>
+                    </group>
+                    <group>
+                        <field name="delivery_proof_image" widget="image"
+                               options="{'size': [128, 128]}"/>
+                    </group>
+                </group>
                 <footer>
                     <button name="action_confirm_deliver" type="object"
-                            string="Step 3 — Confirm Delivery" class="btn-primary"
+                            string="Step 4 — Confirm Delivery" class="btn-primary"
                             invisible="not gps_ok"
                             confirm="Confirm delivery at this GPS location? Stock will move from van to shop."/>
-                    <button string="Step 3 — Waiting for GPS" class="btn-secondary"
+                    <button string="Step 4 — Waiting for GPS" class="btn-secondary"
                             invisible="gps_ok" disabled="1"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>

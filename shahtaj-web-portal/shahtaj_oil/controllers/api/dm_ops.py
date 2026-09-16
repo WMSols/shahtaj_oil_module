@@ -171,16 +171,27 @@ class ShahtajDmApiOps(http.Controller):
         longitude=None,
         lines=None,
         notes=None,
+        receiver_name=None,
+        delivery_proof_image=None,
         **kwargs,
     ):
-        """GPS deliver assigned job. lines: [{line_id, qty}, ...]."""
+        """GPS deliver assigned job. lines: [{line_id, qty}, ...].
+
+        Requires receiver_name + delivery_proof_image (base64 or data-URL).
+        """
         ensure_delivery_man()
         if not job_id:
             raise UserError(_('job_id is required.'))
         if latitude is None or longitude is None:
             raise UserError(_('latitude and longitude are required.'))
         return api_success(dm_service().deliver_job(
-            job_id, latitude, longitude, lines or [], notes=notes,
+            job_id,
+            latitude,
+            longitude,
+            lines or [],
+            notes=notes,
+            receiver_name=receiver_name,
+            delivery_proof_image=delivery_proof_image,
         ))
 
     @http.route('/api/shahtaj/v1/dm/job/return-undelivered', **DM_API_ROUTE)
@@ -207,10 +218,13 @@ class ShahtajDmApiOps(http.Controller):
         longitude=None,
         lines=None,
         notes='',
+        receiver_name=None,
+        delivery_proof_image=None,
         **kwargs,
     ):
-        """Free deliver van stock to a shop with GPS + optional notes.
+        """Free deliver van stock to a shop with GPS + proof.
         lines: [{product_id, qty}, ...].
+        Requires receiver_name + delivery_proof_image.
         """
         ensure_delivery_man()
         if not shop_id:
@@ -218,5 +232,11 @@ class ShahtajDmApiOps(http.Controller):
         if latitude is None or longitude is None:
             raise UserError(_('latitude and longitude are required.'))
         return api_success(dm_service().free_deliver(
-            shop_id, latitude, longitude, lines or [], notes=notes or '',
+            shop_id,
+            latitude,
+            longitude,
+            lines or [],
+            notes=notes or '',
+            receiver_name=receiver_name,
+            delivery_proof_image=delivery_proof_image,
         ))

@@ -8,6 +8,7 @@ from odoo.exceptions import AccessDenied, AccessError
 from odoo.http import request
 from odoo.modules.registry import Registry
 
+from odoo.addons.shahtaj_oil.api import serializers
 from odoo.addons.shahtaj_oil.controllers.api.dm_base import (
     DM_API_ROUTE,
     DM_GROUP,
@@ -119,6 +120,7 @@ class ShahtajDmApiAuth(http.Controller):
                     'departed_at': session.departed_at.isoformat(sep=' ') if session.departed_at else False,
                     'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
                 }
+                gps_criteria_payload = serializers.gps_criteria(user_env)
             except (AccessError, AccessDenied):
                 raise
             except Exception as exc:
@@ -144,6 +146,7 @@ class ShahtajDmApiAuth(http.Controller):
             'session': session_payload,
             'online_status': presence['online_status'],
             'last_seen_at': presence['last_seen_at'],
+            'gps_criteria': gps_criteria_payload,
         })
 
     @http.route('/api/shahtaj/v1/dm/auth/me', **DM_API_ROUTE)

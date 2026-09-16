@@ -146,6 +146,31 @@ class ShahtajDmDelivery(models.Model):
         copy=False,
         help='When stock was last delivered to the shop (updated on each successful deliver).',
     )
+    receiver_name = fields.Char(
+        string='Receiver Name',
+        copy=False,
+        help='Person who received the stock at the shop (required on deliver).',
+    )
+    delivery_proof_image = fields.Image(
+        string='Delivery Proof Photo',
+        max_width=1920,
+        max_height=1920,
+        copy=False,
+        help='Photo of delivered stock / handoff (required on deliver).',
+    )
+    has_delivery_proof = fields.Boolean(
+        string='Has Delivery Proof',
+        compute='_compute_has_delivery_proof',
+        store=True,
+        index=True,
+        help='Stored flag so plan/list APIs avoid loading the proof image binary.',
+    )
+
+    @api.depends('delivery_proof_image')
+    def _compute_has_delivery_proof(self):
+        for rec in self:
+            rec.has_delivery_proof = bool(rec.delivery_proof_image)
+
     assigned_by_id = fields.Many2one(
         'res.users',
         string='Assigned By',
@@ -1512,6 +1537,30 @@ class ShahtajDmDelivery(models.Model):
             },
         }
 
+    @api.model
+    def _shahtaj_prepare_delivery_proof(self, receiver_name=None, delivery_proof_image=None):
+        """Validate receiver + proof image for a deliver handoff.
+
+        Returns vals to write on the delivery job (and usable on stock.picking).
+        Does not change stock flow — call only at successful deliver time.
+        """
+        name = (receiver_name or '').strip()
+        if not name:
+            raise UserError(_('Receiver name is required when delivering stock.'))
+        if not delivery_proof_image:
+            raise UserError(_('Delivery proof photo is required when delivering stock.'))
+        # Accept raw base64 or data-URL from mobile clients.
+        from odoo.addons.shahtaj_oil.api.image_utils import normalize_image_b64
+        image = normalize_image_b64(delivery_proof_image) if isinstance(
+            delivery_proof_image, str
+        ) else delivery_proof_image
+        if not image:
+            raise UserError(_('Delivery proof photo is required when delivering stock.'))
+        return {
+            'receiver_name': name,
+            'delivery_proof_image': image,
+        }
+
     def _deliver_to_shop_with_qtys(
         self,
         qty_by_line_id,
@@ -1519,9 +1568,15 @@ class ShahtajDmDelivery(models.Model):
         longitude=0.0,
         distance_m=0.0,
         reload_form=True,
+        receiver_name=None,
+        delivery_proof_image=None,
     ):
         """Deliver given van qtys to shop; supports partial / multi-attempt."""
         self.ensure_one()
+        proof_vals = self._shahtaj_prepare_delivery_proof(
+            receiver_name=receiver_name,
+            delivery_proof_image=delivery_proof_image,
+        )
         if self.state not in ('picked', 'partial'):
             raise UserError(_('Pick stock onto the van before delivering.'))
         if not self.van_location_id:
@@ -1581,6 +1636,11 @@ class ShahtajDmDelivery(models.Model):
             move.quantity = move.product_uom_qty
             move.picked = True
         picking.with_context(skip_backorder=True, skip_sms=True).button_validate()
+        # Keep proof also on the stock move for free-audit of this handoff.
+        picking.sudo().write({
+            'shahtaj_receiver_name': proof_vals['receiver_name'],
+            'shahtaj_delivery_proof_image': proof_vals['delivery_proof_image'],
+        })
 
         for line, qty in deliver_updates:
             line.qty_delivered = line.qty_delivered + qty
@@ -1597,6 +1657,7 @@ class ShahtajDmDelivery(models.Model):
             'check_in_distance_m': distance_m or 0.0,
             'gps_verified': True,
             'delivered_at': now,
+            **proof_vals,
         }
         if new_state == 'delivered':
             vals['field_state'] = 'done'

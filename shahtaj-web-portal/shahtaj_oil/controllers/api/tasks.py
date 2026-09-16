@@ -31,7 +31,8 @@ class ShahtajApiTasks(http.Controller):
         tasks = tasks.filtered(lambda t: t._shahtaj_belongs_on_booker_day_list())
         return api_success({
             'date': str(today),
-            'tasks': [serializers.task_dict(task) for task in tasks],
+            'tasks': serializers.tasks_list_dict(tasks),
+            'gps_criteria': serializers.gps_criteria(request.env),
         })
 
     @http.route('/api/shahtaj/v1/tasks/check-in', **API_ROUTE)

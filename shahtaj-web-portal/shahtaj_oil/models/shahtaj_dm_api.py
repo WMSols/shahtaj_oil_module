@@ -44,10 +44,16 @@ class ShahtajDmApiService(models.AbstractModel):
         ]
         if product_ids:
             domain.append(('product_id', 'in', list(product_ids)))
-        totals = defaultdict(float)
-        for quant in self.env['stock.quant'].sudo().search(domain):
-            totals[quant.product_id.id] += quant.quantity
-        return dict(totals)
+        rows = self.env['stock.quant'].sudo().read_group(
+            domain,
+            ['quantity:sum'],
+            ['product_id'],
+        )
+        return {
+            row['product_id'][0]: float(row.get('quantity') or 0.0)
+            for row in rows
+            if row.get('product_id')
+        }
 
     @api.model
     def _wh_free_qty_map(self, product_ids=None):
@@ -61,12 +67,33 @@ class ShahtajDmApiService(models.AbstractModel):
         ]
         if product_ids:
             domain.append(('product_id', 'in', list(product_ids)))
-        totals = defaultdict(float)
-        for quant in self.env['stock.quant'].sudo().search(domain):
-            qty = quant.available_quantity
+        # available_quantity = quantity - reserved_quantity (same as Quant.available_quantity).
+        rows = self.env['stock.quant'].sudo().read_group(
+            domain,
+            ['quantity:sum', 'reserved_quantity:sum'],
+            ['product_id'],
+        )
+        totals = {}
+        for row in rows:
+            product = row.get('product_id')
+            if not product:
+                continue
+            qty = float(row.get('quantity') or 0.0) - float(row.get('reserved_quantity') or 0.0)
             if qty:
-                totals[quant.product_id.id] += qty
-        return dict(totals)
+                totals[product[0]] = qty
+        return totals
+
+    @api.model
+    def _prefetch_jobs(self, jobs):
+        """Warm related records used by plan/load serializers (no behavior change)."""
+        if not jobs:
+            return jobs
+        jobs.mapped('partner_id')
+        jobs.mapped('sale_order_id')
+        jobs.mapped('line_ids.product_id')
+        jobs.mapped('line_ids.product_uom_id')
+        return jobs
+
 
     @api.model
     def get_today_load(self, dm=None, day=None):
@@ -77,6 +104,7 @@ class ShahtajDmApiService(models.AbstractModel):
         jobs = Delivery.search(self._jobs_domain(dm, day, open_only=True), order='id')
         for job in jobs:
             job.sudo()._sync_with_sale_order(ensure_visit_task=False)
+        self._prefetch_jobs(jobs)
 
         shops = []
         pick_needed = defaultdict(lambda: {
@@ -256,9 +284,11 @@ class ShahtajDmApiService(models.AbstractModel):
         items = []
         van_map = self._van_qty_map(dm)
         Product = self.env['product.product'].sudo()
+        products = Product.browse(list(van_map.keys()))
+        product_by_id = {product.id: product for product in products}
         for pid, qty in sorted(van_map.items(), key=lambda x: x[0]):
-            product = Product.browse(pid)
-            if not product.exists() or qty <= 0:
+            product = product_by_id.get(pid)
+            if not product or qty <= 0:
                 continue
             items.append({
                 'product_id': pid,
@@ -310,7 +340,9 @@ class ShahtajDmApiService(models.AbstractModel):
         open_jobs = jobs.filtered(lambda j: j.state in ('not_ready', 'ready', 'picked', 'partial'))
         done_jobs = jobs - open_jobs
         ordered = open_jobs + done_jobs
+        self._prefetch_jobs(ordered)
         session = self.env['shahtaj.dm.day.session'].get_or_create_today(dm, day)
+        limits = self.env['res.company'].shahtaj_get_shop_distance_limits()
         return {
             'date': str(day),
             'session': {
@@ -320,6 +352,10 @@ class ShahtajDmApiService(models.AbstractModel):
                 'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
             },
             'jobs': [self.job_brief(j) for j in ordered],
+            'gps_criteria': {
+                'min_m': float(limits.get('min_m') or 0.0),
+                'max_m': float(limits.get('max_m') or 0.0),
+            },
         }
 
     @api.model
@@ -342,6 +378,8 @@ class ShahtajDmApiService(models.AbstractModel):
             'gps_verified': bool(job.gps_verified),
             'picked_at': job.picked_at.isoformat(sep=' ') if job.picked_at else False,
             'delivered_at': job.delivered_at.isoformat(sep=' ') if job.delivered_at else False,
+            'receiver_name': job.receiver_name or '',
+            'has_delivery_proof': bool(job.has_delivery_proof),
         }
 
     @api.model
@@ -392,7 +430,17 @@ class ShahtajDmApiService(models.AbstractModel):
         return {'job': self.job_brief(job)}
 
     @api.model
-    def deliver_job(self, job_id, latitude, longitude, lines, notes=None, dm=None):
+    def deliver_job(
+        self,
+        job_id,
+        latitude,
+        longitude,
+        lines,
+        notes=None,
+        receiver_name=None,
+        delivery_proof_image=None,
+        dm=None,
+    ):
         """GPS deliver from van for an assigned job. lines=[{line_id, qty}]."""
         job = self._job_for_dm(job_id, dm)
         if notes:
@@ -422,6 +470,8 @@ class ShahtajDmApiService(models.AbstractModel):
             longitude=float(longitude),
             distance_m=distance,
             reload_form=False,
+            receiver_name=receiver_name,
+            delivery_proof_image=delivery_proof_image,
         )
         return {
             'distance_m': distance,
@@ -435,12 +485,28 @@ class ShahtajDmApiService(models.AbstractModel):
         return {'job': self.job_detail(job)}
 
     @api.model
-    def free_deliver(self, shop_id, latitude, longitude, lines, notes='', dm=None):
+    def free_deliver(
+        self,
+        shop_id,
+        latitude,
+        longitude,
+        lines,
+        notes='',
+        receiver_name=None,
+        delivery_proof_image=None,
+        dm=None,
+    ):
         """Deliver free van stock to a shop (no assigned job required) + notes."""
         dm = dm or self._dm_user()
         shop = self.env['res.partner'].sudo().browse(int(shop_id))
         if not shop.exists() or not shop.is_shahtaj_shop:
             raise UserError(_('Shop not found.'))
+
+        Delivery = self.env['shahtaj.dm.delivery']
+        proof_vals = Delivery._shahtaj_prepare_delivery_proof(
+            receiver_name=receiver_name,
+            delivery_proof_image=delivery_proof_image,
+        )
 
         Visit = self.env['shahtaj.visit']
         distance = Visit._validate_check_in_coordinates(
@@ -460,7 +526,6 @@ class ShahtajDmApiService(models.AbstractModel):
         if not qty_map:
             raise UserError(_('Enter a deliver quantity on at least one product.'))
 
-        Delivery = self.env['shahtaj.dm.delivery']
         van = Delivery._ensure_van_location_for_dm(dm)
         warehouse = Delivery._get_warehouse()
         customer_loc = shop.property_stock_customer
@@ -513,6 +578,10 @@ class ShahtajDmApiService(models.AbstractModel):
             move_vals_list=move_vals_list,
             partner_id=shop.id,
         )
+        picking.write({
+            'shahtaj_receiver_name': proof_vals['receiver_name'],
+            'shahtaj_delivery_proof_image': proof_vals['delivery_proof_image'],
+        })
         picking.action_confirm()
         picking.action_assign()
         for move in picking.move_ids:
@@ -524,6 +593,9 @@ class ShahtajDmApiService(models.AbstractModel):
             'shop_id': shop.id,
             'shop_name': shop.display_name,
             'notes': (notes or '').strip(),
+            'receiver_name': proof_vals['receiver_name'],
+            'has_delivery_proof': True,
+            'picking_id': picking.id,
             'van': self.van_snapshot(dm),
         }
 
@@ -574,8 +646,21 @@ class ShahtajDmApiService(models.AbstractModel):
         )
 
     @api.model
-    def recovery_collect(self, shop_id=None, allocations=None, notes='', dm=None):
-        """Collect cash into DM wallet. Independent of check-in / delivery state."""
+    def recovery_collect(
+        self,
+        shop_id=None,
+        allocations=None,
+        notes='',
+        payment_method='cash',
+        cheque_number=None,
+        cheque_image=None,
+        dm=None,
+    ):
+        """Collect into DM wallet. Independent of check-in / delivery state.
+
+        ``payment_method``: ``cash`` (default) or ``cheque`` (needs number + photo).
+        Method is supporting metadata — journal stays DMCASH.
+        """
         dm = dm or self._dm_user()
         shop = self._resolve_recovery_shop(shop_id, dm=dm)
         Service = self._recovery_service()
@@ -602,17 +687,31 @@ class ShahtajDmApiService(models.AbstractModel):
             allocations=cleaned,
             notes=notes or '',
             delivery=None,
+            payment_method=payment_method or 'cash',
+            cheque_number=cheque_number,
+            cheque_image=cheque_image,
         )
+        channel = payments[:1].shahtaj_payment_channel if payments else (payment_method or 'cash')
         return {
             'shop_id': shop.id,
             'shop_name': shop.display_name,
             'collected_amount': sum(payments.mapped('amount')),
+            'payment_method': channel or 'cash',
+            'cheque_number': (
+                payments[:1].shahtaj_instrument_reference or ''
+            ) if channel == 'cheque' else '',
+            'has_cheque_image': bool(payments[:1].shahtaj_has_cheque_image) if payments else False,
             'payment_ids': payments.ids,
             'payments': [{
                 'payment_id': p.id,
                 'name': p.name,
                 'amount': p.amount,
                 'date': str(p.date) if p.date else False,
+                'payment_method': p.shahtaj_payment_channel or 'cash',
+                'cheque_number': (
+                    p.shahtaj_instrument_reference or ''
+                ) if (p.shahtaj_payment_channel or '') == 'cheque' else '',
+                'has_cheque_image': bool(p.shahtaj_has_cheque_image),
             } for p in payments],
             'wallet': Service.wallet_summary(dm),
             'shop': Service.shop_recovery_payload(shop, delivery_man=dm),

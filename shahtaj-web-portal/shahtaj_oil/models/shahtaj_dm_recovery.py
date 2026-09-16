@@ -217,6 +217,7 @@ class ShahtajDmRecoveryService(models.AbstractModel):
         rows = []
         for pay in payments:
             invoice_names = pay.reconciled_invoice_ids.mapped('name')
+            channel = pay.shahtaj_payment_channel or 'cash'
             rows.append({
                 'payment_id': pay.id,
                 'name': pay.name,
@@ -226,11 +227,56 @@ class ShahtajDmRecoveryService(models.AbstractModel):
                 'shop_name': pay.partner_id.display_name if pay.partner_id else '',
                 'invoices': invoice_names,
                 'notes': pay.shahtaj_payment_notes or '',
+                'payment_method': channel,
+                'cheque_number': (
+                    pay.shahtaj_instrument_reference or ''
+                ) if channel == 'cheque' else '',
+                'has_cheque_image': bool(pay.shahtaj_has_cheque_image),
             })
         return {
             'collections': rows,
             'count': len(rows),
             'wallet_balance': self.wallet_balance(delivery_man, company),
+        }
+
+    @api.model
+    def _prepare_collection_method_vals(
+        self,
+        payment_method='cash',
+        cheque_number=None,
+        cheque_image=None,
+    ):
+        """Validate + normalize supporting payment-method vals (cash/cheque).
+
+        Accounting journal stays DMCASH; method is metadata for audit / app.
+        """
+        method = (payment_method or 'cash').strip().lower()
+        if method not in ('cash', 'cheque'):
+            raise UserError(_(
+                'payment_method must be "cash" or "cheque".'
+            ))
+        if method == 'cash':
+            return {
+                'shahtaj_payment_channel': 'cash',
+                'shahtaj_instrument_reference': False,
+                'shahtaj_cheque_image': False,
+            }
+
+        number = (cheque_number or '').strip()
+        if not number:
+            raise UserError(_('Cheque number is required for cheque collections.'))
+        if not cheque_image:
+            raise UserError(_('Cheque photo is required for cheque collections.'))
+        from odoo.addons.shahtaj_oil.api.image_utils import normalize_image_b64
+        image = normalize_image_b64(cheque_image) if isinstance(
+            cheque_image, str
+        ) else cheque_image
+        if not image:
+            raise UserError(_('Cheque photo is required for cheque collections.'))
+        return {
+            'shahtaj_payment_channel': 'cheque',
+            'shahtaj_instrument_reference': number,
+            'shahtaj_cheque_image': image,
         }
 
     @api.model
@@ -242,11 +288,15 @@ class ShahtajDmRecoveryService(models.AbstractModel):
         notes='',
         delivery=None,
         company=None,
+        payment_method='cash',
+        cheque_number=None,
+        cheque_image=None,
     ):
         """Post inbound DMCASH payments for invoice→amount pairs.
 
         ``allocations``: list of ``(account.move, amount)`` or dicts with
         ``invoice`` / ``invoice_id`` and ``amount``.
+        ``payment_method``: ``cash`` (default) or ``cheque`` (requires number + photo).
         Returns the created ``account.payment`` recordset.
         """
         self._assert_can_collect(delivery_man)
@@ -255,6 +305,11 @@ class ShahtajDmRecoveryService(models.AbstractModel):
         currency = company.currency_id
         Payment = self.env['account.payment'].sudo()
         Register = self.env['account.payment.register'].sudo()
+        method_vals = self._prepare_collection_method_vals(
+            payment_method=payment_method,
+            cheque_number=cheque_number,
+            cheque_image=cheque_image,
+        )
 
         pairs = []
         for row in allocations or []:
@@ -301,7 +356,8 @@ class ShahtajDmRecoveryService(models.AbstractModel):
                 'payment_date': fields.Date.context_today(self),
                 'amount': amount,
                 'communication': notes or _('DM collection — %(shop)s', shop=invoice.partner_id.display_name),
-                'shahtaj_payment_channel': 'cash',
+                'shahtaj_payment_channel': method_vals['shahtaj_payment_channel'],
+                'shahtaj_instrument_reference': method_vals.get('shahtaj_instrument_reference') or False,
                 'shahtaj_payment_notes': notes or False,
             })
             if hasattr(wizard, 'custom_user_amount'):
@@ -313,7 +369,9 @@ class ShahtajDmRecoveryService(models.AbstractModel):
                     'shahtaj_is_dm_wallet_collection': True,
                     'shahtaj_collected_by_dm_id': delivery_man.id,
                     'shahtaj_dm_delivery_id': delivery.id if delivery else False,
-                    'shahtaj_payment_channel': 'cash',
+                    'shahtaj_payment_channel': method_vals['shahtaj_payment_channel'],
+                    'shahtaj_instrument_reference': method_vals.get('shahtaj_instrument_reference') or False,
+                    'shahtaj_cheque_image': method_vals.get('shahtaj_cheque_image') or False,
                     'shahtaj_payment_notes': notes or created.shahtaj_payment_notes,
                 })
                 payments |= created.sudo()
@@ -327,9 +385,10 @@ class ShahtajDmRecoveryService(models.AbstractModel):
                 name=_('DM wallet collection'),
                 related_record=delivery or delivery_man,
                 message=_(
-                    '%(dm)s collected %(amount).2f from %(count)s invoice(s)',
+                    '%(dm)s collected %(amount).2f (%(method)s) from %(count)s invoice(s)',
                     dm=delivery_man.display_name,
                     amount=sum(payments.mapped('amount')),
+                    method=method_vals['shahtaj_payment_channel'],
                     count=len(payments),
                 ),
             )

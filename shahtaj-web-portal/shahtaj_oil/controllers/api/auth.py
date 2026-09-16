@@ -104,6 +104,7 @@ class ShahtajApiAuth(http.Controller):
                 )
                 cr.commit()
                 user_payload = serializers.user_brief(user)
+                gps_criteria_payload = serializers.gps_criteria(user_env)
             except (AccessError, AccessDenied):
                 raise
             except Exception as exc:
@@ -128,6 +129,7 @@ class ShahtajApiAuth(http.Controller):
             'user': user_payload,
             'online_status': presence['online_status'],
             'last_seen_at': presence['last_seen_at'],
+            'gps_criteria': gps_criteria_payload,
         })
 
     @http.route('/api/shahtaj/v1/auth/me', **API_ROUTE)

@@ -50,6 +50,16 @@ class ShahtajDmDaySession(models.Model):
         index=True,
     )
     notes = fields.Text(string='Notes')
+    gps_min_distance_m = fields.Float(
+        string='GPS Min (m)',
+        compute='_compute_gps_criteria',
+        help='Company minimum shop distance — same as mobile gps_criteria.min_m.',
+    )
+    gps_max_distance_m = fields.Float(
+        string='GPS Max (m)',
+        compute='_compute_gps_criteria',
+        help='Company maximum shop distance — same as mobile gps_criteria.max_m.',
+    )
 
     _sql_constraints = [
         (
@@ -58,6 +68,13 @@ class ShahtajDmDaySession(models.Model):
             'A delivery man can have only one session per day.',
         ),
     ]
+
+    @api.depends('company_id')
+    def _compute_gps_criteria(self):
+        limits = self.env['res.company'].shahtaj_get_shop_distance_limits()
+        for rec in self:
+            rec.gps_min_distance_m = float(limits.get('min_m') or 0.0)
+            rec.gps_max_distance_m = float(limits.get('max_m') or 0.0)
 
     @api.depends('delivery_man_id', 'session_date', 'state')
     def _compute_display_name(self):

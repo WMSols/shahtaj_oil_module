@@ -120,7 +120,7 @@ class ShahtajApiShops(http.Controller):
             ('active', '=', True),
         ], order='create_date desc', limit=50)
         return api_success({
-            'shops': [serializers.shop_brief(shop) for shop in shops],
+            'shops': serializers.shop_briefs(shops),
         })
 
     @http.route('/api/shahtaj/v1/shops/get', **API_ROUTE)
