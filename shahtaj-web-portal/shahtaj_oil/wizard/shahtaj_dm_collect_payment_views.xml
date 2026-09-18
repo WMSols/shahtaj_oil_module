@@ -63,6 +63,18 @@
                             <field name="currency_id" column_invisible="1" force_save="1"/>
                         </list>
                     </field>
+                    <separator string="Last 10 paid invoices (discuss with shopkeeper)"/>
+                    <field name="paid_line_ids" readonly="1">
+                        <list create="false" edit="false" delete="false">
+                            <field name="invoice_name" string="Number"/>
+                            <field name="invoice_date"/>
+                            <field name="paid_date"/>
+                            <field name="amount_total" sum="Paid total"/>
+                            <field name="payment_info" string="Collected by / method"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <field name="move_id" column_invisible="1"/>
+                        </list>
+                    </field>
                 </sheet>
                 <footer>
                     <button name="action_fill_full_residuals" type="object"

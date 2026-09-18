@@ -62,7 +62,7 @@ class ShahtajDmRecoveryService(models.AbstractModel):
 
     @api.model
     def _open_customer_invoices(self, shop, company=None):
-        """Posted customer invoices/credit notes still due for a shop."""
+        """Posted customer invoices still due for a shop (unpaid / partial)."""
         company = company or self.env.company
         if not shop:
             return self.env['account.move']
@@ -75,6 +75,120 @@ class ShahtajDmRecoveryService(models.AbstractModel):
             ('company_id', '=', company.id),
             ('amount_residual', '>', 0),
         ], order='invoice_date asc, id asc')
+
+    @api.model
+    def _paid_customer_invoices(self, shop, company=None, limit=10):
+        """Latest fully paid customer invoices for a shop (newest first)."""
+        company = company or self.env.company
+        limit = max(1, min(int(limit or 10), 10))
+        if not shop:
+            return self.env['account.move']
+        commercial = shop.commercial_partner_id
+        return self.env['account.move'].sudo().search([
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', '=', 'paid'),
+            ('partner_id', 'child_of', commercial.id),
+            ('company_id', '=', company.id),
+        ], order='invoice_date desc, id desc', limit=limit)
+
+    @api.model
+    def _payment_brief_for_recovery(self, payment):
+        """Lean payment row for recovery history (no image bytes)."""
+        channel = payment.shahtaj_payment_channel or (
+            'cash' if payment.shahtaj_is_dm_wallet_collection else False
+        )
+        dm = payment.shahtaj_collected_by_dm_id
+        return {
+            'payment_id': payment.id,
+            'payment_name': payment.name or '',
+            'payment_date': str(payment.date) if payment.date else False,
+            'amount': payment.amount,
+            'payment_method': channel or False,
+            'cheque_number': (
+                payment.shahtaj_instrument_reference or ''
+            ) if channel == 'cheque' else '',
+            'collected_by_dm_id': dm.id if dm else False,
+            'collected_by_dm_name': dm.display_name if dm else '',
+            'is_dm_wallet_collection': bool(payment.shahtaj_is_dm_wallet_collection),
+        }
+
+    @api.model
+    def _paid_invoice_rows(self, invoices):
+        """Serialize paid invoices + reconciled payments (one prefetch pass)."""
+        if not invoices:
+            return []
+        # Prefetch payments + DM collector in batch (avoid N+1).
+        invoices.mapped('reconciled_payment_ids.shahtaj_collected_by_dm_id')
+        invoices.mapped('matched_payment_ids.shahtaj_collected_by_dm_id')
+        rows = []
+        for inv in invoices:
+            payments = (inv.reconciled_payment_ids | inv.matched_payment_ids).sudo()
+            payments = payments.filtered(
+                lambda p: p.state in ('paid', 'in_process') and p.payment_type == 'inbound'
+            ).sorted(lambda p: (p.date or fields.Date.to_date('1970-01-01'), p.id))
+            payment_briefs = [self._payment_brief_for_recovery(p) for p in payments]
+            paid_dates = [p.date for p in payments if p.date]
+            rows.append({
+                'invoice_id': inv.id,
+                'name': inv.name,
+                'invoice_date': str(inv.invoice_date) if inv.invoice_date else False,
+                'amount_total': inv.amount_total,
+                'amount_residual': abs(inv.amount_residual),
+                'payment_state': inv.payment_state,
+                'is_legacy_balance': bool(getattr(inv, 'shahtaj_is_legacy_balance', False)),
+                'paid_date': str(max(paid_dates)) if paid_dates else (
+                    str(inv.invoice_date) if inv.invoice_date else False
+                ),
+                'payments': payment_briefs,
+            })
+        return rows
+
+    @api.model
+    def shop_recovery_payload(self, shop, delivery_man=None, company=None):
+        """Open invoices + last paid invoices for Recovery (no check-in required)."""
+        company = company or self.env.company
+        if not shop or not shop.exists():
+            raise UserError(_('Shop not found.'))
+        if not shop.is_shahtaj_shop:
+            raise UserError(_('Recovery is only available for Shahtaj shops.'))
+
+        invoices = self._open_customer_invoices(shop, company)
+        invoice_rows = [{
+            'invoice_id': inv.id,
+            'name': inv.name,
+            'invoice_date': str(inv.invoice_date) if inv.invoice_date else False,
+            'amount_total': inv.amount_total,
+            'amount_residual': abs(inv.amount_residual),
+            'payment_state': inv.payment_state,
+            'is_legacy_balance': bool(getattr(inv, 'shahtaj_is_legacy_balance', False)),
+        } for inv in invoices]
+        outstanding = sum(row['amount_residual'] for row in invoice_rows)
+
+        paid_invoices = self._paid_customer_invoices(shop, company, limit=10)
+        paid_rows = self._paid_invoice_rows(paid_invoices)
+
+        snap = {}
+        if hasattr(shop, '_shahtaj_get_credit_snapshot'):
+            snap = shop._shahtaj_get_credit_snapshot()
+
+        payload = {
+            'shop_id': shop.id,
+            'shop_name': shop.display_name,
+            'shop_category': shop.shahtaj_shop_category or False,
+            'outstanding': outstanding,
+            'posted_receivable': float(snap.get('posted_outstanding', shop.sudo().credit or 0.0)),
+            'effective_outstanding': float(snap.get('effective_outstanding', outstanding)),
+            'credit_limit': float(snap.get('credit_limit', shop.credit_limit or 0.0)),
+            'credit_remaining': float(snap.get('credit_remaining', 0.0)),
+            'invoices': invoice_rows,
+            'invoice_count': len(invoice_rows),
+            'paid_invoices': paid_rows,
+            'paid_invoice_count': len(paid_rows),
+        }
+        if delivery_man:
+            payload['wallet_balance'] = self.wallet_balance(delivery_man, company)
+        return payload
 
     @api.model
     def _collection_domain(self, delivery_man, company=None, extra=None):
@@ -150,47 +264,6 @@ class ShahtajDmRecoveryService(models.AbstractModel):
             'settled_total': settled_total,
             'as_of': str(today),
         }
-
-    @api.model
-    def shop_recovery_payload(self, shop, delivery_man=None, company=None):
-        """Open invoices + outstanding for Recovery screen (no check-in required)."""
-        company = company or self.env.company
-        if not shop or not shop.exists():
-            raise UserError(_('Shop not found.'))
-        if not shop.is_shahtaj_shop:
-            raise UserError(_('Recovery is only available for Shahtaj shops.'))
-
-        invoices = self._open_customer_invoices(shop, company)
-        invoice_rows = [{
-            'invoice_id': inv.id,
-            'name': inv.name,
-            'invoice_date': str(inv.invoice_date) if inv.invoice_date else False,
-            'amount_total': inv.amount_total,
-            'amount_residual': abs(inv.amount_residual),
-            'payment_state': inv.payment_state,
-            'is_legacy_balance': bool(getattr(inv, 'shahtaj_is_legacy_balance', False)),
-        } for inv in invoices]
-        outstanding = sum(row['amount_residual'] for row in invoice_rows)
-
-        snap = {}
-        if hasattr(shop, '_shahtaj_get_credit_snapshot'):
-            snap = shop._shahtaj_get_credit_snapshot()
-
-        payload = {
-            'shop_id': shop.id,
-            'shop_name': shop.display_name,
-            'shop_category': shop.shahtaj_shop_category or False,
-            'outstanding': outstanding,
-            'posted_receivable': float(snap.get('posted_outstanding', shop.sudo().credit or 0.0)),
-            'effective_outstanding': float(snap.get('effective_outstanding', outstanding)),
-            'credit_limit': float(snap.get('credit_limit', shop.credit_limit or 0.0)),
-            'credit_remaining': float(snap.get('credit_remaining', 0.0)),
-            'invoices': invoice_rows,
-            'invoice_count': len(invoice_rows),
-        }
-        if delivery_man:
-            payload['wallet_balance'] = self.wallet_balance(delivery_man, company)
-        return payload
 
     @api.model
     def list_collections(

@@ -68,12 +68,48 @@ class ShahtajDmCollectPayment(models.TransientModel):
         'wizard_id',
         string='Invoices',
     )
+    paid_line_ids = fields.One2many(
+        'shahtaj.dm.collect.payment.paid.line',
+        'wizard_id',
+        string='Recently Paid',
+        readonly=True,
+    )
 
     @api.onchange('payment_method')
     def _onchange_payment_method(self):
         if self.payment_method == 'cash':
             self.cheque_number = False
             self.cheque_image = False
+
+    def _paid_line_commands_for_partner(self, partner):
+        """Build readonly paid-history lines (last 10) for the collect wizard."""
+        if not partner:
+            return [(5, 0, 0)]
+        Service = self.env['shahtaj.dm.recovery.service']
+        paid = Service._paid_customer_invoices(partner, limit=10)
+        rows = Service._paid_invoice_rows(paid)
+        commands = [(5, 0, 0)]
+        for row in rows:
+            parts = []
+            for pay in row.get('payments') or []:
+                who = pay.get('collected_by_dm_name') or _('Office / other')
+                method = pay.get('payment_method') or '—'
+                date = pay.get('payment_date') or '—'
+                amount = float(pay.get('amount') or 0.0)
+                cheque = pay.get('cheque_number') or ''
+                bit = f'{who} · {method} · {date} · {amount:.2f}'
+                if cheque:
+                    bit = f'{bit} · #{cheque}'
+                parts.append(bit)
+            commands.append((0, 0, {
+                'move_id': row['invoice_id'],
+                'invoice_name': row.get('name') or '',
+                'invoice_date': row.get('invoice_date') or False,
+                'paid_date': row.get('paid_date') or False,
+                'amount_total': row.get('amount_total') or 0.0,
+                'payment_info': '\n'.join(parts) if parts else _('No payment details'),
+            }))
+        return commands
 
 
     @api.depends('line_ids.amount')
@@ -124,12 +160,14 @@ class ShahtajDmCollectPayment(models.TransientModel):
                 })
                 for inv in Service._open_customer_invoices(partner)
             ]
+            res['paid_line_ids'] = self._paid_line_commands_for_partner(partner)
         return res
 
     @api.onchange('partner_id')
     def _onchange_partner_id(self):
         Service = self.env['shahtaj.dm.recovery.service']
         self.line_ids = [(5, 0, 0)]
+        self.paid_line_ids = [(5, 0, 0)]
         if not self.partner_id:
             self.shop_outstanding = 0.0
             return
@@ -142,6 +180,7 @@ class ShahtajDmCollectPayment(models.TransientModel):
                 'amount': 0.0,
             }))
         self.line_ids = lines
+        self.paid_line_ids = self._paid_line_commands_for_partner(self.partner_id)
 
     @api.onchange('delivery_man_id')
     def _onchange_delivery_man_id(self):
@@ -233,6 +272,32 @@ class ShahtajDmCollectPaymentLine(models.TransientModel):
     amount = fields.Monetary(
         string='Collect Now',
         currency_field='currency_id',
+    )
+
+
+class ShahtajDmCollectPaymentPaidLine(models.TransientModel):
+    _name = 'shahtaj.dm.collect.payment.paid.line'
+    _description = 'DM Collect Payment — Recently Paid Invoice'
+
+    wizard_id = fields.Many2one(
+        'shahtaj.dm.collect.payment',
+        required=True,
+        ondelete='cascade',
+    )
+    move_id = fields.Many2one('account.move', string='Invoice', readonly=True)
+    invoice_name = fields.Char(string='Number', readonly=True)
+    invoice_date = fields.Date(string='Invoice Date', readonly=True)
+    paid_date = fields.Date(string='Paid Date', readonly=True)
+    currency_id = fields.Many2one(related='wizard_id.currency_id', readonly=True)
+    amount_total = fields.Monetary(
+        string='Total',
+        currency_field='currency_id',
+        readonly=True,
+    )
+    payment_info = fields.Text(
+        string='Collected By / Method',
+        readonly=True,
+        help='Who collected, payment method, date, and amount.',
     )
 
 

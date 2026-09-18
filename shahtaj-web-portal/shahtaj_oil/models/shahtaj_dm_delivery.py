@@ -304,6 +304,12 @@ class ShahtajDmDelivery(models.Model):
         compute='_compute_shop_balance_info',
         sanitize=False,
     )
+    shop_paid_invoices_html = fields.Html(
+        string='Recently Paid Invoices',
+        compute='_compute_shop_balance_info',
+        sanitize=False,
+        help='Last 10 fully paid invoices with who collected / method.',
+    )
 
     visit_task_id = fields.Many2one(
         'shahtaj.visit.task',
@@ -364,6 +370,9 @@ class ShahtajDmDelivery(models.Model):
                 rec.shop_invoices_html = (
                     '<p class="text-muted mb-0">No shop linked to this delivery.</p>'
                 )
+                rec.shop_paid_invoices_html = (
+                    '<p class="text-muted mb-0">No shop linked to this delivery.</p>'
+                )
                 continue
 
             shop_sudo = shop.sudo()
@@ -420,44 +429,87 @@ class ShahtajDmDelivery(models.Model):
                 rec.shop_invoices_html = (
                     '<p class="text-muted mb-0">No posted invoices for this shop yet.</p>'
                 )
-                continue
-
-            rows = []
-            for inv in invoices:
-                state = inv.payment_state or ''
-                label = payment_labels.get(state, state or '—')
-                badge = {
-                    'not_paid': '#dc3545',
-                    'partial': '#fd7e14',
-                    'in_payment': '#0d6efd',
-                    'paid': '#198754',
-                    'reversed': '#6c757d',
-                }.get(state, '#6c757d')
-                inv_date = inv.invoice_date.isoformat() if inv.invoice_date else '—'
-                due = inv.invoice_date_due.isoformat() if inv.invoice_date_due else '—'
-                rows.append(
-                    '<tr>'
-                    f'<td>{inv.name or "—"}</td>'
-                    f'<td>{type_labels.get(inv.move_type, inv.move_type)}</td>'
-                    f'<td>{inv_date}</td>'
-                    f'<td>{due}</td>'
-                    f'<td style="text-align:right;">{inv.amount_total:,.2f}</td>'
-                    f'<td style="text-align:right;">{inv.amount_residual:,.2f}</td>'
-                    f'<td><span style="background:{badge};color:#fff;padding:2px 8px;'
-                    f'border-radius:4px;font-size:12px;">{label}</span></td>'
-                    '</tr>'
+            else:
+                rows = []
+                for inv in invoices:
+                    state = inv.payment_state or ''
+                    label = payment_labels.get(state, state or '—')
+                    badge = {
+                        'not_paid': '#dc3545',
+                        'partial': '#fd7e14',
+                        'in_payment': '#0d6efd',
+                        'paid': '#198754',
+                        'reversed': '#6c757d',
+                    }.get(state, '#6c757d')
+                    inv_date = inv.invoice_date.isoformat() if inv.invoice_date else '—'
+                    due = inv.invoice_date_due.isoformat() if inv.invoice_date_due else '—'
+                    rows.append(
+                        '<tr>'
+                        f'<td>{inv.name or "—"}</td>'
+                        f'<td>{type_labels.get(inv.move_type, inv.move_type)}</td>'
+                        f'<td>{inv_date}</td>'
+                        f'<td>{due}</td>'
+                        f'<td style="text-align:right;">{inv.amount_total:,.2f}</td>'
+                        f'<td style="text-align:right;">{inv.amount_residual:,.2f}</td>'
+                        f'<td><span style="background:{badge};color:#fff;padding:2px 8px;'
+                        f'border-radius:4px;font-size:12px;">{label}</span></td>'
+                        '</tr>'
+                    )
+                rec.shop_invoices_html = (
+                    '<div class="table-responsive">'
+                    '<table class="table table-sm table-striped mb-0">'
+                    '<thead><tr>'
+                    '<th>Number</th><th>Type</th><th>Date</th><th>Due</th>'
+                    '<th style="text-align:right;">Total</th>'
+                    '<th style="text-align:right;">Remaining</th>'
+                    '<th>Payment</th>'
+                    '</tr></thead>'
+                    f'<tbody>{"".join(rows)}</tbody></table></div>'
                 )
-            rec.shop_invoices_html = (
-                '<div class="table-responsive">'
-                '<table class="table table-sm table-striped mb-0">'
-                '<thead><tr>'
-                '<th>Number</th><th>Type</th><th>Date</th><th>Due</th>'
-                '<th style="text-align:right;">Total</th>'
-                '<th style="text-align:right;">Remaining</th>'
-                '<th>Payment</th>'
-                '</tr></thead>'
-                f'<tbody>{"".join(rows)}</tbody></table></div>'
+
+            # Last 10 paid + collector (same data as recovery/shop API).
+            Service = self.env['shahtaj.dm.recovery.service']
+            paid_rows = Service._paid_invoice_rows(
+                Service._paid_customer_invoices(shop, company, limit=10),
             )
+            if not paid_rows:
+                rec.shop_paid_invoices_html = (
+                    '<p class="text-muted mb-0">No fully paid invoices yet for this shop.</p>'
+                )
+            else:
+                paid_html_rows = []
+                for row in paid_rows:
+                    parts = []
+                    for pay in row.get('payments') or []:
+                        who = pay.get('collected_by_dm_name') or 'Office / other'
+                        method = pay.get('payment_method') or '—'
+                        date = pay.get('payment_date') or '—'
+                        amount = float(pay.get('amount') or 0.0)
+                        cheque = pay.get('cheque_number') or ''
+                        bit = f'{who} · {method} · {date} · {amount:,.2f}'
+                        if cheque:
+                            bit = f'{bit} · #{cheque}'
+                        parts.append(bit)
+                    info = '<br/>'.join(parts) if parts else '—'
+                    paid_html_rows.append(
+                        '<tr>'
+                        f'<td>{row.get("name") or "—"}</td>'
+                        f'<td>{row.get("invoice_date") or "—"}</td>'
+                        f'<td>{row.get("paid_date") or "—"}</td>'
+                        f'<td style="text-align:right;">{float(row.get("amount_total") or 0):,.2f}</td>'
+                        f'<td>{info}</td>'
+                        '</tr>'
+                    )
+                rec.shop_paid_invoices_html = (
+                    '<div class="table-responsive">'
+                    '<table class="table table-sm table-striped mb-0">'
+                    '<thead><tr>'
+                    '<th>Number</th><th>Invoice Date</th><th>Paid Date</th>'
+                    '<th style="text-align:right;">Total</th>'
+                    '<th>Collected by / method</th>'
+                    '</tr></thead>'
+                    f'<tbody>{"".join(paid_html_rows)}</tbody></table></div>'
+                )
 
     @api.depends('state', 'line_ids.qty_picked', 'line_ids.qty_delivered')
     def _compute_delivery_progress(self):

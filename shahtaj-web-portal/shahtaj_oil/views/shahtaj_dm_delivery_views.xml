@@ -382,6 +382,8 @@
                                     <field name="currency_id" column_invisible="1"/>
                                 </list>
                             </field>
+                            <separator string="Last 10 paid — who collected"/>
+                            <field name="shop_paid_invoices_html" nolabel="1" colspan="2"/>
                             <separator string="Printable summary"/>
                             <field name="shop_invoices_html" nolabel="1" colspan="2"/>
                         </page>

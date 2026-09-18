@@ -20,7 +20,7 @@ class ShahtajDmApiRecovery(http.Controller):
 
     @http.route('/api/shahtaj/v1/dm/recovery/shop', **DM_API_ROUTE)
     def recovery_shop(self, shop_id=None, **kwargs):
-        """Open invoices + outstanding for Recovery button on a shop.
+        """Open invoices + outstanding + last paid invoices for Recovery.
 
         Requires ``shop_id``. No check-in / job_id required.
         """

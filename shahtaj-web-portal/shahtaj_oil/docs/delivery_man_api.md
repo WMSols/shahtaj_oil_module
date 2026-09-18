@@ -558,9 +558,38 @@ Example response `data`:
       "is_legacy_balance": false
     }
   ],
+  "paid_invoice_count": 1,
+  "paid_invoices": [
+    {
+      "invoice_id": 88,
+      "name": "INV/2026/0008",
+      "invoice_date": "2026-08-20",
+      "amount_total": 8000.0,
+      "amount_residual": 0.0,
+      "payment_state": "paid",
+      "is_legacy_balance": false,
+      "paid_date": "2026-08-25",
+      "payments": [
+        {
+          "payment_id": 501,
+          "payment_name": "PAY/2026/0001",
+          "payment_date": "2026-08-25",
+          "amount": 8000.0,
+          "payment_method": "cash",
+          "cheque_number": "",
+          "collected_by_dm_id": 42,
+          "collected_by_dm_name": "Ali DM",
+          "is_dm_wallet_collection": true
+        }
+      ]
+    }
+  ],
   "wallet_balance": 2500.0
 }
 ```
+
+`invoices` = unpaid / partial (collectable).  
+`paid_invoices` = last **10** fully paid invoices (newest first), each with payment rows (who collected, method, date). No cheque image bytes.
 
 ### `POST /recovery/collect`
 
@@ -655,5 +684,5 @@ Returns `{ collections: [...], count, wallet_balance }`.
 
 ---
 
-*Module: `shahtaj_oil` · API prefix `/api/shahtaj/v1/dm` · Document aligned with implementation as of module `19.0.1.1.125`*
+*Module: `shahtaj_oil` · API prefix `/api/shahtaj/v1/dm` · Document aligned with implementation as of module `19.0.1.1.126`*
 +
