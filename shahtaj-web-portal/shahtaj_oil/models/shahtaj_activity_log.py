@@ -13,7 +13,7 @@ RETENTION_DAYS = 2
 KNOWN_OPERATIONS = (
     'auth.login',
     'dm.auth.login',
-    'dm.free_deliver',
+    'dm.walk_in_deliver',
     'dm.job.deliver',
     'dm.job.failed',
     'dm.job.notes',

@@ -74,6 +74,12 @@ class ResPartner(models.Model):
     )
 
     is_shahtaj_shop = fields.Boolean(string='Is Shop')
+    shahtaj_is_walk_in = fields.Boolean(
+        string='Walk-in Customer',
+        default=False,
+        index=True,
+        help='Minimal cash customer from DM walk-in delivery (not a registered Shahtaj shop).',
+    )
     shop_approval_state = fields.Selection(
         [
             ('pending', 'Pending'),

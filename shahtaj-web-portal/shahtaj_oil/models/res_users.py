@@ -1187,6 +1187,15 @@ class ResUsers(models.Model):
             },
         }
 
+    def action_shahtaj_dm_walk_in(self):
+        """Open walk-in delivery wizard for this DM's van."""
+        self.ensure_one()
+        return self.env['shahtaj.dm.walk.in'].with_context(
+            shahtaj_delivery_man_id=self.id,
+            default_delivery_man_id=self.id,
+            lock_delivery_man=True,
+        ).action_open()
+
     def action_shahtaj_dm_settle_wallet(self):
         """Distributor: settle this DM's wallet cash to bank."""
         self.ensure_one()

@@ -48,6 +48,9 @@
                     <button name="action_shahtaj_dm_collect_payment" type="object"
                             string="Collect Payment" class="btn-secondary"
                             groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                    <button name="action_shahtaj_dm_walk_in" type="object"
+                            string="Walk-in Delivery" class="btn-secondary"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_delivery_man"/>
                     <button name="action_shahtaj_dm_settle_wallet" type="object"
                             string="Settle Wallet to Bank" class="btn-primary"
                             groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"

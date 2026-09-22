@@ -15,7 +15,7 @@ class StockPicking(models.Model):
     shahtaj_receiver_name = fields.Char(
         string='Receiver Name',
         copy=False,
-        help='Person who received stock (DM delivery / free deliver proof).',
+        help='Person who received stock (DM job delivery / walk-in proof).',
     )
     shahtaj_delivery_proof_image = fields.Image(
         string='Delivery Proof Photo',

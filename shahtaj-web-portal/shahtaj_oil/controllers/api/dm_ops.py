@@ -202,41 +202,47 @@ class ShahtajDmApiOps(http.Controller):
             raise UserError(_('job_id is required.'))
         return api_success(dm_service().return_job_undelivered(job_id))
 
-    # ── Free deliver (qty + notes, any shop) ──────────────────────────
+    # ── Walk-in delivery (SO + van stock + full DM wallet pay) ────────
 
-    @http.route('/api/shahtaj/v1/dm/shops/search', **DM_API_ROUTE)
-    def shops_search(self, query='', limit=30, **kwargs):
-        ensure_delivery_man()
-        return api_success(dm_service().shops_search(query=query or '', limit=int(limit or 30)))
-
-    @http.route('/api/shahtaj/v1/dm/deliver/free', **DM_API_ROUTE)
-    @dm_api_activity('dm.free_deliver', 'DM free deliver from van')
-    def deliver_free(
+    @http.route('/api/shahtaj/v1/dm/deliver/walk-in', **DM_API_ROUTE)
+    @dm_api_activity('dm.walk_in_deliver', 'DM walk-in delivery')
+    def deliver_walk_in(
         self,
-        shop_id=None,
+        customer_name=None,
+        phone=None,
         latitude=None,
         longitude=None,
         lines=None,
         notes='',
         receiver_name=None,
         delivery_proof_image=None,
+        payment_method='cash',
+        cheque_number=None,
+        cheque_image=None,
         **kwargs,
     ):
-        """Free deliver van stock to a shop with GPS + proof.
+        """Walk-in: create/reuse minimal customer, SO at company pricelist,
+        deliver from van, invoice, full-pay into DM wallet.
+
         lines: [{product_id, qty}, ...].
-        Requires receiver_name + delivery_proof_image.
+        Requires GPS + receiver_name + delivery_proof_image.
+        payment_method: cash (default) or cheque.
         """
         ensure_delivery_man()
-        if not shop_id:
-            raise UserError(_('shop_id is required.'))
+        if not customer_name:
+            raise UserError(_('customer_name is required.'))
         if latitude is None or longitude is None:
             raise UserError(_('latitude and longitude are required.'))
-        return api_success(dm_service().free_deliver(
-            shop_id,
-            latitude,
-            longitude,
-            lines or [],
+        return api_success(dm_service().walk_in_deliver(
+            customer_name=customer_name,
+            phone=phone,
+            latitude=latitude,
+            longitude=longitude,
+            lines=lines or [],
             notes=notes or '',
             receiver_name=receiver_name,
             delivery_proof_image=delivery_proof_image,
+            payment_method=payment_method or 'cash',
+            cheque_number=cheque_number,
+            cheque_image=cheque_image,
         ))

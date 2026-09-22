@@ -465,6 +465,13 @@
               sequence="33"
               groups="shahtaj_oil.group_shahtaj_delivery_man"/>
 
+    <menuitem id="menu_shahtaj_dm_walk_in"
+              name="Walk-in Delivery"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_dm_walk_in"
+              sequence="34"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
     <menuitem id="menu_shahtaj_dm_collect_payment"
               name="Collect Payment"
               parent="menu_shahtaj_root"
@@ -478,6 +485,42 @@
               action="action_shahtaj_dm_my_wallet_collections"
               sequence="36"
               groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
+    <menuitem id="menu_shahtaj_dm_my_reports"
+              name="My Reports"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_field_report_mine"
+              sequence="37"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
+    <!-- Field reports (office native) -->
+    <menuitem id="menu_shahtaj_field_reports_root"
+              name="Field Reports"
+              parent="menu_shahtaj_root"
+              sequence="47"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_field_reports"
+              name="All Reports"
+              parent="menu_shahtaj_field_reports_root"
+              action="action_shahtaj_field_report"
+              sequence="10"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_field_report_tags"
+              name="Report Tags"
+              parent="menu_shahtaj_field_reports_root"
+              action="action_shahtaj_field_report_tag"
+              sequence="20"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <!-- Order booker native: own reports -->
+    <menuitem id="menu_shahtaj_ob_my_reports"
+              name="My Reports"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_field_report_mine"
+              sequence="26"
+              groups="shahtaj_oil.group_shahtaj_order_booker"/>
 
     <!-- Legacy top-level Orders &amp; Dispatch folder (replaced by OB/DM parents) -->
     <delete model="ir.ui.menu" id="menu_shahtaj_orders"/>

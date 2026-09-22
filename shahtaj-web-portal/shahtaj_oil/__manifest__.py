@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.1.127',
+    'version': '19.0.1.1.131',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -33,6 +33,7 @@
         'data/shahtaj_cron.xml',
         'data/shahtaj_expense_data.xml',
         'data/shahtaj_dm_data.xml',
+        'data/shahtaj_field_report_data.xml',
 
         # ── 3. CORE VIEWS + ACTIONS (no inherit from other module views) ──
         'views/shahtaj_route_views.xml',
@@ -43,6 +44,7 @@
         'views/shahtaj_target_views.xml',
         'views/shahtaj_activity_log_views.xml',
         'views/shahtaj_gps_attempt_views.xml',
+        'views/shahtaj_field_report_views.xml',
         'data/shahtaj_activity_log_data.xml',
 
         # ── 4. VISIT VIEWS (before sale_accounting which inherits visit views) ──
@@ -91,6 +93,7 @@
         'wizard/shahtaj_dm_van_transfer_views.xml',
         'wizard/shahtaj_dm_assign_views.xml',
         'wizard/shahtaj_dm_collect_payment_views.xml',
+        'wizard/shahtaj_dm_walk_in_views.xml',
         'views/shahtaj_order_reject_views.xml',
         'wizard/shahtaj_credit_override_views.xml',
 
@@ -98,6 +101,7 @@
         
         # ── 8. SECURITY FIXES (must update rules created in step 1) ──
         'security/shahtaj_record_rules_fix.xml',
+        'security/shahtaj_field_report_rules.xml',
         'security/shahtaj_booker_ui_fix.xml',
         'security/shahtaj_partner_access_upgrade.xml',
 

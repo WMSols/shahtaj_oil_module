@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tags -->
+    <record id="view_shahtaj_field_report_tag_list" model="ir.ui.view">
+        <field name="name">shahtaj.field.report.tag.list</field>
+        <field name="model">shahtaj.field.report.tag</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="kind"/>
+                <field name="color" widget="color_picker" optional="show"/>
+                <field name="active" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_field_report_tag_form" model="ir.ui.view">
+        <field name="name">shahtaj.field.report.tag.form</field>
+        <field name="model">shahtaj.field.report.tag</field>
+        <field name="arch" type="xml">
+            <form string="Report Tag">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="kind"/>
+                        <field name="sequence"/>
+                        <field name="color" widget="color_picker"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_field_report_tag" model="ir.actions.act_window">
+        <field name="name">Report Tags</field>
+        <field name="res_model">shahtaj.field.report.tag</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Reports -->
+    <record id="view_shahtaj_field_report_list" model="ir.ui.view">
+        <field name="name">shahtaj.field.report.list</field>
+        <field name="model">shahtaj.field.report</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="subject"/>
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                <field name="user_id"/>
+                <field name="reporter_role"/>
+                <field name="state"
+                       decoration-info="state == 'new'"
+                       decoration-warning="state == 'in_progress'"
+                       decoration-success="state == 'done'"
+                       decoration-muted="state == 'cancelled'"
+                       widget="badge"/>
+                <field name="create_date"/>
+                <field name="has_screenshot" optional="hide"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_field_report_form" model="ir.ui.view">
+        <field name="name">shahtaj.field.report.form</field>
+        <field name="model">shahtaj.field.report</field>
+        <field name="arch" type="xml">
+            <form string="Field Report">
+                <header>
+                    <button name="action_mark_in_progress" type="object"
+                            string="In Progress" class="btn-secondary"
+                            invisible="state != 'new'"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                    <button name="action_mark_done" type="object"
+                            string="Mark Done" class="btn-primary"
+                            invisible="state in ('done', 'cancelled')"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                    <button name="action_reopen" type="object"
+                            string="Reopen" class="btn-secondary"
+                            invisible="state not in ('done', 'cancelled')"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                    <button name="action_mark_cancelled" type="object"
+                            string="Cancel" class="btn-secondary"
+                            invisible="state in ('done', 'cancelled')"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="new,in_progress,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Report">
+                            <field name="subject"/>
+                            <field name="tag_ids" widget="many2many_tags"
+                                   options="{'color_field': 'color'}"/>
+                            <field name="description"/>
+                        </group>
+                        <group string="Reporter">
+                            <field name="user_id" readonly="1"/>
+                            <field name="reporter_role" readonly="1"/>
+                            <field name="create_date" readonly="1"/>
+                            <field name="device_info" readonly="1"/>
+                            <field name="latitude" readonly="1"/>
+                            <field name="longitude" readonly="1"/>
+                            <field name="closed_at" readonly="1" invisible="not closed_at"/>
+                            <field name="closed_by_id" readonly="1" invisible="not closed_by_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="has_screenshot" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Screenshot / Capture">
+                        <field name="screenshot" widget="image" nolabel="1"
+                               options="{'size': [256, 256]}"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shahtaj_field_report_search" model="ir.ui.view">
+        <field name="name">shahtaj.field.report.search</field>
+        <field name="model">shahtaj.field.report</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="subject"/>
+                <field name="user_id"/>
+                <field name="tag_ids"/>
+                <filter name="filter_new" string="New" domain="[('state', '=', 'new')]"/>
+                <filter name="filter_in_progress" string="In Progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>
+                <filter name="filter_open" string="Open"
+                        domain="[('state', 'in', ('new', 'in_progress'))]"/>
+                <separator/>
+                <filter name="filter_ob" string="Order Booker"
+                        domain="[('reporter_role', '=', 'order_booker')]"/>
+                <filter name="filter_dm" string="Delivery Man"
+                        domain="[('reporter_role', '=', 'delivery_man')]"/>
+                <group>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_role" string="Role" context="{'group_by': 'reporter_role'}"/>
+                    <filter name="group_user" string="Reporter" context="{'group_by': 'user_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Office: all reports -->
+    <record id="action_shahtaj_field_report" model="ir.actions.act_window">
+        <field name="name">Field Reports</field>
+        <field name="res_model">shahtaj.field.report</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No field reports yet</p>
+            <p>Order bookers and delivery men can submit app errors and field issues from the mobile app.</p>
+        </field>
+    </record>
+
+    <!-- Field worker: own reports (native) -->
+    <record id="action_shahtaj_field_report_mine" model="ir.actions.act_window">
+        <field name="name">My Reports</field>
+        <field name="res_model">shahtaj.field.report</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('user_id', '=', uid)]</field>
+        <field name="context">{
+            'default_user_id': uid,
+            'create': True,
+        }</field>
+    </record>
+
+</odoo>

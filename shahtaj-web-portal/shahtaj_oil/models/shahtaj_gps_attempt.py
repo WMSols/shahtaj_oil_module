@@ -39,6 +39,7 @@ class ShahtajGpsAttempt(models.Model):
             ('check_in', 'Check-in'),
             ('place_order', 'Place Order'),
             ('deliver', 'Deliver to Shop'),
+            ('walk_in', 'Walk-in Delivery'),
         ],
         string='Purpose',
         required=True,

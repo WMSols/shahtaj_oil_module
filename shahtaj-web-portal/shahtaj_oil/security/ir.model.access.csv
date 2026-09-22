@@ -151,6 +151,12 @@ access_shahtaj_dm_collect_payment_line_native,shahtaj.dm.collect.payment.line.na
 access_shahtaj_dm_collect_payment_paid_line_dm,shahtaj.dm.collect.payment.paid.line.dm,model_shahtaj_dm_collect_payment_paid_line,group_shahtaj_delivery_man,1,1,1,1
 access_shahtaj_dm_collect_payment_paid_line_dist,shahtaj.dm.collect.payment.paid.line.dist,model_shahtaj_dm_collect_payment_paid_line,group_shahtaj_distributor,1,1,1,1
 access_shahtaj_dm_collect_payment_paid_line_native,shahtaj.dm.collect.payment.paid.line.native,model_shahtaj_dm_collect_payment_paid_line,group_shahtaj_native_distributor_ui,1,1,1,1
+access_shahtaj_dm_walk_in_dm,shahtaj.dm.walk.in.dm,model_shahtaj_dm_walk_in,group_shahtaj_delivery_man,1,1,1,1
+access_shahtaj_dm_walk_in_dist,shahtaj.dm.walk.in.dist,model_shahtaj_dm_walk_in,group_shahtaj_distributor,1,1,1,1
+access_shahtaj_dm_walk_in_native,shahtaj.dm.walk.in.native,model_shahtaj_dm_walk_in,group_shahtaj_native_distributor_ui,1,1,1,1
+access_shahtaj_dm_walk_in_line_dm,shahtaj.dm.walk.in.line.dm,model_shahtaj_dm_walk_in_line,group_shahtaj_delivery_man,1,1,1,1
+access_shahtaj_dm_walk_in_line_dist,shahtaj.dm.walk.in.line.dist,model_shahtaj_dm_walk_in_line,group_shahtaj_distributor,1,1,1,1
+access_shahtaj_dm_walk_in_line_native,shahtaj.dm.walk.in.line.native,model_shahtaj_dm_walk_in_line,group_shahtaj_native_distributor_ui,1,1,1,1
 access_shahtaj_dm_wallet_settle_dist,shahtaj.dm.wallet.settle.dist,model_shahtaj_dm_wallet_settle,group_shahtaj_distributor,1,1,1,1
 access_shahtaj_dm_wallet_settle_native,shahtaj.dm.wallet.settle.native,model_shahtaj_dm_wallet_settle,group_shahtaj_native_distributor_ui,1,1,1,1
 access_shahtaj_dm_wallet_settlement_dist,shahtaj.dm.wallet.settlement.dist,model_shahtaj_dm_wallet_settlement,group_shahtaj_distributor,1,1,0,0
@@ -165,4 +171,12 @@ access_shahtaj_visit_day_progress_dist,shahtaj.visit.day.progress.dist,model_sha
 access_shahtaj_visit_day_progress_native,shahtaj.visit.day.progress.native,model_shahtaj_visit_day_progress,group_shahtaj_native_distributor_ui,1,1,1,1
 access_shahtaj_visit_day_progress_line_dist,shahtaj.visit.day.progress.line.dist,model_shahtaj_visit_day_progress_line,group_shahtaj_distributor,1,1,1,1
 access_shahtaj_visit_day_progress_line_native,shahtaj.visit.day.progress.line.native,model_shahtaj_visit_day_progress_line,group_shahtaj_native_distributor_ui,1,1,1,1
+access_shahtaj_field_report_tag_ob,shahtaj.field.report.tag.ob,model_shahtaj_field_report_tag,group_shahtaj_order_booker,1,0,0,0
+access_shahtaj_field_report_tag_dm,shahtaj.field.report.tag.dm,model_shahtaj_field_report_tag,group_shahtaj_delivery_man,1,0,0,0
+access_shahtaj_field_report_tag_dist,shahtaj.field.report.tag.dist,model_shahtaj_field_report_tag,group_shahtaj_distributor,1,1,1,1
+access_shahtaj_field_report_tag_native,shahtaj.field.report.tag.native,model_shahtaj_field_report_tag,group_shahtaj_native_distributor_ui,1,1,1,1
+access_shahtaj_field_report_ob,shahtaj.field.report.ob,model_shahtaj_field_report,group_shahtaj_order_booker,1,1,1,0
+access_shahtaj_field_report_dm,shahtaj.field.report.dm,model_shahtaj_field_report,group_shahtaj_delivery_man,1,1,1,0
+access_shahtaj_field_report_dist,shahtaj.field.report.dist,model_shahtaj_field_report,group_shahtaj_distributor,1,1,1,1
+access_shahtaj_field_report_native,shahtaj.field.report.native,model_shahtaj_field_report,group_shahtaj_native_distributor_ui,1,1,1,1
 

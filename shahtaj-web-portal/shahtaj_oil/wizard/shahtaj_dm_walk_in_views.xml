@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_shahtaj_dm_walk_in_form" model="ir.ui.view">
+        <field name="name">shahtaj.dm.walk.in.form</field>
+        <field name="model">shahtaj.dm.walk.in</field>
+        <field name="arch" type="xml">
+            <form string="Walk-in Delivery">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Flush leftover <b>van stock</b> to a walk-in customer:
+                        creates a minimal customer (not a Shahtaj shop), sale order
+                        at the <b>company pricelist</b>, delivers from the van,
+                        invoices, and <b>full-pays</b> into the DM wallet (DMCASH).
+                    </div>
+                    <group>
+                        <group string="Customer (minimal)">
+                            <field name="customer_name" placeholder="Name / shop signboard"/>
+                            <field name="phone" placeholder="Optional — reuse if same phone"/>
+                            <field name="receiver_name" placeholder="Who received the goods"/>
+                            <field name="delivery_proof_image" widget="image"
+                                   options="{'size': [128, 128]}"/>
+                        </group>
+                        <group string="GPS + Wallet">
+                            <div colspan="2" class="mb-2">
+                                <widget name="shahtaj_geolocate"
+                                        latitude_field="latitude"
+                                        longitude_field="longitude"/>
+                            </div>
+                            <field name="latitude" string="My lat"/>
+                            <field name="longitude" string="My lng"/>
+                            <field name="delivery_man_id"
+                                   readonly="context.get('lock_delivery_man')"
+                                   groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            <field name="delivery_man_id" readonly="1"
+                                   groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                            <field name="pricelist_id"/>
+                            <field name="wallet_balance" readonly="1"/>
+                            <field name="amount_total" readonly="1"
+                                   decoration-bf="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Payment (full amount only)">
+                        <group>
+                            <field name="payment_method" widget="radio"/>
+                            <field name="cheque_number"
+                                   invisible="payment_method != 'cheque'"
+                                   required="payment_method == 'cheque'"
+                                   placeholder="Cheque number / serial"/>
+                        </group>
+                        <group>
+                            <field name="cheque_image" widget="image"
+                                   invisible="payment_method != 'cheque'"
+                                   required="payment_method == 'cheque'"
+                                   options="{'size': [128, 128]}"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" placeholder="Optional note…"/>
+                    </group>
+                    <separator string="Van stock — set Deliver Qty (prices from company pricelist)"/>
+                    <field name="line_ids">
+                        <list editable="bottom" create="false" delete="false">
+                            <field name="product_id" readonly="1" force_save="1"/>
+                            <field name="qty_on_van" string="On van" readonly="1" force_save="1"/>
+                            <field name="qty" string="Deliver qty" force_save="1"/>
+                            <field name="price_unit" string="Unit price" readonly="1" force_save="1"/>
+                            <field name="price_subtotal" string="Subtotal" sum="Total"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_walk_in" type="object"
+                            string="Confirm Walk-in (Deliver + Invoice + Full Pay)"
+                            class="btn-primary"
+                            confirm="Create sale order, deliver from van, invoice, and collect full payment into DM wallet?"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_dm_walk_in" model="ir.actions.server">
+        <field name="name">Walk-in Delivery</field>
+        <field name="model_id" ref="model_shahtaj_dm_delivery"/>
+        <field name="state">code</field>
+        <field name="code">action = env['shahtaj.dm.walk.in'].action_open()</field>
+    </record>
+
+</odoo>
