@@ -15,7 +15,7 @@ from odoo.addons.shahtaj_oil.controllers.api.dm_base import (
 
 class ShahtajDmApiOps(http.Controller):
 
-    # ── Session (overall On the Way) ──────────────────────────────────
+    # ── Session (day: Left Office / Out on Route) ─────────────────────
 
     @http.route('/api/shahtaj/v1/dm/session/get', **DM_API_ROUTE)
     def session_get(self, **kwargs):
@@ -31,9 +31,9 @@ class ShahtajDmApiOps(http.Controller):
         })
 
     @http.route('/api/shahtaj/v1/dm/session/depart', **DM_API_ROUTE)
-    @dm_api_activity('dm.session.depart', 'DM went on the way')
+    @dm_api_activity('dm.session.depart', 'DM left office')
     def session_depart(self, notes=None, **kwargs):
-        """After office load steps — mark overall On the Way."""
+        """After office load — day status Left Office / Out on Route."""
         ensure_delivery_man()
         session = request.env['shahtaj.dm.day.session'].get_or_create_today()
         if notes:

@@ -97,11 +97,14 @@ class ShahtajDmApiService(models.AbstractModel):
 
     @api.model
     def get_today_load(self, dm=None, day=None):
-        """Office load screen: shops + products still to pick + van/WH snapshot."""
+        """Office load screen: today's jobs + van-first pick suggestion."""
         dm = dm or self._dm_user()
         day = day or self._today()
         Delivery = self.env['shahtaj.dm.delivery']
-        jobs = Delivery.search(self._jobs_domain(dm, day, open_only=True), order='id')
+        jobs = Delivery.search(
+            Delivery._shahtaj_today_open_jobs_domain(dm, day),
+            order='id',
+        )
         for job in jobs:
             job.sudo()._sync_with_sale_order(ensure_visit_task=False)
         self._prefetch_jobs(jobs)
@@ -152,13 +155,28 @@ class ShahtajDmApiService(models.AbstractModel):
         product_ids = list(pick_needed.keys())
         van_map = self._van_qty_map(dm, product_ids or None)
         wh_map = self._wh_free_qty_map(product_ids or None)
+        free_van = (
+            Delivery._shahtaj_unattributed_van_qty_map(dm, set(product_ids))
+            if product_ids else {}
+        )
         pick_lines = []
         for pid, row in pick_needed.items():
+            still = row['qty_still']
+            product = self.env['product.product'].browse(pid)
+            rounding = product.uom_id.rounding or 0.01
+            van_cover = float_round(
+                min(still, free_van.get(pid, 0.0)),
+                precision_rounding=rounding,
+            )
             pick_lines.append({
                 **row,
                 'qty_on_van': van_map.get(pid, 0.0),
                 'qty_in_warehouse': wh_map.get(pid, 0.0),
-                'qty_to_pick': row['qty_still'],
+                'qty_van_cover': van_cover,
+                'qty_to_pick': float_round(
+                    max(0.0, still - van_cover),
+                    precision_rounding=rounding,
+                ),
             })
         pick_lines.sort(key=lambda r: r['name'] or '')
 
@@ -179,68 +197,115 @@ class ShahtajDmApiService(models.AbstractModel):
 
     @api.model
     def pick_today_load(self, qty_by_product, dm=None, day=None):
-        """Step 1: load stock for today's jobs (product_id → qty)."""
+        """Van-first load for today's jobs, then WH→van for remaining Pick Now."""
         dm = dm or self._dm_user()
         day = day or self._today()
         Delivery = self.env['shahtaj.dm.delivery']
-        if not qty_by_product:
-            raise UserError(_('Set a pick quantity on at least one product.'))
+        if qty_by_product is None:
+            qty_by_product = {}
 
         cleaned = {}
-        for pid, qty in qty_by_product.items():
+        for pid, qty in (qty_by_product or {}).items():
             qty = float(qty or 0.0)
             if qty > 0:
                 cleaned[int(pid)] = qty
-        if not cleaned:
-            raise UserError(_('Set a pick quantity on at least one product.'))
 
         deliveries = Delivery.search(
-            self._jobs_domain(dm, day, open_only=True) + [
-                ('state', 'in', ('ready', 'picked', 'partial')),
-            ],
+            Delivery._shahtaj_today_open_jobs_domain(dm, day),
             order='id',
         )
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
 
-        remaining = dict(cleaned)
-        qty_by_delivery = defaultdict(dict)
+        live_still = defaultdict(float)
         for delivery in deliveries:
             for line in delivery.line_ids:
-                pid = line.product_id.id
-                if pid not in remaining:
-                    continue
-                left = remaining[pid]
-                if left <= 0:
-                    continue
-                still = max(line.qty_assigned - line.qty_picked, 0.0)
-                if still <= 0:
-                    continue
-                rounding = line.product_uom_id.rounding or 0.01
-                take = float_round(min(still, left), precision_rounding=rounding)
-                if take <= 0:
-                    continue
-                qty_by_delivery[delivery.id][line.id] = take
-                remaining[pid] = float_round(left - take, precision_rounding=rounding)
+                if line.product_id:
+                    live_still[line.product_id.id] += max(
+                        line.qty_assigned - line.qty_picked, 0.0,
+                    )
 
-        for pid, left in remaining.items():
+        free_van = Delivery._shahtaj_unattributed_van_qty_map(
+            dm, set(live_still) | set(cleaned),
+        )
+        van_apply = {}
+        wh_move = {}
+        for pid, still in live_still.items():
+            if still <= 0:
+                continue
             product = self.env['product.product'].browse(pid)
             rounding = product.uom_id.rounding or 0.01
-            if float_compare(left, 0.0, precision_rounding=rounding) > 0:
+            user_wh = float(cleaned.get(pid) or 0.0)
+            if float_compare(user_wh, still, precision_rounding=rounding) > 0:
                 raise UserError(_(
-                    'Could not allocate %(qty)s of %(product)s across today\'s shops.',
-                    qty=left,
+                    'Cannot pick %(qty)s of %(product)s — only %(max)s still needed today.',
+                    qty=user_wh,
                     product=product.display_name,
+                    max=still,
                 ))
-        if not qty_by_delivery:
-            raise UserError(_('Nothing left to pick for today.'))
+            wh = float_round(min(user_wh, still), precision_rounding=rounding)
+            cover = float_round(
+                min(free_van.get(pid, 0.0), max(0.0, still - wh)),
+                precision_rounding=rounding,
+            )
+            if cover > 0:
+                van_apply[pid] = cover
+            if wh > 0:
+                wh_move[pid] = wh
 
-        picked = 0
-        for delivery_id, qty_map in qty_by_delivery.items():
-            Delivery.browse(delivery_id)._pick_stock_with_qtys(qty_map, reload_form=False)
-            picked += 1
+        if not van_apply and not wh_move:
+            raise UserError(_(
+                'Nothing to load for today. Free van stock may already cover jobs, '
+                'or pick quantities are zero.'
+            ))
+
+        shops_touched = set()
+        if van_apply:
+            qty_by_delivery, remaining = Delivery._shahtaj_fifo_allocate_product_qtys(
+                deliveries, van_apply,
+            )
+            for pid, left in remaining.items():
+                product = self.env['product.product'].browse(pid)
+                rounding = product.uom_id.rounding or 0.01
+                if float_compare(left, 0.0, precision_rounding=rounding) > 0:
+                    raise UserError(_(
+                        'Could not apply %(qty)s of %(product)s from van to today’s shops.',
+                        qty=left,
+                        product=product.display_name,
+                    ))
+            for delivery_id, qty_map in qty_by_delivery.items():
+                Delivery.browse(delivery_id)._attribute_van_stock_with_qtys(
+                    qty_map, reload_form=False,
+                )
+                shops_touched.add(delivery_id)
+
+        if wh_move:
+            deliveries = Delivery.search(
+                Delivery._shahtaj_today_open_jobs_domain(dm, day),
+                order='id',
+            )
+            qty_by_delivery, remaining = Delivery._shahtaj_fifo_allocate_product_qtys(
+                deliveries, wh_move,
+            )
+            for pid, left in remaining.items():
+                product = self.env['product.product'].browse(pid)
+                rounding = product.uom_id.rounding or 0.01
+                if float_compare(left, 0.0, precision_rounding=rounding) > 0:
+                    raise UserError(_(
+                        'Could not allocate %(qty)s of %(product)s across today\'s shops.',
+                        qty=left,
+                        product=product.display_name,
+                    ))
+            for delivery_id, qty_map in qty_by_delivery.items():
+                Delivery.browse(delivery_id)._pick_stock_with_qtys(
+                    qty_map, reload_form=False,
+                )
+                shops_touched.add(delivery_id)
+
         return {
-            'jobs_picked': picked,
+            'jobs_picked': len(shops_touched),
+            'van_skus_applied': len(van_apply),
+            'warehouse_skus_picked': len(wh_move),
             'load': self.get_today_load(dm, day),
         }
 

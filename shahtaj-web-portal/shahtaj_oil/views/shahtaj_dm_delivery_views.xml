@@ -115,7 +115,7 @@
                         invisible="state not in ('ready', 'picked', 'partial')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <button name="action_field_in_transit" type="object"
-                        string="On the Way" icon="fa-road"
+                        string="Heading to Shop" icon="fa-road"
                         invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 <button name="action_deliver_to_shop" type="object"
@@ -126,6 +126,11 @@
                         string="Return WH" icon="fa-undo"
                         invisible="state not in ('picked', 'partial')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                <button name="action_undo_delivery_to_shop" type="object"
+                        string="Undo Deliver" icon="fa-reply"
+                        invisible="state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
+                        groups="shahtaj_oil.group_shahtaj_distributor"
+                        confirm="Reverse shop handoff or repair Stop/visit? Only before invoicing."/>
                 <button name="action_print_invoice" type="object"
                         string="Print Invoice" icon="fa-print"
                         invisible="state == 'not_ready'"
@@ -154,9 +159,10 @@
                             invisible="state not in ('ready', 'picked', 'partial')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_field_in_transit" type="object"
-                            string="On the Way" class="btn-secondary"
+                            string="Heading to Shop" class="btn-secondary"
                             invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+                            groups="shahtaj_oil.group_shahtaj_delivery_man"
+                            confirm="Mark this shop stop as Heading to Shop? This does not change your day Left Office status."/>
                     <button name="action_field_not_attended" type="object"
                             string="Shop Closed" class="btn-warning"
                             invisible="state not in ('picked', 'partial') or field_state == 'done'"
@@ -176,9 +182,18 @@
                             invisible="state not in ('picked', 'partial')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
                             confirm="Return undelivered van stock for this shop back to the warehouse?"/>
+                    <button name="action_undo_delivery_to_shop" type="object"
+                            string="Undo Delivery to Shop" class="btn-danger"
+                            invisible="state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
+                            groups="shahtaj_oil.group_shahtaj_distributor"
+                            confirm="Reverse this shop handoff (or repair Stop/visit if stock already cleared)? Only allowed before invoicing."/>
+                    <button name="action_refresh_delivery_status" type="object"
+                            string="Refresh Status" class="btn-secondary"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
+                            icon="fa-refresh"/>
                     <button name="action_field_reset_pending" type="object"
                             string="Reset Stop" class="btn-secondary"
-                            invisible="field_state not in ('in_transit', 'not_attended', 'failed') or state in ('delivered', 'returned')"
+                            invisible="field_state not in ('in_transit', 'not_attended', 'failed', 'done') or state in ('delivered', 'returned')"
                             groups="shahtaj_oil.group_shahtaj_distributor"/>
                     <button name="action_print_invoice" type="object"
                             string="Print Invoice" class="btn-secondary"
@@ -222,13 +237,15 @@
                         <h1><field name="display_name" readonly="1"/></h1>
                     </div>
                     <div class="alert alert-info" role="alert">
-                        <b>Two statuses</b>
+                        <b>Three different things</b>
                         <ul class="mb-0">
-                            <li><b>Stock</b> (top bar) — warehouse flow: pick → van → shop / return</li>
-                            <li><b>Stop</b> — field story: On the Way / Shop Closed / Could Not Deliver / Done</li>
+                            <li><b>Day Status</b> — My Day Session: At Office / Left Office (whole DM, not this shop)</li>
+                            <li><b>Stock</b> (top bar) — warehouse: pick → van → shop / return</li>
+                            <li><b>Stop</b> — this shop only: Not Started / Heading to Shop / Shop Closed / Could Not Deliver / Done</li>
+                            <li><b>Heading to Shop</b> on this form = this stop only (not “left the warehouse”)</li>
                             <li><b>Deliver to Shop (GPS)</b> — at the shop: Use My GPS → set qty → confirm</li>
+                            <li><b>Undo Delivery to Shop</b> (distributor) — before invoicing: stock back to van, clear Delivered</li>
                             <li>Shop Closed and Could Not Deliver need a <b>note</b> below</li>
-                            <li><b>Shop Balance</b> tab — outstanding + unpaid / partial / paid invoices to share with the shopkeeper</li>
                         </ul>
                     </div>
                     <group>
@@ -475,7 +492,7 @@
                 <separator/>
                 <filter string="Not Started" name="stop_pending"
                         domain="[('field_state', '=', 'pending')]"/>
-                <filter string="On the Way" name="stop_in_transit"
+                <filter string="Heading to Shop" name="stop_in_transit"
                         domain="[('field_state', '=', 'in_transit')]"/>
                 <filter string="Shop Closed" name="stop_not_attended"
                         domain="[('field_state', '=', 'not_attended')]"/>
@@ -535,7 +552,7 @@
             <p>
                 Jobs assigned to you appear here after the distributor assigns
                 a sales order (or after invoice sync). Use Today / This Week filters.
-                Stock: Ready → Loaded → Delivered. Stop: On the Way / Shop Closed / Done.
+                Stock: Ready → Loaded → Delivered. Stop: Heading to Shop / Shop Closed / Done. Day: Leave Office is on My Day Session.
             </p>
         </field>
     </record>

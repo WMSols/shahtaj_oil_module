@@ -15,23 +15,32 @@
                         </p>
                     </div>
                     <group string="Overview">
-                        <group>
+                        <group string="Jobs &amp; dispatch">
                             <field name="delivery_man_count" readonly="1"/>
                             <field name="dm_jobs_today_count" readonly="1"/>
                             <field name="dm_jobs_active_count" readonly="1"/>
-                        </group>
-                        <group>
                             <field name="dispatch_orders_count" readonly="1"/>
-                            <field name="dm_tasks_today_pending" readonly="1"/>
+                        </group>
+                        <group string="Day vs stop (do not mix)">
+                            <field name="dm_out_on_route_count" readonly="1"/>
                             <field name="dm_deliveries_in_transit" readonly="1"/>
+                            <field name="dm_tasks_today_pending" readonly="1"/>
                         </group>
                     </group>
                     <div class="alert alert-info" role="alert">
+                        <strong>Day vs Stop</strong>
+                        <ul class="mb-0 mt-2">
+                            <li><b>DMs Left Office Today</b> — day session (whole DM left warehouse).</li>
+                            <li><b>Stops Heading to Shop</b> — individual delivery jobs (per shop).</li>
+                            <li>Clicking <b>Heading to Shop</b> on one delivery does <u>not</u> mean the DM day status changed.</li>
+                        </ul>
+                    </div>
+                    <div class="alert alert-secondary" role="alert">
                         <strong>Typical workflow</strong>
                         <ol class="mb-0 mt-2">
                             <li>Create delivery men and assign confirmed orders from <b>Dispatch Orders</b>.</li>
                             <li>Plan trips under <b>Delivery Jobs</b> (assign / split by delivery man and date).</li>
-                            <li>Delivery men load vans and complete stops via the DM mobile menus.</li>
+                            <li>DM: Today Load → <b>My Day Session → Leave Office</b> → deliver each shop.</li>
                             <li>After delivery, invoice shops under <b>Shop Accounting</b>.</li>
                         </ol>
                     </div>

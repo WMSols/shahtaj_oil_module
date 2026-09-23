@@ -10,7 +10,7 @@
                     <button name="action_pick_today_load" type="object"
                             string="Pick to Van" class="oe_highlight"
                             icon="fa-truck"
-                            confirm="Move the Pick Now quantities from warehouse onto the van?"/>
+                            confirm="Apply free van stock to today’s jobs, then move Pick Now from warehouse onto the van?"/>
                     <button name="action_refresh" type="object"
                             string="Refresh" class="btn-secondary" icon="fa-refresh"/>
                     <button name="action_open_my_deliveries" type="object"
@@ -40,8 +40,9 @@
                         <field name="stock_summary_html" nolabel="1" colspan="2"/>
                     </group>
                     <div class="alert alert-info" role="alert">
-                        <b>Warehouse</b> = free to pick · <b>On Van</b> = already loaded ·
-                        Edit <b>Pick Now</b>, then <b>Pick to Van</b>. Click <b>Refresh</b> after other picks.
+                        <b>Van Covers</b> = free van stock applied first ·
+                        <b>Pick Now</b> = warehouse → van (defaults to Still Need − Van Covers) ·
+                        Today / overdue jobs only. Click <b>Refresh</b> after other picks.
                     </div>
                     <notebook>
                         <page string="Load Van" name="pick">
@@ -54,6 +55,8 @@
                                            readonly="1" force_save="1" sum="On Van"/>
                                     <field name="qty_still_needed" string="Still Need"
                                            readonly="1" force_save="1" sum="Still Need"/>
+                                    <field name="qty_van_cover" string="Van Covers"
+                                           readonly="1" force_save="1" sum="Van Covers"/>
                                     <field name="qty_to_pick" string="Pick Now"
                                            force_save="1" sum="Pick Now"/>
                                     <field name="qty_ordered" string="Assigned" optional="hide"

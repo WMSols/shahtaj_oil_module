@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DM Today's Load: shop progress + editable collective pick for the day."""
+"""DM Today's Load: shop progress + van-first collective pick for the day."""
 from collections import defaultdict
 
 from odoo import _, api, fields, models
@@ -83,22 +83,35 @@ class ShahtajDmTodayLoad(models.TransientModel):
         return warehouse.lot_stock_id if warehouse else self.env['stock.location']
 
     def _shahtaj_qty_by_product_at_location(self, location, product_ids=None, free_qty=False):
-        """Sum stock.quant by product at one location. free_qty uses available_quantity."""
+        """Sum stock.quant by product at one location. free_qty = qty − reserved."""
         if not location:
             return {}
         domain = [
             ('location_id', '=', location.id),
             ('quantity', '!=', 0),
         ]
-        if product_ids:
-            domain.append(('product_id', 'in', list(product_ids)))
-        quants = self.env['stock.quant'].sudo().search(domain)
-        totals = defaultdict(float)
-        for quant in quants:
-            qty = quant.available_quantity if free_qty else quant.quantity
+        if product_ids is not None:
+            pids = list(product_ids)
+            if not pids:
+                return {}
+            domain.append(('product_id', 'in', pids))
+        fields_agg = ['quantity:sum']
+        if free_qty:
+            fields_agg.append('reserved_quantity:sum')
+        rows = self.env['stock.quant'].sudo().read_group(
+            domain, fields_agg, ['product_id'],
+        )
+        totals = {}
+        for row in rows:
+            product = row.get('product_id')
+            if not product:
+                continue
+            qty = float(row.get('quantity') or 0.0)
+            if free_qty:
+                qty -= float(row.get('reserved_quantity') or 0.0)
             if qty:
-                totals[quant.product_id.id] += qty
-        return dict(totals)
+                totals[product[0]] = qty
+        return totals
 
     def _shahtaj_build_stock_summary_html(self, van_by_product, wh_by_product):
         """Compact two-column summary: Warehouse vs Van."""
@@ -143,16 +156,8 @@ class ShahtajDmTodayLoad(models.TransientModel):
         )
 
     def _shahtaj_today_load_delivery_domain(self, dm, day):
-        """Jobs shown on Today Load: today, unscheduled, overdue, or still open."""
-        return [
-            ('delivery_man_id', '=', dm.id),
-            ('state', '!=', 'not_ready'),
-            '|', '|', '|',
-            ('scheduled_date', '=', day),
-            ('scheduled_date', '=', False),
-            ('scheduled_date', '<', day),
-            ('state', 'in', ('ready', 'picked', 'partial')),
-        ]
+        """Jobs on Today Load — same set for Refresh and Confirm Pick."""
+        return self.env['shahtaj.dm.delivery']._shahtaj_today_open_jobs_domain(dm, day)
 
     @api.model
     def action_open(self):
@@ -243,12 +248,12 @@ class ShahtajDmTodayLoad(models.TransientModel):
 
         van_loc = self._shahtaj_get_van_location_for_dm(dm)
         wh_loc = self._shahtaj_get_warehouse_stock_location()
-        # Include anything already sitting on the van even if not needed today
         van_by_product = self._shahtaj_qty_by_product_at_location(van_loc, free_qty=False)
         product_ids |= set(van_by_product.keys())
         wh_by_product = self._shahtaj_qty_by_product_at_location(
             wh_loc, product_ids=product_ids, free_qty=True,
         )
+        free_van = Delivery._shahtaj_unattributed_van_qty_map(dm, product_ids)
 
         for pid in sorted(product_ids):
             agg = product_agg.get(pid) or {
@@ -268,6 +273,16 @@ class ShahtajDmTodayLoad(models.TransientModel):
                 and van_by_product.get(pid, 0.0) <= 0
             ):
                 continue
+            product = self.env['product.product'].browse(pid)
+            rounding = product.uom_id.rounding or 0.01
+            van_cover = float_round(
+                min(still, free_van.get(pid, 0.0)),
+                precision_rounding=rounding,
+            )
+            pick_now = float_round(
+                max(0.0, still - van_cover),
+                precision_rounding=rounding,
+            )
             pick_vals.append((0, 0, {
                 'product_id': agg['product_id'],
                 'product_uom_id': agg['product_uom_id'],
@@ -275,7 +290,8 @@ class ShahtajDmTodayLoad(models.TransientModel):
                 'qty_already_picked': agg['qty_picked'],
                 'qty_delivered': agg['qty_delivered'],
                 'qty_still_needed': still,
-                'qty_to_pick': still,
+                'qty_van_cover': van_cover,
+                'qty_to_pick': pick_now,
                 'qty_warehouse_available': wh_by_product.get(pid, 0.0),
                 'qty_on_van': van_by_product.get(pid, 0.0),
             }))
@@ -284,7 +300,7 @@ class ShahtajDmTodayLoad(models.TransientModel):
         shops_partial = len(deliveries.filtered(lambda d: d.delivery_progress == 'partial'))
         summary = (
             f'<p class="mb-0">'
-            f'<b>{len(shop_vals)}</b> shops · '
+            f'<b>{len(shop_vals)}</b> shops (today / overdue) · '
             f'<b>{shops_partial}</b> partial · '
             f'<b>{shops_done}</b> done'
             f'</p>'
@@ -308,96 +324,132 @@ class ShahtajDmTodayLoad(models.TransientModel):
         return True
 
     def action_pick_today_load(self):
-        """Confirm editable collective pick for today's deliveries."""
+        """Apply free van stock to today's jobs, then WH→van for Pick Now."""
         self.ensure_one()
         Delivery = self.env['shahtaj.dm.delivery']
         day = self.load_date or fields.Date.context_today(self)
         dm = self.delivery_man_id or self._shahtaj_resolve_delivery_man()
 
-        # Snapshot edited pick qty before any sync that might confuse UI
         pick_by_product = {}
         for pline in self.pick_line_ids:
             rounding = pline.product_uom_id.rounding or 0.01
+            still = pline.qty_still_needed or 0.0
             qty = pline.qty_to_pick or 0.0
             if float_compare(qty, 0.0, precision_rounding=rounding) < 0:
                 raise UserError(_('Pick quantity cannot be negative.'))
-            if float_compare(qty, pline.qty_still_needed, precision_rounding=rounding) > 0:
+            if float_compare(qty, still, precision_rounding=rounding) > 0:
                 raise UserError(_(
                     'Cannot pick %(qty)s of %(product)s — only %(max)s still needed today.',
                     qty=qty,
                     product=pline.product_id.display_name,
-                    max=pline.qty_still_needed,
+                    max=still,
                 ))
             if not float_is_zero(qty, precision_rounding=rounding):
                 pick_by_product[pline.product_id.id] = qty
 
-        if not pick_by_product:
-            raise UserError(_('Set Pick Now on at least one product (or leave totals as suggested).'))
-
-        deliveries = Delivery.search([
-            ('delivery_man_id', '=', dm.id),
-            ('state', 'in', ('ready', 'picked', 'partial')),
-            '|', '|',
-            ('scheduled_date', '=', day),
-            ('scheduled_date', '=', False),
-            ('scheduled_date', '<', day),
-        ], order='id')
-
+        deliveries = Delivery.search(
+            self._shahtaj_today_load_delivery_domain(dm, day),
+            order='id',
+        )
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
 
-        # FIFO allocate product totals onto delivery lines
-        remaining = dict(pick_by_product)
-        qty_by_delivery = defaultdict(dict)  # delivery_id -> {line_id: qty}
-
+        live_still = defaultdict(float)
         for delivery in deliveries:
             for line in delivery.line_ids:
-                pid = line.product_id.id
-                if pid not in remaining:
-                    continue
-                left = remaining[pid]
-                if left <= 0:
-                    continue
-                still = max(line.qty_assigned - line.qty_picked, 0.0)
-                if still <= 0:
-                    continue
-                rounding = line.product_uom_id.rounding or 0.01
-                take = float_round(min(still, left), precision_rounding=rounding)
-                if take <= 0:
-                    continue
-                qty_by_delivery[delivery.id][line.id] = take
-                remaining[pid] = float_round(left - take, precision_rounding=rounding)
+                if line.product_id:
+                    live_still[line.product_id.id] += max(
+                        line.qty_assigned - line.qty_picked, 0.0,
+                    )
 
-        # Any leftover means data drifted (lines changed); ignore tiny float dust
-        for pid, left in remaining.items():
+        free_van = Delivery._shahtaj_unattributed_van_qty_map(
+            dm, set(live_still) | set(pick_by_product),
+        )
+        van_apply = {}
+        wh_move = {}
+        for pid, still in live_still.items():
+            if still <= 0:
+                continue
             product = self.env['product.product'].browse(pid)
             rounding = product.uom_id.rounding or 0.01
-            if float_compare(left, 0.0, precision_rounding=rounding) > 0:
-                raise UserError(_(
-                    'Could not allocate %(qty)s of %(product)s across today\'s shops. '
-                    'Refresh and try again.',
-                    qty=left,
-                    product=product.display_name,
-                ))
+            # Pick Now = WH→van. Free van covers the rest of today's Still Need.
+            # Refresh defaults Pick Now to Still Need − Van Covers (van-first).
+            user_wh = float(pick_by_product.get(pid) or 0.0)
+            free = free_van.get(pid, 0.0)
+            wh = float_round(min(user_wh, still), precision_rounding=rounding)
+            cover = float_round(
+                min(free, max(0.0, still - wh)),
+                precision_rounding=rounding,
+            )
+            if cover > 0:
+                van_apply[pid] = cover
+            if wh > 0:
+                wh_move[pid] = wh
 
-        if not qty_by_delivery:
-            raise UserError(_('Nothing left to pick for today.'))
+        if not van_apply and not wh_move:
+            raise UserError(_(
+                'Nothing to load: today’s jobs are covered, or Pick Now is zero '
+                'with no free van stock to apply. Refresh and check Shop Progress.'
+            ))
 
-        picked_shops = 0
-        for delivery_id, qty_map in qty_by_delivery.items():
-            delivery = Delivery.browse(delivery_id)
-            delivery._pick_stock_with_qtys(qty_map, reload_form=False)
-            picked_shops += 1
+        shops_touched = set()
+
+        if van_apply:
+            qty_by_delivery, remaining = Delivery._shahtaj_fifo_allocate_product_qtys(
+                deliveries, van_apply,
+            )
+            for pid, left in remaining.items():
+                product = self.env['product.product'].browse(pid)
+                rounding = product.uom_id.rounding or 0.01
+                if float_compare(left, 0.0, precision_rounding=rounding) > 0:
+                    raise UserError(_(
+                        'Could not apply %(qty)s of %(product)s from van to today’s shops. '
+                        'Refresh and try again.',
+                        qty=left,
+                        product=product.display_name,
+                    ))
+            for delivery_id, qty_map in qty_by_delivery.items():
+                Delivery.browse(delivery_id)._attribute_van_stock_with_qtys(
+                    qty_map, reload_form=False,
+                )
+                shops_touched.add(delivery_id)
+
+        if wh_move:
+            deliveries = Delivery.search(
+                self._shahtaj_today_load_delivery_domain(dm, day),
+                order='id',
+            )
+            qty_by_delivery, remaining = Delivery._shahtaj_fifo_allocate_product_qtys(
+                deliveries, wh_move,
+            )
+            for pid, left in remaining.items():
+                product = self.env['product.product'].browse(pid)
+                rounding = product.uom_id.rounding or 0.01
+                if float_compare(left, 0.0, precision_rounding=rounding) > 0:
+                    raise UserError(_(
+                        'Could not allocate %(qty)s of %(product)s across today’s shops. '
+                        'Refresh and try again.',
+                        qty=left,
+                        product=product.display_name,
+                    ))
+            for delivery_id, qty_map in qty_by_delivery.items():
+                Delivery.browse(delivery_id)._pick_stock_with_qtys(
+                    qty_map, reload_form=False,
+                )
+                shops_touched.add(delivery_id)
 
         self.action_refresh()
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Stock loaded to van'),
+                'title': _('Stock ready on van'),
                 'message': _(
-                    'Picked for %(count)s shop order(s). Check Shop Progress and continue delivering.',
-                    count=picked_shops,
+                    'Updated %(shops)s shop order(s). '
+                    'Van cover on %(van)s SKU(s); warehouse pick on %(wh)s SKU(s).',
+                    shops=len(shops_touched),
+                    van=len(van_apply),
+                    wh=len(wh_move),
                 ),
                 'type': 'success',
                 'sticky': False,
@@ -422,7 +474,7 @@ class ShahtajDmTodayLoad(models.TransientModel):
             'domain': [
                 ('delivery_man_id', '=', (self.delivery_man_id or self.env.user).id),
                 ('scheduled_date', '=', self.load_date or fields.Date.context_today(self)),
-                ('state', '!=', 'not_ready'),
+                ('state', 'in', ('ready', 'picked', 'partial')),
             ],
             'target': 'current',
         }
@@ -520,8 +572,23 @@ class ShahtajDmTodayLoadPick(models.TransientModel):
         readonly=True,
         help='Physical quantity currently on this delivery man van.',
     )
+    qty_van_cover = fields.Float(
+        string='Van Covers',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Free van stock (not already tied to open jobs) that will cover today’s need.',
+    )
     qty_ordered = fields.Float(string='Assigned', digits='Product Unit of Measure', readonly=True)
     qty_already_picked = fields.Float(string='Picked', digits='Product Unit of Measure', readonly=True)
     qty_delivered = fields.Float(string='Delivered', digits='Product Unit of Measure', readonly=True)
-    qty_still_needed = fields.Float(string='Still Need', digits='Product Unit of Measure', readonly=True)
-    qty_to_pick = fields.Float(string='Pick Now', digits='Product Unit of Measure')
+    qty_still_needed = fields.Float(
+        string='Still Need',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Today’s open jobs: assigned − picked.',
+    )
+    qty_to_pick = fields.Float(
+        string='Pick Now',
+        digits='Product Unit of Measure',
+        help='Warehouse → van for today. Defaults to Still Need minus Van Covers.',
+    )

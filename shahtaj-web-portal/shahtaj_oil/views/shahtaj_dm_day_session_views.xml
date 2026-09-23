@@ -8,11 +8,11 @@
             <list string="DM Day Sessions" create="false" delete="false">
                 <field name="session_date"/>
                 <field name="delivery_man_id"/>
-                <field name="state" widget="badge"
+                <field name="state" string="Day Status" widget="badge"
                        decoration-info="state == 'office'"
                        decoration-success="state == 'on_the_way'"
                        decoration-muted="state == 'ended'"/>
-                <field name="departed_at"/>
+                <field name="departed_at" string="Left Office At"/>
                 <field name="ended_at"/>
             </list>
         </field>
@@ -25,9 +25,9 @@
             <form string="DM Day Session" create="false" delete="false">
                 <header>
                     <button name="action_depart" type="object"
-                            string="On the Way" class="oe_highlight"
+                            string="Leave Office" class="oe_highlight"
                             invisible="state != 'office'"
-                            confirm="Mark your day as On the Way? Loaded open stops will move to In Transit."/>
+                            confirm="Mark yourself as Left Office / Out on Route? Open loaded shop stops will show as Heading to Shop."/>
                     <button name="action_end_day" type="object"
                             string="End Day"
                             invisible="state == 'ended'"
@@ -42,23 +42,31 @@
                 <sheet>
                     <div class="alert alert-info" role="alert"
                          invisible="state != 'office'">
-                        Load stock first (Today Load / Pick), then press <b>On the Way</b> when you leave the office.
+                        <b>Day status</b> (this screen) = whether you left the office — not one shop.<br/>
+                        Load stock first (Today Load / Pick), then press <b>Leave Office</b> when you leave the warehouse.
                     </div>
                     <div class="alert alert-success" role="alert"
                          invisible="state != 'on_the_way'">
-                        You are <b>On the Way</b>. Open stops are in transit. Use <b>My Deliveries</b> for shop stops.
+                        You are <b>Left Office / Out on Route</b> for the day.<br/>
+                        Open each shop under <b>My Deliveries</b> to deliver, mark Shop Closed, or Could Not Deliver.
+                        Opening a delivery does not change this day status.
                     </div>
                     <div class="alert alert-secondary" role="alert"
                          invisible="state != 'ended'">
                         Day ended. Ask a distributor to reset if you need to reopen today's session.
                     </div>
                     <group>
-                        <group>
+                        <group string="Day (whole DM)">
                             <field name="delivery_man_id" readonly="1"/>
                             <field name="session_date" readonly="1"/>
+                            <field name="state" string="Day Status" readonly="1"
+                                   widget="badge"
+                                   decoration-info="state == 'office'"
+                                   decoration-success="state == 'on_the_way'"
+                                   decoration-muted="state == 'ended'"/>
                         </group>
-                        <group>
-                            <field name="departed_at" readonly="1"/>
+                        <group string="Times">
+                            <field name="departed_at" string="Left Office At" readonly="1"/>
                             <field name="ended_at" readonly="1"/>
                         </group>
                     </group>
@@ -93,7 +101,7 @@
 session = env['shahtaj.dm.day.session'].get_or_create_today()
 action = {
     'type': 'ir.actions.act_window',
-    'name': 'My Day Session',
+    'name': 'My Day Session (Left Office)',
     'res_model': 'shahtaj.dm.day.session',
     'res_id': session.id,
     'view_mode': 'form',
@@ -105,7 +113,7 @@ action = {
 
     <!-- Keep for explicit use (e.g. button); chains into My Deliveries -->
     <record id="action_shahtaj_dm_my_session_depart" model="ir.actions.server">
-        <field name="name">Start Day — On the Way</field>
+        <field name="name">Leave Office — Out on Route</field>
         <field name="model_id" ref="model_shahtaj_dm_day_session"/>
         <field name="state">code</field>
         <field name="code"><![CDATA[
@@ -115,8 +123,8 @@ action = {
     'type': 'ir.actions.client',
     'tag': 'display_notification',
     'params': {
-        'title': 'On the Way',
-        'message': 'Your day session is now On the Way. Open stops are marked in transit.',
+        'title': 'Left Office',
+        'message': 'Day status is Out on Route. Open loaded stops show as Heading to Shop. Open My Deliveries for each shop.',
         'type': 'success',
         'sticky': False,
         'next': {

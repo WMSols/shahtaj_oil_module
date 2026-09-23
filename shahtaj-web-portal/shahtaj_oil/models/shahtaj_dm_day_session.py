@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Delivery Man day session: overall On the Way (not per job)."""
+"""Delivery Man day session: Left Office / Out on Route (not a per-shop stop)."""
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
 
@@ -28,19 +28,20 @@ class ShahtajDmDaySession(models.Model):
     state = fields.Selection(
         [
             ('office', 'At Office / Loading'),
-            ('on_the_way', 'On the Way'),
+            ('on_the_way', 'Left Office / Out on Route'),
             ('ended', 'Day Ended'),
         ],
-        string='Status',
+        string='Day Status',
         default='office',
         required=True,
         index=True,
         help=(
-            'Overall day status for the delivery man (app UX).\n'
-            'At Office → load stock → On the Way → deliver stops → Day Ended.'
+            'Whole-day status for this delivery man (not one shop).\n'
+            'At Office → load stock → Left Office / Out on Route → deliver stops → Day Ended.\n'
+            'Per-shop progress uses the delivery Stop field (Heading to Shop / Closed / Done).'
         ),
     )
-    departed_at = fields.Datetime(string='Went On the Way At', readonly=True)
+    departed_at = fields.Datetime(string='Left Office At', readonly=True)
     ended_at = fields.Datetime(string='Day Ended At', readonly=True)
     company_id = fields.Many2one(
         'res.company',
@@ -117,7 +118,11 @@ class ShahtajDmDaySession(models.Model):
         })
 
     def action_depart(self):
-        """Mark overall On the Way after loading; sync open jobs to in_transit."""
+        """Mark day as Left Office / Out on Route after loading.
+
+        Also marks open loaded stops as Heading to Shop so the distributor
+        job list reflects that the DM has left the office (same as app).
+        """
         self.ensure_one()
         self._assert_dm_access(self.delivery_man_id)
         if self.state == 'ended':
@@ -128,7 +133,7 @@ class ShahtajDmDaySession(models.Model):
             'state': 'on_the_way',
             'departed_at': fields.Datetime.now(),
         })
-        # Keep job list filters useful for distributors: open loaded jobs → On the Way.
+        # Open loaded stops → Heading to Shop (job-level Stop, not Day Status).
         Delivery = self.env['shahtaj.dm.delivery'].sudo()
         jobs = Delivery.search([
             ('delivery_man_id', '=', self.delivery_man_id.id),

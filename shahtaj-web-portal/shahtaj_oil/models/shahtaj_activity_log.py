@@ -20,6 +20,7 @@ KNOWN_OPERATIONS = (
     'dm.job.pick',
     'dm.job.return',
     'dm.job.shop_closed',
+    'dm.job.undo_deliver',
     'dm.load.pick',
     'dm.session.depart',
     'dm.session.end',

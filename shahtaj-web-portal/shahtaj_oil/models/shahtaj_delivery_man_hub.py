@@ -27,9 +27,15 @@ class ShahtajDeliveryManHub(models.TransientModel):
         string='DM Stops Pending Today',
         compute='_compute_counts',
     )
-    dm_deliveries_in_transit = fields.Integer(
-        string='In Transit / On the Way',
+    dm_out_on_route_count = fields.Integer(
+        string='DMs Left Office Today',
         compute='_compute_counts',
+        help='Day sessions with status Left Office / Out on Route (whole DM, not one shop).',
+    )
+    dm_deliveries_in_transit = fields.Integer(
+        string='Stops Heading to Shop',
+        compute='_compute_counts',
+        help='Delivery jobs whose Stop field is Heading to Shop (per shop, not day status).',
     )
 
     @api.depends_context('uid')
@@ -38,6 +44,7 @@ class ShahtajDeliveryManHub(models.TransientModel):
         DmDelivery = self.env['shahtaj.dm.delivery'].sudo()
         SaleOrder = self.env['sale.order'].sudo()
         VisitTask = self.env['shahtaj.visit.task'].sudo()
+        DaySession = self.env['shahtaj.dm.day.session'].sudo()
         today = fields.Date.context_today(self)
 
         for hub in self:
@@ -60,6 +67,10 @@ class ShahtajDeliveryManHub(models.TransientModel):
                 ('task_kind', '=', 'delivery_man'),
                 ('scheduled_date', '=', today),
                 ('state', 'in', ('pending', 'in_progress')),
+            ])
+            hub.dm_out_on_route_count = DaySession.search_count([
+                ('session_date', '=', today),
+                ('state', '=', 'on_the_way'),
             ])
             hub.dm_deliveries_in_transit = DmDelivery.search_count([
                 ('field_state', '=', 'in_transit'),

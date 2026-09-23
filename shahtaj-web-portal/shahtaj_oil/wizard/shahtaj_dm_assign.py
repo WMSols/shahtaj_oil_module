@@ -40,15 +40,27 @@ class ShahtajDmAssignWizard(models.TransientModel):
         string='Delivery Men',
     )
     allocation_html = fields.Html(
-        string='Allocation Check',
+        string='Allocation & Delivery',
         compute='_compute_allocation_html',
         sanitize=False,
+        help='Assignable plan plus read-only pick/deliver progress from real DM jobs.',
     )
 
     @api.depends(
         'job_ids.line_ids.qty_assigned',
         'job_ids.line_ids.sale_order_line_id',
+        'job_ids.existing_job_id',
+        'job_ids.existing_job_id.state',
+        'job_ids.existing_job_id.field_state',
+        'job_ids.existing_job_id.line_ids.qty_picked',
+        'job_ids.existing_job_id.line_ids.qty_delivered',
         'sale_order_id.order_line.product_uom_qty',
+        'sale_order_id.shahtaj_dm_delivery_ids',
+        'sale_order_id.shahtaj_dm_delivery_ids.state',
+        'sale_order_id.shahtaj_dm_delivery_ids.field_state',
+        'sale_order_id.shahtaj_dm_delivery_ids.line_ids.qty_assigned',
+        'sale_order_id.shahtaj_dm_delivery_ids.line_ids.qty_picked',
+        'sale_order_id.shahtaj_dm_delivery_ids.line_ids.qty_delivered',
     )
     def _compute_allocation_html(self):
         for wiz in self:
@@ -105,13 +117,101 @@ class ShahtajDmAssignWizard(models.TransientModel):
                 )
             )
             body = ''.join(rows) or '<tr><td colspan="4">No products</td></tr>'
-            wiz.allocation_html = (
+            allocation_table = (
                 status
-                + '<table class="table table-sm table-bordered mb-0">'
-                + '<thead><tr><th>Product</th><th>Ordered</th>'
-                + '<th>Assigned</th><th>Left</th></tr></thead>'
+                + '<table class="table table-sm table-bordered mb-3">'
+                + '<thead><tr><th>Product</th><th class="text-end">Ordered</th>'
+                + '<th class="text-end">Assigned</th><th class="text-end">Left</th></tr></thead>'
                 + f'<tbody>{body}</tbody></table>'
             )
+            wiz.allocation_html = allocation_table + wiz._shahtaj_delivery_progress_html()
+
+    def _shahtaj_delivery_progress_html(self):
+        """Read-only who delivered what (from real DM jobs on this SO)."""
+        self.ensure_one()
+        order = self.sale_order_id
+        jobs = order.shahtaj_dm_delivery_ids.sorted('id')
+        if not jobs:
+            return (
+                '<p class="mb-0 text-muted">'
+                '<b>Delivery progress</b> — no DM jobs yet. Save assignments first.'
+                '</p>'
+            )
+        state_labels = dict(jobs[:1]._fields['state'].selection)
+        stop_labels = dict(jobs[:1]._fields['field_state'].selection)
+        job_rows = []
+        for job in jobs:
+            dm = job.delivery_man_id.display_name if job.delivery_man_id else '—'
+            assigned = sum(job.line_ids.mapped('qty_assigned'))
+            picked = sum(job.line_ids.mapped('qty_picked'))
+            delivered = sum(job.line_ids.mapped('qty_delivered'))
+            job_rows.append(
+                f'<tr>'
+                f'<td>{dm}</td>'
+                f'<td class="text-end">{assigned:g}</td>'
+                f'<td class="text-end">{picked:g}</td>'
+                f'<td class="text-end">{delivered:g}</td>'
+                f'<td>{state_labels.get(job.state, job.state)}</td>'
+                f'<td>{stop_labels.get(job.field_state, job.field_state)}</td>'
+                f'</tr>'
+            )
+        product_rows = []
+        sale_lines = order.order_line.filtered(
+            lambda l: l.product_id and l.product_id.type == 'consu' and not l.display_type
+        )
+        for sol in sale_lines:
+            assigned = picked = delivered = 0.0
+            per_dm = []
+            for job in jobs:
+                line = job.line_ids.filtered(
+                    lambda l, sid=sol.id: l.sale_order_line_id.id == sid
+                )[:1]
+                if not line:
+                    continue
+                assigned += line.qty_assigned
+                picked += line.qty_picked
+                delivered += line.qty_delivered
+                if line.qty_assigned or line.qty_picked or line.qty_delivered:
+                    dm = job.delivery_man_id.name if job.delivery_man_id else '—'
+                    per_dm.append(
+                        f'{dm}: A {line.qty_assigned:g} / P {line.qty_picked:g} / D {line.qty_delivered:g}'
+                    )
+            product_rows.append(
+                f'<tr>'
+                f'<td>{sol.product_id.display_name}</td>'
+                f'<td class="text-end">{sol.product_uom_qty:g}</td>'
+                f'<td class="text-end">{assigned:g}</td>'
+                f'<td class="text-end">{picked:g}</td>'
+                f'<td class="text-end">{delivered:g}</td>'
+                f'<td class="small">{"; ".join(per_dm) or "—"}</td>'
+                f'</tr>'
+            )
+        product_body = ''.join(product_rows) or '<tr><td colspan="6">No products</td></tr>'
+        return (
+            '<hr class="my-2"/>'
+            '<p class="mb-1"><b>Delivery progress</b> '
+            '<span class="text-muted">(read-only — from saved DM jobs)</span></p>'
+            '<table class="table table-sm table-bordered mb-2">'
+            '<thead><tr>'
+            '<th>Delivery Man</th>'
+            '<th class="text-end">Assigned</th>'
+            '<th class="text-end">Picked</th>'
+            '<th class="text-end">Delivered</th>'
+            '<th>Stock</th><th>Stop</th>'
+            '</tr></thead>'
+            f'<tbody>{"".join(job_rows)}</tbody></table>'
+            '<table class="table table-sm table-bordered mb-0">'
+            '<thead><tr>'
+            '<th>Product</th>'
+            '<th class="text-end">Ordered</th>'
+            '<th class="text-end">Assigned</th>'
+            '<th class="text-end">Picked</th>'
+            '<th class="text-end">Delivered</th>'
+            '<th>Per DM (A/P/D)</th>'
+            '</tr></thead>'
+            f'<tbody>{product_body}</tbody>'
+            '</table>'
+        )
 
     @api.model
     def default_get(self, fields_list):
@@ -142,6 +242,8 @@ class ShahtajDmAssignWizard(models.TransientModel):
                         'product_uom_id': sol.product_uom_id.id,
                         'qty_ordered': sol.product_uom_qty,
                         'qty_assigned': qty,
+                        'qty_picked': existing.qty_picked if existing else 0.0,
+                        'qty_delivered': existing.qty_delivered if existing else 0.0,
                     }))
                 job_cmds.append((0, 0, {
                     'delivery_man_id': job.delivery_man_id.id,
@@ -162,6 +264,8 @@ class ShahtajDmAssignWizard(models.TransientModel):
                     'product_uom_id': sol.product_uom_id.id,
                     'qty_ordered': sol.product_uom_qty,
                     'qty_assigned': sol.product_uom_qty,
+                    'qty_picked': 0.0,
+                    'qty_delivered': 0.0,
                 })
                 for sol in sale_lines
             ]
@@ -198,6 +302,8 @@ class ShahtajDmAssignWizard(models.TransientModel):
                 'product_uom_id': sol.product_uom_id.id,
                 'qty_ordered': sol.product_uom_qty,
                 'qty_assigned': left,
+                'qty_picked': 0.0,
+                'qty_delivered': 0.0,
             }))
         # delivery_man_id required: leave unset until user picks — use first available DM
         # only as empty slot; user must select. Create with False fails required field.
@@ -306,14 +412,40 @@ class ShahtajDmAssignWizardJob(models.TransientModel):
     )
     qty_assigned_total = fields.Float(
         string='Assigned Qty',
-        compute='_compute_qty_assigned_total',
+        compute='_compute_qty_totals',
         digits='Product Unit of Measure',
     )
+    qty_picked_total = fields.Float(
+        string='Picked',
+        compute='_compute_qty_totals',
+        digits='Product Unit of Measure',
+    )
+    qty_delivered_total = fields.Float(
+        string='Delivered',
+        compute='_compute_qty_totals',
+        digits='Product Unit of Measure',
+    )
+    job_stock_state = fields.Selection(
+        related='existing_job_id.state',
+        string='Stock',
+        readonly=True,
+    )
+    job_field_state = fields.Selection(
+        related='existing_job_id.field_state',
+        string='Stop',
+        readonly=True,
+    )
 
-    @api.depends('line_ids.qty_assigned')
-    def _compute_qty_assigned_total(self):
+    @api.depends(
+        'line_ids.qty_assigned',
+        'line_ids.qty_picked',
+        'line_ids.qty_delivered',
+    )
+    def _compute_qty_totals(self):
         for job in self:
             job.qty_assigned_total = sum(job.line_ids.mapped('qty_assigned'))
+            job.qty_picked_total = sum(job.line_ids.mapped('qty_picked'))
+            job.qty_delivered_total = sum(job.line_ids.mapped('qty_delivered'))
 
     @api.onchange('delivery_man_id', 'wizard_id')
     def _onchange_fill_product_lines(self):
@@ -338,6 +470,8 @@ class ShahtajDmAssignWizardJob(models.TransientModel):
                 'product_uom_id': sol.product_uom_id.id,
                 'qty_ordered': sol.product_uom_qty,
                 'qty_assigned': left,
+                'qty_picked': 0.0,
+                'qty_delivered': 0.0,
             }))
         self.line_ids = lines
 
@@ -372,6 +506,18 @@ class ShahtajDmAssignWizardLine(models.TransientModel):
     qty_assigned = fields.Float(
         string='Assign Qty',
         digits='Product Unit of Measure',
+    )
+    qty_picked = fields.Float(
+        string='Picked',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Read-only from the saved DM job (0 if not created yet).',
+    )
+    qty_delivered = fields.Float(
+        string='Delivered',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Read-only from the saved DM job (0 if not delivered yet).',
     )
 
     @api.model_create_multi

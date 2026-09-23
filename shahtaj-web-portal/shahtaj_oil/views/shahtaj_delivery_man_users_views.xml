@@ -164,7 +164,8 @@
                             </field>
                             <div class="alert alert-info mt-2" role="alert">
                                 <b>Stock</b> = warehouse flow.
-                                <b>Stop</b> = field story (On the Way / Shop Closed / Could Not Deliver).
+                                <b>Stop</b> = this shop (Heading to Shop / Shop Closed / Could Not Deliver).
+                                <b>Day</b> = My Day Session (Left Office) — not a single delivery.
                                 Use <b>Assign / Split DM</b> on the sales order to set
                                 day/time and product quantities per delivery man.
                             </div>

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Delivery Man workflow: pick WH→van, deliver van→shop, return van→WH."""
 import logging
+from collections import defaultdict
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
@@ -98,7 +99,7 @@ class ShahtajDmDelivery(models.Model):
     field_state = fields.Selection(
         [
             ('pending', 'Not Started'),
-            ('in_transit', 'On the Way'),
+            ('in_transit', 'Heading to Shop'),
             ('not_attended', 'Shop Closed'),
             ('failed', 'Could Not Deliver'),
             ('done', 'Stop Done'),
@@ -108,8 +109,9 @@ class ShahtajDmDelivery(models.Model):
         required=True,
         index=True,
         help=(
-            'Field stop story (separate from stock).\n'
-            'Not Started → On the Way → Shop Closed / Could Not Deliver / Stop Done.\n'
+            'This shop stop only (not the DM day status).\n'
+            'Not Started → Heading to Shop → Shop Closed / Could Not Deliver / Stop Done.\n'
+            'Day-level “Left Office” is on My Day Session, not this field.\n'
             'Shop Closed and Could Not Deliver require a note.'
         ),
     )
@@ -795,6 +797,16 @@ class ShahtajDmDelivery(models.Model):
                         picked=line.qty_picked,
                         dm=self.delivery_man_id.name,
                     ))
+                if float_compare(qty, line.qty_delivered, precision_rounding=rounding) < 0:
+                    raise UserError(_(
+                        'Cannot set assigned qty %(qty)s of %(product)s below '
+                        'already delivered %(delivered)s on %(dm)s. '
+                        'Use Undo Delivery to Shop first if you need to change the plan.',
+                        qty=qty,
+                        product=sol.product_id.display_name,
+                        delivered=line.qty_delivered,
+                        dm=self.delivery_man_id.name,
+                    ))
                 line.write({
                     'qty_assigned': qty,
                     'qty_ordered': sol.product_uom_qty,
@@ -847,10 +859,32 @@ class ShahtajDmDelivery(models.Model):
                 vals['scheduled_date'] = today
             if new_state not in ('picked', 'partial', 'delivered', 'returned') and rec.pick_picking_id and rec.pick_picking_id.state != 'done':
                 vals['pick_picking_id'] = False
+            # Keep Stop aligned: don't leave Stop Done when Stock is Ready/Picked.
+            stop = rec._shahtaj_stop_for_stock_state(new_state)
+            if stop and rec.field_state != stop:
+                vals['field_state'] = stop
             if vals:
-                rec.sudo().write(vals)
+                rec.sudo().with_context(shahtaj_skip_planning_log=True).write(vals)
             if ensure_visit_task:
                 rec._ensure_visit_task()
+
+    def _shahtaj_stop_for_stock_state(self, stock_state):
+        """Target Stop after stock sync/undo. Only clears stale ``done``.
+
+        Returns field_state value to write, or False to leave Stop unchanged
+        (Shop Closed / Could Not Deliver stay as set by the DM).
+        """
+        self.ensure_one()
+        any_delivered = any((l.qty_delivered or 0.0) > 0 for l in self.line_ids)
+        if stock_state == 'delivered':
+            return 'done'
+        if stock_state == 'returned':
+            return False
+        if self.field_state == 'done' and not any_delivered:
+            if stock_state in ('picked', 'partial'):
+                return 'in_transit'
+            return 'pending'
+        return False
 
     def _ensure_visit_task(self):
         """Create/update a delivery-man visit task so distributor Visit Tasks list is combined.
@@ -906,12 +940,12 @@ class ShahtajDmDelivery(models.Model):
                 vals['state'] = 'completed'
             elif rec.state == 'returned':
                 vals['state'] = 'cancelled'
-            elif rec.state in ('ready', 'picked', 'partial'):
-                vals['state'] = (
-                    'pending'
-                    if not task or task.state in ('cancelled', 'pending')
-                    else task.state
-                )
+            elif rec.state == 'partial':
+                # Still open — never keep a stale completed task after undo.
+                vals['state'] = 'in_progress'
+            elif rec.state in ('ready', 'picked'):
+                # Re-open after undo / re-invoice so DM dashboard matches Stock.
+                vals['state'] = 'pending'
 
             try:
                 # Savepoint: DB unique errors must not poison invoice post.
@@ -944,7 +978,9 @@ class ShahtajDmDelivery(models.Model):
                     )
                     continue
             if task and rec.visit_task_id != task:
-                rec.sudo().write({'visit_task_id': task.id})
+                rec.sudo().with_context(shahtaj_skip_planning_log=True).write({
+                    'visit_task_id': task.id,
+                })
 
     @api.model
     def _sync_for_sale_orders(self, sale_orders):
@@ -1424,6 +1460,153 @@ class ShahtajDmDelivery(models.Model):
             Move.create(clean)
         return picking
 
+    @api.model
+    def _shahtaj_today_open_jobs_domain(self, dm, day=None):
+        """Open jobs for Today Load: today, unscheduled, or overdue only.
+
+        Excludes future-dated jobs so Still Need matches Confirm Pick.
+        """
+        day = day or fields.Date.context_today(self)
+        return [
+            ('delivery_man_id', '=', dm.id),
+            ('state', 'in', ('ready', 'picked', 'partial')),
+            '|', '|',
+            ('scheduled_date', '=', day),
+            ('scheduled_date', '=', False),
+            ('scheduled_date', '<', day),
+        ]
+
+    @api.model
+    def _shahtaj_unattributed_van_qty_map(self, dm, product_ids=None):
+        """Physical van qty not already tied to open job lines (picked − delivered).
+
+        Leftover from prior days / free van loads can cover today's Still Need
+        without another warehouse pick.
+        """
+        dm.ensure_one()
+        van = dm._shahtaj_get_van_location()
+        if not van:
+            return {}
+        pid_filter = set(product_ids) if product_ids is not None else None
+        Quant = self.env['stock.quant'].sudo()
+        qdomain = [
+            ('location_id', '=', van.id),
+            ('quantity', '!=', 0),
+        ]
+        if pid_filter is not None:
+            if not pid_filter:
+                return {}
+            qdomain.append(('product_id', 'in', list(pid_filter)))
+        physical = {
+            row['product_id'][0]: float(row.get('quantity') or 0.0)
+            for row in Quant.read_group(qdomain, ['quantity:sum'], ['product_id'])
+            if row.get('product_id')
+        }
+        attributed = defaultdict(float)
+        open_jobs = self.search([
+            ('delivery_man_id', '=', dm.id),
+            ('state', 'in', ('ready', 'picked', 'partial')),
+        ])
+        for line in open_jobs.mapped('line_ids'):
+            if not line.product_id:
+                continue
+            pid = line.product_id.id
+            if pid_filter is not None and pid not in pid_filter:
+                continue
+            left = line.qty_picked - line.qty_delivered
+            if left > 0:
+                attributed[pid] += left
+        pids = set(physical) | set(attributed)
+        if pid_filter is not None:
+            pids &= pid_filter
+        return {
+            pid: max(0.0, physical.get(pid, 0.0) - attributed.get(pid, 0.0))
+            for pid in pids
+        }
+
+    @api.model
+    def _shahtaj_fifo_allocate_product_qtys(self, deliveries, qty_by_product):
+        """Distribute product totals onto job lines (assigned − picked).
+
+        Returns (qty_by_delivery_id, remaining_by_product).
+        """
+        remaining = {int(pid): float(qty) for pid, qty in (qty_by_product or {}).items() if float(qty or 0.0) > 0}
+        qty_by_delivery = defaultdict(dict)
+        for delivery in deliveries:
+            for line in delivery.line_ids:
+                pid = line.product_id.id
+                if pid not in remaining:
+                    continue
+                left = remaining[pid]
+                if left <= 0:
+                    continue
+                still = max(line.qty_assigned - line.qty_picked, 0.0)
+                if still <= 0:
+                    continue
+                rounding = line.product_uom_id.rounding or 0.01
+                take = float_round(min(still, left), precision_rounding=rounding)
+                if take <= 0:
+                    continue
+                qty_by_delivery[delivery.id][line.id] = (
+                    qty_by_delivery[delivery.id].get(line.id, 0.0) + take
+                )
+                remaining[pid] = float_round(left - take, precision_rounding=rounding)
+        return qty_by_delivery, remaining
+
+    def _attribute_van_stock_with_qtys(self, qty_by_line_id, reload_form=False):
+        """Mark job lines as picked using stock already on the van (no WH move)."""
+        self.ensure_one()
+        self.sudo()._sync_with_sale_order()
+        if self.state in ('delivered', 'returned'):
+            raise UserError(_('Cannot load stock for a finished/returned delivery.'))
+        if self.state == 'not_ready':
+            raise UserError(_('This order is not ready for stock pickup.'))
+
+        van_location = self._ensure_van_location()
+        updates = []
+        for line in self.line_ids:
+            qty = float(qty_by_line_id.get(line.id) or 0.0)
+            if qty <= 0:
+                continue
+            still_needed = max(line.qty_assigned - line.qty_picked, 0.0)
+            if qty > still_needed + 1e-6:
+                raise UserError(_(
+                    'Cannot assign %(qty)s of %(product)s from van — only %(max)s still needed.',
+                    qty=qty,
+                    product=line.product_id.display_name,
+                    max=still_needed,
+                ))
+            updates.append((line, qty))
+        if not updates:
+            return True
+
+        for line, qty in updates:
+            line.qty_picked = line.qty_picked + qty
+            line.qty_to_pick = max(line.qty_assigned - line.qty_picked, 0.0)
+            line.qty_to_deliver = max(line.qty_assigned - line.qty_delivered, 0.0)
+
+        self._retarget_sale_outgoing_to_van(van_location)
+        today = fields.Date.context_today(self)
+        now = fields.Datetime.now()
+        pick_vals = {
+            'state': 'partial' if any(l.qty_delivered > 0 for l in self.line_ids) else 'picked',
+            'van_location_id': van_location.id,
+            'scheduled_date': self.scheduled_date or today,
+        }
+        if not self.picked_at:
+            pick_vals['picked_at'] = now
+        self.write(pick_vals)
+        self._ensure_visit_task()
+        if not reload_form:
+            return True
+        return self._reload_form(
+            title=_('Van stock applied'),
+            message=_(
+                'Existing van stock assigned to %(shop)s (no warehouse pick).',
+                shop=self.partner_id.display_name,
+            ),
+        )
+
     def _pick_stock_with_qtys(self, qty_by_line_id, reload_form=True):
         """Pick given quantities (line_id → qty) from WH onto van."""
         self.ensure_one()
@@ -1534,7 +1717,7 @@ class ShahtajDmDelivery(models.Model):
             raise UserError(_('This stop is already done.'))
 
     def action_field_in_transit(self):
-        """DM: mark stop as on the way to the shop."""
+        """DM: mark this shop stop as Heading to Shop (not day Left Office)."""
         self.ensure_one()
         self._assert_can_update_field_state()
         self.write({'field_state': 'in_transit'})
@@ -1557,14 +1740,40 @@ class ShahtajDmDelivery(models.Model):
         return True
 
     def action_field_reset_pending(self):
-        """Distributor: clear a closed/failed stop so DM can try again."""
+        """Distributor: clear a closed/failed/stale-done stop so DM can try again."""
         self.ensure_one()
-        if self.field_state not in ('not_attended', 'failed', 'in_transit'):
-            raise UserError(_('Only On the Way / Shop Closed / Could Not Deliver can be reset.'))
+        if self.field_state not in ('not_attended', 'failed', 'in_transit', 'done'):
+            raise UserError(_(
+                'Only Heading to Shop / Shop Closed / Could Not Deliver / Stop Done can be reset.'
+            ))
         if self.state in ('delivered', 'returned'):
             raise UserError(_('Cannot reset stop on a finished stock job.'))
-        self.write({'field_state': 'pending'})
+        if self.field_state == 'done' and any(
+            (l.qty_delivered or 0.0) > 0 for l in self.line_ids
+        ):
+            raise UserError(_(
+                'Stop Done with delivered qty — use Undo Delivery to Shop first '
+                '(before invoicing).'
+            ))
+        self.with_context(shahtaj_skip_planning_log=True).write({'field_state': 'pending'})
+        self._ensure_visit_task()
         return True
+
+    def action_refresh_delivery_status(self):
+        """Recompute Stock/Stop/visit task from invoice + line qtys (safe anytime)."""
+        self.ensure_one()
+        self.sudo()._sync_with_sale_order(ensure_visit_task=True)
+        # Also clear completed DM visits if stock is no longer delivered.
+        if not any((l.qty_delivered or 0.0) > 0 for l in self.line_ids):
+            self._shahtaj_reopen_dm_visit_after_undo()
+            self._ensure_visit_task()
+        return self._reload_form(
+            title=_('Status refreshed'),
+            message=_(
+                'Stock, Stop, and visit task realigned for %(shop)s.',
+                shop=self.partner_id.display_name,
+            ),
+        )
 
     def action_deliver_to_shop(self):
         """Open deliver wizard (editable qty + GPS)."""
@@ -1787,6 +1996,220 @@ class ShahtajDmDelivery(models.Model):
             ),
             notif_type='warning',
         )
+
+    def _shahtaj_can_undo_shop_delivery(self):
+        """True when distributor may reverse shop handoff safely."""
+        self.ensure_one()
+        if self.state == 'returned':
+            return False
+        any_delivered = any((l.qty_delivered or 0.0) > 0 for l in self.line_ids)
+        # Normal undo, or repair stale Stop Done / completed visit after a half-undo.
+        if self.state not in ('partial', 'delivered', 'ready', 'picked'):
+            return False
+        if self.state in ('ready', 'picked') and self.field_state != 'done' and not any_delivered:
+            return False
+        if self.state in ('partial', 'delivered') and not any_delivered and self.field_state != 'done':
+            # May still need status repair (stock already cleared).
+            pass
+        if not self.van_location_id and any_delivered:
+            return False
+        order = self.sale_order_id
+        if order:
+            invoices = order.invoice_ids.filtered(lambda m: m.state != 'cancel')
+            if invoices:
+                return False
+            if order.invoice_status == 'invoiced':
+                return False
+        return True
+
+    def action_undo_delivery_to_shop(self):
+        """Distributor: reverse shop handoff — stock back to van, clear delivered qty.
+
+        Does not touch allocation / pick qty. Blocked after invoicing.
+        """
+        if not (
+            self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            or self.env.user.has_group('base.group_system')
+        ):
+            raise UserError(_('Only distributors can undo a shop delivery.'))
+
+        for job in self:
+            job._shahtaj_undo_delivery_to_shop()
+        return self[:1]._reload_form(
+            title=_('Delivery undone'),
+            message=_(
+                'Shop handoff reversed for %(shop)s. Stock is back on the van; '
+                'Delivered qty cleared. DM can deliver again.',
+                shop=self[:1].partner_id.display_name,
+            ),
+            notif_type='warning',
+        )
+
+    def _shahtaj_undo_delivery_to_shop(self):
+        self.ensure_one()
+        if self.state == 'returned':
+            raise UserError(_(
+                'Cannot undo delivery on a job that already returned stock to the warehouse.'
+            ))
+
+        order = self.sale_order_id
+        if order:
+            invoices = order.invoice_ids.filtered(lambda m: m.state != 'cancel')
+            if invoices:
+                raise UserError(_(
+                    'Cannot undo delivery for %(shop)s: sales order %(order)s already has '
+                    'invoice(s) %(invoices)s. Reverse those invoices first, then try again.',
+                    shop=self.partner_id.display_name,
+                    order=order.display_name,
+                    invoices=', '.join(invoices.mapped('name')),
+                ))
+            if order.invoice_status == 'invoiced':
+                raise UserError(_(
+                    'Cannot undo delivery: order %(order)s is already invoiced.',
+                    order=order.display_name,
+                ))
+
+        has_delivered = any((l.qty_delivered or 0.0) > 0 for l in self.line_ids)
+
+        # Repair: Stock already Ready/Picked but Stop still Done (or visit still completed).
+        if not has_delivered:
+            if self.state not in ('partial', 'delivered', 'ready', 'picked'):
+                raise UserError(_('Nothing delivered on this job to undo.'))
+            new_state = self._compute_dm_state()
+            if new_state in ('partial', 'delivered') and has_delivered:
+                raise UserError(_('Nothing delivered on this job to undo.'))
+            # Prefer live computed stock state when qty already cleared.
+            self._shahtaj_write_after_undo_delivery(
+                new_state if new_state not in ('partial', 'delivered') else (
+                    'picked' if any((l.qty_picked or 0.0) > 0 for l in self.line_ids) else 'ready'
+                )
+            )
+            return True
+
+        if self.state not in ('partial', 'delivered'):
+            raise UserError(_(
+                'Only Part Delivered or Delivered jobs can undo shop handoff.'
+            ))
+        if not self.van_location_id:
+            raise UserError(_('Missing van location — cannot return stock to the van.'))
+
+        customer_loc = self.partner_id.property_stock_customer
+        if not customer_loc:
+            customer_loc = self.env.ref(
+                'stock.stock_location_customers', raise_if_not_found=False,
+            )
+        if not customer_loc:
+            raise UserError(_('No customer stock location found.'))
+
+        warehouse = self._get_warehouse()
+        picking_type = warehouse.int_type_id or warehouse.in_type_id
+        if not picking_type:
+            raise UserError(_('No internal/receipt operation type on the warehouse.'))
+
+        move_vals_list = []
+        for line in self.line_ids:
+            qty = line.qty_delivered or 0.0
+            if qty <= 0:
+                continue
+            rounding = line.product_uom_id.rounding or 0.01
+            qty = float_round(qty, precision_rounding=rounding)
+            vals = {
+                'product_id': line.product_id.id,
+                'product_uom_qty': qty,
+                'product_uom': line.product_uom_id.id,
+                'location_id': customer_loc.id,
+                'location_dest_id': self.van_location_id.id,
+            }
+            if line.sale_order_line_id:
+                vals['sale_line_id'] = line.sale_order_line_id.id
+            move_vals_list.append(vals)
+
+        if not move_vals_list:
+            raise UserError(_('Nothing delivered on this job to undo.'))
+
+        picking = self._create_stock_picking(
+            picking_type=picking_type,
+            location_id=customer_loc,
+            location_dest_id=self.van_location_id,
+            origin=f"DM Undo Deliver: {self.sale_order_id.name}",
+            move_vals_list=move_vals_list,
+            partner_id=self.partner_id,
+            sale_id=self.sale_order_id,
+        )
+        picking.action_confirm()
+        picking.action_assign()
+        for move in picking.move_ids:
+            move.quantity = move.product_uom_qty
+            move.picked = True
+        picking.with_context(skip_backorder=True, skip_sms=True).button_validate()
+
+        for line in self.line_ids:
+            if line.qty_delivered:
+                line.qty_delivered = 0.0
+                line.qty_to_deliver = max(line.qty_assigned - line.qty_delivered, 0.0)
+                line.qty_to_pick = max(line.qty_assigned - line.qty_picked, 0.0)
+
+        new_state = self._compute_dm_state()
+        self._shahtaj_write_after_undo_delivery(new_state)
+        return True
+
+    def _shahtaj_write_after_undo_delivery(self, new_state):
+        """Update job after undo without hitting distributor planning lock on notes."""
+        self.ensure_one()
+        note = (self.notes or '').strip()
+        undo_note = _(
+            'Undo delivery by %(user)s on %(when)s — stock returned to van.',
+            user=self.env.user.name,
+            when=fields.Datetime.now(),
+        )
+        stop = self._shahtaj_stop_for_stock_state(new_state) or (
+            'in_transit' if new_state in ('picked', 'partial') else 'pending'
+        )
+        vals = {
+            'state': new_state,
+            'field_state': stop,
+            'delivered_at': False,
+            'gps_verified': False,
+            'notes': f'{note}\n{undo_note}'.strip() if note else undo_note,
+        }
+        self.with_context(shahtaj_skip_planning_log=True).write(vals)
+        self._shahtaj_reopen_dm_visit_after_undo()
+        self._ensure_visit_task()
+        self.env['shahtaj.activity.log'].log_business(
+            operation='dm.job.undo_deliver',
+            name='Undo DM shop delivery',
+            related_record=self,
+            message=_(
+                'Undid shop delivery for %(shop)s / %(order)s — stock back on van.',
+                shop=self.partner_id.display_name,
+                order=self.sale_order_id.display_name,
+            ),
+        )
+
+    def _shahtaj_reopen_dm_visit_after_undo(self):
+        """Mark completed DM visit rows undone so dashboards match Stock again."""
+        self.ensure_one()
+        Visit = self.env['shahtaj.visit'].sudo()
+        visits = Visit.search([
+            ('visit_kind', '=', 'delivery_man'),
+            ('dm_delivery_id', '=', self.id),
+            ('state', '=', 'completed'),
+        ])
+        if not visits:
+            return
+        now = fields.Datetime.now()
+        for visit in visits:
+            visit.with_context(shahtaj_system_visit_write=True).write({
+                'state': 'cancelled',
+                'outcome': 'undone',
+                'ended_at': now,
+                'notes': (
+                    ((visit.notes or '').strip() + '\n') if visit.notes else ''
+                ) + _(
+                    'Undone with shop delivery undo by %(user)s.',
+                    user=self.env.user.name,
+                ),
+            })
 
     def _ensure_dm_visit_completed(self):
         """Log a completed delivery visit for combined Shop Visits list."""

@@ -14,7 +14,7 @@
                         <field name="amount_total"/>
                         <field name="currency_id" invisible="1"/>
                     </group>
-                    <group string="Allocation">
+                    <group string="Allocation &amp; Delivery">
                         <field name="allocation_html" nolabel="1" colspan="2"/>
                     </group>
                 </group>
@@ -29,6 +29,12 @@
                         <field name="delivery_man_id"/>
                         <field name="scheduled_date"/>
                         <field name="qty_assigned_total" sum="Assigned"/>
+                        <field name="qty_picked_total" sum="Picked" optional="show"/>
+                        <field name="qty_delivered_total" sum="Delivered" optional="show"/>
+                        <field name="job_stock_state" string="Stock" optional="show"
+                               widget="badge"/>
+                        <field name="job_field_state" string="Stop" optional="show"
+                               widget="badge"/>
                         <field name="existing_job_id" optional="hide"/>
                     </list>
                     <form string="Delivery Man Share">
@@ -37,8 +43,16 @@
                             <field name="scheduled_date"/>
                             <field name="existing_job_id" readonly="1"
                                    invisible="not existing_job_id"/>
+                            <field name="job_stock_state" readonly="1"
+                                   invisible="not existing_job_id"/>
+                            <field name="job_field_state" readonly="1"
+                                   invisible="not existing_job_id"/>
                         </group>
                         <separator string="Product quantities for this DM"/>
+                        <div class="alert alert-secondary" role="alert">
+                            <b>Assign Qty</b> is editable.
+                            <b>Picked</b> / <b>Delivered</b> are read-only from the saved job.
+                        </div>
                         <field name="line_ids" nolabel="1">
                             <!-- force_save: readonly/invisible fields must round-trip on web_save -->
                             <list editable="bottom" create="false" delete="false">
@@ -46,6 +60,8 @@
                                 <field name="product_id" readonly="1" force_save="1"/>
                                 <field name="qty_ordered" readonly="1" force_save="1" sum="Ordered"/>
                                 <field name="qty_assigned" force_save="1" sum="Assign"/>
+                                <field name="qty_picked" readonly="1" force_save="1" sum="Picked"/>
+                                <field name="qty_delivered" readonly="1" force_save="1" sum="Delivered"/>
                                 <field name="product_uom_id" readonly="1" force_save="1"/>
                             </list>
                         </field>
@@ -57,6 +73,8 @@
                     (e.g. 100 Oil → DM1 50 + DM2 50).
                     Leaving some qty unassigned is OK — assign the rest later.
                     Each DM picks only their assigned qty (Today Load / Pick Stock).
+                    Delivery progress above is read-only; to undo a shop handoff use
+                    <b>Undo Delivery to Shop</b> on the DM job (distributor).
                 </div>
                 <footer>
                     <button name="action_confirm_assign" type="object"
