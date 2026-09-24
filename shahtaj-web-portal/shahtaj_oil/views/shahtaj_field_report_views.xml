@@ -59,6 +59,7 @@
                        decoration-success="state == 'done'"
                        decoration-muted="state == 'cancelled'"
                        widget="badge"/>
+                <field name="closing_remark" optional="hide"/>
                 <field name="create_date"/>
                 <field name="has_screenshot" optional="hide"/>
                 <field name="company_id" optional="hide" groups="base.group_multi_company"/>
@@ -108,13 +109,22 @@
                             <field name="reporter_role" readonly="1"/>
                             <field name="create_date" readonly="1"/>
                             <field name="device_info" readonly="1"/>
-                            <field name="latitude" readonly="1"/>
-                            <field name="longitude" readonly="1"/>
                             <field name="closed_at" readonly="1" invisible="not closed_at"/>
                             <field name="closed_by_id" readonly="1" invisible="not closed_by_id"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="has_screenshot" invisible="1"/>
                         </group>
+                    </group>
+                    <group string="Closing Remark"
+                           groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui,base.group_system">
+                        <field name="closing_remark" nolabel="1" colspan="2"
+                               placeholder="What was done / why cancelled (required before Mark Done or Cancel)"
+                               readonly="state in ('done', 'cancelled')"/>
+                    </group>
+                    <group string="Closing Remark"
+                           invisible="state not in ('done', 'cancelled') or not closing_remark"
+                           groups="shahtaj_oil.group_shahtaj_order_booker,shahtaj_oil.group_shahtaj_delivery_man">
+                        <field name="closing_remark" nolabel="1" colspan="2" readonly="1"/>
                     </group>
                     <group string="Screenshot / Capture">
                         <field name="screenshot" widget="image" nolabel="1"

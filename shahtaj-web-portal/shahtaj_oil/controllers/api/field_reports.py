@@ -29,8 +29,6 @@ def _create_kwargs(kwargs):
         'tag_ids': kwargs.get('tag_ids'),
         'tag_codes': kwargs.get('tag_codes'),
         'screenshot': kwargs.get('screenshot'),
-        'latitude': kwargs.get('latitude'),
-        'longitude': kwargs.get('longitude'),
         'device_info': kwargs.get('device_info') or '',
     }
 

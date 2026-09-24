@@ -30,6 +30,7 @@ from . import shahtaj_orders_hub
 from . import shahtaj_order_booker_hub
 from . import shahtaj_delivery_man_hub
 from . import shahtaj_pnl_dashboard
+from . import shahtaj_financial_statements
 from . import shahtaj_tax_ledger
 from . import shahtaj_expense
 from . import shahtaj_stock_receipt

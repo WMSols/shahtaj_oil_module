@@ -110,14 +110,18 @@ class ShahtajFieldReport(models.Model):
         max_height=1920,
     )
     has_screenshot = fields.Boolean(compute='_compute_has_screenshot')
-    latitude = fields.Float(string='Latitude', digits=(10, 7))
-    longitude = fields.Float(string='Longitude', digits=(10, 7))
     device_info = fields.Char(
         string='Device Info',
         help='Optional app/device string from the mobile client.',
     )
     closed_at = fields.Datetime(string='Closed At', readonly=True)
     closed_by_id = fields.Many2one('res.users', string='Closed By', readonly=True)
+    closing_remark = fields.Text(
+        string='Closing Remark',
+        help='Short closing statement from office (distributor/admin) when the '
+             'report is marked Done or Cancelled. Not the same as chatter notes.',
+        tracking=True,
+    )
 
     @api.depends('screenshot')
     def _compute_has_screenshot(self):
@@ -161,7 +165,10 @@ class ShahtajFieldReport(models.Model):
     def write(self, vals):
         vals = dict(vals)
         if not self._shahtaj_is_office_user():
-            blocked = {'state', 'user_id', 'company_id', 'closed_at', 'closed_by_id', 'reporter_role'}
+            blocked = {
+                'state', 'user_id', 'company_id', 'closed_at', 'closed_by_id',
+                'reporter_role', 'closing_remark',
+            }
             dirty = blocked.intersection(vals)
             if dirty:
                 raise AccessError(_(
@@ -170,11 +177,27 @@ class ShahtajFieldReport(models.Model):
         if 'state' in vals:
             new_state = vals['state']
             if new_state in ('done', 'cancelled'):
+                # Prefer remark from this write; else existing value on each record
+                remark_in_vals = vals.get('closing_remark')
+                for rec in self:
+                    remark = (
+                        (remark_in_vals if remark_in_vals is not None else rec.closing_remark)
+                        or ''
+                    ).strip()
+                    if not remark:
+                        raise UserError(_(
+                            'Please enter a Closing Remark before closing this report '
+                            '(what was done / why it was cancelled).'
+                        ))
+                if remark_in_vals is not None:
+                    vals['closing_remark'] = remark_in_vals.strip()
                 vals.setdefault('closed_at', fields.Datetime.now())
                 vals.setdefault('closed_by_id', self.env.uid)
             elif new_state in ('new', 'in_progress'):
                 vals['closed_at'] = False
                 vals['closed_by_id'] = False
+                # Clear so a new closing statement is required next time
+                vals['closing_remark'] = False
         return super().write(vals)
 
     def action_mark_in_progress(self):
@@ -184,11 +207,21 @@ class ShahtajFieldReport(models.Model):
 
     def action_mark_done(self):
         self._shahtaj_assert_office()
+        for rec in self:
+            if not (rec.closing_remark or '').strip():
+                raise UserError(_(
+                    'Enter a Closing Remark on the report form, then click Mark Done.'
+                ))
         self.write({'state': 'done'})
         return True
 
     def action_mark_cancelled(self):
         self._shahtaj_assert_office()
+        for rec in self:
+            if not (rec.closing_remark or '').strip():
+                raise UserError(_(
+                    'Enter a Closing Remark on the report form, then click Cancel.'
+                ))
         self.write({'state': 'cancelled'})
         return True
 
@@ -251,11 +284,10 @@ class ShahtajFieldReport(models.Model):
             'reported_by_id': self.user_id.id,
             'reporter_role': self.reporter_role,
             'has_screenshot': bool(self.screenshot),
-            'latitude': self.latitude or 0.0,
-            'longitude': self.longitude or 0.0,
             'device_info': self.device_info or '',
             'create_date': self.create_date.isoformat(sep=' ') if self.create_date else False,
             'closed_at': self.closed_at.isoformat(sep=' ') if self.closed_at else False,
+            'closing_remark': self.closing_remark or '',
         }
         if include_screenshot and self.screenshot:
             data['screenshot'] = self.screenshot.decode('utf-8') if isinstance(
@@ -274,8 +306,6 @@ class ShahtajFieldReport(models.Model):
         tag_ids=None,
         tag_codes=None,
         screenshot=None,
-        latitude=None,
-        longitude=None,
         device_info='',
     ):
         subject = (subject or '').strip()
@@ -307,10 +337,6 @@ class ShahtajFieldReport(models.Model):
             image = normalize_image_b64(screenshot) if isinstance(screenshot, str) else screenshot
             if image:
                 vals['screenshot'] = image
-        if latitude is not None:
-            vals['latitude'] = float(latitude)
-        if longitude is not None:
-            vals['longitude'] = float(longitude)
 
         report = self.create(vals)
         report.message_post(
@@ -322,12 +348,41 @@ class ShahtajFieldReport(models.Model):
 
     @api.model
     def shahtaj_api_list_my_reports(self, state=None, limit=50, offset=0):
-        domain = [('user_id', '=', self.env.uid)]
-        if state:
-            domain.append(('state', '=', state))
-        limit = min(max(int(limit or 50), 1), 200)
-        offset = max(int(offset or 0), 0)
-        reports = self.search(domain, limit=limit, offset=offset, order='create_date desc, id desc')
+        """List reports for the logged-in OB/DM.
+
+        Default (no state filter):
+          - all open reports (new + in_progress)
+          - last 3 completed/closed (done + cancelled)
+
+        Optional state filter keeps the same response shape; for done/cancelled
+        still returns at most the last 3. limit/offset are ignored for this
+        curated inbox (API contract unchanged).
+        """
+        base = [('user_id', '=', self.env.uid)]
+        open_order = 'create_date desc, id desc'
+        closed_order = 'closed_at desc, create_date desc, id desc'
+
+        if state in ('new', 'in_progress'):
+            reports = self.search(base + [('state', '=', state)], order=open_order)
+        elif state in ('done', 'cancelled'):
+            reports = self.search(
+                base + [('state', '=', state)],
+                limit=3,
+                order=closed_order,
+            )
+        else:
+            open_reports = self.search(
+                base + [('state', 'in', ('new', 'in_progress'))],
+                order=open_order,
+            )
+            closed_reports = self.search(
+                base + [('state', 'in', ('done', 'cancelled'))],
+                limit=3,
+                order=closed_order,
+            )
+            # Open first, then recent closed (preserve each search order)
+            reports = open_reports + closed_reports
+
         return {
             'reports': [r.shahtaj_api_report_dict() for r in reports],
             'count': len(reports),

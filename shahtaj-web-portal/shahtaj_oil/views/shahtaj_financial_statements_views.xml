@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ═══════════════ Trial Balance ═══════════════ -->
+    <record id="view_shahtaj_trial_balance_form" model="ir.ui.view">
+        <field name="name">shahtaj.trial.balance.form</field>
+        <field name="model">shahtaj.trial.balance</field>
+        <field name="arch" type="xml">
+            <form string="Trial Balance" create="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"
+                            class="oe_highlight" icon="fa-refresh"/>
+                    <button name="action_set_this_month" type="object"
+                            string="This Month"/>
+                    <button name="action_set_last_month" type="object"
+                            string="Last Month"/>
+                    <button name="action_set_fiscal_year" type="object"
+                            string="Fiscal Year to Date"/>
+                    <button name="action_open_journal_items" type="object"
+                            string="Journal Items"/>
+                    <button name="action_print" type="object"
+                            string="Print PDF" icon="fa-print"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Trial Balance</h1>
+                        <p class="text-muted">
+                            Posted journal items only.
+                            <b>Opening</b> = balance before Period From;
+                            <b>Period Debit / Credit</b> = movements in range;
+                            <b>Closing</b> = balance as of Period To.
+                            Closing Debit must equal Closing Credit when books are balanced.
+                        </p>
+                    </div>
+                    <group string="Period">
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="hide_zero"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="target_moves" readonly="1"/>
+                            <field name="is_balanced" readonly="1"
+                                   decoration-success="is_balanced"
+                                   decoration-danger="not is_balanced"/>
+                        </group>
+                    </group>
+                    <field name="summary_html" nolabel="1" colspan="2"/>
+                    <group string="Totals">
+                        <group>
+                            <field name="total_opening_debit" readonly="1"/>
+                            <field name="total_debit" readonly="1"/>
+                            <field name="total_closing_debit" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="total_opening_credit" readonly="1"/>
+                            <field name="total_credit" readonly="1"/>
+                            <field name="total_closing_credit" readonly="1"/>
+                            <field name="difference" readonly="1"
+                                   decoration-danger="difference != 0"
+                                   decoration-success="difference == 0"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <b>How to read this (financial flow)</b>
+                        <ul class="mb-0 mt-2">
+                            <li><b>Opening Dr / Cr</b> — account position before the period (signed balance shown in one column).</li>
+                            <li><b>Period Debit / Credit</b> — sum of posted movements between From and To.</li>
+                            <li><b>Closing Dr / Cr</b> — position as of To (authoritative from ledger, not Opening + Period).</li>
+                            <li>Change dates (or use quick period buttons) and click <b>Refresh</b>.</li>
+                            <li>Click a line’s account button to drill into journal items for that account in the period.</li>
+                        </ul>
+                    </div>
+                    <notebook>
+                        <page string="Accounts" name="accounts">
+                            <field name="line_ids" readonly="1" nolabel="1">
+                                <list create="false" delete="false" edit="false"
+                                      decoration-muted="opening_debit == 0 and opening_credit == 0 and debit == 0 and credit == 0 and closing_debit == 0 and closing_credit == 0">
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="account_type" optional="hide"/>
+                                    <field name="opening_debit" sum="Opening Debit"/>
+                                    <field name="opening_credit" sum="Opening Credit"/>
+                                    <field name="debit" sum="Period Debit"/>
+                                    <field name="credit" sum="Period Credit"/>
+                                    <field name="closing_debit" sum="Closing Debit"/>
+                                    <field name="closing_credit" sum="Closing Credit"/>
+                                    <button name="action_open_account_moves" type="object"
+                                            string="Items" icon="fa-external-link"
+                                            title="Open journal items for this account"/>
+                                    <field name="account_id" column_invisible="1"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_trial_balance" model="ir.actions.server">
+        <field name="name">Trial Balance</field>
+        <field name="model_id" ref="model_shahtaj_trial_balance"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open()</field>
+    </record>
+
+    <!-- ═══════════════ Balance Sheet ═══════════════ -->
+    <record id="view_shahtaj_balance_sheet_form" model="ir.ui.view">
+        <field name="name">shahtaj.balance.sheet.form</field>
+        <field name="model">shahtaj.balance.sheet</field>
+        <field name="arch" type="xml">
+            <form string="Balance Sheet" create="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"
+                            class="oe_highlight" icon="fa-refresh"/>
+                    <button name="action_set_today" type="object" string="Today"/>
+                    <button name="action_set_month_end" type="object"
+                            string="This Month End"/>
+                    <button name="action_set_last_month_end" type="object"
+                            string="Last Month End"/>
+                    <button name="action_open_journal_items" type="object"
+                            string="Journal Items"/>
+                    <button name="action_print" type="object"
+                            string="Print PDF" icon="fa-print"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Balance Sheet</h1>
+                        <p class="text-muted">
+                            Point-in-time statement as of the selected date.
+                            Posted journal items only.
+                            <b>Assets = Liabilities + Equity</b>, including
+                            Current Year Earnings from the fiscal year start through As of.
+                        </p>
+                    </div>
+                    <group string="As of">
+                        <group>
+                            <field name="date_to"/>
+                            <field name="fiscal_year_start" readonly="1"/>
+                            <field name="hide_zero"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="is_balanced" readonly="1"
+                                   decoration-success="is_balanced"
+                                   decoration-danger="not is_balanced"/>
+                            <field name="current_year_earnings" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="summary_html" nolabel="1" colspan="2"/>
+                    <group string="Totals">
+                        <group>
+                            <field name="total_assets" readonly="1"
+                                   decoration-bf="1"/>
+                            <field name="total_liabilities" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="total_equity" readonly="1"/>
+                            <field name="total_liabilities_equity" readonly="1"
+                                   decoration-bf="1"/>
+                            <field name="difference" readonly="1"
+                                   decoration-danger="difference != 0"
+                                   decoration-success="difference == 0"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <b>How to read this (financial flow)</b>
+                        <ul class="mb-0 mt-2">
+                            <li><b>Assets</b> — debit-normal accounts (receivable, cash, stock, fixed assets…).</li>
+                            <li><b>Liabilities</b> — credit-normal (payable, credit card, other liabilities).</li>
+                            <li><b>Equity</b> — capital / retained earnings, plus CoA undistributed earnings, plus <b>Current Year Earnings</b>.</li>
+                            <li><b>Current Year Earnings</b> = net of income &amp; expense accounts from Fiscal Year Start → As of (zero after a full year-end close).</li>
+                            <li>The statement balances when Assets = Liabilities + Equity.</li>
+                        </ul>
+                    </div>
+                    <notebook>
+                        <page string="Statement" name="statement">
+                            <field name="line_ids" readonly="1" nolabel="1">
+                                <list create="false" delete="false" edit="false"
+                                      decoration-bf="line_type in ('section', 'total')"
+                                      decoration-info="line_type == 'cye'"
+                                      decoration-muted="line_type == 'section'">
+                                    <field name="code" optional="show"/>
+                                    <field name="name"/>
+                                    <field name="balance" sum=""/>
+                                    <field name="line_type" optional="hide"/>
+                                    <field name="section" optional="hide"/>
+                                    <button name="action_open_account_moves" type="object"
+                                            string="Items" icon="fa-external-link"
+                                            invisible="not account_id"
+                                            title="Open journal items for this account"/>
+                                    <field name="account_id" column_invisible="1"/>
+                                    <field name="sequence" column_invisible="1"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_balance_sheet" model="ir.actions.server">
+        <field name="name">Balance Sheet</field>
+        <field name="model_id" ref="model_shahtaj_balance_sheet"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open()</field>
+    </record>
+
+</odoo>

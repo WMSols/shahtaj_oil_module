@@ -348,6 +348,9 @@ class ShahtajDmApiService(models.AbstractModel):
         van = dm._shahtaj_get_van_location()
         items = []
         van_map = self._van_qty_map(dm)
+        free_map = self.env['shahtaj.dm.delivery']._shahtaj_unattributed_van_qty_map(
+            dm, set(van_map) if van_map else set(),
+        )
         Product = self.env['product.product'].sudo()
         products = Product.browse(list(van_map.keys()))
         product_by_id = {product.id: product for product in products}
@@ -359,12 +362,14 @@ class ShahtajDmApiService(models.AbstractModel):
                 'product_id': pid,
                 'name': product.display_name,
                 'qty': qty,
+                'qty_free': free_map.get(pid, 0.0),
                 'uom': product.uom_id.name if product.uom_id else '',
             })
         return {
             'van_location_id': van.id if van else False,
             'items': items,
             'qty_total': sum(i['qty'] for i in items),
+            'qty_free_total': sum(i['qty_free'] for i in items),
         }
 
     @api.model
@@ -379,10 +384,14 @@ class ShahtajDmApiService(models.AbstractModel):
         pids = products.ids
         van_map = self._van_qty_map(dm, pids)
         wh_map = self._wh_free_qty_map(pids)
+        free_map = self.env['shahtaj.dm.delivery']._shahtaj_unattributed_van_qty_map(
+            dm, set(pids),
+        )
         rows = []
         for product in products:
             wh_qty = wh_map.get(product.id, 0.0)
             van_qty = van_map.get(product.id, 0.0)
+            free_qty = free_map.get(product.id, 0.0)
             if wh_qty <= 0 and van_qty <= 0:
                 continue
             rows.append({
@@ -390,6 +399,7 @@ class ShahtajDmApiService(models.AbstractModel):
                 'name': product.display_name,
                 'qty_in_warehouse': wh_qty,
                 'qty_on_van': van_qty,
+                'qty_free_on_van': free_qty,
                 'uom': product.uom_id.name if product.uom_id else '',
             })
         return {'products': rows}
@@ -679,6 +689,9 @@ class ShahtajDmApiService(models.AbstractModel):
                 qty_map[pid] = qty_map.get(pid, 0.0) + qty
         if not qty_map:
             raise UserError(_('Enter a deliver quantity on at least one product.'))
+
+        # Only surplus (unattributed) van stock — never drain reserved job stock.
+        Delivery._shahtaj_assert_van_surplus(dm, qty_map, _('walk-in deliver'))
 
         van = Delivery._ensure_van_location_for_dm(dm)
         van_map = self._van_qty_map(dm, list(qty_map.keys()))

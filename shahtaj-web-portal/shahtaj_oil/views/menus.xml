@@ -305,6 +305,20 @@
               sequence="45"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_trial_balance"
+              name="Trial Balance"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_trial_balance"
+              sequence="36"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_balance_sheet"
+              name="Balance Sheet"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_balance_sheet"
+              sequence="37"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_pnl_dashboard"
               name="8. Profit &amp; Loss"
               parent="menu_shahtaj_root"

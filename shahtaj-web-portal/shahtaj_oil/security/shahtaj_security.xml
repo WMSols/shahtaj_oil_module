@@ -19,7 +19,7 @@
         <field name="name">Distributor Financial Access</field>
         <field name="sequence">11</field>
         <field name="privilege_id" eval="False"/>
-        <field name="comment">Technical add-on (not a Shahtaj role): invoices, payments, P&amp;L, bank/cash, and product pricing. Must stack with Distributor — never share the Shahtaj privilege or Odoo 19 drops the Distributor role.</field>
+        <field name="comment">Technical add-on (not a Shahtaj role): invoices, payments, P&amp;L, Trial Balance, Balance Sheet, bank/cash, and product pricing. Must stack with Distributor — never share the Shahtaj privilege or Odoo 19 drops the Distributor role.</field>
     </record>
 
     <!-- Native Odoo apps (Sales, Inventory, Accounting, …) — only for native-UI distributors -->

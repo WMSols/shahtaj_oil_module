@@ -134,6 +134,11 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
             })
             wiz.process()
 
+        # SO qty_delivered is truth: when fully delivered, close matching DM jobs.
+        order = self.sale_order_id.sudo()
+        order.invalidate_recordset(['shahtaj_delivery_status', 'shahtaj_qty_to_deliver'])
+        self.env['shahtaj.dm.delivery']._shahtaj_align_dm_jobs_to_sale_delivery(order)
+
         return {
             'type': 'ir.actions.act_window',
             'name': _('Sales Order'),

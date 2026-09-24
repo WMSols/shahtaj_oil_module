@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="paperformat_shahtaj_financial_landscape" model="report.paperformat">
+        <field name="name">Shahtaj Financial Landscape</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">20</field>
+        <field name="margin_bottom">15</field>
+        <field name="margin_left">8</field>
+        <field name="margin_right">8</field>
+        <field name="header_line" eval="False"/>
+        <field name="dpi">90</field>
+    </record>
+
+    <!-- ═══════════════ Trial Balance PDF ═══════════════ -->
+    <record id="action_report_shahtaj_trial_balance" model="ir.actions.report">
+        <field name="name">Trial Balance</field>
+        <field name="model">shahtaj.trial.balance</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">shahtaj_oil.report_trial_balance</field>
+        <field name="report_file">shahtaj_oil.report_trial_balance</field>
+        <field name="print_report_name">'Trial Balance - %s to %s' % (object.date_from, object.date_to)</field>
+        <field name="paperformat_id" ref="paperformat_shahtaj_financial_landscape"/>
+    </record>
+
+    <template id="report_trial_balance">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Trial Balance</h2>
+                        <p class="mb-1">
+                            Period:
+                            <strong><span t-field="doc.date_from"/></strong>
+                            to
+                            <strong><span t-field="doc.date_to"/></strong>
+                            <t t-if="doc.company_id">
+                                — <span t-field="doc.company_id.name"/>
+                            </t>
+                        </p>
+                        <p class="text-muted mb-2" style="font-size: 11px;">
+                            Posted entries only.
+                            Opening = before period; Period = movements; Closing = as of Period To.
+                            <t t-if="doc.is_balanced">
+                                <span class="text-success"><strong>Balanced.</strong></span>
+                            </t>
+                            <t t-else="">
+                                <span class="text-danger">
+                                    <strong>Out of balance</strong>
+                                    (difference
+                                    <span t-field="doc.difference"
+                                          t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>).
+                                </span>
+                            </t>
+                        </p>
+                        <table class="table table-sm table-bordered" style="font-size: 10px;">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Account</th>
+                                    <th class="text-end">Opening Dr</th>
+                                    <th class="text-end">Opening Cr</th>
+                                    <th class="text-end">Period Dr</th>
+                                    <th class="text-end">Period Cr</th>
+                                    <th class="text-end">Closing Dr</th>
+                                    <th class="text-end">Closing Cr</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="doc.line_ids" t-as="line">
+                                    <td><span t-field="line.code"/></td>
+                                    <td><span t-field="line.name"/></td>
+                                    <td class="text-end">
+                                        <span t-if="line.opening_debit"
+                                              t-field="line.opening_debit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.opening_credit"
+                                              t-field="line.opening_credit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.debit"
+                                              t-field="line.debit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.credit"
+                                              t-field="line.credit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.closing_debit"
+                                              t-field="line.closing_debit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.closing_credit"
+                                              t-field="line.closing_credit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="2" class="text-end">Totals</th>
+                                    <th class="text-end">
+                                        <span t-field="doc.total_opening_debit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </th>
+                                    <th class="text-end">
+                                        <span t-field="doc.total_opening_credit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </th>
+                                    <th class="text-end">
+                                        <span t-field="doc.total_debit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </th>
+                                    <th class="text-end">
+                                        <span t-field="doc.total_credit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </th>
+                                    <th class="text-end">
+                                        <span t-field="doc.total_closing_debit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </th>
+                                    <th class="text-end">
+                                        <span t-field="doc.total_closing_credit"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- ═══════════════ Balance Sheet PDF ═══════════════ -->
+    <record id="action_report_shahtaj_balance_sheet" model="ir.actions.report">
+        <field name="name">Balance Sheet</field>
+        <field name="model">shahtaj.balance.sheet</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">shahtaj_oil.report_balance_sheet</field>
+        <field name="report_file">shahtaj_oil.report_balance_sheet</field>
+        <field name="print_report_name">'Balance Sheet - %s' % (object.date_to,)</field>
+    </record>
+
+    <template id="report_balance_sheet">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Balance Sheet</h2>
+                        <p class="mb-1">
+                            As of:
+                            <strong><span t-field="doc.date_to"/></strong>
+                            <t t-if="doc.fiscal_year_start">
+                                (Fiscal year from <span t-field="doc.fiscal_year_start"/>)
+                            </t>
+                            <t t-if="doc.company_id">
+                                — <span t-field="doc.company_id.name"/>
+                            </t>
+                        </p>
+                        <p class="text-muted mb-2" style="font-size: 11px;">
+                            Posted entries only. Assets must equal Liabilities + Equity.
+                            <t t-if="doc.is_balanced">
+                                <span class="text-success"><strong>Balanced.</strong></span>
+                            </t>
+                            <t t-else="">
+                                <span class="text-danger">
+                                    <strong>Does not balance</strong>
+                                    (gap
+                                    <span t-field="doc.difference"
+                                          t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>).
+                                </span>
+                            </t>
+                            Current Year Earnings:
+                            <span t-field="doc.current_year_earnings"
+                                  t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>.
+                        </p>
+                        <table class="table table-sm table-bordered" style="font-size: 11px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 12%;">Code</th>
+                                    <th>Description</th>
+                                    <th class="text-end" style="width: 22%;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="doc.line_ids" t-as="line"
+                                    t-att-style="'font-weight: bold;' if line.line_type in ('section', 'total') else ('font-style: italic;' if line.line_type == 'cye' else None)">
+                                    <td>
+                                        <span t-if="line.line_type == 'account'" t-field="line.code"/>
+                                    </td>
+                                    <td>
+                                        <span t-field="line.name"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <t t-if="line.line_type != 'section'">
+                                            <span t-field="line.balance"
+                                                  t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                        </t>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <table class="table table-sm mt-3" style="font-size: 11px; width: 50%; margin-left: auto;">
+                            <tr>
+                                <th>Total Assets</th>
+                                <td class="text-end">
+                                    <span t-field="doc.total_assets"
+                                          t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Total Liabilities</th>
+                                <td class="text-end">
+                                    <span t-field="doc.total_liabilities"
+                                          t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Total Equity</th>
+                                <td class="text-end">
+                                    <span t-field="doc.total_equity"
+                                          t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Liabilities + Equity</th>
+                                <td class="text-end">
+                                    <strong>
+                                        <span t-field="doc.total_liabilities_equity"
+                                              t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                    </strong>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

@@ -687,9 +687,8 @@ class ShahtajDmDelivery(models.Model):
                 qty_ordered = sol.product_uom_qty
                 if existing:
                     qty_assigned = existing.qty_assigned
-                    # Legacy / sole-job backfill when share was never set.
-                    if float_is_zero(qty_assigned, precision_digits=6) and sole_job:
-                        qty_assigned = qty_ordered
+                    # Do NOT re-inflate intentional zeros on an existing sole job
+                    # (legacy backfill only for brand-new lines below).
                     qty_delivered = existing.qty_delivered
                     qty_picked = existing.qty_picked
                     vals = {
@@ -704,6 +703,7 @@ class ShahtajDmDelivery(models.Model):
                     }
                     existing.write(vals)
                 else:
+                    # New product line on a sole job → default to full ordered share.
                     qty_assigned = qty_ordered if sole_job else 0.0
                     DeliveryLine.create({
                         'delivery_id': rec.id,
@@ -1177,12 +1177,36 @@ class ShahtajDmDelivery(models.Model):
                 sol.id: (block.get('lines') or {}).get(sol.id, 0.0) or 0.0
                 for sol in sale_lines
             }
-            # Skip empty jobs (all zero) unless they already exist with progress
-            if all(float_is_zero(q, precision_digits=6) for q in lines.values()):
+            dm_user = self.env['res.users'].browse(block['delivery_man_id'])
+            all_zero = all(float_is_zero(q, precision_digits=6) for q in lines.values())
+            if all_zero:
+                # Clear stale shares: never leave old qty_assigned when wizard shows 0.
+                existing = DmDelivery.search([
+                    ('sale_order_id', '=', sale_order.id),
+                    ('delivery_man_id', '=', dm_user.id),
+                ], limit=1)
+                if not existing:
+                    continue
+                has_progress = (
+                    existing.state in ('picked', 'partial', 'delivered', 'returned')
+                    or any(
+                        not float_is_zero(l.qty_picked, precision_digits=6)
+                        or not float_is_zero(l.qty_delivered, precision_digits=6)
+                        for l in existing.line_ids
+                    )
+                )
+                if has_progress:
+                    # Apply zeros → raises if below picked/delivered (correct guard).
+                    existing._apply_line_assignments(lines)
+                    existing._sync_with_sale_order()
+                    touched |= existing
+                else:
+                    existing.unlink()
                 continue
+
             job = self.action_assign_to_delivery_man(
                 sale_order=sale_order,
-                delivery_man=self.env['res.users'].browse(block['delivery_man_id']),
+                delivery_man=dm_user,
                 scheduled_date=block.get('scheduled_date'),
                 scheduled_time=block.get('scheduled_time') or 0.0,
                 assigned_by=assigned_by,
@@ -1338,6 +1362,14 @@ class ShahtajDmDelivery(models.Model):
         if not move_vals_list:
             raise UserError(_('Set a quantity on at least one product.'))
 
+        # Van→WH free return may only use surplus (not stock reserved for open jobs).
+        if direction == 'to_wh':
+            self._shahtaj_assert_van_surplus(
+                dm,
+                {m['product_id']: m['product_uom_qty'] for m in move_vals_list},
+                _('return to warehouse'),
+            )
+
         # Validate stock availability before moving
         Quant = self.env['stock.quant'].sudo()
         for move in move_vals_list:
@@ -1481,7 +1513,8 @@ class ShahtajDmDelivery(models.Model):
         """Physical van qty not already tied to open job lines (picked − delivered).
 
         Leftover from prior days / free van loads can cover today's Still Need
-        without another warehouse pick.
+        without another warehouse pick. Also the only stock allowed for walk-in
+        / free van→WH return while jobs are still open.
         """
         dm.ensure_one()
         van = dm._shahtaj_get_van_location()
@@ -1523,6 +1556,84 @@ class ShahtajDmDelivery(models.Model):
             pid: max(0.0, physical.get(pid, 0.0) - attributed.get(pid, 0.0))
             for pid in pids
         }
+
+    @api.model
+    def _shahtaj_assert_van_surplus(self, dm, qty_by_product, purpose):
+        """Block consuming van stock that is still reserved for open shop jobs.
+
+        Allows surplus only: physical − (picked − delivered on open jobs).
+        """
+        dm.ensure_one()
+        need = {
+            int(pid): float(qty or 0.0)
+            for pid, qty in (qty_by_product or {}).items()
+            if float(qty or 0.0) > 0
+        }
+        if not need:
+            return
+        free = self._shahtaj_unattributed_van_qty_map(dm, set(need))
+        Product = self.env['product.product'].sudo()
+        for pid, qty in need.items():
+            product = Product.browse(pid)
+            rounding = (product.uom_id.rounding if product.exists() else None) or 0.01
+            available = free.get(pid, 0.0)
+            if float_compare(qty, available, precision_rounding=rounding) > 0:
+                raise UserError(_(
+                    'Cannot %(purpose)s %(qty)s of %(product)s — only %(free)s is free on the van. '
+                    'The rest is reserved for open shop deliveries (picked, not yet delivered). '
+                    'Finish those stops, or return undelivered stock to the warehouse first.',
+                    purpose=purpose,
+                    qty=qty,
+                    product=product.display_name if product.exists() else pid,
+                    free=available,
+                ))
+
+    @api.model
+    def _shahtaj_align_dm_jobs_to_sale_delivery(self, sale_order):
+        """When the SO is fully delivered, align open DM jobs to delivered.
+
+        SO truth = sum of order line qty_delivered (any path: DM GPS, Mark Delivery).
+        Multi-DM shares are each marked complete for their assigned qty so jobs
+        do not stay 'picked' with qty_delivered=0 after the SO is done.
+        """
+        sale_order = sale_order.sudo()
+        if not sale_order or not sale_order.exists():
+            return self.browse()
+        storable = sale_order.order_line.filtered(
+            lambda l: l.product_id and l.product_id.type == 'consu' and not l.display_type
+        )
+        if not storable:
+            return self.browse()
+        ordered = sum(storable.mapped('product_uom_qty'))
+        delivered = sum(storable.mapped('qty_delivered'))
+        if float_compare(delivered, ordered, precision_digits=2) < 0:
+            return self.browse()
+
+        jobs = self.search([
+            ('sale_order_id', '=', sale_order.id),
+            ('state', 'in', ('not_ready', 'ready', 'picked', 'partial')),
+        ])
+        if not jobs:
+            return jobs
+
+        now = fields.Datetime.now()
+        for job in jobs:
+            for line in job.line_ids:
+                target = line.qty_assigned or 0.0
+                new_picked = max(line.qty_picked or 0.0, target)
+                line.write({
+                    'qty_picked': new_picked,
+                    'qty_delivered': target,
+                    'qty_to_pick': 0.0,
+                    'qty_to_deliver': 0.0,
+                })
+            job.with_context(shahtaj_skip_planning_log=True).write({
+                'state': 'delivered',
+                'field_state': 'done',
+                'delivered_at': job.delivered_at or now,
+            })
+            job._ensure_dm_visit_completed()
+        return jobs
 
     @api.model
     def _shahtaj_fifo_allocate_product_qtys(self, deliveries, qty_by_product):
@@ -1930,6 +2041,8 @@ class ShahtajDmDelivery(models.Model):
             self._ensure_dm_visit_completed()
         else:
             self._ensure_visit_task()
+        # If this handoff completed the whole SO (all DMs), close any lagging jobs.
+        self._shahtaj_align_dm_jobs_to_sale_delivery(self.sale_order_id)
         if reload_form:
             return self._reload_form(
                 title=_('Deliver to Shop — done'),

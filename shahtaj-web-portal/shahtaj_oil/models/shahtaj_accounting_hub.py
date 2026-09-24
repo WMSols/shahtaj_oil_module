@@ -163,6 +163,12 @@ class ShahtajAccountingHub(models.TransientModel):
     def action_open_pnl_dashboard(self):
         return self.env['shahtaj.pnl.dashboard'].action_open_pnl_dashboard()
 
+    def action_open_trial_balance(self):
+        return self.env['shahtaj.trial.balance'].action_open()
+
+    def action_open_balance_sheet(self):
+        return self.env['shahtaj.balance.sheet'].action_open()
+
     def action_open_tax_ledger(self):
         return self.env['shahtaj.tax.ledger'].action_open_tax_ledger()
 

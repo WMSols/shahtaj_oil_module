@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.1.136',
+    'version': '19.0.1.1.142',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -63,6 +63,7 @@
         'views/shahtaj_purchase_views.xml',
         'views/shahtaj_expense_views.xml',
         'views/shahtaj_pnl_dashboard_views.xml',
+        'views/shahtaj_financial_statements_views.xml',
         'views/shahtaj_tax_ledger_views.xml',
         'views/shahtaj_manufacturer_summary_views.xml',
         'views/shahtaj_product_views.xml',
@@ -98,6 +99,7 @@
         'wizard/shahtaj_credit_override_views.xml',
 
         'report/shahtaj_manufacturer_summary_report.xml',
+        'report/shahtaj_financial_statements_report.xml',
         
         # ── 8. SECURITY FIXES (must update rules created in step 1) ──
         'security/shahtaj_record_rules_fix.xml',

@@ -113,11 +113,19 @@
                         </group>
                     </group>
                     <group>
-                        <group string="Step 4 — Tax &amp; Profit">
+                        <group string="Step 4 — Tax &amp; Financial Statements">
                             <button name="action_open_tax_ledger" type="object"
                                     string="Tax Ledger"
                                     class="btn btn-primary mb-2"
                                     icon="fa-percent"/>
+                            <button name="action_open_trial_balance" type="object"
+                                    string="Trial Balance"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-balance-scale"/>
+                            <button name="action_open_balance_sheet" type="object"
+                                    string="Balance Sheet"
+                                    class="btn btn-primary mb-2"
+                                    icon="fa-university"/>
                             <button name="action_open_pnl_dashboard" type="object"
                                     string="Profit &amp; Loss Dashboard"
                                     class="btn btn-primary mb-2"
