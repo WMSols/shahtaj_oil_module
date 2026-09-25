@@ -8,10 +8,16 @@
             <form string="Walk-in Delivery">
                 <sheet>
                     <div class="alert alert-info" role="alert">
-                        Flush leftover <b>van stock</b> to a walk-in customer:
-                        creates a minimal customer (not a Shahtaj shop), sale order
-                        at the <b>company pricelist</b>, delivers from the van,
-                        invoices, and <b>full-pays</b> into the DM wallet (DMCASH).
+                        Sell <b>free van stock</b> to a walk-in customer
+                        (not a Shahtaj shop): sale order at the
+                        <b>company pricelist</b>, deliver from the van, invoice,
+                        and <b>full-pay</b> into the DM wallet (DMCASH).
+                        <br/>
+                        <b>Free</b> = on van minus stock still reserved for
+                        <b>today's</b> scheduled open shop deliveries. Past-day
+                        open jobs do not reserve stock (unless rescheduled to
+                        today). Done/closed jobs and surplus loads are free.
+                        Deliver Qty cannot exceed Free.
                     </div>
                     <group>
                         <group string="Customer (minimal)">
@@ -59,11 +65,15 @@
                     <group>
                         <field name="notes" placeholder="Optional note…"/>
                     </group>
-                    <separator string="Van stock — set Deliver Qty (prices from company pricelist)"/>
+                    <separator string="Van stock — Deliver Qty capped by Free (company pricelist)"/>
                     <field name="line_ids">
                         <list editable="bottom" create="false" delete="false">
                             <field name="product_id" readonly="1" force_save="1"/>
-                            <field name="qty_on_van" string="On van" readonly="1" force_save="1"/>
+                            <field name="qty_on_van" string="On van" readonly="1" force_save="1"
+                                   optional="show"/>
+                            <field name="qty_free" string="Free" readonly="1" force_save="1"
+                                   decoration-danger="qty_free &lt;= 0"
+                                   decoration-success="qty_free &gt; 0"/>
                             <field name="qty" string="Deliver qty" force_save="1"/>
                             <field name="price_unit" string="Unit price" readonly="1" force_save="1"/>
                             <field name="price_subtotal" string="Subtotal" sum="Total"/>

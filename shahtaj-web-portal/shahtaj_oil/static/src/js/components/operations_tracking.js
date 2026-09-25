@@ -615,6 +615,7 @@ export class OperationsTracking extends Component {
             effectiveOutstanding: o.shahtaj_shop_effective_outstanding || 0,
             pastDiscountCount: o.shahtaj_shop_past_discount_count || 0,
             status: status, invoice_status: o.invoice_status,
+            isWalkIn: !!o.shahtaj_is_walk_in,
             is_fully_delivered: totalOrd > 0 && totalDel >= totalOrd, line_ids: o.order_line, lines: []
         };
     }
@@ -635,7 +636,7 @@ export class OperationsTracking extends Component {
             if (tab === 'deliveries' || tab === 'orders' || tab === 'verification') {
                 model = 'sale.order';
                 targetState = tab === 'deliveries' ? 'tableDeliveries' : (tab === 'verification' ? 'tableVerification' : 'tableOrders');
-                fields = ["name", "partner_id", "user_id", "date_order", "amount_total", "amount_tax", "amount_untaxed", "state", "order_line", "invoice_status"];
+                fields = ["name", "partner_id", "user_id", "date_order", "amount_total", "amount_tax", "amount_untaxed", "state", "order_line", "invoice_status", "shahtaj_is_walk_in"];
                 if (tab !== 'deliveries') {
                     // Stored fields only. Credit/history snapshot fields are computed
                     // and stall this list on a production database — load them in viewOrder.
@@ -645,7 +646,11 @@ export class OperationsTracking extends Component {
                         "shahtaj_discount_reasons",
                     );
                 }
-                domain.push('|', ['shahtaj_visit_id', '!=', false], ['partner_id.is_shahtaj_shop', '=', true]);
+                domain.push('|', '|',
+                    ['shahtaj_visit_id', '!=', false],
+                    ['partner_id.is_shahtaj_shop', '=', true],
+                    ['shahtaj_is_walk_in', '=', true],
+                );
                 
                 if (tab === 'deliveries') domain.push(['state', 'in', ['sale', 'done']]);
                 if (tab === 'verification') {
@@ -827,7 +832,10 @@ export class OperationsTracking extends Component {
                 } else {
                     try {
                         this.state.verificationCount = await this.orm.searchCount('sale.order', [
-                            '|', ['shahtaj_visit_id', '!=', false], ['partner_id.is_shahtaj_shop', '=', true],
+                            '|', '|',
+                            ['shahtaj_visit_id', '!=', false],
+                            ['partner_id.is_shahtaj_shop', '=', true],
+                            ['shahtaj_is_walk_in', '=', true],
                             ['shahtaj_approval_state', '=', 'to_approve'],
                             ['state', 'in', ['draft', 'sent']],
                         ]);

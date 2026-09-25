@@ -207,32 +207,32 @@
               sequence="22"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_dm_visit_tasks_progress"
+              name="DM Daily Progress"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_visit_hub_dm"
+              sequence="23"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_dm_wallet_collections_dist"
               name="DM Wallet Collections"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_wallet_collections_all"
-              sequence="26"
+              sequence="27"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_dm_wallet_settle_dist"
               name="Settle DM Wallet"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_wallet_settle"
-              sequence="27"
+              sequence="28"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_dm_wallet_settlements_dist"
               name="DM Wallet Settlements"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_wallet_settlements"
-              sequence="28"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
-
-    <menuitem id="menu_shahtaj_dm_visit_tasks_progress"
-              name="DM Visit Tasks Progress"
-              parent="menu_shahtaj_delivery_man_ops"
-              action="action_shahtaj_visit_hub_dm"
-              sequence="23"
+              sequence="29"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <!-- Parent is a folder; Overview restores the hub screen that child menus had hidden. -->
@@ -281,21 +281,35 @@
               name="Expense Invoices"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_expense"
-              sequence="33"
+              sequence="36"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_vendor_bills"
               name="Vendor Bills"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_vendor_bills"
-              sequence="34"
+              sequence="37"
               groups="purchase.group_purchase_user"/>
 
     <menuitem id="menu_shahtaj_tax_ledger"
               name="Tax Ledger"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_tax_ledger"
-              sequence="35"
+              sequence="38"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_trial_balance"
+              name="Trial Balance"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_trial_balance"
+              sequence="39"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
+    <menuitem id="menu_shahtaj_balance_sheet"
+              name="Balance Sheet"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_balance_sheet"
+              sequence="40"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_expense_categories"
@@ -303,20 +317,6 @@
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_expense_category"
               sequence="45"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
-
-    <menuitem id="menu_shahtaj_trial_balance"
-              name="Trial Balance"
-              parent="menu_shahtaj_accounting"
-              action="action_shahtaj_trial_balance"
-              sequence="36"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
-
-    <menuitem id="menu_shahtaj_balance_sheet"
-              name="Balance Sheet"
-              parent="menu_shahtaj_accounting"
-              action="action_shahtaj_balance_sheet"
-              sequence="37"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_pnl_dashboard"

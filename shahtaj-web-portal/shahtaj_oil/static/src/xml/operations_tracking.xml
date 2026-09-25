@@ -880,7 +880,12 @@
                                         <tr>
                                             <td class="ps-4 fw-bold align-middle text-dark"><t t-esc="ord.id"/></td>
                                             <td class="align-middle">
-                                                <div class="text-dark fw-bold"><t t-esc="ord.shop"/></div>
+                                                <div class="text-dark fw-bold">
+                                                    <t t-esc="ord.shop"/>
+                                                    <t t-if="ord.isWalkIn">
+                                                        <span class="badge bg-warning text-dark ms-1">Walk-in</span>
+                                                    </t>
+                                                </div>
                                                 <small class="text-muted">Shop ID: <t t-esc="ord.shopId"/> · Booker ID: <t t-esc="ord.bookerId"/> · <t t-esc="ord.booker"/></small>
                                             </td>
                                             <td class="align-middle text-nowrap text-muted fw-bold"><t t-esc="ord.date"/></td>

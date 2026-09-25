@@ -20,6 +20,7 @@
                             <field name="dm_jobs_today_count" readonly="1"/>
                             <field name="dm_jobs_active_count" readonly="1"/>
                             <field name="dispatch_orders_count" readonly="1"/>
+                            <field name="walk_in_order_count" readonly="1"/>
                         </group>
                         <group string="Day vs stop (do not mix)">
                             <field name="dm_out_on_route_count" readonly="1"/>
@@ -69,13 +70,17 @@
                                     class="btn btn-secondary mb-2"
                                     icon="fa-archive"/>
                             <button name="action_open_visit_tasks_progress" type="object"
-                                    string="DM Visit Tasks Progress"
+                                    string="DM Daily Progress"
                                     class="btn btn-secondary mb-2"
                                     icon="fa-tasks"/>
                             <button name="action_open_orders_hub" type="object"
                                     string="Field Orders Overview"
                                     class="btn btn-link mb-2"
                                     icon="fa-dashboard"/>
+                            <button name="action_open_walk_in_orders" type="object"
+                                    string="Walk-in (tagged in Field Orders)"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-shopping-bag"/>
                         </group>
                     </group>
                 </sheet>

@@ -63,15 +63,17 @@
                 <button name="action_shahtaj_assign_dm" type="object"
                         string="Assign / Split DM"
                         class="oe_highlight"
-                        invisible="state not in ('sale', 'done') or shahtaj_delivery_status == 'no_stock'"
+                        invisible="shahtaj_is_walk_in or state not in ('sale', 'done') or shahtaj_delivery_status == 'no_stock'"
                         groups="shahtaj_oil.group_shahtaj_distributor"/>
                 <button name="action_shahtaj_mark_delivery" type="object"
                         string="Mark Delivery"
                         class="oe_highlight"
-                        invisible="state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"
+                        invisible="shahtaj_is_walk_in or state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"
                         groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
             </header>
             <field name="partner_id" position="after">
+                <field name="shahtaj_is_walk_in" readonly="1"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <field name="shahtaj_dm_delivery_count" invisible="1"/>
                 <field name="shahtaj_approval_state" widget="badge" readonly="1"
                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"
@@ -195,6 +197,8 @@
         <field name="inherit_id" ref="sale.sale_order_tree"/>
         <field name="arch" type="xml">
             <field name="partner_id" position="after">
+                <field name="shahtaj_is_walk_in" string="Walk-in" optional="show"
+                       groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <field name="shahtaj_order_booker_id" optional="show"
                        groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                 <field name="shahtaj_approval_state" optional="show" widget="badge"
@@ -228,11 +232,11 @@
                 <button name="action_shahtaj_assign_dm" type="object"
                         string="Assign / Split" icon="fa-user"
                         groups="shahtaj_oil.group_shahtaj_distributor"
-                        invisible="state not in ('sale', 'done') or shahtaj_delivery_status == 'no_stock'"/>
+                        invisible="shahtaj_is_walk_in or state not in ('sale', 'done') or shahtaj_delivery_status == 'no_stock'"/>
                 <button name="action_shahtaj_mark_delivery" type="object"
                         string="Deliver" icon="fa-truck"
                         groups="shahtaj_oil.group_shahtaj_distributor_financial"
-                        invisible="state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"/>
+                        invisible="shahtaj_is_walk_in or state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"/>
             </field>
         </field>
     </record>
@@ -286,6 +290,10 @@
                         domain="[('date_order', '&gt;=', '=monday'), ('date_order', '&lt;', '=monday +1w')]"/>
                 <filter string="Order Booker" name="has_order_booker"
                         domain="[('shahtaj_order_booker_id', '!=', False)]"/>
+                <filter string="Walk-in" name="walk_in"
+                        domain="[('shahtaj_is_walk_in', '=', True)]"/>
+                <filter string="Shop visits" name="shop_visits"
+                        domain="[('shahtaj_visit_id', '!=', False)]"/>
                 <separator/>
                 <filter string="Needs Verification" name="to_approve"
                         domain="[('shahtaj_approval_state', '=', 'to_approve')]"/>

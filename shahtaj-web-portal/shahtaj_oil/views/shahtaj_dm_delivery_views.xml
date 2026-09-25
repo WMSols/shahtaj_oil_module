@@ -83,6 +83,7 @@
                 <field name="has_delivery_proof" string="Proof" optional="hide"/>
                 <field name="sale_order_id"/>
                 <field name="partner_id"/>
+                <field name="is_walk_in" string="Walk-in" optional="show"/>
                 <field name="order_booker_id"/>
                 <field name="delivery_man_id" optional="hide"
                        groups="shahtaj_oil.group_shahtaj_distributor"/>
@@ -112,23 +113,23 @@
                        decoration-success="field_state == 'done'"/>
                 <button name="action_pick_stock" type="object"
                         string="Pick Stock" icon="fa-cube"
-                        invisible="state not in ('ready', 'picked', 'partial')"
+                        invisible="is_walk_in or state not in ('ready', 'picked', 'partial')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <button name="action_field_in_transit" type="object"
                         string="Heading to Shop" icon="fa-road"
-                        invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
+                        invisible="is_walk_in or state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 <button name="action_deliver_to_shop" type="object"
                         string="Deliver (GPS)" icon="fa-map-marker"
-                        invisible="state not in ('picked', 'partial')"
+                        invisible="is_walk_in or state not in ('picked', 'partial')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 <button name="action_return_to_warehouse" type="object"
                         string="Return WH" icon="fa-undo"
-                        invisible="state not in ('picked', 'partial')"
+                        invisible="is_walk_in or state not in ('picked', 'partial')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <button name="action_undo_delivery_to_shop" type="object"
                         string="Undo Deliver" icon="fa-reply"
-                        invisible="state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
+                        invisible="is_walk_in or state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
                         groups="shahtaj_oil.group_shahtaj_distributor"
                         confirm="Reverse shop handoff or repair Stop/visit? Only before invoicing."/>
                 <button name="action_print_invoice" type="object"
@@ -156,35 +157,35 @@
                 <header>
                     <button name="action_pick_stock" type="object"
                             string="Pick Stock from Warehouse" class="oe_highlight"
-                            invisible="state not in ('ready', 'picked', 'partial')"
+                            invisible="is_walk_in or state not in ('ready', 'picked', 'partial')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_field_in_transit" type="object"
                             string="Heading to Shop" class="btn-secondary"
-                            invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
+                            invisible="is_walk_in or state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"
                             confirm="Mark this shop stop as Heading to Shop? This does not change your day Left Office status."/>
                     <button name="action_field_not_attended" type="object"
                             string="Shop Closed" class="btn-warning"
-                            invisible="state not in ('picked', 'partial') or field_state == 'done'"
+                            invisible="is_walk_in or state not in ('picked', 'partial') or field_state == 'done'"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"
                             confirm="Mark shop closed / not attended? Add a note first if empty."/>
                     <button name="action_field_failed" type="object"
                             string="Could Not Deliver" class="btn-danger"
-                            invisible="state not in ('picked', 'partial') or field_state == 'done'"
+                            invisible="is_walk_in or state not in ('picked', 'partial') or field_state == 'done'"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"
                             confirm="Mark could not deliver? Stock stays on the van. Add a note first if empty."/>
                     <button name="action_deliver_to_shop" type="object"
                             string="Deliver to Shop (GPS)" class="oe_highlight"
-                            invisible="state not in ('picked', 'partial')"
+                            invisible="is_walk_in or state not in ('picked', 'partial')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                     <button name="action_return_to_warehouse" type="object"
                             string="Return Undelivered to Warehouse" class="btn-warning"
-                            invisible="state not in ('picked', 'partial')"
+                            invisible="is_walk_in or state not in ('picked', 'partial')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
                             confirm="Return undelivered van stock for this shop back to the warehouse?"/>
                     <button name="action_undo_delivery_to_shop" type="object"
                             string="Undo Delivery to Shop" class="btn-danger"
-                            invisible="state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
+                            invisible="is_walk_in or state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
                             groups="shahtaj_oil.group_shahtaj_distributor"
                             confirm="Reverse this shop handoff (or repair Stop/visit if stock already cleared)? Only allowed before invoicing."/>
                     <button name="action_refresh_delivery_status" type="object"
@@ -252,7 +253,9 @@
                         <group string="Order Details">
                             <field name="sale_order_id" readonly="1"/>
                             <field name="partner_id" readonly="1"/>
-                            <field name="order_booker_id" readonly="1"/>
+                            <field name="is_walk_in" readonly="1"/>
+                            <field name="order_booker_id" readonly="1"
+                                   invisible="is_walk_in"/>
                             <field name="order_date" readonly="1"/>
                         </group>
                         <group string="Delivery Info">
@@ -414,12 +417,12 @@
                                 <button name="action_pick_stock" type="object"
                                         string="Pick More to Van" class="btn-secondary"
                                         icon="fa-cube"
-                                        invisible="state not in ('ready', 'picked', 'partial')"
+                                        invisible="is_walk_in or state not in ('ready', 'picked', 'partial')"
                                         groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                                 <button name="action_return_to_warehouse" type="object"
                                         string="Return Leftover to Warehouse" class="btn-warning"
                                         icon="fa-undo"
-                                        invisible="state not in ('picked', 'partial')"
+                                        invisible="is_walk_in or state not in ('picked', 'partial')"
                                         groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
                                         confirm="Return undelivered van stock for this shop back to the warehouse?"/>
                             </div>
@@ -476,6 +479,10 @@
                         domain="[('assignment_mode', '=', 'manual')]"/>
                 <filter string="Auto Assign" name="auto_assign"
                         domain="[('assignment_mode', '=', 'auto')]"/>
+                <filter string="Walk-in" name="walk_in"
+                        domain="[('is_walk_in', '=', True)]"/>
+                <filter string="Shop deliveries" name="shop_deliveries"
+                        domain="[('is_walk_in', '!=', True)]"/>
                 <separator/>
                 <filter string="Waiting Invoice" name="not_ready"
                         domain="[('state', '=', 'not_ready')]"/>
@@ -577,8 +584,9 @@
             </p>
             <p>
                 Assign confirmed sales orders to delivery men from Field Sales
-                Orders or Dispatch Orders (Assign Delivery Man). Use Stop filters
-                (Shop Closed / Could Not Deliver) to see blocked stops.
+                Orders or Dispatch Orders (Assign Delivery Man). <b>Walk-in</b>
+                van cash sales also appear here as completed jobs (filter Walk-in).
+                Use Stop filters (Shop Closed / Could Not Deliver) for blocked shop stops.
             </p>
         </field>
     </record>

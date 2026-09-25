@@ -44,9 +44,17 @@ class ShahtajDmDelivery(models.Model):
     )
     partner_id = fields.Many2one(
         related='sale_order_id.partner_id',
-        string='Shop',
+        string='Shop / Customer',
         store=True,
         readonly=True,
+    )
+    is_walk_in = fields.Boolean(
+        string='Walk-in',
+        related='sale_order_id.shahtaj_is_walk_in',
+        store=True,
+        index=True,
+        readonly=True,
+        help='Cash-and-carry van sale (not a shop visit delivery).',
     )
     order_booker_id = fields.Many2one(
         related='sale_order_id.shahtaj_order_booker_id',
@@ -325,10 +333,18 @@ class ShahtajDmDelivery(models.Model):
         'This sale order is already assigned to this delivery man.',
     )
 
-    @api.depends('sale_order_id.name', 'partner_id.name', 'delivery_man_id.name', 'is_split_share')
+    @api.depends(
+        'sale_order_id.name', 'partner_id.name', 'delivery_man_id.name',
+        'is_split_share', 'is_walk_in',
+    )
     def _compute_display_name(self):
         for rec in self:
-            base = f"{rec.sale_order_id.name or '?'} → {rec.partner_id.name or '?'}"
+            customer = rec.partner_id.name or '?'
+            order = rec.sale_order_id.name or '?'
+            if rec.is_walk_in:
+                base = f"Walk-in {order} → {customer}"
+            else:
+                base = f"{order} → {customer}"
             if rec.is_split_share and rec.delivery_man_id:
                 rec.display_name = f"{base} ({rec.delivery_man_id.name})"
             else:
@@ -896,6 +912,9 @@ class ShahtajDmDelivery(models.Model):
         Task = self.env['shahtaj.visit.task'].sudo()
         today = fields.Date.context_today(self)
         for rec in self:
+            if rec.is_walk_in:
+                # Walk-in cash sales are not shop visit stops.
+                continue
             if rec.state == 'not_ready' or not rec.partner_id or not rec.delivery_man_id:
                 continue
             booker = rec.order_booker_id
@@ -1509,14 +1528,16 @@ class ShahtajDmDelivery(models.Model):
         ]
 
     @api.model
-    def _shahtaj_unattributed_van_qty_map(self, dm, product_ids=None):
-        """Physical van qty not already tied to open job lines (picked − delivered).
+    def _shahtaj_unattributed_van_qty_map(self, dm, product_ids=None, day=None):
+        """Physical van qty not reserved by today's scheduled open jobs.
 
-        Leftover from prior days / free van loads can cover today's Still Need
-        without another warehouse pick. Also the only stock allowed for walk-in
-        / free van→WH return while jobs are still open.
+        Free = on van − (picked − delivered) on open jobs scheduled for *today*
+        only. Past-day (or future) open jobs do not reserve stock for walk-in /
+        van→WH return / Today Load van-cover until the distributor reschedules
+        them to today. Leftover from prior days then counts as free surplus.
         """
         dm.ensure_one()
+        day = day or fields.Date.context_today(self)
         van = dm._shahtaj_get_van_location()
         if not van:
             return {}
@@ -1536,9 +1557,12 @@ class ShahtajDmDelivery(models.Model):
             if row.get('product_id')
         }
         attributed = defaultdict(float)
+        # Only today's schedule reserves van stock. Overdue / future open jobs
+        # release into free until rescheduled onto today.
         open_jobs = self.search([
             ('delivery_man_id', '=', dm.id),
             ('state', 'in', ('ready', 'picked', 'partial')),
+            ('scheduled_date', '=', day),
         ])
         for line in open_jobs.mapped('line_ids'):
             if not line.product_id:
@@ -1559,9 +1583,9 @@ class ShahtajDmDelivery(models.Model):
 
     @api.model
     def _shahtaj_assert_van_surplus(self, dm, qty_by_product, purpose):
-        """Block consuming van stock that is still reserved for open shop jobs.
+        """Block consuming van stock still reserved for *today's* open shop jobs.
 
-        Allows surplus only: physical − (picked − delivered on open jobs).
+        Allows surplus only: physical − (picked − delivered on today's schedule).
         """
         dm.ensure_one()
         need = {
@@ -1580,13 +1604,94 @@ class ShahtajDmDelivery(models.Model):
             if float_compare(qty, available, precision_rounding=rounding) > 0:
                 raise UserError(_(
                     'Cannot %(purpose)s %(qty)s of %(product)s — only %(free)s is free on the van. '
-                    'The rest is reserved for open shop deliveries (picked, not yet delivered). '
-                    'Finish those stops, or return undelivered stock to the warehouse first.',
+                    'The rest is reserved for today\'s open shop deliveries (picked, not yet delivered). '
+                    'Finish those stops, or return undelivered stock to the warehouse first. '
+                    'Stock from past-day open jobs counts as free unless rescheduled to today.',
                     purpose=purpose,
                     qty=qty,
                     product=product.display_name if product.exists() else pid,
                     free=available,
                 ))
+
+    @api.model
+    def _shahtaj_create_walk_in_job(
+        self,
+        sale_order,
+        dm,
+        picking=False,
+        proof_vals=None,
+        notes='',
+        latitude=None,
+        longitude=None,
+    ):
+        """Register a completed Delivery Job for a walk-in van cash sale.
+
+        Walk-ins skip WH pick / shop GPS flow, but distributors still need the
+        stop visible under Delivery Jobs next to shop deliveries.
+        """
+        sale_order = sale_order.sudo()
+        dm = dm.sudo()
+        if not sale_order or not sale_order.exists():
+            return self.browse()
+        if not dm or not dm.shahtaj_is_delivery_man:
+            raise UserError(_('Select a valid delivery man for the walk-in job.'))
+
+        existing = self.sudo().search([
+            ('sale_order_id', '=', sale_order.id),
+            ('delivery_man_id', '=', dm.id),
+        ], limit=1)
+        if existing:
+            return existing
+
+        proof_vals = proof_vals or {}
+        now = fields.Datetime.now()
+        today = fields.Date.context_today(self)
+        van = dm._shahtaj_get_van_location()
+        line_cmds = []
+        for sol in sale_order.order_line.filtered(
+            lambda l: l.product_id and not l.display_type
+        ):
+            qty = sol.product_uom_qty or 0.0
+            if qty <= 0:
+                continue
+            line_cmds.append((0, 0, {
+                'sale_order_line_id': sol.id,
+                'product_id': sol.product_id.id,
+                'product_uom_id': sol.product_uom_id.id,
+                'qty_ordered': qty,
+                'qty_assigned': qty,
+                'qty_to_pick': 0.0,
+                'qty_picked': qty,
+                'qty_to_deliver': 0.0,
+                'qty_delivered': qty,
+            }))
+        if not line_cmds:
+            raise UserError(_('Walk-in order has no deliverable lines.'))
+
+        job = self.sudo().with_context(
+            shahtaj_skip_planning_log=True,
+            tracking_disable=True,
+        ).create({
+            'delivery_man_id': dm.id,
+            'sale_order_id': sale_order.id,
+            'scheduled_date': today,
+            'assignment_mode': 'manual',
+            'assigned_by_id': self.env.user.id,
+            'state': 'delivered',
+            'field_state': 'done',
+            'picked_at': now,
+            'delivered_at': now,
+            'receiver_name': proof_vals.get('receiver_name') or False,
+            'delivery_proof_image': proof_vals.get('delivery_proof_image') or False,
+            'delivery_picking_id': picking.id if picking else False,
+            'van_location_id': van.id if van else False,
+            'notes': (notes or '').strip() or _('Walk-in van cash sale'),
+            'check_in_latitude': latitude if latitude is not None else 0.0,
+            'check_in_longitude': longitude if longitude is not None else 0.0,
+            'gps_verified': True,
+            'line_ids': line_cmds,
+        })
+        return job
 
     @api.model
     def _shahtaj_align_dm_jobs_to_sale_delivery(self, sale_order):

@@ -36,6 +36,14 @@ class SaleOrder(models.Model):
         store=True,
         readonly=True,
     )
+    shahtaj_is_walk_in = fields.Boolean(
+        string='Walk-in',
+        related='partner_id.shahtaj_is_walk_in',
+        store=True,
+        index=True,
+        readonly=True,
+        help='Cash-and-carry van sale to a non-shop walk-in customer.',
+    )
     shahtaj_delivery_man_id = fields.Many2one(
         'res.users',
         string='Delivery Man (booker link)',

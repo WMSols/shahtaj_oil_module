@@ -123,7 +123,14 @@ class ShahtajDmWalkIn(models.TransientModel):
             van = Service.van_snapshot(dm)
             commands = [(5, 0, 0)]
             Product = self.env['product.product']
+            # Walk-in may only consume free/surplus van stock (not reserved for
+            # open shop jobs). List every product on the van so reserved stock
+            # is visible, but Deliver Qty is capped by qty_free.
             for item in van.get('items') or []:
+                on_van = float(item.get('qty') or 0.0)
+                if on_van <= 0:
+                    continue
+                free = float(item.get('qty_free') or 0.0)
                 product = Product.browse(item['product_id'])
                 price = 0.0
                 if pricelist and product.exists():
@@ -132,7 +139,8 @@ class ShahtajDmWalkIn(models.TransientModel):
                     )
                 commands.append((0, 0, {
                     'product_id': item['product_id'],
-                    'qty_on_van': item['qty'],
+                    'qty_on_van': on_van,
+                    'qty_free': max(0.0, free),
                     'qty': 0.0,
                     'price_unit': price,
                 }))
@@ -161,10 +169,17 @@ class ShahtajDmWalkIn(models.TransientModel):
             qty = float(line.qty or 0.0)
             if qty <= 0:
                 continue
-            if float_compare(qty, line.qty_on_van, precision_digits=3) > 0:
+            free = float(line.qty_free or 0.0)
+            if float_compare(qty, free, precision_digits=3) > 0:
                 raise UserError(_(
-                    'Qty for %(product)s exceeds van stock (%(van)s).',
+                    'Qty for %(product)s exceeds free van stock '
+                    '(%(free)s free of %(van)s on van). '
+                    'Stock reserved for today\'s open shop deliveries cannot be '
+                    'sold as walk-in until those stops are finished or closed. '
+                    'Past-day open jobs do not reserve stock unless '
+                    'rescheduled to today.',
                     product=line.product_id.display_name,
+                    free=free,
                     van=line.qty_on_van,
                 ))
             lines.append({
@@ -172,7 +187,12 @@ class ShahtajDmWalkIn(models.TransientModel):
                 'qty': qty,
             })
         if not lines:
-            raise UserError(_('Set a deliver quantity on at least one product.'))
+            raise UserError(_(
+                'Set a deliver quantity on at least one product with free van stock. '
+                'If Free is 0, finish today\'s open shop deliveries first '
+                '(or load surplus / use stock from past-day jobs not '
+                'rescheduled to today).'
+            ))
 
         result = self.env['shahtaj.dm.api.service'].walk_in_deliver(
             customer_name=self.customer_name,
@@ -242,10 +262,21 @@ class ShahtajDmWalkInLine(models.TransientModel):
         string='On Van',
         digits='Product Unit of Measure',
         readonly=True,
+        help='Physical quantity currently on the van.',
+    )
+    qty_free = fields.Float(
+        string='Free',
+        digits='Product Unit of Measure',
+        readonly=True,
+        help='Surplus available for walk-in: on van minus qty still reserved '
+             'for today\'s scheduled open shop deliveries (picked − delivered). '
+             'Past-day open jobs do not reserve stock unless rescheduled to today. '
+             'Done/closed jobs release stock back to free.',
     )
     qty = fields.Float(
         string='Deliver Qty',
         digits='Product Unit of Measure',
+        help='Cannot exceed Free.',
     )
     currency_id = fields.Many2one(related='wizard_id.currency_id', readonly=True)
     price_unit = fields.Monetary(
@@ -268,13 +299,17 @@ class ShahtajDmWalkInLine(models.TransientModel):
     @api.onchange('qty')
     def _onchange_qty(self):
         for line in self:
-            if line.qty and line.qty_on_van and line.qty > line.qty_on_van:
+            free = float(line.qty_free or 0.0)
+            if line.qty and float_compare(line.qty, free, precision_digits=3) > 0:
                 return {
                     'warning': {
-                        'title': _('Exceeds van stock'),
+                        'title': _('Exceeds free van stock'),
                         'message': _(
-                            'Only %(qty)s available on van.',
-                            qty=line.qty_on_van,
+                            'Only %(free)s is free for walk-in '
+                            '(%(van)s on van; the rest is reserved for today\'s '
+                            'open shop deliveries).',
+                            free=free,
+                            van=line.qty_on_van,
                         ),
                     },
                 }

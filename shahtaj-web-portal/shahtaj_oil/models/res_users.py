@@ -117,6 +117,15 @@ class ResUsers(models.Model):
         string='Orders to Dispatch',
         compute='_compute_shahtaj_dm_dispatchable_orders',
     )
+    shahtaj_dm_walk_in_order_ids = fields.Many2many(
+        'sale.order',
+        string='Walk-in Orders',
+        compute='_compute_shahtaj_dm_walk_in_orders',
+    )
+    shahtaj_dm_walk_in_order_count = fields.Integer(
+        string='Walk-in Orders',
+        compute='_compute_shahtaj_dm_walk_in_orders',
+    )
     shahtaj_dm_wallet_balance = fields.Monetary(
         string='DM Wallet Balance',
         compute='_compute_shahtaj_dm_wallet_balance',
@@ -180,11 +189,20 @@ class ResUsers(models.Model):
     shahtaj_task_today_total = fields.Integer(compute='_compute_shahtaj_stats')
     shahtaj_task_today_pending = fields.Integer(compute='_compute_shahtaj_stats')
     shahtaj_task_today_done = fields.Integer(compute='_compute_shahtaj_stats')
+    shahtaj_task_today_progress = fields.Float(
+        string='Today Progress %',
+        compute='_compute_shahtaj_stats',
+    )
     shahtaj_week_task_total = fields.Integer(compute='_compute_shahtaj_stats')
     shahtaj_week_task_done = fields.Integer(compute='_compute_shahtaj_stats')
     shahtaj_week_task_progress = fields.Float(
         string='Week Progress %',
         compute='_compute_shahtaj_stats',
+    )
+    shahtaj_dm_delivery_today_ids = fields.One2many(
+        'shahtaj.dm.delivery',
+        compute='_compute_shahtaj_dm_delivery_today',
+        string='Deliveries Today',
     )
     shahtaj_active_target_progress = fields.Float(
         string='Target Progress %',
@@ -762,6 +780,7 @@ class ResUsers(models.Model):
         base_domain = [
             ('state', 'in', ('sale', 'done')),
             ('shahtaj_delivery_status', 'in', ('pending', 'partial')),
+            ('shahtaj_is_walk_in', '!=', True),
         ]
         for user in self:
             if not user.shahtaj_is_delivery_man:
@@ -776,6 +795,21 @@ class ResUsers(models.Model):
             orders = SaleOrder.search(domain, order='date_order desc', limit=80)
             user.shahtaj_dm_dispatchable_order_ids = orders
             user.shahtaj_dm_dispatchable_order_count = len(orders)
+
+    @api.depends('shahtaj_is_delivery_man')
+    def _compute_shahtaj_dm_walk_in_orders(self):
+        SaleOrder = self.env['sale.order'].sudo()
+        for user in self:
+            if not user.shahtaj_is_delivery_man:
+                user.shahtaj_dm_walk_in_order_ids = SaleOrder.browse()
+                user.shahtaj_dm_walk_in_order_count = 0
+                continue
+            orders = SaleOrder.search([
+                ('shahtaj_is_walk_in', '=', True),
+                ('user_id', '=', user.id),
+            ], order='date_order desc', limit=80)
+            user.shahtaj_dm_walk_in_order_ids = orders
+            user.shahtaj_dm_walk_in_order_count = len(orders)
 
     @api.depends('shahtaj_is_delivery_man')
     def _compute_shahtaj_dm_wallet_balance(self):
@@ -867,11 +901,11 @@ class ResUsers(models.Model):
                     ('state', '!=', 'cancelled'),
                 ], order='scheduled_date desc, route_id, shop_id')
             elif user.shahtaj_is_delivery_man:
-                tasks = Task.search([
-                    ('delivery_man_id', '=', user.id),
-                    ('task_kind', '=', 'delivery_man'),
-                    ('state', '!=', 'cancelled'),
-                ], order='scheduled_date desc, route_id, shop_id')
+                # DM progress uses delivery jobs; visit-task lists stay empty here.
+                user.shahtaj_task_today_ids = empty
+                user.shahtaj_task_week_ids = empty
+                user.shahtaj_task_history_ids = empty
+                continue
             else:
                 user.shahtaj_task_today_ids = empty
                 user.shahtaj_task_week_ids = empty
@@ -886,6 +920,20 @@ class ResUsers(models.Model):
             user.shahtaj_task_history_ids = tasks.filtered(
                 lambda t: t.scheduled_date < week_start
             )
+
+    def _compute_shahtaj_dm_delivery_today(self):
+        """Today's assigned DM delivery jobs for daily progress hub."""
+        DmDelivery = self.env['shahtaj.dm.delivery']
+        today = fields.Date.context_today(self)
+        empty = DmDelivery.browse()
+        for user in self:
+            if not user.shahtaj_is_delivery_man:
+                user.shahtaj_dm_delivery_today_ids = empty
+                continue
+            user.shahtaj_dm_delivery_today_ids = DmDelivery.search([
+                ('delivery_man_id', '=', user.id),
+                ('scheduled_date', '=', today),
+            ], order='partner_id, id')
 
     @api.depends(
         'shahtaj_is_order_booker',
@@ -944,6 +992,10 @@ class ResUsers(models.Model):
             user.shahtaj_task_today_done = len(
                 today_tasks.filtered(lambda t: t.state == 'completed')
             )
+            user.shahtaj_task_today_progress = (
+                user.shahtaj_task_today_done / user.shahtaj_task_today_total * 100.0
+                if user.shahtaj_task_today_total else 0.0
+            )
 
             week_tasks = Task.search([
                 ('order_booker_id', '=', user.id),
@@ -960,6 +1012,10 @@ class ResUsers(models.Model):
                 user.shahtaj_week_task_done / user.shahtaj_week_task_total * 100.0
                 if user.shahtaj_week_task_total else 0.0
             )
+        # Delivery men: daily progress from today's assigned delivery jobs only
+        # (not visit-task week %). Done = delivered or returned to WH.
+        DmDelivery = self.env['shahtaj.dm.delivery']
+        _dm_done = ('delivered', 'returned')
         for user in self.filtered(
             lambda u: u.shahtaj_is_delivery_man and not u.shahtaj_is_order_booker
         ):
@@ -967,34 +1023,24 @@ class ResUsers(models.Model):
             user.shahtaj_target_count = 0
             user.shahtaj_active_target_progress = 0.0
             user.shahtaj_active_target_summary = ''
-            today_tasks = Task.search([
+            today_jobs = DmDelivery.search([
                 ('delivery_man_id', '=', user.id),
-                ('task_kind', '=', 'delivery_man'),
                 ('scheduled_date', '=', today),
-                ('state', '!=', 'cancelled'),
             ])
-            user.shahtaj_task_today_total = len(today_tasks)
-            user.shahtaj_task_today_pending = len(
-                today_tasks.filtered(lambda t: t.state in ('pending', 'in_progress'))
-            )
+            user.shahtaj_task_today_total = len(today_jobs)
             user.shahtaj_task_today_done = len(
-                today_tasks.filtered(lambda t: t.state == 'completed')
+                today_jobs.filtered(lambda j: j.state in _dm_done)
             )
-            week_tasks = Task.search([
-                ('delivery_man_id', '=', user.id),
-                ('task_kind', '=', 'delivery_man'),
-                ('scheduled_date', '>=', week_start),
-                ('scheduled_date', '<=', week_end),
-                ('state', '!=', 'cancelled'),
-            ])
-            user.shahtaj_week_task_total = len(week_tasks)
-            user.shahtaj_week_task_done = len(
-                week_tasks.filtered(lambda t: t.state == 'completed')
+            user.shahtaj_task_today_pending = len(
+                today_jobs.filtered(lambda j: j.state not in _dm_done)
             )
-            user.shahtaj_week_task_progress = (
-                user.shahtaj_week_task_done / user.shahtaj_week_task_total * 100.0
-                if user.shahtaj_week_task_total else 0.0
+            user.shahtaj_task_today_progress = (
+                user.shahtaj_task_today_done / user.shahtaj_task_today_total * 100.0
+                if user.shahtaj_task_today_total else 0.0
             )
+            user.shahtaj_week_task_total = 0
+            user.shahtaj_week_task_done = 0
+            user.shahtaj_week_task_progress = 0.0
         for user in self.filtered(
             lambda u: not u.shahtaj_is_order_booker and not u.shahtaj_is_delivery_man
         ):
@@ -1003,6 +1049,7 @@ class ResUsers(models.Model):
             user.shahtaj_task_today_total = 0
             user.shahtaj_task_today_pending = 0
             user.shahtaj_task_today_done = 0
+            user.shahtaj_task_today_progress = 0.0
             user.shahtaj_week_task_total = 0
             user.shahtaj_week_task_done = 0
             user.shahtaj_week_task_progress = 0.0
@@ -1195,6 +1242,24 @@ class ResUsers(models.Model):
             default_delivery_man_id=self.id,
             lock_delivery_man=True,
         ).action_open()
+
+    def action_shahtaj_dm_view_walk_in_orders(self):
+        """Open this DM's walk-in sale orders (tagged in shared SO list)."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Walk-in Orders — %s', self.display_name),
+            'res_model': 'sale.order',
+            'view_mode': 'list,form',
+            'domain': [
+                ('shahtaj_is_walk_in', '=', True),
+                ('user_id', '=', self.id),
+            ],
+            'context': {
+                'create': False,
+                'search_default_walk_in': 1,
+            },
+        }
 
     def action_shahtaj_dm_settle_wallet(self):
         """Distributor: settle this DM's wallet cash to bank."""

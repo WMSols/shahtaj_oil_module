@@ -733,7 +733,7 @@ class ShahtajDmApiService(models.AbstractModel):
             order_lines.append((0, 0, {
                 'product_id': product.id,
                 'product_uom_qty': qty,
-                'product_uom': product.uom_id.id,
+                'product_uom_id': product.uom_id.id,
             }))
 
         order = Sale.with_context(
@@ -813,6 +813,17 @@ class ShahtajDmApiService(models.AbstractModel):
                 move.picked = True
         picking.with_context(skip_backorder=True, skip_sms=True).button_validate()
 
+        # Completed Delivery Job so distributors see walk-ins under Delivery Jobs.
+        job = Delivery._shahtaj_create_walk_in_job(
+            sale_order=order,
+            dm=dm,
+            picking=picking,
+            proof_vals=proof_vals,
+            notes=notes or '',
+            latitude=lat,
+            longitude=lng,
+        )
+
         invoices = order._create_invoices()
         if not invoices:
             raise UserError(_('Could not create an invoice for the walk-in order.'))
@@ -853,6 +864,7 @@ class ShahtajDmApiService(models.AbstractModel):
                 payment.shahtaj_instrument_reference or ''
             ) if payment and (channel or '') == 'cheque' else '',
             'picking_id': picking.id,
+            'dm_delivery_id': job.id if job else False,
             'receiver_name': proof_vals['receiver_name'],
             'has_delivery_proof': True,
             'notes': (notes or '').strip(),

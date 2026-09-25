@@ -37,6 +37,14 @@ class AccountPayment(models.Model):
         tracking=True,
         help='How the shop/customer paid or received a refund.',
     )
+    shahtaj_is_walk_in = fields.Boolean(
+        string='Walk-in',
+        related='partner_id.shahtaj_is_walk_in',
+        store=True,
+        index=True,
+        readonly=True,
+        help='Payment collected from a DM walk-in customer into the wallet.',
+    )
     shahtaj_payer_bank_name = fields.Char(
         string='Customer Bank',
         copy=False,

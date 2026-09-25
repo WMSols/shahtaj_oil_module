@@ -24,8 +24,9 @@ class ShahtajDeliveryManHub(models.TransientModel):
         compute='_compute_counts',
     )
     dm_tasks_today_pending = fields.Integer(
-        string='DM Stops Pending Today',
+        string='Deliveries Pending Today',
         compute='_compute_counts',
+        help='Today-scheduled delivery jobs not yet delivered or returned.',
     )
     dm_out_on_route_count = fields.Integer(
         string='DMs Left Office Today',
@@ -37,13 +38,17 @@ class ShahtajDeliveryManHub(models.TransientModel):
         compute='_compute_counts',
         help='Delivery jobs whose Stop field is Heading to Shop (per shop, not day status).',
     )
+    walk_in_order_count = fields.Integer(
+        string='Walk-in Orders',
+        compute='_compute_counts',
+        help='Cash-and-carry van sales to non-shop walk-in customers.',
+    )
 
     @api.depends_context('uid')
     def _compute_counts(self):
         Users = self.env['res.users'].sudo()
         DmDelivery = self.env['shahtaj.dm.delivery'].sudo()
         SaleOrder = self.env['sale.order'].sudo()
-        VisitTask = self.env['shahtaj.visit.task'].sudo()
         DaySession = self.env['shahtaj.dm.day.session'].sudo()
         today = fields.Date.context_today(self)
 
@@ -62,11 +67,11 @@ class ShahtajDeliveryManHub(models.TransientModel):
             hub.dispatch_orders_count = SaleOrder.search_count([
                 ('state', 'in', ('sale', 'done')),
                 ('shahtaj_delivery_status', 'in', ('pending', 'partial')),
+                ('partner_id.shahtaj_is_walk_in', '!=', True),
             ])
-            hub.dm_tasks_today_pending = VisitTask.search_count([
-                ('task_kind', '=', 'delivery_man'),
+            hub.dm_tasks_today_pending = DmDelivery.search_count([
                 ('scheduled_date', '=', today),
-                ('state', 'in', ('pending', 'in_progress')),
+                ('state', 'not in', ('delivered', 'returned')),
             ])
             hub.dm_out_on_route_count = DaySession.search_count([
                 ('session_date', '=', today),
@@ -74,6 +79,9 @@ class ShahtajDeliveryManHub(models.TransientModel):
             ])
             hub.dm_deliveries_in_transit = DmDelivery.search_count([
                 ('field_state', '=', 'in_transit'),
+            ])
+            hub.walk_in_order_count = SaleOrder.search_count([
+                ('partner_id.shahtaj_is_walk_in', '=', True),
             ])
 
     @api.model
@@ -122,3 +130,12 @@ class ShahtajDeliveryManHub(models.TransientModel):
 
     def action_open_orders_hub(self):
         return self.env['shahtaj.orders.hub'].action_open_orders_hub()
+
+    def action_open_walk_in_orders(self):
+        return self._open_action('shahtaj_oil.action_shahtaj_walk_in_orders')
+
+    def action_open_walk_in_invoices(self):
+        return self._open_action('shahtaj_oil.action_shahtaj_walk_in_invoices')
+
+    def action_open_walk_in_payments(self):
+        return self._open_action('shahtaj_oil.action_shahtaj_walk_in_payments')

@@ -14,6 +14,14 @@ class AccountMove(models.Model):
         help='Posted when a shop is approved with a previous outstanding amount. '
              'Distributor can collect payment against this invoice.',
     )
+    shahtaj_is_walk_in = fields.Boolean(
+        string='Walk-in',
+        related='partner_id.shahtaj_is_walk_in',
+        store=True,
+        index=True,
+        readonly=True,
+        help='Invoice from a DM walk-in (van cash-and-carry) sale.',
+    )
 
     def _shahtaj_needs_invoice_sudo(self):
         """Custom-portal financial distributors lack Accounting/Invoicing group."""
