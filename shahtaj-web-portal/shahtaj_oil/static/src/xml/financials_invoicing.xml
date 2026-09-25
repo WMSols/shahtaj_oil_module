@@ -302,12 +302,7 @@
                                         <t t-else="">
                                             <t t-foreach="this.state.allOrders" t-as="ord" t-key="ord.id">
                                         <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewOrder(ord)">
-                                                    <td class="ps-4 fw-bold text-dark">
-                                                        <t t-esc="ord.display_name"/>
-                                                        <t t-if="ord.isWalkIn">
-                                                            <span class="badge bg-warning text-dark ms-1">Walk-in</span>
-                                                        </t>
-                                                    </td>
+                                                    <td class="ps-4 fw-bold text-dark"><t t-esc="ord.display_name"/></td>
                                                     <td class="fw-bold"><t t-esc="ord.shop"/><small class="d-block text-muted fw-normal">ID: <t t-esc="ord.shopId"/></small></td>
                                                     <td><span class="badge "><i class="fa fa-user me-1"></i><t t-esc="ord.booker"/></span></td>
                                                     <td class="text-muted"><t t-esc="ord.date"/></td>
@@ -715,12 +710,7 @@
                                     </t>
                                         <t t-foreach="this.state.invoices" t-as="inv" t-key="inv.id">
                                             <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewInvoice(inv)">
-                                                <td class="ps-4 fw-bold text-primary">
-                                                    <t t-esc="inv.display_name"/>
-                                                    <t t-if="inv.isWalkIn">
-                                                        <span class="badge bg-warning text-dark ms-1">Walk-in</span>
-                                                    </t>
-                                                </td>
+                                                <td class="ps-4 fw-bold text-primary"><t t-esc="inv.display_name"/></td>
                                                 <td class="fw-bold"><t t-esc="inv.shop"/></td>
                                                 <td><t t-esc="inv.date"/></td>
                                                 <td class="text-end fw-bold">Rs. <t t-esc="inv.amount"/></td>
@@ -1199,12 +1189,7 @@
                                         </t>
                                         <t t-foreach="this.state.payments" t-as="pay" t-key="pay.id">
                                             <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewPayment(pay)">
-                                                <td class="ps-4 fw-bold text-success">
-                                                    <t t-esc="pay.display_name"/>
-                                                    <t t-if="pay.isWalkIn">
-                                                        <span class="badge bg-warning text-dark ms-1">Walk-in</span>
-                                                    </t>
-                                                </td>
+                                                <td class="ps-4 fw-bold text-success"><t t-esc="pay.display_name"/></td>
                                                 <td class="fw-bold"><t t-esc="pay.shop"/></td>
                                                 <td>
                                                     <span class="badge bg-light text-dark border shadow-sm">

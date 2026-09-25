@@ -386,11 +386,11 @@ export class FinancialsInvoicing extends Component {
         if (!['invoices', 'expenses', 'credit', 'po_management'].includes(this.state.activeSubTab)) return;
         
         const tabMap = {
-            'all_orders': { stateKey: 'allOrders', model: 'sale.order', fields: ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status", "shahtaj_is_walk_in"] },
-            'orders': { stateKey: 'orders', model: 'sale.order', fields: ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status", "shahtaj_is_walk_in"] },
-            'customer_invoices': { stateKey: 'invoices', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id", "shahtaj_is_walk_in"] },
-            'credit_notes': { stateKey: 'creditNotes', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id", "shahtaj_is_walk_in"] },
-            'payments': { stateKey: 'payments', model: 'account.payment', fields: ["name", "partner_id", "date", "amount", "journal_id", "memo", "state", "shahtaj_payment_channel", "shahtaj_payer_bank_name", "shahtaj_payer_account_number", "shahtaj_instrument_reference", "shahtaj_payment_notes", "shahtaj_is_walk_in"] },
+            'all_orders': { stateKey: 'allOrders', model: 'sale.order', fields: ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"] },
+            'orders': { stateKey: 'orders', model: 'sale.order', fields: ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"] },
+            'customer_invoices': { stateKey: 'invoices', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"] },
+            'credit_notes': { stateKey: 'creditNotes', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"] },
+            'payments': { stateKey: 'payments', model: 'account.payment', fields: ["name", "partner_id", "date", "amount", "journal_id", "memo", "state", "shahtaj_payment_channel", "shahtaj_payer_bank_name", "shahtaj_payer_account_number", "shahtaj_instrument_reference", "shahtaj_payment_notes"] },
             'purchase_orders': { stateKey: 'purchaseOrders', model: 'purchase.order', fields: ["name", "partner_id", "date_order", "date_planned", "amount_untaxed", "amount_tax", "amount_total", "state", "invoice_status", "currency_id"] },
             'receipts': { stateKey: 'receipts', model: 'stock.picking', fields: this._receiptFields() },
             'vendor_bills': { stateKey: 'vendorBills', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "invoice_origin", "move_type", "journal_id"] },
@@ -412,11 +412,11 @@ export class FinancialsInvoicing extends Component {
             const filters = this.state.filters[stateKey];
             let domain = [];
             
-            if (stateKey === 'allOrders') domain.push('|', ["shahtaj_visit_id", "!=", false], ["shahtaj_is_walk_in", "=", true]);
+            if (stateKey === 'allOrders') domain.push(["shahtaj_visit_id", "!=", false]);
             if (stateKey === 'orders') domain.push(["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]);
-            if (stateKey === 'invoices') domain.push(["move_type", "in", ["out_invoice"]], '|', ["partner_id.is_shahtaj_shop", "=", true], ["shahtaj_is_walk_in", "=", true]);
-            if (stateKey === 'creditNotes') domain.push(["move_type", "=", "out_refund"], '|', ["partner_id.is_shahtaj_shop", "=", true], ["shahtaj_is_walk_in", "=", true]);
-            if (stateKey === 'payments') domain.push('|', ["partner_id.is_shahtaj_shop", "=", true], ["shahtaj_is_walk_in", "=", true]);
+            if (stateKey === 'invoices') domain.push(["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]);
+            if (stateKey === 'creditNotes') domain.push(["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]);
+            if (stateKey === 'payments') domain.push(["partner_id.is_shahtaj_shop", "=", true]);
             if (stateKey === 'purchaseOrders') domain.push(["partner_id.supplier_rank", ">", 0]);
             if (stateKey === 'receipts') domain.push(...this._receiptsListDomain());
             if (stateKey === 'vendorBills') domain.push(["move_type", "in", ["in_invoice", "in_refund"]]);
@@ -520,7 +520,6 @@ export class FinancialsInvoicing extends Component {
                         date: inv.invoice_date || "Not set", amount: (inv.amount_total || 0).toLocaleString(),
                         residual: (inv.amount_residual || 0).toLocaleString(), rawResidual: inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total,
                         status, journal_id: inv.journal_id ? inv.journal_id[0] : false,
-                        isWalkIn: !!inv.shahtaj_is_walk_in,
                     };
                 });
             }
@@ -537,7 +536,6 @@ export class FinancialsInvoicing extends Component {
                     visit: o.shahtaj_visit_id ? o.shahtaj_visit_id[1] : "N/A",
                     status: o.state === "cancel" ? "Cancelled" : (o.state === "draft" ? "Draft" : "Confirmed"),
                     invoice_status: o.invoice_status,
-                    isWalkIn: !!o.shahtaj_is_walk_in,
                 }));
             }
             else if (stateKey === 'payments') {
@@ -550,7 +548,6 @@ export class FinancialsInvoicing extends Component {
                     channel: pay.shahtaj_payment_channel || "cash", bank: pay.shahtaj_payer_bank_name || "N/A",
                     account: pay.shahtaj_payer_account_number || "N/A", reference: pay.shahtaj_instrument_reference || "N/A",
                     notes: pay.shahtaj_payment_notes || "N/A",
-                    isWalkIn: !!pay.shahtaj_is_walk_in,
                 }));
             }
             else if (stateKey === 'purchaseOrders') {
@@ -809,10 +806,10 @@ export class FinancialsInvoicing extends Component {
 
         // 2. Fetch lightning-fast counts for the 5 KPI Cards
         const [totalOrders, toInvoice, openInvoices, creditNotes, approvedShops] = await Promise.all([
-            this.orm.searchCount("sale.order", ['|', ["shahtaj_visit_id", "!=", false], ["shahtaj_is_walk_in", "=", true]]),
+            this.orm.searchCount("sale.order", [["shahtaj_visit_id", "!=", false]]),
             this.orm.searchCount("sale.order", [["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]]),
-            this.orm.searchCount("account.move", [["move_type", "in", ["out_invoice"]], '|', ["partner_id.is_shahtaj_shop", "=", true], ["shahtaj_is_walk_in", "=", true], ["state", "=", "posted"], ["payment_state", "in", ["not_paid", "partial"]]]),
-            this.orm.searchCount("account.move", [["move_type", "=", "out_refund"], '|', ["partner_id.is_shahtaj_shop", "=", true], ["shahtaj_is_walk_in", "=", true]]),
+            this.orm.searchCount("account.move", [["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true], ["state", "=", "posted"], ["payment_state", "in", ["not_paid", "partial"]]]),
+            this.orm.searchCount("account.move", [["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]]),
             this.orm.searchCount("res.partner", [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]])
         ]);
 
