@@ -139,10 +139,7 @@ class ShahtajDmDaySession(models.Model):
             ('delivery_man_id', '=', self.delivery_man_id.id),
             ('state', 'in', ('picked', 'partial')),
             ('field_state', 'in', ('pending', 'not_attended', 'failed')),
-            '|', '|',
             ('scheduled_date', '=', self.session_date),
-            ('scheduled_date', '=', False),
-            ('scheduled_date', '<', self.session_date),
         ])
         if jobs:
             jobs.write({'field_state': 'in_transit'})

@@ -21,13 +21,15 @@ class ShahtajDmApiService(models.AbstractModel):
 
     @api.model
     def _jobs_domain(self, dm, day=None, open_only=True):
+        """DM plan/list: only jobs scheduled for the given day (default today).
+
+        Overdue / unscheduled open jobs stay for the distributor to filter and
+        reschedule — they are not pushed into the DM day plan.
+        """
         day = day or self._today()
         domain = [
             ('delivery_man_id', '=', dm.id),
-            '|', '|',
             ('scheduled_date', '=', day),
-            ('scheduled_date', '=', False),
-            ('scheduled_date', '<', day),
         ]
         if open_only:
             domain.append(('state', 'in', ('not_ready', 'ready', 'picked', 'partial')))
@@ -149,6 +151,8 @@ class ShahtajDmApiService(models.AbstractModel):
                 'state': job.state,
                 'field_state': job.field_state,
                 'scheduled_date': str(job.scheduled_date) if job.scheduled_date else False,
+                'is_overdue': bool(job.is_overdue),
+                'schedule_status': job.schedule_status or 'today',
                 'lines': lines,
             })
 
@@ -406,7 +410,7 @@ class ShahtajDmApiService(models.AbstractModel):
 
     @api.model
     def get_plan(self, dm=None, day=None):
-        """Active visit/delivery plan for the day (refresh for live assigns)."""
+        """Delivery plan for jobs scheduled on this day only (default today)."""
         dm = dm or self._dm_user()
         day = day or self._today()
         Delivery = self.env['shahtaj.dm.delivery']
@@ -425,6 +429,11 @@ class ShahtajDmApiService(models.AbstractModel):
                 'state': session.state,
                 'departed_at': session.departed_at.isoformat(sep=' ') if session.departed_at else False,
                 'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
+            },
+            'counts': {
+                'assigned': len(jobs),
+                'open': len(open_jobs),
+                'done': len(done_jobs),
             },
             'jobs': [self.job_brief(j) for j in ordered],
             'gps_criteria': {
@@ -448,6 +457,8 @@ class ShahtajDmApiService(models.AbstractModel):
             'state': job.state,
             'field_state': job.field_state,
             'scheduled_date': str(job.scheduled_date) if job.scheduled_date else False,
+            'is_overdue': bool(job.is_overdue),
+            'schedule_status': job.schedule_status or False,
             'qty_on_van': on_van,
             'notes': job.notes or '',
             'gps_verified': bool(job.gps_verified),

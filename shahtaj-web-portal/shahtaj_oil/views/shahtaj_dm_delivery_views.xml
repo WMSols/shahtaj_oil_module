@@ -67,7 +67,7 @@
                   decoration-info="state == 'ready'"
                   decoration-warning="state in ('picked', 'partial') or field_state in ('not_attended', 'failed')"
                   decoration-success="state == 'delivered' or field_state == 'done'"
-                  decoration-danger="state == 'returned' or field_state == 'failed'">
+                  decoration-danger="state == 'returned' or field_state == 'failed' or is_overdue">
                 <header>
                     <button name="action_refresh_for_current_user" type="object"
                             string="Refresh" class="btn-secondary" icon="fa-refresh"
@@ -77,6 +77,12 @@
                             groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 </header>
                 <field name="scheduled_date" optional="show"/>
+                <field name="schedule_status" string="Schedule" widget="badge" optional="show"
+                       decoration-danger="schedule_status in ('overdue', 'unscheduled')"
+                       decoration-warning="schedule_status == 'future'"
+                       decoration-info="schedule_status == 'today'"
+                       decoration-muted="schedule_status == 'closed'"/>
+                <field name="is_overdue" column_invisible="1"/>
                 <field name="picked_at" optional="hide"/>
                 <field name="delivered_at" optional="show"/>
                 <field name="receiver_name" optional="hide"/>
@@ -260,12 +266,19 @@
                         </group>
                         <group string="Delivery Info">
                             <field name="shahtaj_processing_locked" invisible="1"/>
+                            <field name="shahtaj_can_edit_schedule" invisible="1"/>
                             <field name="delivery_man_id"
                                    readonly="shahtaj_processing_locked"/>
                             <field name="scheduled_date"
-                                   readonly="shahtaj_processing_locked"/>
+                                   readonly="not shahtaj_can_edit_schedule"/>
+                            <field name="schedule_status" widget="badge" readonly="1"
+                                   decoration-danger="schedule_status in ('overdue', 'unscheduled')"
+                                   decoration-warning="schedule_status == 'future'"
+                                   decoration-info="schedule_status == 'today'"
+                                   decoration-muted="schedule_status == 'closed'"/>
+                            <field name="is_overdue" invisible="1"/>
                             <field name="scheduled_time" widget="float_time"
-                                   readonly="shahtaj_processing_locked"/>
+                                   readonly="not shahtaj_can_edit_schedule"/>
                             <field name="picked_at" readonly="1"
                                    invisible="not picked_at"/>
                             <field name="delivered_at" readonly="1"
@@ -472,6 +485,12 @@
                 <field name="scheduled_date"/>
                 <filter string="Today" name="today"
                         domain="[('scheduled_date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Today Not Done" name="today_not_done"
+                        domain="[('scheduled_date', '=', context_today().strftime('%Y-%m-%d')), ('state', 'in', ('not_ready', 'ready', 'picked', 'partial'))]"/>
+                <filter string="Overdue / Not Done" name="overdue"
+                        domain="[('is_overdue', '=', True)]"/>
+                <filter string="Unscheduled" name="unscheduled"
+                        domain="[('state', 'in', ('not_ready', 'ready', 'picked', 'partial')), ('scheduled_date', '=', False)]"/>
                 <filter string="This Week" name="this_week"
                         domain="[('scheduled_date', '&gt;=', ((context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d'))), ('scheduled_date', '&lt;=', ((context_today() + datetime.timedelta(days=6 - context_today().weekday())).strftime('%Y-%m-%d')))]"/>
                 <separator/>
@@ -558,7 +577,9 @@
             </p>
             <p>
                 Jobs assigned to you appear here after the distributor assigns
-                a sales order (or after invoice sync). Use Today / This Week filters.
+                a sales order (or after invoice sync). Default filter is
+                <b>Today</b> — only jobs scheduled for today. Overdue jobs are
+                handled by the distributor (reschedule Delivery Day).
                 Stock: Ready → Loaded → Delivered. Stop: Heading to Shop / Shop Closed / Done. Day: Leave Office is on My Day Session.
             </p>
         </field>
@@ -586,7 +607,27 @@
                 Assign confirmed sales orders to delivery men from Field Sales
                 Orders or Dispatch Orders (Assign Delivery Man). <b>Walk-in</b>
                 van cash sales also appear here as completed jobs (filter Walk-in).
-                Use Stop filters (Shop Closed / Could Not Deliver) for blocked shop stops.
+                Use <b>Overdue / Not Done</b> for open jobs past their delivery day,
+                then edit Delivery Day to reschedule. Stop filters cover Shop Closed /
+                Could Not Deliver.
+            </p>
+        </field>
+    </record>
+
+    <!-- Distributor: overdue / not-done open jobs (reschedule from form) -->
+    <record id="action_shahtaj_dm_overdue_jobs" model="ir.actions.act_window">
+        <field name="name">Overdue / Not Done</field>
+        <field name="res_model">shahtaj.dm.delivery</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shahtaj_dm_delivery_search"/>
+        <field name="context">{'search_default_overdue': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No overdue delivery jobs
+            </p>
+            <p>
+                Open jobs with a past delivery day (or no day) appear here.
+                Edit <b>Delivery Day</b> to put them back on a DM's today plan.
             </p>
         </field>
     </record>

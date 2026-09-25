@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
+from odoo.osv import expression
 from odoo.tools import float_compare, float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
@@ -140,6 +141,27 @@ class ShahtajDmDelivery(models.Model):
         index=True,
         help='Day this delivery is planned for (My Deliveries / Today Load).',
     )
+    is_overdue = fields.Boolean(
+        string='Overdue / Not Done',
+        compute='_compute_schedule_status',
+        search='_search_is_overdue',
+        help=(
+            'Open job with no delivery day or a day before today. '
+            'Distributor should reschedule these; they are not shown on the DM day plan.'
+        ),
+    )
+    schedule_status = fields.Selection(
+        [
+            ('unscheduled', 'Unscheduled'),
+            ('today', 'Today'),
+            ('overdue', 'Overdue'),
+            ('future', 'Future'),
+            ('closed', 'Closed'),
+        ],
+        string='Schedule',
+        compute='_compute_schedule_status',
+        help='Relative to today for open jobs; Closed when delivered or returned.',
+    )
     scheduled_time = fields.Float(
         string='Planned Delivery Time',
         help='Planned time of day (distributor assignment).',
@@ -181,6 +203,54 @@ class ShahtajDmDelivery(models.Model):
         for rec in self:
             rec.has_delivery_proof = bool(rec.delivery_proof_image)
 
+    @api.depends('scheduled_date', 'state')
+    @api.depends_context('uid', 'tz')
+    def _compute_schedule_status(self):
+        today = fields.Date.context_today(self)
+        open_states = ('not_ready', 'ready', 'picked', 'partial')
+        for rec in self:
+            if rec.state not in open_states:
+                rec.is_overdue = False
+                rec.schedule_status = 'closed'
+                continue
+            day = rec.scheduled_date
+            if not day:
+                rec.is_overdue = True
+                rec.schedule_status = 'unscheduled'
+            elif day < today:
+                rec.is_overdue = True
+                rec.schedule_status = 'overdue'
+            elif day == today:
+                rec.is_overdue = False
+                rec.schedule_status = 'today'
+            else:
+                rec.is_overdue = False
+                rec.schedule_status = 'future'
+
+    def _search_is_overdue(self, operator, value):
+        """Allow search/filter on is_overdue without storing the field."""
+        today = fields.Date.context_today(self)
+        open_domain = [('state', 'in', ('not_ready', 'ready', 'picked', 'partial'))]
+        overdue_domain = [
+            '|',
+            ('scheduled_date', '=', False),
+            ('scheduled_date', '<', today),
+        ]
+        positive = (operator, value) in (
+            ('=', True), ('!=', False), ('=', 1),
+        )
+        negative = (operator, value) in (
+            ('=', False), ('!=', True), ('=', 0),
+        )
+        if positive:
+            return expression.AND([open_domain, overdue_domain])
+        if negative:
+            return expression.OR([
+                [('state', 'not in', ('not_ready', 'ready', 'picked', 'partial'))],
+                [('scheduled_date', '>=', today)],
+            ])
+        raise UserError(_('Unsupported search on Overdue / Not Done.'))
+
     assigned_by_id = fields.Many2one(
         'res.users',
         string='Assigned By',
@@ -210,11 +280,32 @@ class ShahtajDmDelivery(models.Model):
         string='Processing Locked',
         compute='_compute_shahtaj_processing_locked',
     )
+    shahtaj_can_edit_schedule = fields.Boolean(
+        string='Can Edit Schedule',
+        compute='_compute_shahtaj_can_edit_schedule',
+    )
 
     @api.depends('state')
     def _compute_shahtaj_processing_locked(self):
         for rec in self:
             rec.shahtaj_processing_locked = rec._shahtaj_is_processing_locked()
+
+    @api.depends('state')
+    @api.depends_context('uid')
+    def _compute_shahtaj_can_edit_schedule(self):
+        """Distributors may reschedule Delivery Day even after pick (overdue fix)."""
+        user = self.env.user
+        is_dist = (
+            user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
+        )
+        for rec in self:
+            if rec.state in ('delivered', 'returned'):
+                rec.shahtaj_can_edit_schedule = False
+            elif is_dist:
+                rec.shahtaj_can_edit_schedule = True
+            else:
+                rec.shahtaj_can_edit_schedule = not rec._shahtaj_is_processing_locked()
 
     check_in_latitude = fields.Float(string='Last Deliver Latitude', digits=(10, 7))
     check_in_longitude = fields.Float(string='Last Deliver Longitude', digits=(10, 7))
@@ -665,11 +756,21 @@ class ShahtajDmDelivery(models.Model):
         )
         if planning_vals and is_distributor:
             locked = self.filtered(lambda rec: rec._shahtaj_is_processing_locked())
-            if locked:
+            # Allow Delivery Day / time / notes on picked open jobs so overdue
+            # work can be rescheduled; reassigning DM while stock is on van stays blocked.
+            if locked and 'delivery_man_id' in planning_vals:
+                raise UserError(_(
+                    'Cannot change delivery man for %(names)s — '
+                    'stock is already picked or delivery is finished. '
+                    'You can still change Delivery Day to reschedule.',
+                    names=', '.join(locked.mapped('display_name')),
+                ))
+            finished = self.filtered(lambda rec: rec.state in ('delivered', 'returned'))
+            if finished and planning_vals:
                 raise UserError(_(
                     'Cannot change delivery planning for %(names)s — '
-                    'stock is already picked or delivery is finished.',
-                    names=', '.join(locked.mapped('display_name')),
+                    'delivery is already finished.',
+                    names=', '.join(finished.mapped('display_name')),
                 ))
             self.env['shahtaj.activity.log'].log_model_field_changes(
                 self,
@@ -681,7 +782,7 @@ class ShahtajDmDelivery(models.Model):
         res = super().write(vals)
         if planning_vals.intersection({'delivery_man_id', 'scheduled_date'}):
             self.filtered(
-                lambda r: not r._shahtaj_is_processing_locked()
+                lambda r: r.state not in ('delivered', 'returned')
             )._ensure_visit_task()
         return res
 
@@ -1513,16 +1614,25 @@ class ShahtajDmDelivery(models.Model):
 
     @api.model
     def _shahtaj_today_open_jobs_domain(self, dm, day=None):
-        """Open jobs for Today Load: today, unscheduled, or overdue only.
+        """Open jobs for Today Load / pick: scheduled for today only.
 
-        Excludes future-dated jobs so Still Need matches Confirm Pick.
+        Overdue and unscheduled jobs are excluded until the distributor
+        reschedules them onto today (same rule as DM plan/today).
         """
         day = day or fields.Date.context_today(self)
         return [
             ('delivery_man_id', '=', dm.id),
             ('state', 'in', ('ready', 'picked', 'partial')),
-            '|', '|',
             ('scheduled_date', '=', day),
+        ]
+
+    @api.model
+    def _shahtaj_overdue_open_jobs_domain(self, day=None):
+        """Open jobs past their delivery day (or with no day) for distributor."""
+        day = day or fields.Date.context_today(self)
+        return [
+            ('state', 'in', ('not_ready', 'ready', 'picked', 'partial')),
+            '|',
             ('scheduled_date', '=', False),
             ('scheduled_date', '<', day),
         ]

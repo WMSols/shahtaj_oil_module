@@ -23,6 +23,11 @@ class ShahtajDeliveryManHub(models.TransientModel):
         string='Orders to Dispatch',
         compute='_compute_counts',
     )
+    dm_jobs_overdue_count = fields.Integer(
+        string='Overdue / Not Done',
+        compute='_compute_counts',
+        help='Open jobs with a past delivery day or no day — reschedule from Delivery Jobs.',
+    )
     dm_tasks_today_pending = fields.Integer(
         string='Deliveries Pending Today',
         compute='_compute_counts',
@@ -73,6 +78,9 @@ class ShahtajDeliveryManHub(models.TransientModel):
                 ('scheduled_date', '=', today),
                 ('state', 'not in', ('delivered', 'returned')),
             ])
+            hub.dm_jobs_overdue_count = DmDelivery.search_count(
+                DmDelivery._shahtaj_overdue_open_jobs_domain(today),
+            )
             hub.dm_out_on_route_count = DaySession.search_count([
                 ('session_date', '=', today),
                 ('state', '=', 'on_the_way'),
@@ -121,6 +129,9 @@ class ShahtajDeliveryManHub(models.TransientModel):
 
     def action_open_dispatch_jobs(self):
         return self._open_action('shahtaj_oil.action_shahtaj_dm_dispatch_jobs')
+
+    def action_open_overdue_jobs(self):
+        return self._open_action('shahtaj_oil.action_shahtaj_dm_overdue_jobs')
 
     def action_open_all_deliveries(self):
         return self._open_action('shahtaj_oil.action_shahtaj_dm_delivery_all')

@@ -200,18 +200,25 @@
               sequence="21"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
+    <menuitem id="menu_shahtaj_dm_overdue_jobs"
+              name="Overdue / Not Done"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_overdue_jobs"
+              sequence="22"
+              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+
     <menuitem id="menu_shahtaj_dm_all_deliveries"
               name="All Delivery Orders"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_delivery_all"
-              sequence="22"
+              sequence="23"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_dm_visit_tasks_progress"
               name="DM Daily Progress"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_visit_hub_dm"
-              sequence="23"
+              sequence="24"
               groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
 
     <menuitem id="menu_shahtaj_dm_wallet_collections_dist"

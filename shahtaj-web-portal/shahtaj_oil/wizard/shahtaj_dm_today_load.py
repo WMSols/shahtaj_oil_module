@@ -300,7 +300,7 @@ class ShahtajDmTodayLoad(models.TransientModel):
         shops_partial = len(deliveries.filtered(lambda d: d.delivery_progress == 'partial'))
         summary = (
             f'<p class="mb-0">'
-            f'<b>{len(shop_vals)}</b> shops (today / overdue) · '
+            f'<b>{len(shop_vals)}</b> shops (today) · '
             f'<b>{shops_partial}</b> partial · '
             f'<b>{shops_done}</b> done'
             f'</p>'

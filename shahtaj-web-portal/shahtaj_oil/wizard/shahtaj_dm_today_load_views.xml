@@ -42,7 +42,8 @@
                     <div class="alert alert-info" role="alert">
                         <b>Van Covers</b> = free van stock applied first ·
                         <b>Pick Now</b> = warehouse → van (defaults to Still Need − Van Covers) ·
-                        Today / overdue jobs only. Click <b>Refresh</b> after other picks.
+                        Today's scheduled jobs only. Click <b>Refresh</b> after other picks.
+                        Overdue jobs must be rescheduled to today first.
                     </div>
                     <notebook>
                         <page string="Load Van" name="pick">
