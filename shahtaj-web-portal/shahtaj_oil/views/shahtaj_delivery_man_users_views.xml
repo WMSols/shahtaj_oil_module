@@ -47,13 +47,13 @@
                             confirm="Deactivate this delivery man? They will not be able to log in."/>
                     <button name="action_shahtaj_dm_collect_payment" type="object"
                             string="Collect Payment" class="btn-secondary"
-                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_shahtaj_dm_walk_in" type="object"
                             string="Walk-in Delivery" class="btn-secondary"
-                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_delivery_man"/>
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_delivery_man"/>
                     <button name="action_shahtaj_dm_settle_wallet" type="object"
                             string="Settle Wallet to Bank" class="btn-primary"
-                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"
                             confirm="Settle this delivery man's wallet cash to the bank?"/>
                     <button name="action_shahtaj_delete_delivery_man" type="object"
                             string="Delete Permanently" class="btn-danger"
@@ -98,7 +98,7 @@
                         </button>
                         <button name="action_shahtaj_dm_view_wallet_collections" type="object"
                                 class="oe_stat_button" icon="fa-money"
-                                groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui">
+                                groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui">
                             <div class="o_stat_info">
                                 <span class="o_stat_value">
                                     <field name="shahtaj_dm_wallet_balance" nolabel="1" widget="monetary"/>

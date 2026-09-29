@@ -90,7 +90,7 @@ class ShahtajDmDaySession(models.Model):
         user = self.env.user
         if user.shahtaj_is_delivery_man and user.id != dm.id:
             if not (
-                user.has_group('shahtaj_oil.group_shahtaj_distributor')
+                user.has_group('shahtaj_oil.group_shahtaj_office_ops')
                 or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
             ):
                 raise AccessError(_('You can only manage your own day session.'))

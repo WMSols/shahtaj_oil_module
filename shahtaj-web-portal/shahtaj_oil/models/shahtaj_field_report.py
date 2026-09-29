@@ -131,7 +131,7 @@ class ShahtajFieldReport(models.Model):
     def _shahtaj_is_office_user(self):
         user = self.env.user
         return bool(
-            user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
             or user.has_group('base.group_system')
         )

@@ -527,9 +527,13 @@ class SaleOrder(models.Model):
 
     def _shahtaj_user_is_distributor(self):
         user = self.env.user
-        return user.has_group('shahtaj_oil.group_shahtaj_distributor') or user.has_group(
+        return user.has_group('shahtaj_oil.group_shahtaj_office_ops') or user.has_group(
             'shahtaj_oil.group_shahtaj_distributor_financial'
         )
+
+    def _shahtaj_user_can_approve_orders(self):
+        """Distributor and Manager (via order_approver technical group)."""
+        return self.env.user.has_group('shahtaj_oil.group_shahtaj_order_approver')
 
     def _shahtaj_action_open_credit_override_wizard(self, action_type):
         self.ensure_one()
@@ -878,7 +882,7 @@ class SaleOrder(models.Model):
         tracked_order_fields = {'date_order'}
         user = self.env.user
         is_distributor = (
-            user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             and not user._is_public()
         )
         if tracked_order_fields.intersection(vals) and is_distributor:
@@ -904,13 +908,16 @@ class SaleOrder(models.Model):
         return res
 
     def _shahtaj_distributor_needs_stock_sudo(self):
-        """Custom-portal distributors lack stock.picking ACL used by delivery fields."""
+        """Office/KPO users may lack stock.picking ACL used by delivery fields."""
         if self.env.su:
             return False
         user = self.env.user
         if user.has_group('stock.group_stock_user'):
             return False
-        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
+        return (
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or user.has_group('shahtaj_oil.group_shahtaj_kpo')
+        )
 
     def _compute_delivery_status(self):
         if self._shahtaj_distributor_needs_stock_sudo():

@@ -213,23 +213,23 @@ class ResUsers(models.Model):
         compute='_compute_shahtaj_stats',
     )
     shahtaj_custom_frontend = fields.Boolean(
-        string='Use Custom Distributor Portal',
+        string='Use Custom Frontend',
         default=False,
         help=(
-            'Distributor only. When enabled, this distributor logs into the Shahtaj '
-            'OWL portal only (no standard Odoo apps or native Shahtaj menus). When '
-            'disabled, only the standard Odoo / Shahtaj backend is available. '
-            'Ignored for order bookers.'
+            'Web portal roles (Distributor, Manager, …). When enabled, login uses '
+            'the Shahtaj custom portal (when that role’s portal is available). '
+            'When disabled, login uses the native Odoo / Shahtaj backend. '
+            'Hidden and forced off for Order Booker and Delivery Man.'
         ),
     )
     shahtaj_distributor_financial_access = fields.Boolean(
         string='Financial & Pricing Access',
         default=False,
         help=(
-            'Distributor only. When enabled, this distributor can view invoices, '
-            'payments, bank/cash, P&L, shop balances, and product cost/sales prices. '
-            'When disabled, only operational screens (visits, orders, targets, stock '
-            'quantities) are available. Ignored for order bookers.'
+            'Distributor only — always ON. Distributors always have invoices, '
+            'payments, bank/cash, P&L, shop balances, and product pricing. '
+            'Ops-only (financial OFF) was removed; use Manager for non-finance '
+            'approval / OB MIS. Ignored for other roles.'
         ),
     )
     shahtaj_is_distributor = fields.Boolean(
@@ -237,6 +237,27 @@ class ResUsers(models.Model):
         compute='_compute_shahtaj_is_distributor',
         store=True,
         index=True,
+    )
+    shahtaj_is_manager = fields.Boolean(
+        string='Is Manager',
+        compute='_compute_shahtaj_is_manager',
+        store=True,
+        index=True,
+        help='Stored flag for user-form UI (custom frontend toggle visibility).',
+    )
+    shahtaj_is_kpo = fields.Boolean(
+        string='Is KPO',
+        compute='_compute_shahtaj_is_kpo',
+        store=True,
+        index=True,
+        help='Stored flag for user-form UI (custom frontend toggle visibility).',
+    )
+    shahtaj_is_warehouse = fields.Boolean(
+        string='Is Warehouse Incharge',
+        compute='_compute_shahtaj_is_warehouse',
+        store=True,
+        index=True,
+        help='Stored flag for user-form UI (custom frontend toggle visibility).',
     )
 
     # Same pattern as sale_stock.property_warehouse_id: res.users form fields must be
@@ -247,6 +268,9 @@ class ResUsers(models.Model):
             'shahtaj_custom_frontend',
             'shahtaj_distributor_financial_access',
             'shahtaj_is_distributor',
+            'shahtaj_is_manager',
+            'shahtaj_is_kpo',
+            'shahtaj_is_warehouse',
         ]
 
     @property
@@ -262,10 +286,57 @@ class ResUsers(models.Model):
                 'shahtaj_oil.group_shahtaj_distributor'
             )
 
+    @api.depends('group_ids')
+    def _compute_shahtaj_is_manager(self):
+        for user in self:
+            user.shahtaj_is_manager = user.has_group(
+                'shahtaj_oil.group_shahtaj_manager'
+            )
+
+    @api.depends('group_ids')
+    def _compute_shahtaj_is_kpo(self):
+        for user in self:
+            user.shahtaj_is_kpo = user.has_group(
+                'shahtaj_oil.group_shahtaj_kpo'
+            )
+
+    @api.depends('group_ids')
+    def _compute_shahtaj_is_warehouse(self):
+        for user in self:
+            user.shahtaj_is_warehouse = user.has_group(
+                'shahtaj_oil.group_shahtaj_warehouse'
+            )
+
+    def _shahtaj_can_use_custom_frontend(self):
+        """True for web portal roles that may use the custom/native UI toggle."""
+        self.ensure_one()
+        if self.has_group('shahtaj_oil.group_shahtaj_order_booker'):
+            return False
+        if self.has_group('shahtaj_oil.group_shahtaj_delivery_man'):
+            return False
+        return (
+            self.has_group('shahtaj_oil.group_shahtaj_distributor')
+            or self.has_group('shahtaj_oil.group_shahtaj_manager')
+            or self.has_group('shahtaj_oil.group_shahtaj_kpo')
+            or self.has_group('shahtaj_oil.group_shahtaj_warehouse')
+        )
+
+    def _shahtaj_can_manage_dm_stock(self):
+        """Office desks that may open Today Load / Van Transfer for another DM."""
+        self.ensure_one()
+        return (
+            self.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or self.has_group('shahtaj_oil.group_shahtaj_warehouse')
+            or self.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
+        )
+
     _SHAHTAJ_USER_FORM_FIELDS = (
         'shahtaj_custom_frontend',
         'shahtaj_distributor_financial_access',
         'shahtaj_is_distributor',
+        'shahtaj_is_manager',
+        'shahtaj_is_kpo',
+        'shahtaj_is_warehouse',
     )
 
     @api.model
@@ -280,7 +351,9 @@ class ResUsers(models.Model):
             .setdefault('fields', {})
         )
         for fname in self._SHAHTAJ_USER_FORM_FIELDS:
-            if fname in field_defs or fname not in self._fields:
+            if fname not in self._fields:
+                continue
+            if fname in field_defs:
                 continue
             meta = self.fields_get([fname]).get(fname)
             if not meta:
@@ -308,15 +381,18 @@ class ResUsers(models.Model):
             'shahtaj_oil.group_shahtaj_distributor',
             raise_if_not_found=False,
         )
-        if not dist_group:
-            return
         for user in self:
-            if user.shahtaj_custom_frontend and dist_group not in user.group_ids:
+            if user.shahtaj_custom_frontend and not user._shahtaj_can_use_custom_frontend():
                 raise ValidationError(_(
-                    'Custom Distributor Portal can only be enabled for users '
-                    'with the Distributor role.'
+                    'Custom frontend can only be enabled for web portal roles '
+                    '(Distributor, Manager, KPO, Warehouse Incharge). Order Booker and '
+                    'Delivery Man stay on native / app access.'
                 ))
-            if user.shahtaj_distributor_financial_access and dist_group not in user.group_ids:
+            if (
+                user.shahtaj_distributor_financial_access
+                and dist_group
+                and dist_group not in user.group_ids
+            ):
                 raise ValidationError(_(
                     'Financial access can only be enabled for users with the '
                     'Distributor role.'
@@ -345,20 +421,45 @@ class ResUsers(models.Model):
                 assigned.add(cmd[1])
         return group.id in assigned
 
+    def _shahtaj_vals_can_use_custom_frontend(self, vals):
+        """Portal-capable role in vals (Dist / Manager / KPO / Warehouse). OB/DM never."""
+        if self._shahtaj_vals_include_group(
+            vals, 'shahtaj_oil.group_shahtaj_order_booker',
+        ) or self._shahtaj_vals_include_group(
+            vals, 'shahtaj_oil.group_shahtaj_delivery_man',
+        ):
+            return False
+        return (
+            self._shahtaj_vals_include_group(
+                vals, 'shahtaj_oil.group_shahtaj_distributor',
+            )
+            or self._shahtaj_vals_include_group(
+                vals, 'shahtaj_oil.group_shahtaj_manager',
+            )
+            or self._shahtaj_vals_include_group(
+                vals, 'shahtaj_oil.group_shahtaj_kpo',
+            )
+            or self._shahtaj_vals_include_group(
+                vals, 'shahtaj_oil.group_shahtaj_warehouse',
+            )
+        )
+
     @api.model_create_multi
     def create(self, vals_list):
-        """Distributor-only portal/financial flags; bookers always stay off."""
+        """Portal toggle for Dist/Manager/KPO; financial Dist-only; OB/DM always off."""
         prepared = []
         for vals in vals_list:
             vals = dict(vals)
             is_distributor = self._shahtaj_vals_include_group(
                 vals, 'shahtaj_oil.group_shahtaj_distributor',
             )
-            if not is_distributor:
+            can_custom = self._shahtaj_vals_can_use_custom_frontend(vals)
+            if not can_custom:
                 vals['shahtaj_custom_frontend'] = False
+            if not is_distributor:
                 vals['shahtaj_distributor_financial_access'] = False
-            elif 'shahtaj_distributor_financial_access' not in vals:
-                # New distributors get financial access unless explicitly disabled.
+            else:
+                # Distributor always has financial access (ops-only Dist removed).
                 vals['shahtaj_distributor_financial_access'] = True
             if self._shahtaj_vals_include_group(
                 vals, 'shahtaj_oil.group_shahtaj_order_booker',
@@ -400,7 +501,7 @@ class ResUsers(models.Model):
         if (
             operation == 'write'
             and not self.env.su
-            and self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            and self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops')
         ):
             managed, others = self._shahtaj_split_managed_staff()
             if managed and not others:
@@ -414,7 +515,7 @@ class ResUsers(models.Model):
         # Distributors manage order bookers / delivery men with sudo.
         if (
             not self.env.su
-            and self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            and self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops')
         ):
             managed, others = self._shahtaj_split_managed_staff()
             bookers = managed  # keep variable name for rest of method
@@ -429,6 +530,15 @@ class ResUsers(models.Model):
 
         res = super().write(vals)
         if {'shahtaj_custom_frontend', 'shahtaj_distributor_financial_access', 'group_ids'} & set(vals):
+            # Distributors always keep financial access (ops-only Dist removed).
+            dists = self.filtered(
+                lambda u: u.has_group('shahtaj_oil.group_shahtaj_distributor')
+                and not u.shahtaj_distributor_financial_access
+            )
+            if dists:
+                dists.with_context(shahtaj_skip_ui_sync=True).write({
+                    'shahtaj_distributor_financial_access': True,
+                })
             self._sync_shahtaj_ui_groups()
             self._sync_shahtaj_financial_group()
         return res
@@ -453,13 +563,42 @@ class ResUsers(models.Model):
         })
 
     def _sync_shahtaj_ui_groups(self):
-        """Assign technical UI groups from shahtaj_custom_frontend + distributor role."""
+        """Assign technical UI groups from roles + shahtaj_custom_frontend.
+
+        Distributor:
+        - custom ON → custom_portal_user
+        - custom OFF → native_distributor_ui + native_apps
+        Manager (distinct role; Shop Accounting trimmed):
+        - custom ON → custom_portal_user
+        - custom OFF → native_manager_ui + native_apps
+          (shop_trading, not full finance statements pack)
+        KPO (distinct role; narrow desk menus + kpo_acl):
+        - custom ON → custom_portal_user
+        - custom OFF → native_kpo_ui (ui_pack_kpo + shop_trading)
+        - Never Dist office_ops / financial / native_apps; ACL = kpo_acl only
+        Warehouse (distinct role; load/stock desk + warehouse_acl):
+        - custom ON → custom_portal_user
+        - custom OFF → native_warehouse_ui (ui_pack_warehouse)
+        - Never Dist office_ops / financial / native_apps / kpo_acl; ACL = warehouse_acl
+        """
         custom_group = self.env.ref(
             'shahtaj_oil.group_shahtaj_custom_portal_user',
             raise_if_not_found=False,
         )
         native_ui_group = self.env.ref(
             'shahtaj_oil.group_shahtaj_native_distributor_ui',
+            raise_if_not_found=False,
+        )
+        native_manager_ui = self.env.ref(
+            'shahtaj_oil.group_shahtaj_native_manager_ui',
+            raise_if_not_found=False,
+        )
+        native_kpo_ui = self.env.ref(
+            'shahtaj_oil.group_shahtaj_native_kpo_ui',
+            raise_if_not_found=False,
+        )
+        native_warehouse_ui = self.env.ref(
+            'shahtaj_oil.group_shahtaj_native_warehouse_ui',
             raise_if_not_found=False,
         )
         native_apps_group = self.env.ref(
@@ -470,42 +609,205 @@ class ResUsers(models.Model):
             'shahtaj_oil.group_shahtaj_distributor',
             raise_if_not_found=False,
         )
+        manager_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_manager',
+            raise_if_not_found=False,
+        )
+        kpo_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_kpo',
+            raise_if_not_found=False,
+        )
+        warehouse_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_warehouse',
+            raise_if_not_found=False,
+        )
+        finance_pack = self.env.ref(
+            'shahtaj_oil.group_shahtaj_ui_pack_finance',
+            raise_if_not_found=False,
+        )
+        shop_trading_pack = self.env.ref(
+            'shahtaj_oil.group_shahtaj_ui_pack_shop_trading',
+            raise_if_not_found=False,
+        )
         if not all([custom_group, native_ui_group, native_apps_group, dist_group]):
             return
 
         for user in self.sudo():
             is_distributor = dist_group in user.group_ids
-            has_financial = user.shahtaj_distributor_financial_access
+            is_manager = bool(manager_group and manager_group in user.group_ids)
+            is_kpo = bool(kpo_group and kpo_group in user.group_ids)
+            is_warehouse = bool(
+                warehouse_group and warehouse_group in user.group_ids
+            )
+            is_office_native = (
+                is_distributor or is_manager or is_kpo or is_warehouse
+            )
             commands = []
-            if is_distributor and user.shahtaj_custom_frontend:
+
+            def _strip_other_native_uis(cmds):
+                if native_manager_ui:
+                    cmds.append((3, native_manager_ui.id))
+                if native_kpo_ui:
+                    cmds.append((3, native_kpo_ui.id))
+                if native_warehouse_ui:
+                    cmds.append((3, native_warehouse_ui.id))
+                return cmds
+
+            if is_office_native and user.shahtaj_custom_frontend:
                 commands = [
                     (4, custom_group.id),
                     (3, native_ui_group.id),
                 ]
+                commands = _strip_other_native_uis(commands)
             elif is_distributor:
                 commands = [
                     (3, custom_group.id),
                     (4, native_ui_group.id),
                 ]
-            if is_distributor:
-                if has_financial:
-                    commands.append((4, native_apps_group.id))
-                else:
-                    commands.append((3, native_apps_group.id))
+                commands = _strip_other_native_uis(commands)
+            elif is_manager and native_manager_ui:
+                commands = [
+                    (3, custom_group.id),
+                    (3, native_ui_group.id),
+                    (4, native_manager_ui.id),
+                ]
+                if native_kpo_ui:
+                    commands.append((3, native_kpo_ui.id))
+                if native_warehouse_ui:
+                    commands.append((3, native_warehouse_ui.id))
+                # Drop Dist-only finance menus if left from an earlier full mirror.
+                if finance_pack:
+                    commands.append((3, finance_pack.id))
+                if shop_trading_pack:
+                    commands.append((4, shop_trading_pack.id))
+            elif is_kpo and native_kpo_ui:
+                commands = [
+                    (3, custom_group.id),
+                    (3, native_ui_group.id),
+                    (4, native_kpo_ui.id),
+                ]
+                if native_manager_ui:
+                    commands.append((3, native_manager_ui.id))
+                if native_warehouse_ui:
+                    commands.append((3, native_warehouse_ui.id))
+                # Drop leftover Dist packs from earlier full KPO mirror.
+                for xmlid in (
+                    'shahtaj_oil.group_shahtaj_ui_pack_ob_ops',
+                    'shahtaj_oil.group_shahtaj_ui_pack_dm_ops',
+                    'shahtaj_oil.group_shahtaj_ui_pack_finance',
+                    'shahtaj_oil.group_shahtaj_ui_pack_catalog',
+                    'shahtaj_oil.group_shahtaj_ui_pack_field_reports',
+                    'shahtaj_oil.group_shahtaj_ui_pack_staff_admin',
+                    'shahtaj_oil.group_shahtaj_ui_pack_warehouse',
+                ):
+                    pack = self.env.ref(xmlid, raise_if_not_found=False)
+                    if pack:
+                        commands.append((3, pack.id))
+                kpo_pack = self.env.ref(
+                    'shahtaj_oil.group_shahtaj_ui_pack_kpo',
+                    raise_if_not_found=False,
+                )
+                if kpo_pack:
+                    commands.append((4, kpo_pack.id))
+                if shop_trading_pack:
+                    commands.append((4, shop_trading_pack.id))
+                # KPO ACL only — strip Dist ACL / apps / approver leftovers.
+                for xmlid in (
+                    'shahtaj_oil.group_shahtaj_order_approver',
+                    'shahtaj_oil.group_shahtaj_office_ops',
+                    'shahtaj_oil.group_shahtaj_distributor_financial',
+                    'shahtaj_oil.group_shahtaj_distributor_native_apps',
+                    'shahtaj_oil.group_shahtaj_warehouse_acl',
+                ):
+                    g = self.env.ref(xmlid, raise_if_not_found=False)
+                    if g:
+                        commands.append((3, g.id))
+                kpo_acl = self.env.ref(
+                    'shahtaj_oil.group_shahtaj_kpo_acl',
+                    raise_if_not_found=False,
+                )
+                if kpo_acl:
+                    commands.append((4, kpo_acl.id))
+            elif is_warehouse and native_warehouse_ui:
+                commands = [
+                    (3, custom_group.id),
+                    (3, native_ui_group.id),
+                    (4, native_warehouse_ui.id),
+                ]
+                if native_manager_ui:
+                    commands.append((3, native_manager_ui.id))
+                if native_kpo_ui:
+                    commands.append((3, native_kpo_ui.id))
+                for xmlid in (
+                    'shahtaj_oil.group_shahtaj_ui_pack_ob_ops',
+                    'shahtaj_oil.group_shahtaj_ui_pack_dm_ops',
+                    'shahtaj_oil.group_shahtaj_ui_pack_shop_trading',
+                    'shahtaj_oil.group_shahtaj_ui_pack_finance',
+                    'shahtaj_oil.group_shahtaj_ui_pack_catalog',
+                    'shahtaj_oil.group_shahtaj_ui_pack_field_reports',
+                    'shahtaj_oil.group_shahtaj_ui_pack_staff_admin',
+                    'shahtaj_oil.group_shahtaj_ui_pack_kpo',
+                ):
+                    pack = self.env.ref(xmlid, raise_if_not_found=False)
+                    if pack:
+                        commands.append((3, pack.id))
+                wh_pack = self.env.ref(
+                    'shahtaj_oil.group_shahtaj_ui_pack_warehouse',
+                    raise_if_not_found=False,
+                )
+                if wh_pack:
+                    commands.append((4, wh_pack.id))
+                for xmlid in (
+                    'shahtaj_oil.group_shahtaj_order_approver',
+                    'shahtaj_oil.group_shahtaj_office_ops',
+                    'shahtaj_oil.group_shahtaj_distributor_financial',
+                    'shahtaj_oil.group_shahtaj_distributor_native_apps',
+                    'shahtaj_oil.group_shahtaj_kpo_acl',
+                ):
+                    g = self.env.ref(xmlid, raise_if_not_found=False)
+                    if g:
+                        commands.append((3, g.id))
+                warehouse_acl = self.env.ref(
+                    'shahtaj_oil.group_shahtaj_warehouse_acl',
+                    raise_if_not_found=False,
+                )
+                if warehouse_acl:
+                    commands.append((4, warehouse_acl.id))
+
+            # KPO / Warehouse must never keep Order Approver (Approve/Reject UI).
+            if is_kpo or is_warehouse:
+                order_approver = self.env.ref(
+                    'shahtaj_oil.group_shahtaj_order_approver',
+                    raise_if_not_found=False,
+                )
+                if order_approver:
+                    commands.append((3, order_approver.id))
+
+            if is_distributor or is_manager:
+                commands.append((4, native_apps_group.id))
+            elif is_kpo or is_warehouse:
+                # Narrow ACL only — never Dist native_apps.
+                commands.append((3, native_apps_group.id))
             else:
-                if user.shahtaj_custom_frontend:
-                    user.with_context(shahtaj_skip_ui_sync=True).write({
-                        'shahtaj_custom_frontend': False,
-                    })
                 if user.shahtaj_distributor_financial_access:
                     user.with_context(shahtaj_skip_ui_sync=True).write({
                         'shahtaj_distributor_financial_access': False,
+                    })
+                if user.shahtaj_custom_frontend:
+                    user.with_context(shahtaj_skip_ui_sync=True).write({
+                        'shahtaj_custom_frontend': False,
                     })
                 commands = [
                     (3, custom_group.id),
                     (3, native_ui_group.id),
                     (3, native_apps_group.id),
                 ]
+                if native_manager_ui:
+                    commands.append((3, native_manager_ui.id))
+                if native_kpo_ui:
+                    commands.append((3, native_kpo_ui.id))
+                if native_warehouse_ui:
+                    commands.append((3, native_warehouse_ui.id))
 
             group_ids = set(user.group_ids.ids)
             desired = set(group_ids)
@@ -514,16 +816,64 @@ class ResUsers(models.Model):
                     desired.add(cmd[1])
                 elif cmd[0] == 3:
                     desired.discard(cmd[1])
-            # native_apps = Purchase / Sales / Inventory / invoicing ACLs.
-            # Financial ON → every distributor (native + custom portal).
-            # Financial OFF → strip those app groups (never strip Internal User
-            # or the Shahtaj Distributor role).
             user_group = self.env.ref('base.group_user', raise_if_not_found=False)
             protected = {
                 dist_group.id,
                 custom_group.id,
                 native_ui_group.id,
             }
+            if manager_group:
+                protected.add(manager_group.id)
+            if native_manager_ui:
+                protected.add(native_manager_ui.id)
+            if kpo_group:
+                protected.add(kpo_group.id)
+            if native_kpo_ui:
+                protected.add(native_kpo_ui.id)
+            if warehouse_group:
+                protected.add(warehouse_group.id)
+            if native_warehouse_ui:
+                protected.add(native_warehouse_ui.id)
+            kpo_pack = self.env.ref(
+                'shahtaj_oil.group_shahtaj_ui_pack_kpo',
+                raise_if_not_found=False,
+            )
+            if kpo_pack:
+                protected.add(kpo_pack.id)
+            kpo_acl = self.env.ref(
+                'shahtaj_oil.group_shahtaj_kpo_acl',
+                raise_if_not_found=False,
+            )
+            if kpo_acl:
+                protected.add(kpo_acl.id)
+            wh_pack = self.env.ref(
+                'shahtaj_oil.group_shahtaj_ui_pack_warehouse',
+                raise_if_not_found=False,
+            )
+            if wh_pack:
+                protected.add(wh_pack.id)
+            warehouse_acl = self.env.ref(
+                'shahtaj_oil.group_shahtaj_warehouse_acl',
+                raise_if_not_found=False,
+            )
+            if warehouse_acl:
+                protected.add(warehouse_acl.id)
+            if finance_pack:
+                protected.add(finance_pack.id)
+            if shop_trading_pack:
+                protected.add(shop_trading_pack.id)
+            office_ops = self.env.ref(
+                'shahtaj_oil.group_shahtaj_office_ops',
+                raise_if_not_found=False,
+            )
+            if office_ops and not is_kpo and not is_warehouse:
+                protected.add(office_ops.id)
+            financial_group = self.env.ref(
+                'shahtaj_oil.group_shahtaj_distributor_financial',
+                raise_if_not_found=False,
+            )
+            if financial_group and not is_kpo and not is_warehouse:
+                protected.add(financial_group.id)
             if user_group:
                 protected.add(user_group.id)
             app_ids = set(native_apps_group.all_implied_ids.ids)
@@ -531,12 +881,35 @@ class ResUsers(models.Model):
             app_ids -= protected
             if native_apps_group.id in desired:
                 desired.update(app_ids)
-            elif is_distributor:
+            else:
                 desired.difference_update(app_ids)
+            # Extra strip for KPO / Warehouse: Dist ACL leftovers + apps.
+            if is_kpo:
+                if office_ops:
+                    desired.discard(office_ops.id)
+                if financial_group:
+                    desired.discard(financial_group.id)
+                desired.difference_update(app_ids)
+                desired.discard(native_apps_group.id)
+                if warehouse_acl:
+                    desired.discard(warehouse_acl.id)
+                if kpo_acl:
+                    desired.add(kpo_acl.id)
+            if is_warehouse:
+                if office_ops:
+                    desired.discard(office_ops.id)
+                if financial_group:
+                    desired.discard(financial_group.id)
+                desired.difference_update(app_ids)
+                desired.discard(native_apps_group.id)
+                if kpo_acl:
+                    desired.discard(kpo_acl.id)
+                if warehouse_acl:
+                    desired.add(warehouse_acl.id)
             user._shahtaj_write_group_ids(group_ids, desired)
 
     def _sync_shahtaj_financial_group(self):
-        """Assign financial security group from the per-user toggle."""
+        """Financial ACL group: Dist (always) and Manager (temporary). Not KPO/Warehouse."""
         financial_group = self.env.ref(
             'shahtaj_oil.group_shahtaj_distributor_financial',
             raise_if_not_found=False,
@@ -545,16 +918,35 @@ class ResUsers(models.Model):
             'shahtaj_oil.group_shahtaj_distributor',
             raise_if_not_found=False,
         )
+        manager_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_manager',
+            raise_if_not_found=False,
+        )
+        kpo_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_kpo',
+            raise_if_not_found=False,
+        )
+        warehouse_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_warehouse',
+            raise_if_not_found=False,
+        )
         if not financial_group or not dist_group:
             return
 
         for user in self.sudo():
             group_ids = set(user.group_ids.ids)
             desired = set(group_ids)
-            if (
-                dist_group.id in desired
-                and user.shahtaj_distributor_financial_access
-            ):
+            is_distributor = dist_group.id in desired
+            is_manager = bool(manager_group and manager_group.id in desired)
+            is_kpo = bool(kpo_group and kpo_group.id in desired)
+            is_warehouse = bool(warehouse_group and warehouse_group.id in desired)
+            if is_kpo or is_warehouse:
+                desired.discard(financial_group.id)
+            elif is_distributor or is_manager:
+                if is_distributor and not user.shahtaj_distributor_financial_access:
+                    user.with_context(shahtaj_skip_ui_sync=True).write({
+                        'shahtaj_distributor_financial_access': True,
+                    })
                 desired.add(financial_group.id)
             else:
                 desired.discard(financial_group.id)
@@ -577,35 +969,163 @@ class ResUsers(models.Model):
             group.sudo().write({'privilege_id': False})
 
     @api.model
+    def _shahtaj_fix_kpo_group_implies(self):
+        """KPO implies only Internal User + kpo_acl (strip stale Dist/approver links)."""
+        kpo = self.env.ref('shahtaj_oil.group_shahtaj_kpo', raise_if_not_found=False)
+        kpo_acl = self.env.ref(
+            'shahtaj_oil.group_shahtaj_kpo_acl',
+            raise_if_not_found=False,
+        )
+        user_group = self.env.ref('base.group_user', raise_if_not_found=False)
+        if not kpo:
+            return
+        strip_xmlids = (
+            'shahtaj_oil.group_shahtaj_order_approver',
+            'shahtaj_oil.group_shahtaj_office_ops',
+            'shahtaj_oil.group_shahtaj_distributor_financial',
+            'shahtaj_oil.group_shahtaj_distributor_native_apps',
+            'shahtaj_oil.group_shahtaj_warehouse_acl',
+        )
+        commands = []
+        for xmlid in strip_xmlids:
+            g = self.env.ref(xmlid, raise_if_not_found=False)
+            if g and g in kpo.implied_ids:
+                commands.append((3, g.id))
+        keep = []
+        if user_group:
+            keep.append(user_group.id)
+        if kpo_acl:
+            keep.append(kpo_acl.id)
+        if keep:
+            # Force exact imply set so upgrades cannot leave Dist ACL on KPO.
+            commands = [(6, 0, keep)]
+        if commands:
+            kpo.sudo().write({'implied_ids': commands})
+
+    @api.model
+    def _shahtaj_fix_warehouse_group_implies(self):
+        """Warehouse implies only Internal User + warehouse_acl."""
+        warehouse = self.env.ref(
+            'shahtaj_oil.group_shahtaj_warehouse',
+            raise_if_not_found=False,
+        )
+        warehouse_acl = self.env.ref(
+            'shahtaj_oil.group_shahtaj_warehouse_acl',
+            raise_if_not_found=False,
+        )
+        user_group = self.env.ref('base.group_user', raise_if_not_found=False)
+        if not warehouse:
+            return
+        keep = []
+        if user_group:
+            keep.append(user_group.id)
+        if warehouse_acl:
+            keep.append(warehouse_acl.id)
+        if keep:
+            warehouse.sudo().write({'implied_ids': [(6, 0, keep)]})
+
+    @api.model
     def _sync_all_shahtaj_ui_groups(self):
-        users = self.search([
+        manager_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_manager',
+            raise_if_not_found=False,
+        )
+        kpo_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_kpo',
+            raise_if_not_found=False,
+        )
+        warehouse_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_warehouse',
+            raise_if_not_found=False,
+        )
+        domain = [
             '|',
             ('shahtaj_is_distributor', '=', True),
             ('shahtaj_custom_frontend', '=', True),
-        ])
+        ]
+        if manager_group:
+            domain = ['|', ('group_ids', 'in', manager_group.id)] + domain
+        if kpo_group:
+            domain = ['|', ('group_ids', 'in', kpo_group.id)] + domain
+        if warehouse_group:
+            domain = ['|', ('group_ids', 'in', warehouse_group.id)] + domain
+        users = self.search(domain)
         users._sync_shahtaj_ui_groups()
 
     @api.model
     def _sync_all_shahtaj_financial_groups(self):
-        users = self.search([('shahtaj_is_distributor', '=', True)])
+        """Sync financial ACL onto Dist/Manager; strip it from KPO/Warehouse if leftover."""
+        manager_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_manager',
+            raise_if_not_found=False,
+        )
+        kpo_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_kpo',
+            raise_if_not_found=False,
+        )
+        warehouse_group = self.env.ref(
+            'shahtaj_oil.group_shahtaj_warehouse',
+            raise_if_not_found=False,
+        )
+        domain = [('shahtaj_is_distributor', '=', True)]
+        if manager_group:
+            domain = ['|', ('group_ids', 'in', manager_group.id)] + domain
+        if kpo_group:
+            domain = ['|', ('group_ids', 'in', kpo_group.id)] + domain
+        if warehouse_group:
+            domain = ['|', ('group_ids', 'in', warehouse_group.id)] + domain
+        users = self.search(domain)
         users._sync_shahtaj_financial_group()
+    @api.model
+    def _shahtaj_force_distributor_financial_access(self):
+        """Upgrade helper: ops-only Dist removed — every distributor gets financial ON."""
+        users = self.with_context(active_test=False).search([
+            ('shahtaj_is_distributor', '=', True),
+        ])
+        if not users:
+            return
+        need_flag = users.filtered(lambda u: not u.shahtaj_distributor_financial_access)
+        if need_flag:
+            need_flag.with_context(shahtaj_skip_ui_sync=True).write({
+                'shahtaj_distributor_financial_access': True,
+            })
+        users._sync_shahtaj_financial_group()
+        users._sync_shahtaj_ui_groups()
 
     @api.model
     def _clear_shahtaj_distributor_flags_on_non_distributors(self):
-        """Force portal/financial toggles off for every non-distributor (e.g. bookers)."""
+        """Clear invalid flags: financial only on Dist; custom FE only on portal roles."""
         users = self.with_context(active_test=False).search([
             '|',
             ('shahtaj_custom_frontend', '=', True),
             ('shahtaj_distributor_financial_access', '=', True),
         ])
-        non_distributors = users.filtered(lambda u: not u.shahtaj_is_distributor)
-        if non_distributors:
-            non_distributors.with_context(shahtaj_skip_ui_sync=True).write({
-                'shahtaj_custom_frontend': False,
-                'shahtaj_distributor_financial_access': False,
-            })
-            non_distributors._sync_shahtaj_ui_groups()
-            non_distributors._sync_shahtaj_financial_group()
+        to_clear_custom = self.env['res.users']
+        to_clear_financial = self.env['res.users']
+        for user in users:
+            if (
+                user.shahtaj_custom_frontend
+                and not user._shahtaj_can_use_custom_frontend()
+            ):
+                to_clear_custom |= user
+            if (
+                user.shahtaj_distributor_financial_access
+                and not user.shahtaj_is_distributor
+            ):
+                to_clear_financial |= user
+        touched = to_clear_custom | to_clear_financial
+        if not touched:
+            return
+        for user in touched:
+            vals = {}
+            if user in to_clear_custom:
+                vals['shahtaj_custom_frontend'] = False
+            if user in to_clear_financial:
+                vals['shahtaj_distributor_financial_access'] = False
+            if vals:
+                user.with_context(shahtaj_skip_ui_sync=True).write(vals)
+        touched._sync_shahtaj_ui_groups()
+        touched._sync_shahtaj_financial_group()
 
     @api.depends('group_ids')
     def _compute_shahtaj_is_order_booker(self):
@@ -1069,9 +1589,9 @@ class ResUsers(models.Model):
         _recompute_shahtaj_order_booker_flags(self.env)
 
     def _shahtaj_ensure_distributor_manage_booker(self):
-        """Only distributors may activate/deactivate Shahtaj order booker logins."""
-        if not self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor'):
-            raise AccessError(_('Only distributors can manage order booker accounts.'))
+        """Office roles (Dist/Manager) may activate/deactivate order booker logins."""
+        if not self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
+            raise AccessError(_('Only distributors or managers can manage order booker accounts.'))
         booker_group = self.env.ref('shahtaj_oil.group_shahtaj_order_booker')
         for user in self.sudo().with_context(active_test=False):
             if booker_group not in user.group_ids:
@@ -1109,8 +1629,8 @@ class ResUsers(models.Model):
         }
 
     def _shahtaj_ensure_distributor_manage_delivery_man(self):
-        if not self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor'):
-            raise AccessError(_('Only distributors can manage delivery man accounts.'))
+        if not self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
+            raise AccessError(_('Only distributors or managers can manage delivery man accounts.'))
         dm_group = self.env.ref('shahtaj_oil.group_shahtaj_delivery_man')
         for user in self.sudo().with_context(active_test=False):
             if dm_group not in user.group_ids:
@@ -1201,8 +1721,11 @@ class ResUsers(models.Model):
         user = self.env.user
         if user.shahtaj_is_delivery_man and user.id == self.id:
             return self.env['shahtaj.dm.van.transfer'].action_open()
-        if not user.has_group('shahtaj_oil.group_shahtaj_distributor'):
-            raise UserError(_('Only distributors can manage another delivery man\'s van.'))
+        if not user._shahtaj_can_manage_dm_stock():
+            raise UserError(_(
+                'Only distributors, managers, or warehouse incharge can manage '
+                'another delivery man\'s van.'
+            ))
         return self.env['shahtaj.dm.van.transfer'].with_context(
             shahtaj_delivery_man_id=self.id,
         ).action_open()
@@ -1213,8 +1736,11 @@ class ResUsers(models.Model):
         user = self.env.user
         if user.shahtaj_is_delivery_man and user.id == self.id:
             return self.env['shahtaj.dm.today.load'].action_open()
-        if not user.has_group('shahtaj_oil.group_shahtaj_distributor'):
-            raise UserError(_('Only distributors can open another delivery man\'s load board.'))
+        if not user._shahtaj_can_manage_dm_stock():
+            raise UserError(_(
+                'Only distributors, managers, or warehouse incharge can open '
+                'another delivery man\'s load board.'
+            ))
         return self.env['shahtaj.dm.today.load'].with_context(
             shahtaj_delivery_man_id=self.id,
         ).action_open()

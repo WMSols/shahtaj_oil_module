@@ -417,7 +417,7 @@ class ShahtajVisit(models.Model):
         user = self.env.user
         return (
             user.has_group('shahtaj_oil.group_shahtaj_order_booker')
-            and not user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            and not user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             and not user.has_group('base.group_system')
         )
 
@@ -941,7 +941,7 @@ class ShahtajVisit(models.Model):
         resets the visit task to pending, and notifies the order booker.
         """
         if not (
-            self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             or self.env.user.has_group('base.group_system')
         ):
             raise UserError(_('Only distributors can undo a completed shop visit.'))

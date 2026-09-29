@@ -37,7 +37,7 @@
                             <field name="longitude" string="My lng"/>
                             <field name="delivery_man_id"
                                    readonly="context.get('lock_delivery_man')"
-                                   groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                             <field name="delivery_man_id" readonly="1"
                                    groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                             <field name="pricelist_id"/>

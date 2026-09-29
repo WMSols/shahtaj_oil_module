@@ -43,7 +43,7 @@ class ResCompany(models.Model):
         user = self.env.user
         return (
             user.has_group('base.group_system')
-            or user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            or user.has_group('shahtaj_oil.group_shahtaj_office_ops')
         )
 
     @api.model

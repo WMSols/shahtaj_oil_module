@@ -47,13 +47,13 @@
                         icon="fa-check"
                         class="btn-success"
                         invisible="shahtaj_approval_state != 'to_approve' or state not in ('draft', 'sent')"
-                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"/>
+                        groups="shahtaj_oil.group_shahtaj_order_approver"/>
                 <button name="action_shahtaj_open_reject_wizard" type="object"
                         string="Reject"
                         icon="fa-times"
                         class="btn-outline-danger"
                         invisible="shahtaj_approval_state != 'to_approve' or state not in ('draft', 'sent')"
-                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_distributor_financial"/>
+                        groups="shahtaj_oil.group_shahtaj_order_approver"/>
                 <field name="currency_id" column_invisible="1"/>
             </list>
         </field>

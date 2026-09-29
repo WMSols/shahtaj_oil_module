@@ -62,10 +62,13 @@ class ShahtajDmTodayLoad(models.TransientModel):
     )
 
     def _shahtaj_resolve_delivery_man(self):
-        """Current user for DM; context override when distributor opens for a DM."""
+        """Current user for DM; context override when office/warehouse opens for a DM."""
         user = self.env.user
         ctx_dm = self.env.context.get('shahtaj_delivery_man_id')
-        if ctx_dm and user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+        if ctx_dm and (
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or user.has_group('shahtaj_oil.group_shahtaj_warehouse')
+        ):
             return self.env['res.users'].browse(ctx_dm)
         if user.shahtaj_is_delivery_man:
             return user

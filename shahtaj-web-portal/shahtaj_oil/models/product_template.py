@@ -134,13 +134,16 @@ class ProductTemplate(models.Model):
             return
 
         variant_ids = templates.mapped('product_variant_ids').ids
-        SaleLine = self.env['sale.order.line']
+        # Sold/received aggregates are operational stock stats. Receipt model ACL is
+        # Dist-financial only — sudo so Warehouse (and similar) can open Stock Overview
+        # without inheriting financial access. Payable value is still UI-gated.
+        SaleLine = self.env['sale.order.line'].sudo()
         sold_groups = SaleLine.read_group(
             domain=[
                 ('product_id', 'in', variant_ids),
                 ('order_id.state', 'in', ('sale', 'done')),
             ],
-            fields=[ 'qty_delivered'],
+            fields=['qty_delivered'],
             groupby=['product_id'],
             lazy=False,
         )
@@ -149,7 +152,7 @@ class ProductTemplate(models.Model):
             for group in sold_groups if group.get('product_id')
         }
 
-        Receipt = self.env['shahtaj.stock.receipt']
+        Receipt = self.env['shahtaj.stock.receipt'].sudo()
         received_groups = Receipt.read_group(
             [('product_id', 'in', variant_ids)],
             ['qty:sum', 'subtotal:sum'],
@@ -189,14 +192,17 @@ class ProductTemplate(models.Model):
                 template.shahtaj_qty_bookable = 0.0
 
     def _shahtaj_needs_stock_qty_sudo(self):
-        """Custom-portal distributors / bookers lack stock.move ACL for qty fields."""
+        """Roles without stock.user ACL still need on-hand qty on product lists."""
         if self.env.su:
             return False
         user = self.env.user
         if user.has_group('stock.group_stock_user'):
             return False
-        return user.has_group('shahtaj_oil.group_shahtaj_distributor') or user.has_group(
-            'shahtaj_oil.group_shahtaj_order_booker'
+        return (
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or user.has_group('shahtaj_oil.group_shahtaj_order_booker')
+            or user.has_group('shahtaj_oil.group_shahtaj_warehouse')
+            or user.has_group('shahtaj_oil.group_shahtaj_warehouse_acl')
         )
 
     def _compute_quantities(self):
@@ -458,7 +464,7 @@ class ProductTemplate(models.Model):
         # Receipt ACL is on the financial group; stock add is allowed for all
         # distributors via portal, so log with elevated rights only here.
         Receipt = self.env['shahtaj.stock.receipt']
-        if self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+        if self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
             Receipt = Receipt.sudo()
         Receipt.create({
             'product_id': variant.id,
@@ -517,7 +523,7 @@ class ProductTemplate(models.Model):
             return False
         if user.has_group('stock.group_stock_user'):
             return False
-        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
+        return user.has_group('shahtaj_oil.group_shahtaj_office_ops')
 
     def _shahtaj_ensure_distributor_stock_access(self):
         """Only Shahtaj distributors (or real Inventory users) may use stock helpers."""
@@ -526,7 +532,7 @@ class ProductTemplate(models.Model):
             return
         if user.has_group('stock.group_stock_user'):
             return
-        if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+        if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
             return
         raise AccessError(_(
             'Only distributors can adjust Shahtaj warehouse stock from the portal.'

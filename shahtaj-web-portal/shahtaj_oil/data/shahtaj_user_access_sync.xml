@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <function model="res.users" name="_shahtaj_fix_financial_group_privilege"/>
+    <function model="res.users" name="_shahtaj_fix_kpo_group_implies"/>
+    <function model="res.users" name="_shahtaj_fix_warehouse_group_implies"/>
     <function model="res.users" name="_sync_shahtaj_distributor_booker_access"/>
     <function model="res.users" name="_clear_shahtaj_distributor_flags_on_non_distributors"/>
+    <function model="res.users" name="_shahtaj_force_distributor_financial_access"/>
     <function model="res.users" name="_sync_all_shahtaj_financial_groups"/>
     <function model="res.users" name="_sync_all_shahtaj_ui_groups"/>
     <function model="res.users" name="_shahtaj_run_setup_checks"/>

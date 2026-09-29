@@ -76,19 +76,19 @@
                     <button name="action_mark_in_progress" type="object"
                             string="In Progress" class="btn-secondary"
                             invisible="state != 'new'"
-                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_mark_done" type="object"
                             string="Mark Done" class="btn-primary"
                             invisible="state in ('done', 'cancelled')"
-                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_reopen" type="object"
                             string="Reopen" class="btn-secondary"
                             invisible="state not in ('done', 'cancelled')"
-                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_mark_cancelled" type="object"
                             string="Cancel" class="btn-secondary"
                             invisible="state in ('done', 'cancelled')"
-                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="new,in_progress,done"/>
                 </header>
@@ -116,7 +116,7 @@
                         </group>
                     </group>
                     <group string="Closing Remark"
-                           groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui,base.group_system">
+                           groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,base.group_system">
                         <field name="closing_remark" nolabel="1" colspan="2"
                                placeholder="What was done / why cancelled (required before Mark Done or Cancel)"
                                readonly="state in ('done', 'cancelled')"/>

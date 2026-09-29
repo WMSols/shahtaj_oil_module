@@ -16,7 +16,7 @@ class AccountJournal(models.Model):
         create rights, so elevate this one tightly-scoped operation only.
         """
         is_distributor = self.env.user.has_group(
-            'shahtaj_oil.group_shahtaj_distributor',
+            'shahtaj_oil.group_shahtaj_office_ops',
         )
         is_financial = self.env.user.has_group(
             'shahtaj_oil.group_shahtaj_distributor_financial',

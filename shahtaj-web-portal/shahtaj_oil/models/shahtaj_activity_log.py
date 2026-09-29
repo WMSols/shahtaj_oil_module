@@ -120,6 +120,7 @@ class ShahtajActivityLog(models.Model):
             ('delivery_man_api', 'Delivery Man API'),
             ('delivery_man_ui', 'Delivery Man UI'),
             ('distributor_ui', 'Distributor UI'),
+            ('kpo_ui', 'KPO UI'),
             ('admin_ui', 'Admin UI'),
             ('system', 'System'),
             ('cron', 'Cron'),
@@ -161,6 +162,7 @@ class ShahtajActivityLog(models.Model):
         [
             ('admin', 'Admin'),
             ('distributor', 'Distributor'),
+            ('kpo', 'KPO'),
             ('order_booker', 'Order Booker'),
             ('delivery_man', 'Delivery Man'),
             ('system', 'System'),
@@ -199,8 +201,10 @@ class ShahtajActivityLog(models.Model):
                 return 'system'
             if user.has_group('base.group_system'):
                 return 'admin'
-            if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
                 return 'distributor'
+            if user.has_group('shahtaj_oil.group_shahtaj_kpo'):
+                return 'kpo'
             if user.has_group('shahtaj_oil.group_shahtaj_delivery_man'):
                 return 'delivery_man'
             if user.has_group('shahtaj_oil.group_shahtaj_order_booker'):
@@ -241,8 +245,10 @@ class ShahtajActivityLog(models.Model):
                 return 'system'
             if user.has_group('base.group_system'):
                 return 'admin_ui'
-            if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
                 return 'distributor_ui'
+            if user.has_group('shahtaj_oil.group_shahtaj_kpo'):
+                return 'kpo_ui'
             if user.has_group('shahtaj_oil.group_shahtaj_delivery_man'):
                 return 'delivery_man_ui'
             if user.has_group('shahtaj_oil.group_shahtaj_order_booker'):

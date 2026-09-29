@@ -23,14 +23,17 @@ class ProductProduct(models.Model):
     )
 
     def _shahtaj_needs_stock_qty_sudo(self):
-        """Custom-portal distributors / bookers lack stock.move ACL for qty fields."""
+        """Roles without stock.user ACL still need on-hand qty on product lists."""
         if self.env.su:
             return False
         user = self.env.user
         if user.has_group('stock.group_stock_user'):
             return False
-        return user.has_group('shahtaj_oil.group_shahtaj_distributor') or user.has_group(
-            'shahtaj_oil.group_shahtaj_order_booker'
+        return (
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or user.has_group('shahtaj_oil.group_shahtaj_order_booker')
+            or user.has_group('shahtaj_oil.group_shahtaj_warehouse')
+            or user.has_group('shahtaj_oil.group_shahtaj_warehouse_acl')
         )
 
     def _compute_quantities(self):
@@ -51,7 +54,7 @@ class ProductProduct(models.Model):
         user = self.env.user
         if user.has_group('stock.group_stock_user'):
             return False
-        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
+        return user.has_group('shahtaj_oil.group_shahtaj_office_ops')
 
     def write(self, vals):
         # Archive syncs orderpoint_ids; UoM/price edits can read stock.move.

@@ -296,7 +296,7 @@ class ShahtajDmDelivery(models.Model):
         """Distributors may reschedule Delivery Day even after pick (overdue fix)."""
         user = self.env.user
         is_dist = (
-            user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
         )
         for rec in self:
@@ -751,7 +751,7 @@ class ShahtajDmDelivery(models.Model):
         is_distributor = (
             not self.env.context.get('shahtaj_system_visit_write')
             and not self.env.context.get('shahtaj_skip_planning_log')
-            and user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            and user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             and not user._is_public()
         )
         if planning_vals and is_distributor:
@@ -1442,7 +1442,7 @@ class ShahtajDmDelivery(models.Model):
             raise UserError(_('%(user)s is not a delivery man.', user=dm.display_name))
         if user.shahtaj_is_delivery_man and user.id != dm.id:
             if not (
-                user.has_group('shahtaj_oil.group_shahtaj_distributor')
+                user.has_group('shahtaj_oil.group_shahtaj_office_ops')
                 or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
             ):
                 raise AccessError(_('You can only move stock on your own van.'))
@@ -2356,7 +2356,7 @@ class ShahtajDmDelivery(models.Model):
         Does not touch allocation / pick qty. Blocked after invoicing.
         """
         if not (
-            self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             or self.env.user.has_group('base.group_system')
         ):
             raise UserError(_('Only distributors can undo a shop delivery.'))

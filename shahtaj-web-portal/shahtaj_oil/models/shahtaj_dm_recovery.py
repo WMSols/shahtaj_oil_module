@@ -10,13 +10,30 @@ class ShahtajDmRecoveryService(models.AbstractModel):
     _description = 'Delivery Man Recovery Service'
 
     @api.model
+    def _shahtaj_user_can_settle_wallet(self):
+        """Dist/Manager (office/financial) or KPO desk."""
+        user = self.env.user
+        return bool(
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
+            or user.has_group('shahtaj_oil.group_shahtaj_distributor_financial')
+            or user.has_group('shahtaj_oil.group_shahtaj_kpo')
+            or user.has_group('shahtaj_oil.group_shahtaj_kpo_acl')
+        )
+
+    @api.model
     def _assert_can_collect(self, delivery_man):
         user = self.env.user
         if not delivery_man or not delivery_man.shahtaj_is_delivery_man:
             raise UserError(_('Select a valid delivery man.'))
-        if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+        if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
             return
         if user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui'):
+            return
+        # KPO desk may post office-side collections during EOD validation.
+        if user.has_group('shahtaj_oil.group_shahtaj_kpo') or user.has_group(
+            'shahtaj_oil.group_shahtaj_kpo_acl'
+        ):
             return
         if user.shahtaj_is_delivery_man and user.id == delivery_man.id:
             return
@@ -24,14 +41,11 @@ class ShahtajDmRecoveryService(models.AbstractModel):
 
     @api.model
     def _assert_can_settle(self):
-        user = self.env.user
-        if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+        if self._shahtaj_user_can_settle_wallet():
             return
-        if user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui'):
-            return
-        if user.has_group('shahtaj_oil.group_shahtaj_distributor_financial'):
-            return
-        raise AccessError(_('Only distributors can settle the DM wallet to bank.'))
+        raise AccessError(_(
+            'Only distributors, managers, or KPO can settle the DM wallet to bank.'
+        ))
 
     @api.model
     def _dmcash_journal(self, company=None):

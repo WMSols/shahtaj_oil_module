@@ -131,6 +131,6 @@
               parent="menu_shahtaj_root"
               action="action_shahtaj_gps_attempt"
               sequence="95"
-              groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
 </odoo>

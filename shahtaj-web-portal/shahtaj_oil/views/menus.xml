@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!--
+      Native menu visibility uses UI packs (group_shahtaj_ui_pack_*), not role names.
+      Role → packs via: group_shahtaj_native_distributor_ui / group_shahtaj_native_manager_ui
+      / group_shahtaj_native_kpo_ui / group_shahtaj_native_warehouse_ui.
+      To share a menu with a new role, either add the pack to that role's native_*_ui
+      implied_ids, or add a new pack.
+    -->
 
     <record id="action_shahtaj_dashboard" model="ir.actions.client">
-        <field name="name">Distributor Portal</field> 
+        <field name="name">Distributor Portal</field>
         <field name="tag">shahtaj_dashboard_tag</field>
     </record>
 
@@ -18,326 +25,424 @@
               sequence="1"
               groups="shahtaj_oil.group_shahtaj_custom_portal_user"/>
 
-    <!-- ── 3. Order Booker Operations (native distributor) ── -->
+    <!-- ── 3. Order Booker Operations (UI pack: ob_ops) ── -->
     <menuitem id="menu_shahtaj_order_booker_ops"
               name="3. Order Booker"
               parent="menu_shahtaj_root"
               sequence="10"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_order_bookers"
               name="Order Bookers"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_order_booker_management"
               sequence="10"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_create_order_booker"
               name="Create Order Booker"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_create_order_booker_wizard"
               sequence="11"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_staff_admin"/>
 
     <menuitem id="menu_shahtaj_order_booker_overview"
               name="Overview"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_order_booker_hub"
               sequence="1"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_weekly_schedules"
               name="Weekly Schedules"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_schedule_hub"
               sequence="20"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_visit_tasks_progress"
               name="Visit Tasks Progress"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_visit_hub_ob"
               sequence="21"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_all_visit_tasks"
               name="All Visit Tasks"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_visit_task"
               sequence="22"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_generate_tasks"
               name="Generate Tasks"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_generate_tasks_wizard"
               sequence="23"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_shop_visits"
               name="Shop Visits"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_visit"
               sequence="30"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_targets"
               name="Sales Targets"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_visit_target"
               sequence="31"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_zones"
               name="Zones"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_zone"
               sequence="40"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_routes"
               name="Routes"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_route"
               sequence="41"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_shops"
               name="All Shops"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_shop"
               sequence="42"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_shop_approvals"
               name="Pending Shop Approvals"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_shop_pending"
               sequence="43"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_shops_unassigned"
               name="Unassigned Shops"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_shop_unassigned"
               sequence="44"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_orders_overview"
               name="Field Orders Overview"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_orders_hub"
               sequence="50"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_orders_needing_verification"
               name="Orders Needing Verification"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_orders_needing_verification"
               sequence="51"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_orders_all"
               name="All Field Sales Orders"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_field_sales_orders"
               sequence="52"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_orders_rejected"
               name="Rejected Orders"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_orders_rejected"
               sequence="53"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
     <menuitem id="menu_shahtaj_ob_orders_to_invoice"
               name="Orders to Invoice"
               parent="menu_shahtaj_order_booker_ops"
               action="action_shahtaj_orders_to_invoice"
               sequence="54"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
-    <!-- ── 4. Delivery Man Operations (native distributor) ── -->
+    <!-- ── 4. Delivery Man Operations (UI pack: dm_ops — Distributor only for now) ── -->
     <menuitem id="menu_shahtaj_delivery_man_ops"
               name="4. Delivery Man"
               parent="menu_shahtaj_root"
               sequence="15"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_delivery_man_overview"
               name="Overview"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_delivery_man_hub"
               sequence="1"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_delivery_men"
               name="Delivery Men"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_delivery_man_management"
               sequence="10"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_create_delivery_man"
               name="Create Delivery Man"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_create_delivery_man_wizard"
               sequence="11"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_staff_admin"/>
 
     <menuitem id="menu_shahtaj_dm_dispatch_orders"
               name="Dispatch Orders"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_dispatch_orders"
               sequence="20"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_dm_dispatch_jobs"
               name="Delivery Jobs"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_dispatch_jobs"
               sequence="21"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_dm_overdue_jobs"
               name="Overdue / Not Done"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_overdue_jobs"
               sequence="22"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_dm_all_deliveries"
               name="All Delivery Orders"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_delivery_all"
               sequence="23"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_dm_visit_tasks_progress"
               name="DM Daily Progress"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_visit_hub_dm"
               sequence="24"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_dm_wallet_collections_dist"
               name="DM Wallet Collections"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_wallet_collections_all"
               sequence="27"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_dm_wallet_settle_dist"
               name="Settle DM Wallet"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_wallet_settle"
               sequence="28"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
 
     <menuitem id="menu_shahtaj_dm_wallet_settlements_dist"
               name="DM Wallet Settlements"
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_wallet_settlements"
               sequence="29"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_dm_ops"/>
+
+    <!-- ── 5. KPO Operations (UI pack: kpo — KPO native only; Dist menus unchanged) ── -->
+    <menuitem id="menu_shahtaj_kpo_ops"
+              name="5. KPO Operations"
+              parent="menu_shahtaj_root"
+              sequence="18"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
+    <menuitem id="menu_shahtaj_kpo_orders_print"
+              name="Orders to Print"
+              parent="menu_shahtaj_kpo_ops"
+              action="action_shahtaj_field_sales_orders"
+              sequence="10"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
+    <menuitem id="menu_shahtaj_kpo_wallet_collections"
+              name="DM Wallet Collections"
+              parent="menu_shahtaj_kpo_ops"
+              action="action_shahtaj_dm_wallet_collections_all"
+              sequence="20"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
+    <menuitem id="menu_shahtaj_kpo_wallet_settle"
+              name="Settle DM Wallet"
+              parent="menu_shahtaj_kpo_ops"
+              action="action_shahtaj_dm_wallet_settle"
+              sequence="21"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
+    <menuitem id="menu_shahtaj_kpo_wallet_settlements"
+              name="DM Wallet Settlements"
+              parent="menu_shahtaj_kpo_ops"
+              action="action_shahtaj_dm_wallet_settlements"
+              sequence="22"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
+    <!-- ── 5b. Warehouse Operations (UI pack: warehouse — Warehouse native only) ── -->
+    <menuitem id="menu_shahtaj_warehouse_ops"
+              name="5b. Warehouse Operations"
+              parent="menu_shahtaj_root"
+              sequence="19"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
+    <menuitem id="menu_shahtaj_warehouse_delivery_men"
+              name="Delivery Men"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_delivery_man_management"
+              sequence="10"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
+    <menuitem id="menu_shahtaj_warehouse_dispatch_jobs"
+              name="Delivery Jobs"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_dm_dispatch_jobs"
+              sequence="20"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
+    <menuitem id="menu_shahtaj_warehouse_all_deliveries"
+              name="All Delivery Orders"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_dm_delivery_all"
+              sequence="21"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
+    <menuitem id="menu_shahtaj_warehouse_stock_overview"
+              name="Stock Overview"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_stock_overview"
+              sequence="30"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
+    <menuitem id="menu_shahtaj_warehouse_product_list"
+              name="Product List"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_product_list"
+              sequence="31"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
 
     <!-- Parent is a folder; Overview restores the hub screen that child menus had hidden. -->
     <menuitem id="menu_shahtaj_accounting"
               name="8. Shop Accounting"
               parent="menu_shahtaj_root"
               sequence="42"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_accounting_overview"
               name="Overview"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_accounting_hub"
               sequence="1"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_bank_cash_journals"
               name="Bank &amp; Cash Journals"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_bank_cash_journals"
               sequence="10"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_journal_transactions"
               name="Journal Transactions"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_journal_transactions"
               sequence="20"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_customer_payments_native"
               name="Customer Payments"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_customer_payments"
               sequence="30"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_customer_invoices_native"
               name="Customer Invoices"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_customer_invoices"
               sequence="32"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance"/>
+
+    <menuitem id="menu_shahtaj_credit_notes_native"
+              name="Credit Notes"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_credit_notes"
+              sequence="33"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance"/>
+
+    <menuitem id="menu_shahtaj_opening_balance_invoices_native"
+              name="Opening Balance Invoices"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_opening_balance_invoices"
+              sequence="34"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance"/>
+
+    <menuitem id="menu_shahtaj_shop_balances_native"
+              name="Shop Balances"
+              parent="menu_shahtaj_accounting"
+              action="action_shahtaj_shop_balances"
+              sequence="35"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_expenses"
               name="Expense Invoices"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_expense"
               sequence="36"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_vendor_bills"
               name="Vendor Bills"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_vendor_bills"
               sequence="37"
-              groups="purchase.group_purchase_user"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_tax_ledger"
               name="Tax Ledger"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_tax_ledger"
               sequence="38"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_trial_balance"
               name="Trial Balance"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_trial_balance"
               sequence="39"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_balance_sheet"
               name="Balance Sheet"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_balance_sheet"
               sequence="40"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_expense_categories"
               name="Expense Categories"
               parent="menu_shahtaj_accounting"
               action="action_shahtaj_expense_category"
               sequence="45"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_pnl_dashboard"
               name="8. Profit &amp; Loss"
               parent="menu_shahtaj_root"
               action="action_shahtaj_pnl_dashboard"
               sequence="43"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_finance"/>
 
     <menuitem id="menu_shahtaj_products"
               name="Products"
               parent="menu_shahtaj_root"
               sequence="45"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_catalog"/>
 
     <menuitem id="menu_shahtaj_quick_add_product"
               name="Quick Add Product"
@@ -367,7 +472,7 @@
               name="Inventory"
               parent="menu_shahtaj_root"
               sequence="46"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_catalog"/>
 
     <menuitem id="menu_shahtaj_add_stock"
               name="Add Stock"
@@ -519,21 +624,21 @@
               name="Field Reports"
               parent="menu_shahtaj_root"
               sequence="47"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_field_reports"/>
 
     <menuitem id="menu_shahtaj_field_reports"
               name="All Reports"
               parent="menu_shahtaj_field_reports_root"
               action="action_shahtaj_field_report"
               sequence="10"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_field_reports"/>
 
     <menuitem id="menu_shahtaj_field_report_tags"
               name="Report Tags"
               parent="menu_shahtaj_field_reports_root"
               action="action_shahtaj_field_report_tag"
               sequence="20"
-              groups="shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_ui_pack_field_reports"/>
 
     <!-- Order booker native: own reports -->
     <menuitem id="menu_shahtaj_ob_my_reports"
@@ -549,5 +654,58 @@
     <delete model="ir.ui.menu" id="menu_shahtaj_orders_needing_verification"/>
     <delete model="ir.ui.menu" id="menu_shahtaj_orders_all"/>
     <delete model="ir.ui.menu" id="menu_shahtaj_orders_rejected_menu"/>
+
+    <!-- Force-replace menu groups (menuitem @groups merges on upgrade and leaves stale packs). -->
+    <record id="menu_shahtaj_accounting" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_shop_trading'), ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_accounting_overview" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_shop_trading'), ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_bank_cash_journals" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_journal_transactions" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_customer_payments_native" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_shop_trading'), ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_customer_invoices_native" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_shop_trading'), ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_credit_notes_native" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_shop_trading'), ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_opening_balance_invoices_native" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_shop_trading'), ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_shop_balances_native" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_shop_trading'), ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_expenses" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_shop_trading'), ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_vendor_bills" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_tax_ledger" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_trial_balance" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_balance_sheet" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_expense_categories" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_pnl_dashboard" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
+    <record id="menu_shahtaj_ob_orders_to_invoice" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_shahtaj_ui_pack_finance')])]"/>
+    </record>
 
 </odoo>
