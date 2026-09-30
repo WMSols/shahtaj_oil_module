@@ -63,7 +63,7 @@
     <record id="group_shahtaj_ui_pack_kpo" model="res.groups">
         <field name="name">UI Pack: KPO Desk</field>
         <field name="privilege_id" eval="False"/>
-        <field name="comment">Native menus for KPO only: orders-to-print, DM wallet collections/settle. Dist/Manager do not get this pack.</field>
+        <field name="comment">Native menus for KPO only: orders-to-print, DM wallet collections/settle, purchase orders / receipts / vendors / vendor bills. Dist/Manager do not get this pack.</field>
     </record>
 
     <record id="group_shahtaj_ui_pack_warehouse" model="res.groups">
@@ -76,7 +76,7 @@
     <record id="group_shahtaj_kpo_acl" model="res.groups">
         <field name="name">KPO Access (ACL)</field>
         <field name="privilege_id" eval="False"/>
-        <field name="comment">Technical: narrow ir.model.access for KPO workflow only (orders read/print, wallet EOD, shop balances/payments). Implied only by group_shahtaj_kpo.</field>
+        <field name="comment">Technical: narrow ir.model.access for KPO workflow (orders read/print, wallet EOD, shop balances/payments, purchase orders full CRUD + receive/bill). Implied only by group_shahtaj_kpo.</field>
     </record>
 
     <!-- Warehouse-only model ACL (do not reuse Dist office_ops / financial / kpo_acl). Dist/KPO ACL rows untouched. -->
@@ -185,7 +185,7 @@
             ref('group_shahtaj_ui_pack_kpo'),
             ref('group_shahtaj_ui_pack_shop_trading'),
         ])]"/>
-        <field name="comment">Technical: KPO native menus — KPO desk (orders print, wallet) + Shop Accounting billing/balances. No OB/DM dispatch/catalog/finance statements/staff.</field>
+        <field name="comment">Technical: KPO native menus — KPO desk (orders print, wallet, PO) + Shop Accounting billing/balances. No OB/DM dispatch/catalog/finance statements/staff.</field>
     </record>
 
     <!-- Warehouse Incharge privilege — distinct; ACL via warehouse_acl only. -->

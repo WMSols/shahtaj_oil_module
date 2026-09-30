@@ -284,6 +284,34 @@
               sequence="22"
               groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
 
+    <menuitem id="menu_shahtaj_kpo_purchase_orders"
+              name="Purchase Orders"
+              parent="menu_shahtaj_kpo_ops"
+              action="action_shahtaj_purchase_orders"
+              sequence="30"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
+    <menuitem id="menu_shahtaj_kpo_incoming_receipts"
+              name="Receipts &amp; Returns"
+              parent="menu_shahtaj_kpo_ops"
+              action="action_shahtaj_incoming_receipts"
+              sequence="31"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
+    <menuitem id="menu_shahtaj_kpo_vendors"
+              name="Vendors"
+              parent="menu_shahtaj_kpo_ops"
+              action="action_shahtaj_vendors"
+              sequence="32"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
+    <menuitem id="menu_shahtaj_kpo_vendor_bills"
+              name="Vendor Bills"
+              parent="menu_shahtaj_kpo_ops"
+              action="action_shahtaj_vendor_bills"
+              sequence="33"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
+
     <!-- ── 5b. Warehouse Operations (UI pack: warehouse — DM ops + stock; no wallet) ── -->
     <menuitem id="menu_shahtaj_warehouse_ops"
               name="5b. Warehouse Operations"

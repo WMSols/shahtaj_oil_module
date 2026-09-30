@@ -741,6 +741,13 @@ class ResUsers(models.Model):
                 )
                 if kpo_acl:
                     commands.append((4, kpo_acl.id))
+                # Needed for vendor bill form fields (groups=account_invoice|readonly).
+                account_invoice = self.env.ref(
+                    'account.group_account_invoice',
+                    raise_if_not_found=False,
+                )
+                if account_invoice:
+                    commands.append((4, account_invoice.id))
             elif is_warehouse and native_warehouse_ui:
                 commands = [
                     (3, custom_group.id),
@@ -908,6 +915,15 @@ class ResUsers(models.Model):
                     desired.discard(warehouse_acl.id)
                 if kpo_acl:
                     desired.add(kpo_acl.id)
+                # Vendor bills / Pay need invoice-group fields on account.move
+                # (invoice_has_outstanding, payment widgets, …). Keep this without
+                # Dist native_apps (Purchase/Sales/Stock managers stay stripped).
+                account_invoice = self.env.ref(
+                    'account.group_account_invoice',
+                    raise_if_not_found=False,
+                )
+                if account_invoice:
+                    desired.add(account_invoice.id)
             if is_warehouse:
                 if office_ops:
                     desired.discard(office_ops.id)
