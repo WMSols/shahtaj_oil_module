@@ -917,6 +917,7 @@ class SaleOrder(models.Model):
         return (
             user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             or user.has_group('shahtaj_oil.group_shahtaj_kpo')
+            or user.has_group('shahtaj_oil.group_shahtaj_warehouse')
         )
 
     def _compute_delivery_status(self):

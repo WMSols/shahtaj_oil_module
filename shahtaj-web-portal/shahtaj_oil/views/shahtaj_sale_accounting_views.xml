@@ -45,7 +45,7 @@
                         class="oe_stat_button"
                         icon="fa-truck"
                         invisible="shahtaj_dm_delivery_count == 0"
-                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager">
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager,shahtaj_oil.group_shahtaj_warehouse">
                     <field name="shahtaj_dm_delivery_count" widget="statinfo" string="DM Jobs"/>
                 </button>
             </div>
@@ -69,12 +69,12 @@
                         string="Assign / Split DM"
                         class="oe_highlight"
                         invisible="shahtaj_is_walk_in or state not in ('sale', 'done') or shahtaj_delivery_status == 'no_stock'"
-                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager"/>
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager,shahtaj_oil.group_shahtaj_warehouse"/>
                 <button name="action_shahtaj_mark_delivery" type="object"
                         string="Mark Delivery"
                         class="oe_highlight"
                         invisible="shahtaj_is_walk_in or state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"
-                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager"/>
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager,shahtaj_oil.group_shahtaj_warehouse"/>
             </header>
             <field name="partner_id" position="after">
                 <field name="shahtaj_is_walk_in" readonly="1"
@@ -241,11 +241,11 @@
                         invisible="shahtaj_approval_state != 'to_approve' or state not in ('draft', 'sent')"/>
                 <button name="action_shahtaj_assign_dm" type="object"
                         string="Assign / Split" icon="fa-user"
-                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager,shahtaj_oil.group_shahtaj_warehouse"
                         invisible="shahtaj_is_walk_in or state not in ('sale', 'done') or shahtaj_delivery_status == 'no_stock'"/>
                 <button name="action_shahtaj_mark_delivery" type="object"
                         string="Deliver" icon="fa-truck"
-                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager"
+                        groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_manager,shahtaj_oil.group_shahtaj_warehouse"
                         invisible="shahtaj_is_walk_in or state not in ('sale', 'done') or shahtaj_delivery_status in ('done', 'no_stock')"/>
             </field>
         </field>

@@ -69,7 +69,7 @@
     <record id="group_shahtaj_ui_pack_warehouse" model="res.groups">
         <field name="name">UI Pack: Warehouse Desk</field>
         <field name="privilege_id" eval="False"/>
-        <field name="comment">Native menus for Warehouse Incharge only: Delivery Men, Delivery Jobs, Today Load / van via DM form, Stock Overview, Product List. Dist/Manager/KPO do not get this pack.</field>
+        <field name="comment">Native menus for Warehouse Incharge only: Overview, Delivery Men, Dispatch, Jobs, Overdue, Sessions, Progress, Stock, Products. No wallet. Dist/Manager/KPO do not get this pack.</field>
     </record>
 
     <!-- KPO-only model ACL (do not reuse Dist office_ops / financial). Dist ACL rows untouched. -->
@@ -83,7 +83,7 @@
     <record id="group_shahtaj_warehouse_acl" model="res.groups">
         <field name="name">Warehouse Access (ACL)</field>
         <field name="privilege_id" eval="False"/>
-        <field name="comment">Technical: narrow ir.model.access for Warehouse load desk (DM jobs RW, today load / van transfer wizards, stock/products/partners read). Implied only by group_shahtaj_warehouse.</field>
+        <field name="comment">Technical: narrow ir.model.access for Warehouse DM ops desk (dispatch assign, delivery jobs RW, day sessions, walk-in, today load / van transfer, stock pickings RW, products/partners/orders R). No wallet settle/collect. Implied only by group_shahtaj_warehouse.</field>
     </record>
 
     <!-- Shared Dist+Manager model ACLs (temporary full mirror for Manager; cut gradually later) -->
@@ -206,7 +206,7 @@
         <field name="implied_ids" eval="[(6, 0, [
             ref('group_shahtaj_ui_pack_warehouse'),
         ])]"/>
-        <field name="comment">Technical: Warehouse native menus — Warehouse desk only (DM list, jobs, stock overview, products). No OB/KPO wallet/shop accounting/finance/catalog pack/staff.</field>
+        <field name="comment">Technical: Warehouse native menus — Overview, Delivery Men, Dispatch Orders, Delivery Jobs, Overdue, All Deliveries, DM Daily Progress, Day Sessions, Stock Overview, Product List. No wallet/print/shop accounting/finance/OB/staff.</field>
     </record>
 
     <!-- OWL distributor portal only — assigned when user.shahtaj_custom_frontend is True -->

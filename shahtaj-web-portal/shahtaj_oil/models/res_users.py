@@ -330,6 +330,19 @@ class ResUsers(models.Model):
             or self.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
         )
 
+    def _shahtaj_can_manage_dm_ops(self):
+        """Office desks that may plan/assign/load/return DM jobs (not wallet).
+
+        Dist/Manager (office_ops / native_distributor_ui) and Warehouse Incharge.
+        KPO is intentionally excluded — wallet/print only.
+        """
+        self.ensure_one()
+        return (
+            self.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or self.has_group('shahtaj_oil.group_shahtaj_warehouse')
+            or self.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
+        )
+
     _SHAHTAJ_USER_FORM_FIELDS = (
         'shahtaj_custom_frontend',
         'shahtaj_distributor_financial_access',

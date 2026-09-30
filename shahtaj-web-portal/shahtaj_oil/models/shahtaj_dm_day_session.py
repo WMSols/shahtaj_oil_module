@@ -89,10 +89,7 @@ class ShahtajDmDaySession(models.Model):
     def _assert_dm_access(self, dm):
         user = self.env.user
         if user.shahtaj_is_delivery_man and user.id != dm.id:
-            if not (
-                user.has_group('shahtaj_oil.group_shahtaj_office_ops')
-                or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
-            ):
+            if not user._shahtaj_can_manage_dm_ops():
                 raise AccessError(_('You can only manage your own day session.'))
         if not dm.shahtaj_is_delivery_man:
             raise UserError(_('%(user)s is not a delivery man.', user=dm.display_name))

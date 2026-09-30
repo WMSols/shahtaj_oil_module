@@ -83,10 +83,7 @@ class ShahtajDmWalkIn(models.TransientModel):
     def _shahtaj_resolve_delivery_man(self):
         user = self.env.user
         ctx_dm = self.env.context.get('shahtaj_delivery_man_id')
-        if ctx_dm and (
-            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
-            or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
-        ):
+        if ctx_dm and user._shahtaj_can_manage_dm_ops():
             return self.env['res.users'].browse(ctx_dm)
         if user.shahtaj_is_delivery_man:
             return user
@@ -98,9 +95,7 @@ class ShahtajDmWalkIn(models.TransientModel):
         dm = self.delivery_man_id
         if not dm or not dm.shahtaj_is_delivery_man:
             raise UserError(_('Select a valid delivery man.'))
-        if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
-            return
-        if user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui'):
+        if user._shahtaj_can_manage_dm_ops():
             return
         if user.shahtaj_is_delivery_man and user.id == dm.id:
             return

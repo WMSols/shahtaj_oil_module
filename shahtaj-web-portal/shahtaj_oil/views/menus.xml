@@ -284,11 +284,18 @@
               sequence="22"
               groups="shahtaj_oil.group_shahtaj_ui_pack_kpo"/>
 
-    <!-- ── 5b. Warehouse Operations (UI pack: warehouse — Warehouse native only) ── -->
+    <!-- ── 5b. Warehouse Operations (UI pack: warehouse — DM ops + stock; no wallet) ── -->
     <menuitem id="menu_shahtaj_warehouse_ops"
               name="5b. Warehouse Operations"
               parent="menu_shahtaj_root"
               sequence="19"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
+    <menuitem id="menu_shahtaj_warehouse_overview"
+              name="Overview"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_delivery_man_hub"
+              sequence="1"
               groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
 
     <menuitem id="menu_shahtaj_warehouse_delivery_men"
@@ -298,6 +305,13 @@
               sequence="10"
               groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
 
+    <menuitem id="menu_shahtaj_warehouse_dispatch_orders"
+              name="Dispatch Orders"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_dm_dispatch_orders"
+              sequence="15"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
     <menuitem id="menu_shahtaj_warehouse_dispatch_jobs"
               name="Delivery Jobs"
               parent="menu_shahtaj_warehouse_ops"
@@ -305,11 +319,32 @@
               sequence="20"
               groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
 
+    <menuitem id="menu_shahtaj_warehouse_overdue_jobs"
+              name="Overdue / Not Done"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_dm_overdue_jobs"
+              sequence="21"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
     <menuitem id="menu_shahtaj_warehouse_all_deliveries"
               name="All Delivery Orders"
               parent="menu_shahtaj_warehouse_ops"
               action="action_shahtaj_dm_delivery_all"
-              sequence="21"
+              sequence="22"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
+    <menuitem id="menu_shahtaj_warehouse_visit_progress"
+              name="DM Daily Progress"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_visit_hub_dm"
+              sequence="23"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
+
+    <menuitem id="menu_shahtaj_warehouse_day_sessions"
+              name="DM Day Sessions"
+              parent="menu_shahtaj_warehouse_ops"
+              action="action_shahtaj_dm_day_session"
+              sequence="24"
               groups="shahtaj_oil.group_shahtaj_ui_pack_warehouse"/>
 
     <menuitem id="menu_shahtaj_warehouse_stock_overview"

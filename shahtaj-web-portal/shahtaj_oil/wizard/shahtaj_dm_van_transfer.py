@@ -64,15 +64,10 @@ class ShahtajDmVanTransfer(models.TransientModel):
     def _shahtaj_resolve_delivery_man(self):
         user = self.env.user
         ctx_dm = self.env.context.get('shahtaj_delivery_man_id')
-        if ctx_dm and (
-            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
-            or user.has_group('shahtaj_oil.group_shahtaj_warehouse')
-        ):
+        if ctx_dm and user._shahtaj_can_manage_dm_ops():
             return self.env['res.users'].browse(ctx_dm)
         if user.shahtaj_is_delivery_man:
             return user
-        if ctx_dm and user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui'):
-            return self.env['res.users'].browse(ctx_dm)
         raise UserError(_('No delivery man selected.'))
 
     def _shahtaj_assert_can_manage(self):
@@ -82,11 +77,7 @@ class ShahtajDmVanTransfer(models.TransientModel):
         dm = self.delivery_man_id
         if not dm or not dm.shahtaj_is_delivery_man:
             raise UserError(_('Select a valid delivery man.'))
-        if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
-            return True
-        if user.has_group('shahtaj_oil.group_shahtaj_warehouse'):
-            return True
-        if user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui'):
+        if user._shahtaj_can_manage_dm_ops():
             return True
         if user.shahtaj_is_delivery_man and user.id == dm.id:
             return True
@@ -96,11 +87,7 @@ class ShahtajDmVanTransfer(models.TransientModel):
 
     def _shahtaj_actor_role(self):
         user = self.env.user
-        if (
-            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
-            or user.has_group('shahtaj_oil.group_shahtaj_warehouse')
-            or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
-        ):
+        if user._shahtaj_can_manage_dm_ops():
             if not user.shahtaj_is_delivery_man or (
                 self.delivery_man_id and user.id != self.delivery_man_id.id
             ):

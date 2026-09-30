@@ -293,16 +293,13 @@ class ShahtajDmDelivery(models.Model):
     @api.depends('state')
     @api.depends_context('uid')
     def _compute_shahtaj_can_edit_schedule(self):
-        """Distributors may reschedule Delivery Day even after pick (overdue fix)."""
+        """Office/Warehouse may reschedule Delivery Day even after pick (overdue fix)."""
         user = self.env.user
-        is_dist = (
-            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
-            or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
-        )
+        is_office = user._shahtaj_can_manage_dm_ops()
         for rec in self:
             if rec.state in ('delivered', 'returned'):
                 rec.shahtaj_can_edit_schedule = False
-            elif is_dist:
+            elif is_office:
                 rec.shahtaj_can_edit_schedule = True
             else:
                 rec.shahtaj_can_edit_schedule = not rec._shahtaj_is_processing_locked()
@@ -748,13 +745,13 @@ class ShahtajDmDelivery(models.Model):
     def write(self, vals):
         planning_vals = DM_DISTRIBUTOR_PLANNING_FIELDS.intersection(vals)
         user = self.env.user
-        is_distributor = (
+        is_office_planner = (
             not self.env.context.get('shahtaj_system_visit_write')
             and not self.env.context.get('shahtaj_skip_planning_log')
-            and user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            and user._shahtaj_can_manage_dm_ops()
             and not user._is_public()
         )
-        if planning_vals and is_distributor:
+        if planning_vals and is_office_planner:
             locked = self.filtered(lambda rec: rec._shahtaj_is_processing_locked())
             # Allow Delivery Day / time / notes on picked open jobs so overdue
             # work can be rescheduled; reassigning DM while stock is on van stays blocked.
@@ -986,17 +983,18 @@ class ShahtajDmDelivery(models.Model):
                 rec._ensure_visit_task()
 
     def _shahtaj_stop_for_stock_state(self, stock_state):
-        """Target Stop after stock sync/undo. Only clears stale ``done``.
+        """Target Stop after stock sync/undo.
 
         Returns field_state value to write, or False to leave Stop unchanged
-        (Shop Closed / Could Not Deliver stay as set by the DM).
+        (Shop Closed / Could Not Deliver stay as set by the DM while stock is open).
+        Returned-to-WH clears any Heading / Done stop so UI matches finished stock.
         """
         self.ensure_one()
         any_delivered = any((l.qty_delivered or 0.0) > 0 for l in self.line_ids)
         if stock_state == 'delivered':
             return 'done'
         if stock_state == 'returned':
-            return False
+            return 'pending'
         if self.field_state == 'done' and not any_delivered:
             if stock_state in ('picked', 'partial'):
                 return 'in_transit'
@@ -1441,10 +1439,7 @@ class ShahtajDmDelivery(models.Model):
         if not dm.shahtaj_is_delivery_man:
             raise UserError(_('%(user)s is not a delivery man.', user=dm.display_name))
         if user.shahtaj_is_delivery_man and user.id != dm.id:
-            if not (
-                user.has_group('shahtaj_oil.group_shahtaj_office_ops')
-                or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
-            ):
+            if not user._shahtaj_can_manage_dm_ops():
                 raise AccessError(_('You can only move stock on your own van.'))
         if direction not in ('to_van', 'to_wh'):
             raise UserError(_('Invalid transfer direction.'))
@@ -2314,6 +2309,8 @@ class ShahtajDmDelivery(models.Model):
         self.write({
             'state': 'returned',
             'return_picking_id': picking.id,
+            # Clear Heading to Shop / other stop flags — job is finished at warehouse.
+            'field_state': 'pending',
         })
         self._ensure_visit_task()
         return self._reload_form(
@@ -2356,10 +2353,12 @@ class ShahtajDmDelivery(models.Model):
         Does not touch allocation / pick qty. Blocked after invoicing.
         """
         if not (
-            self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            self.env.user._shahtaj_can_manage_dm_ops()
             or self.env.user.has_group('base.group_system')
         ):
-            raise UserError(_('Only distributors can undo a shop delivery.'))
+            raise UserError(_(
+                'Only distributors, managers, or warehouse incharge can undo a shop delivery.'
+            ))
 
         for job in self:
             job._shahtaj_undo_delivery_to_shop()

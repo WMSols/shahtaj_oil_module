@@ -35,7 +35,7 @@
                     <button name="action_reset_office" type="object"
                             string="Reset to Office"
                             invisible="state == 'office'"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="office,on_the_way,ended"/>
                 </header>
@@ -146,7 +146,7 @@ action = {
               parent="menu_shahtaj_delivery_man_ops"
               action="action_shahtaj_dm_day_session"
               sequence="25"
-              groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+              groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
 
     <!-- Intentionally NOT first: app home must be My Deliveries (seq 28 in menus.xml) -->
     <menuitem id="menu_shahtaj_dm_my_day_session"
