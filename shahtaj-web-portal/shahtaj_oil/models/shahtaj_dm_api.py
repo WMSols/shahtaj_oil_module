@@ -109,6 +109,12 @@ class ShahtajDmApiService(models.AbstractModel):
         )
         for job in jobs:
             job.sudo()._sync_with_sale_order(ensure_visit_task=False)
+        # Sync: free van cover → qty_picked / Loaded (Dist + app agree).
+        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        jobs = Delivery.search(
+            Delivery._shahtaj_today_open_jobs_domain(dm, day),
+            order='id',
+        )
         self._prefetch_jobs(jobs)
 
         shops = []
@@ -220,6 +226,12 @@ class ShahtajDmApiService(models.AbstractModel):
         )
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
+        # Attribute free van first so "need=0" jobs become Loaded before pick math.
+        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        deliveries = Delivery.search(
+            Delivery._shahtaj_today_open_jobs_domain(dm, day),
+            order='id',
+        )
 
         live_still = defaultdict(float)
         for delivery in deliveries:
@@ -258,6 +270,15 @@ class ShahtajDmApiService(models.AbstractModel):
                 wh_move[pid] = wh
 
         if not van_apply and not wh_move:
+            # Already fully covered/attributed — success, not an error.
+            if not any(q > 0 for q in live_still.values()):
+                return {
+                    'jobs_picked': 0,
+                    'van_skus_applied': 0,
+                    'warehouse_skus_picked': 0,
+                    'already_loaded': True,
+                    'load': self.get_today_load(dm, day),
+                }
             raise UserError(_(
                 'Nothing to load for today. Free van stock may already cover jobs, '
                 'or pick quantities are zero.'
@@ -416,6 +437,11 @@ class ShahtajDmApiService(models.AbstractModel):
         Delivery = self.env['shahtaj.dm.delivery']
         jobs = Delivery.search(self._jobs_domain(dm, day, open_only=False), order='id')
         # Prefer open first in app sort
+        open_jobs = jobs.filtered(lambda j: j.state in ('not_ready', 'ready', 'picked', 'partial'))
+        for job in open_jobs:
+            job.sudo()._sync_with_sale_order(ensure_visit_task=False)
+        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        jobs = Delivery.search(self._jobs_domain(dm, day, open_only=False), order='id')
         open_jobs = jobs.filtered(lambda j: j.state in ('not_ready', 'ready', 'picked', 'partial'))
         done_jobs = jobs - open_jobs
         ordered = open_jobs + done_jobs

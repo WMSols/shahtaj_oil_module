@@ -124,18 +124,6 @@ class ShahtajDmDelivery(models.Model):
             'Shop Closed and Could Not Deliver require a note.'
         ),
     )
-    delivery_progress = fields.Selection(
-        [
-            ('pending', 'Pending'),
-            ('partial', 'Partial'),
-            ('done', 'Done'),
-        ],
-        string='Progress (internal)',
-        compute='_compute_delivery_progress',
-        store=True,
-        index=True,
-        help='Internal coarse summary derived from Status. Prefer Status in the UI.',
-    )
     scheduled_date = fields.Date(
         string='Delivery Day',
         index=True,
@@ -616,28 +604,6 @@ class ShahtajDmDelivery(models.Model):
                     '</tr></thead>'
                     f'<tbody>{"".join(paid_html_rows)}</tbody></table></div>'
                 )
-
-    @api.depends('state', 'line_ids.qty_picked', 'line_ids.qty_delivered')
-    def _compute_delivery_progress(self):
-        for rec in self:
-            if rec.state in ('delivered',):
-                rec.delivery_progress = 'done'
-            elif rec.state in ('partial',):
-                rec.delivery_progress = 'partial'
-            elif rec.state == 'returned':
-                # Returned leftover: done for the day if nothing left to deliver to shop
-                remaining = sum(
-                    max(l.qty_picked - l.qty_delivered, 0.0) for l in rec.line_ids
-                )
-                any_delivered = any(l.qty_delivered > 0 for l in rec.line_ids)
-                if remaining <= 0 and any_delivered:
-                    rec.delivery_progress = 'done'
-                elif any_delivered:
-                    rec.delivery_progress = 'partial'
-                else:
-                    rec.delivery_progress = 'pending'
-            else:
-                rec.delivery_progress = 'pending'
 
     @api.depends(
         'van_location_id',
@@ -1344,6 +1310,10 @@ class ShahtajDmDelivery(models.Model):
         ])
         for job in jobs:
             job._sync_with_sale_order()
+        # Stamp free van onto today's open jobs so Dist Stock matches Load Van.
+        self._shahtaj_attribute_free_van_to_open_jobs(
+            delivery_man, fields.Date.context_today(self),
+        )
         return jobs
 
     @api.model
@@ -1520,6 +1490,10 @@ class ShahtajDmDelivery(models.Model):
         for move in picking.move_ids:
             move.quantity = move.product_uom_qty
         picking.with_context(skip_backorder=True, skip_sms=True).button_validate()
+        # Free WH→van often leaves need=0 on Load screen without stamping jobs —
+        # attribute free van onto today's open jobs so Dist Stock shows Loaded.
+        if direction == 'to_van':
+            self._shahtaj_attribute_free_van_to_open_jobs(dm)
         return picking
 
     def _retarget_sale_outgoing_to_van(self, van_location):
@@ -1685,6 +1659,70 @@ class ShahtajDmDelivery(models.Model):
             pid: max(0.0, physical.get(pid, 0.0) - attributed.get(pid, 0.0))
             for pid in pids
         }
+
+    @api.model
+    def _shahtaj_attribute_free_van_to_open_jobs(self, dm, day=None):
+        """Stamp today's open jobs Loaded when free van already covers still-needed.
+
+        Load Van / app can show need=0 (van cover) while Dist still has qty_picked=0
+        and Stock=Ready. This applies free van onto job lines (FIFO, no WH move)
+        so Dist dashboard and DM job Stock stay in sync.
+
+        Returns number of jobs that received an attribution write.
+        """
+        if self.env.context.get('shahtaj_skip_van_attribute'):
+            return 0
+        if not dm:
+            return 0
+        dm.ensure_one()
+        day = day or fields.Date.context_today(self)
+        deliveries = self.search(
+            self._shahtaj_today_open_jobs_domain(dm, day),
+            order='id',
+        )
+        if not deliveries:
+            return 0
+
+        still_by_product = defaultdict(float)
+        for delivery in deliveries:
+            for line in delivery.line_ids:
+                if not line.product_id:
+                    continue
+                still = max(line.qty_assigned - line.qty_picked, 0.0)
+                if still > 0:
+                    still_by_product[line.product_id.id] += still
+        if not still_by_product:
+            return 0
+
+        free_van = self._shahtaj_unattributed_van_qty_map(
+            dm, set(still_by_product), day=day,
+        )
+        van_apply = {}
+        for pid, still in still_by_product.items():
+            product = self.env['product.product'].browse(pid)
+            rounding = product.uom_id.rounding or 0.01
+            cover = float_round(
+                min(still, free_van.get(pid, 0.0)),
+                precision_rounding=rounding,
+            )
+            if float_compare(cover, 0.0, precision_rounding=rounding) > 0:
+                van_apply[pid] = cover
+        if not van_apply:
+            return 0
+
+        qty_by_delivery, _remaining = self._shahtaj_fifo_allocate_product_qtys(
+            deliveries, van_apply,
+        )
+        touched = 0
+        for delivery_id, qty_map in qty_by_delivery.items():
+            if not qty_map:
+                continue
+            # Skip re-entry if sync/attribute nests (attribute calls sync).
+            self.browse(delivery_id).with_context(
+                shahtaj_skip_van_attribute=True,
+            )._attribute_van_stock_with_qtys(qty_map, reload_form=False)
+            touched += 1
+        return touched
 
     @api.model
     def _shahtaj_assert_van_surplus(self, dm, qty_by_product, purpose):
@@ -2084,6 +2122,11 @@ class ShahtajDmDelivery(models.Model):
         """Recompute Stock/Stop/visit task from invoice + line qtys (safe anytime)."""
         self.ensure_one()
         self.sudo()._sync_with_sale_order(ensure_visit_task=True)
+        if self.delivery_man_id:
+            day = self.scheduled_date or fields.Date.context_today(self)
+            self._shahtaj_attribute_free_van_to_open_jobs(self.delivery_man_id, day)
+            # Recompute this job after van attribution (may have become picked).
+            self.sudo()._sync_with_sale_order(ensure_visit_task=True)
         # Also clear completed DM visits if stock is no longer delivered.
         if not any((l.qty_delivered or 0.0) > 0 for l in self.line_ids):
             self._shahtaj_reopen_dm_visit_after_undo()

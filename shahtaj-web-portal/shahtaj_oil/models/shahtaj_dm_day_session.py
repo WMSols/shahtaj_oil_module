@@ -130,8 +130,13 @@ class ShahtajDmDaySession(models.Model):
             'state': 'on_the_way',
             'departed_at': fields.Datetime.now(),
         })
-        # Open loaded stops → Heading to Shop (job-level Stop, not Day Status).
         Delivery = self.env['shahtaj.dm.delivery'].sudo()
+        # Free van may already cover today's need — stamp jobs Loaded first so
+        # Left Office can mark those stops Heading to Shop (same as app).
+        Delivery._shahtaj_attribute_free_van_to_open_jobs(
+            self.delivery_man_id, self.session_date,
+        )
+        # Open loaded stops → Heading to Shop (job-level Stop, not Day Status).
         jobs = Delivery.search([
             ('delivery_man_id', '=', self.delivery_man_id.id),
             ('state', 'in', ('picked', 'partial')),
