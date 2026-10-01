@@ -114,37 +114,58 @@ class ShahtajDmDaySession(models.Model):
             'company_id': self.env.company.id,
         })
 
+    def action_sync_on_route_stops(self, include_retry_stops=False):
+        """While Left Office: stamp free van + Heading on today's loaded stops.
+
+        Idempotent. Used after Dist mid-day assign/reschedule and when DM
+        refreshes plan/load so existing APIs return live Stock/Stop without
+        changing response shape. No-op unless session is on_the_way.
+
+        By default only Stop=Not Started → Heading (safe for mid-day / refresh).
+        First Leave Office passes include_retry_stops=True so Shop Closed /
+        Could Not Deliver from an earlier attempt can be reopened as Heading
+        (same rule as before).
+        """
+        Delivery = self.env['shahtaj.dm.delivery'].sudo()
+        stop_states = (
+            ('pending', 'not_attended', 'failed')
+            if include_retry_stops else ('pending',)
+        )
+        for session in self:
+            if session.state != 'on_the_way':
+                continue
+            Delivery._shahtaj_attribute_free_van_to_open_jobs(
+                session.delivery_man_id, session.session_date,
+            )
+            jobs = Delivery.search([
+                ('delivery_man_id', '=', session.delivery_man_id.id),
+                ('state', 'in', ('picked', 'partial')),
+                ('field_state', 'in', stop_states),
+                ('scheduled_date', '=', session.session_date),
+            ])
+            if jobs:
+                jobs.write({'field_state': 'in_transit'})
+        return True
+
     def action_depart(self):
         """Mark day as Left Office / Out on Route after loading.
 
         Also marks open loaded stops as Heading to Shop so the distributor
         job list reflects that the DM has left the office (same as app).
+        If already Left Office, re-sync mid-day Dist assigns (pending only).
         """
         self.ensure_one()
         self._assert_dm_access(self.delivery_man_id)
         if self.state == 'ended':
             raise UserError(_('This day session already ended.'))
-        if self.state == 'on_the_way':
-            return self
-        self.write({
-            'state': 'on_the_way',
-            'departed_at': fields.Datetime.now(),
-        })
-        Delivery = self.env['shahtaj.dm.delivery'].sudo()
-        # Free van may already cover today's need — stamp jobs Loaded first so
-        # Left Office can mark those stops Heading to Shop (same as app).
-        Delivery._shahtaj_attribute_free_van_to_open_jobs(
-            self.delivery_man_id, self.session_date,
-        )
-        # Open loaded stops → Heading to Shop (job-level Stop, not Day Status).
-        jobs = Delivery.search([
-            ('delivery_man_id', '=', self.delivery_man_id.id),
-            ('state', 'in', ('picked', 'partial')),
-            ('field_state', 'in', ('pending', 'not_attended', 'failed')),
-            ('scheduled_date', '=', self.session_date),
-        ])
-        if jobs:
-            jobs.write({'field_state': 'in_transit'})
+        first_depart = self.state != 'on_the_way'
+        if first_depart:
+            self.write({
+                'state': 'on_the_way',
+                'departed_at': fields.Datetime.now(),
+            })
+        # First leave may reopen closed/failed; later sync only new pending stops.
+        self.action_sync_on_route_stops(include_retry_stops=first_depart)
         return self
 
     def action_end_day(self):

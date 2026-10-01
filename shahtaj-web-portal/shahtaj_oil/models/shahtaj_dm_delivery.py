@@ -744,9 +744,20 @@ class ShahtajDmDelivery(models.Model):
             )
         res = super().write(vals)
         if planning_vals.intersection({'delivery_man_id', 'scheduled_date'}):
-            self.filtered(
+            open_jobs = self.filtered(
                 lambda r: r.state not in ('delivered', 'returned')
-            )._ensure_visit_task()
+            )
+            open_jobs._ensure_visit_task()
+            # Only Dist/office planning edits — not system pick/sync writes.
+            if is_office_planner:
+                seen = set()
+                for job in open_jobs:
+                    dm = job.delivery_man_id
+                    day = job.scheduled_date
+                    if not dm or not day or (dm.id, day) in seen:
+                        continue
+                    seen.add((dm.id, day))
+                    self._shahtaj_sync_route_after_dist_change(dm, day)
         return res
 
     def _sync_lines_from_sale_order(self):
@@ -1176,7 +1187,29 @@ class ShahtajDmDelivery(models.Model):
                 line_qty_map[sol.id] = remaining
         job._apply_line_assignments(line_qty_map)
         job._sync_with_sale_order()
+        # Dist mid-day assign while DM Left Office → Stock/Stop for plan API.
+        self._shahtaj_sync_route_after_dist_change(delivery_man, day)
         return job
+
+    @api.model
+    def _shahtaj_sync_route_after_dist_change(self, dm, day=None):
+        """If DM already Left Office for day, align Stock/Stop for live Dist changes.
+
+        No new API fields — only updates job Stock/Stop so plan/today returns
+        the same keys with correct values after Dist assign/reschedule.
+        Safe no-op when session is office/ended/missing.
+        """
+        if not dm:
+            return
+        day = day or fields.Date.context_today(self)
+        session = self.env['shahtaj.dm.day.session'].sudo().search([
+            ('delivery_man_id', '=', dm.id),
+            ('session_date', '=', day),
+            ('company_id', '=', self.env.company.id),
+            ('state', '=', 'on_the_way'),
+        ], limit=1)
+        if session:
+            session.action_sync_on_route_stops(include_retry_stops=False)
 
     @api.model
     def action_apply_split_plan(self, sale_order, assignments, assigned_by=None):
@@ -1284,6 +1317,10 @@ class ShahtajDmDelivery(models.Model):
                     existing._apply_line_assignments(lines)
                     existing._sync_with_sale_order()
                     touched |= existing
+                    self._shahtaj_sync_route_after_dist_change(
+                        dm_user,
+                        existing.scheduled_date or block.get('scheduled_date'),
+                    )
                 else:
                     existing.unlink()
                 continue
@@ -1312,6 +1349,10 @@ class ShahtajDmDelivery(models.Model):
             job._sync_with_sale_order()
         # Stamp free van onto today's open jobs so Dist Stock matches Load Van.
         self._shahtaj_attribute_free_van_to_open_jobs(
+            delivery_man, fields.Date.context_today(self),
+        )
+        # Mid-day Dist jobs while Left Office → Heading on refresh/list.
+        self._shahtaj_sync_route_after_dist_change(
             delivery_man, fields.Date.context_today(self),
         )
         return jobs

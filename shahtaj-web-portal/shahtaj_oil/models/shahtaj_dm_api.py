@@ -111,6 +111,8 @@ class ShahtajDmApiService(models.AbstractModel):
             job.sudo()._sync_with_sale_order(ensure_visit_task=False)
         # Sync: free van cover → qty_picked / Loaded (Dist + app agree).
         Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        # Mid-day Dist assigns while Left Office → Heading on load refresh.
+        Delivery._shahtaj_sync_route_after_dist_change(dm, day)
         jobs = Delivery.search(
             Delivery._shahtaj_today_open_jobs_domain(dm, day),
             order='id',
@@ -441,6 +443,8 @@ class ShahtajDmApiService(models.AbstractModel):
         for job in open_jobs:
             job.sudo()._sync_with_sale_order(ensure_visit_task=False)
         Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        # Dist mid-day assigns while Left Office → correct Stop on pull refresh.
+        Delivery._shahtaj_sync_route_after_dist_change(dm, day)
         jobs = Delivery.search(self._jobs_domain(dm, day, open_only=False), order='id')
         open_jobs = jobs.filtered(lambda j: j.state in ('not_ready', 'ready', 'picked', 'partial'))
         done_jobs = jobs - open_jobs
