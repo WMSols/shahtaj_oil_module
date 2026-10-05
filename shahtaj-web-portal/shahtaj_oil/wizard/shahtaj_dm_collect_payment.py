@@ -136,7 +136,7 @@ class ShahtajDmCollectPayment(models.TransientModel):
             res['delivery_man_id'] = delivery.delivery_man_id.id
         else:
             if user.shahtaj_is_delivery_man and not user.has_group(
-                'shahtaj_oil.group_shahtaj_distributor'
+                'shahtaj_oil.group_shahtaj_office_ops'
             ):
                 res['delivery_man_id'] = user.id
             if ctx.get('default_partner_id'):

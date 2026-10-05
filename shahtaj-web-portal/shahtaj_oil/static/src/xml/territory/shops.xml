@@ -382,19 +382,32 @@
                     <option value="verified">On-site Verified</option>
                     <option value="unverified">Not Verified</option>
                 </select>
+                <div class="d-flex align-items-center gap-1">
+                    <small class="fw-bold text-muted text-nowrap">Registered On</small>
+                    <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;"
+                           t-model="this.state.shopFilterRegisteredOn"
+                           t-on-change="() => this.onFilterChange('shops')"
+                           title="Shops registered on this date"/>
+                </div>
+                <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.shopFilterRegistrar" t-on-change="() => this.onFilterChange('shops')" title="Who registered the shop">
+                    <option value="all">All registrars</option>
+                    <option value="order_booker">Order bookers</option>
+                </select>
                 <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.shopFilterBooker" t-on-change="() => this.onFilterChange('shops')">
                     <option value="all">All Order Bookers</option>
                     <t t-foreach="this.state.bookers" t-as="booker" t-key="booker.id">
                         <option t-att-value="booker.id"><t t-esc="booker.name"/></option>
                     </t>
                 </select>
-                <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.shopFilterRoute" t-on-change="() => this.onFilterChange('shops')">
-                    <option value="all">All Routes</option>
-                    <option value="unassigned">Unassigned Only</option>
-                    <t t-foreach="this.state.routes" t-as="route" t-key="route.id">
-                        <option t-att-value="route.id"><t t-esc="route.name"/></option>
-                    </t>
-                </select>
+                <RouteFilter routeId="this.state.shopFilterRoute"
+                             routeName="this.state.shopFilterRouteName"
+                             onSelect="(routeId, routeName) => this.onShopRouteFilterSelect(routeId, routeName)"/>
+                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printShops" t-att-disabled="this.state.isPrintingShops or this.state.isLoadingList" title="Print the shops that match the current filters">
+                    <i class="fa fa-print me-1"/> Print
+                </button>
+                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('shops')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                    <i class="fa fa-times me-1"/> Clear filters
+                </button>
                 <button class="btn btn-sm btn-dark d-flex align-items-center text-white ms-2 shadow-sm" t-on-click="() => this.state.showShopForm = true" title="Manually register a new shop to the database">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
                         <path d="M5 12h14"/>
@@ -569,7 +582,7 @@
             <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
                 <h6 class="fw-bold text-primary mb-0">1. Basic Information</h6>
                 <small class="text-muted d-block mt-1">
-                    Only <b>Shop Name</b> is required. Owner details and photos are optional.
+                    <b>Shop Name</b> is required. A credit shop also needs a credit limit greater than 0. Owner details and photos are optional.
                     Assign zones/routes later from the route checklist.
                 </small>
             </div>
@@ -616,8 +629,8 @@
                         </select>
                     </div>
                     <div class="col-md-4 mb-3" t-if="this.hasFinancialAccess and this.state.shopForm.shopCategory === 'credit'">
-                        <label class="small fw-bold">Approved Credit Limit (Rs.)</label>
-                        <input type="number" class="form-control" t-model="this.state.shopForm.creditLimit" placeholder="e.g. 150000"/>
+                        <label class="small fw-bold">Approved Credit Limit (Rs.) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" min="0.01" step="any" t-model="this.state.shopForm.creditLimit" placeholder="e.g. 150000"/>
                     </div>
                     <div class="col-md-4 mb-3" t-if="this.hasFinancialAccess">
                         <label class="small fw-bold">Legacy Balance Brought Forward</label>

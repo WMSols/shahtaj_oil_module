@@ -12,9 +12,9 @@
                             </button>
                             <div class="d-flex gap-2" t-if="this.showDmJobActions()">
                                 <button t-if="this.state.selectedDmJob.orderId" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openAssignModal(this.state.selectedDmJob.orderId, true)">View DM Assignment</button>
-                                <button t-if="this.canPickJob(this.state.selectedDmJob)" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openPickModal(this.state.selectedDmJob.id)">Pick Stock</button>
-                                <button t-if="this.canResetField(this.state.selectedDmJob)" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.resetDmJobField(this.state.selectedDmJob.id)">Reset Pending</button>
-                                <button t-if="this.canReturnWarehouse(this.state.selectedDmJob)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(this.state.selectedDmJob.id)">Return to WH</button>
+                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canPickJob(this.state.selectedDmJob)" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openPickModal(this.state.selectedDmJob.id)">Pick Stock</button>
+                                <button t-if="this.canMutate and this.canResetField(this.state.selectedDmJob)" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.resetDmJobField(this.state.selectedDmJob.id)">Reset Pending</button>
+                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(this.state.selectedDmJob)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(this.state.selectedDmJob.id)">Return to WH</button>
                             </div>
                         </div>
                         <h4 class="fw-bold"><t t-esc="this.state.selectedDmJob.name"/></h4>
@@ -24,7 +24,7 @@
                         </div>
 
                         <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
-                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('delivery')">
+                            <button type="button" class="btn shahtaj-accordion-toggle w-100 text-start d-flex align-items-center justify-content-between p-3" t-on-click="() => this.toggleDmJobSection('delivery')">
                                 <h6 class="mb-0 fw-bold text-dark text-uppercase small">Delivery Details</h6>
                                 <i t-attf-class="fa #{this.state.dmJobSections.delivery ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
                             </button>
@@ -46,7 +46,7 @@
                         </div>
 
                         <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
-                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('order')">
+                            <button type="button" class="btn shahtaj-accordion-toggle w-100 text-start d-flex align-items-center justify-content-between p-3" t-on-click="() => this.toggleDmJobSection('order')">
                                 <h6 class="mb-0 fw-bold text-dark text-uppercase small">Order Details</h6>
                                 <i t-attf-class="fa #{this.state.dmJobSections.order ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
                             </button>
@@ -60,8 +60,8 @@
                             </t>
                         </div>
 
-                        <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
-                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('shop')">
+                        <div t-if="this.hasFinancialAccess and !this.state.selectedDmJob.isWalkIn" class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
+                            <button type="button" class="btn shahtaj-accordion-toggle w-100 text-start d-flex align-items-center justify-content-between p-3" t-on-click="() => this.toggleDmJobSection('shop')">
                                 <h6 class="mb-0 fw-bold text-dark text-uppercase small">Shop Balance</h6>
                                 <i t-attf-class="fa #{this.state.dmJobSections.shop ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
                             </button>
@@ -77,7 +77,7 @@
                         </div>
 
                         <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden" t-if="this.state.selectedDmJob.gpsVerified">
-                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('gps')">
+                            <button type="button" class="btn shahtaj-accordion-toggle w-100 text-start d-flex align-items-center justify-content-between p-3" t-on-click="() => this.toggleDmJobSection('gps')">
                                 <h6 class="mb-0 fw-bold text-dark text-uppercase small">Last GPS</h6>
                                 <i t-attf-class="fa #{this.state.dmJobSections.gps ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
                             </button>
@@ -104,7 +104,7 @@
                         </div>
 
                         <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
-                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('products')">
+                            <button type="button" class="btn shahtaj-accordion-toggle w-100 text-start d-flex align-items-center justify-content-between p-3" t-on-click="() => this.toggleDmJobSection('products')">
                                 <h6 class="mb-0 fw-bold text-dark text-uppercase small">Products</h6>
                                 <i t-attf-class="fa #{this.state.dmJobSections.products ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
                             </button>
@@ -141,20 +141,20 @@
                 <t t-if="!this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery">
                     <div class="px-3 pt-3 border-bottom bg-white">
                         <ul class="nav nav-pills gap-2 mb-3 flex-wrap">
-                            <li class="nav-item">
-                                <button t-on-click="() => this.setDeliveriesSubTab('dispatch')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'dispatch' ? 'active bg-dark text-white' : 'text-muted bg-light'}">To Dispatch</button>
+                            <li class="nav-item" t-if="this.canSeeDelivery('dispatch')">
+                                <button t-on-click="() => this.setDeliveriesSubTab('dispatch')" t-attf-class="nav-link shahtaj-pill-tab rounded-pill fw-bold px-3 py-2 #{this.state.deliveriesSubTab === 'dispatch' ? 'active bg-dark text-white' : 'text-muted bg-light'}">To Dispatch</button>
                             </li>
-                            <li class="nav-item">
-                                <button t-on-click="() => this.setDeliveriesSubTab('jobs')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'jobs' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Delivery Jobs</button>
+                            <li class="nav-item" t-if="this.canSeeDelivery('jobs')">
+                                <button t-on-click="() => this.setDeliveriesSubTab('jobs')" t-attf-class="nav-link shahtaj-pill-tab rounded-pill fw-bold px-3 py-2 #{this.state.deliveriesSubTab === 'jobs' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Delivery Jobs</button>
                             </li>
-                            <li class="nav-item">
-                                <button t-on-click="() => this.setDeliveriesSubTab('sessions')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'sessions' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Day Sessions</button>
+                            <li class="nav-item" t-if="this.canSeeDelivery('sessions')">
+                                <button t-on-click="() => this.setDeliveriesSubTab('sessions')" t-attf-class="nav-link shahtaj-pill-tab rounded-pill fw-bold px-3 py-2 #{this.state.deliveriesSubTab === 'sessions' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Day Sessions</button>
                             </li>
-                            <li class="nav-item" t-if="this.hasFinancialAccess">
-                                <button t-on-click="() => this.setDeliveriesSubTab('recovery')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'recovery' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Recovery</button>
+                            <li class="nav-item" t-if="this.canSeeDelivery('recovery')">
+                                <button t-on-click="() => this.setDeliveriesSubTab('recovery')" t-attf-class="nav-link shahtaj-pill-tab rounded-pill fw-bold px-3 py-2 #{this.state.deliveriesSubTab === 'recovery' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Recovery</button>
                             </li>
-                            <li class="nav-item" t-if="this.hasFinancialAccess">
-                                <button t-on-click="() => this.setDeliveriesSubTab('settlements')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'settlements' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Wallet Settlements</button>
+                            <li class="nav-item" t-if="this.canSeeDelivery('settlements')">
+                                <button t-on-click="() => this.setDeliveriesSubTab('settlements')" t-attf-class="nav-link shahtaj-pill-tab rounded-pill fw-bold px-3 py-2 #{this.state.deliveriesSubTab === 'settlements' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Wallet Settlements</button>
                             </li>
                         </ul>
                     </div>
@@ -162,11 +162,30 @@
 
                 <t t-if="!this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'dispatch'">
                     <div class="p-3 bg-light border-bottom">
-                        <div class="input-group input-group-sm w-50 shadow-sm">
-                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
-                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search shop, booker, or order..."
-                                   t-att-value="this.state.filters.dispatch.search"
-                                   t-on-input="(ev) => this.onSearchInput(ev, 'dispatch')"/>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div class="input-group input-group-sm shadow-sm" style="max-width: 360px;">
+                                <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search shop, booker, or order..."
+                                       t-att-value="this.state.filters.dispatch.search"
+                                       t-on-input="(ev) => this.onSearchInput(ev, 'dispatch')"/>
+                            </div>
+                            <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.dispatch.dateFrom" t-on-change="() => this.onFilterChange('dispatch')" title="From date"/>
+                            <span class="text-muted small">to</span>
+                            <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.dispatch.dateTo" t-on-change="() => this.onFilterChange('dispatch')" title="To date"/>
+                            <select class="form-select form-select-sm" style="max-width: 200px;" t-model="this.state.filters.dispatch.deliveryStatus" t-on-change="() => this.onFilterChange('dispatch')">
+                                <option value="all">All delivery statuses</option>
+                                <option value="pending">To Deliver</option>
+                                <option value="partial">Partially Delivered</option>
+                            </select>
+                            <select class="form-select form-select-sm" style="max-width: 180px;" t-model="this.state.filters.dispatch.invoiceStatus" t-on-change="() => this.onFilterChange('dispatch')">
+                                <option value="all">All invoice statuses</option>
+                                <option value="invoiced">Invoiced</option>
+                                <option value="draft">Draft</option>
+                                <option value="not_invoiced">Not invoiced</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('dispatch')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
                         </div>
                     </div>
                     <div class="position-relative">
@@ -181,15 +200,18 @@
                                     <tr>
                                         <th class="ps-4 border-top-0">Order</th>
                                         <th class="border-top-0">Shop &amp; Booker</th>
-                                        <th class="border-top-0">Left</th>
+                                        <th class="border-top-0">Delivery Status</th>
+                                        <th class="text-end border-top-0">Order Total Qty</th>
+                                        <th class="text-end border-top-0">Unassigned Qty</th>
                                         <th class="border-top-0">Invoice</th>
+                                        <th class="border-top-0">Stock</th>
                                         <th class="border-top-0">DM Jobs</th>
                                         <th class="text-end pe-4 border-top-0">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <t t-if="this.state.tableDispatch.length === 0 and !this.state.isLoadingList">
-                                        <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No orders waiting to dispatch.</td></tr>
+                                        <tr><td colspan="9" class="text-center py-5 text-muted fw-bold">No orders waiting to dispatch.</td></tr>
                                     </t>
                                     <t t-foreach="this.state.tableDispatch" t-as="row" t-key="row.odoo_id">
                                         <tr>
@@ -198,16 +220,35 @@
                                                 <div class="fw-bold"><t t-esc="row.shop"/></div>
                                                 <small class="text-muted"><t t-esc="row.booker"/></small>
                                             </td>
-                                            <td><t t-esc="row.qtyToDeliver"/></td>
+                                            <td>
+                                                <span t-attf-class="badge #{this.deliveryStatusBadgeClass(row.deliveryStatus)}">
+                                                    <t t-esc="this.deliveryStatusLabel(row.deliveryStatus)"/>
+                                                </span>
+                                            </td>
+                                            <td class="text-end"><t t-esc="this._formatQty(row.qtyOrdered)"/></td>
+                                            <td t-attf-class="text-end #{row.qtyUnassigned > 0 ? 'fw-bold' : ''}"><t t-esc="this._formatQty(row.qtyUnassigned)"/></td>
                                             <td>
                                                 <span t-if="row.hasPostedInvoice" class="badge bg-success text-white">Posted</span>
+                                                <span t-elif="row.draftInvoiceId" class="badge bg-warning text-dark">Confirm first</span>
                                                 <span t-else="" class="badge bg-warning text-dark">Invoice first</span>
+                                            </td>
+                                            <td>
+                                                <t t-if="row.stockStates and row.stockStates.length">
+                                                    <t t-foreach="row.stockStates" t-as="stockState" t-key="stockState">
+                                                        <span t-attf-class="badge me-1 #{this.stockStateBadgeClass(stockState)}"><t t-esc="this.stockStateLabel(stockState)"/></span>
+                                                    </t>
+                                                </t>
+                                                <span t-else="" class="text-muted">—</span>
                                             </td>
                                             <td><t t-esc="row.dmJobCount"/></td>
                                             <td class="text-end pe-4">
-                                                <button t-if="this.canCreateInvoice(row)" class="btn btn-sm btn-success text-white fw-bold me-1" t-on-click="() => this.createInvoiceFromDispatch(row)" t-att-disabled="this.state.isCreatingInvoice">Invoice</button>
-                                                <button t-if="this.canAssignDeliveryMan(row)" class="btn btn-sm btn-dark text-white fw-bold me-1" t-on-click="() => this.openAssignModal(row.odoo_id)">Assign / Split</button>
-                                                <button t-if="!row.dmJobCount and row.hasPostedInvoice and row.status !== 'Cancelled'" class="btn btn-sm btn-outline-primary fw-bold me-1" t-on-click="() => this.openDeliveryCustom(row.odoo_id)">Mark Delivery</button>
+                                                <button t-if="this.canDispatchOrders and this.canCreateInvoice(row)" class="btn btn-sm btn-success text-white fw-bold me-1" t-on-click="() => this.createInvoiceFromDispatch(row)" t-att-disabled="this.state.isCreatingInvoice">Invoice</button>
+                                                <button t-if="this.canConfirmDraftInvoice(row)" class="btn btn-sm btn-success text-white fw-bold me-1" t-on-click="() => this.confirmDraftInvoiceFromDispatch(row)" t-att-disabled="this.state.isConfirmingInvoice" title="Post this draft invoice so the order can be dispatched.">
+                                                    <t t-if="this.state.confirmingInvoiceOrderId === row.odoo_id">Confirming...</t>
+                                                    <t t-else="">Confirm</t>
+                                                </button>
+                                                <button t-if="this.canDispatchOrders and this.canAssignDeliveryMan(row)" class="btn btn-sm btn-dark text-white fw-bold me-1" t-on-click="() => this.openAssignModal(row.odoo_id)">Assign / Split</button>
+                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and !row.dmJobCount and row.hasPostedInvoice and row.status !== 'Cancelled'" class="btn btn-sm btn-outline-primary fw-bold me-1" t-on-click="() => this.openDeliveryCustom(row.odoo_id)">Mark Delivery</button>
                                                 <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewDelivery(row)">View</button>
                                             </td>
                                         </tr>
@@ -249,6 +290,7 @@
                         <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.dm_jobs.dateTo" t-on-change="() => this.onFilterChange('dm_jobs')" title="To date"/>
                         <select class="form-select form-select-sm" style="max-width: 140px;" t-model="this.state.filters.dm_jobs.state" t-on-change="() => this.onFilterChange('dm_jobs')">
                             <option value="all">All stock</option>
+                            <option value="except_not_ready">Except not ready</option>
                             <option value="ready">Ready</option>
                             <option value="picked">Picked</option>
                             <option value="partial">Partial</option>
@@ -264,11 +306,23 @@
                             <option value="not_attended">Shop closed</option>
                             <option value="failed">Failed</option>
                         </select>
-                        <select class="form-select form-select-sm" style="max-width: 140px;" t-model="this.state.filters.dm_jobs.assignment_mode" t-on-change="() => this.onFilterChange('dm_jobs')">
-                            <option value="all">All assign</option>
-                            <option value="manual">Manual</option>
-                            <option value="auto">Auto</option>
+                        <select class="form-select form-select-sm" style="max-width: 190px;" t-model="this.state.filters.dm_jobs.schedule" t-on-change="() => this.onFilterChange('dm_jobs')">
+                            <option value="all">All schedule</option>
+                            <option value="overdue">Overdue / Not Done</option>
+                            <option value="unscheduled">Unscheduled</option>
                         </select>
+                        <div class="form-check form-switch mb-0 d-flex align-items-center">
+                            <input class="form-check-input mt-0" type="checkbox" role="switch" id="dmJobsWalkIn"
+                                   t-att-checked="this.state.filters.dm_jobs.walkIn"
+                                   t-on-change="onDmJobsWalkInToggle"/>
+                            <label class="form-check-label small fw-bold text-nowrap ms-2" for="dmJobsWalkIn">Walk In</label>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printDmJobs" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                            <i class="fa fa-print me-1"/> Print
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('dm_jobs')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
                     </div>
                     <div class="position-relative">
                         <t t-if="this.state.isLoadingList">
@@ -285,7 +339,7 @@
                                         <th class="border-top-0">Order / Shop</th>
                                         <th class="border-top-0">DM / Booker</th>
                                         <th class="text-end border-top-0" t-if="this.hasFinancialAccess">Amount</th>
-                                        <th class="text-end border-top-0">Shop Due</th>
+                                        <th class="text-end border-top-0" t-if="this.hasFinancialAccess">Shop Due</th>
                                         <th class="border-top-0">Stock</th>
                                         <th class="border-top-0">Field</th>
                                         <th class="text-end pe-4 border-top-0">Action</th>
@@ -293,7 +347,7 @@
                                 </thead>
                                 <tbody>
                                     <t t-if="this.state.tableDmJobs.length === 0 and !this.state.isLoadingList">
-                                        <tr><td t-att-colspan="this.hasFinancialAccess ? 9 : 8" class="text-center py-5 text-muted fw-bold">No delivery jobs for these filters.</td></tr>
+                                        <tr><td t-att-colspan="this.hasFinancialAccess ? 9 : 7" class="text-center py-5 text-muted fw-bold">No delivery jobs for these filters.</td></tr>
                                     </t>
                                     <t t-foreach="this.state.tableDmJobs" t-as="job" t-key="job.id">
                                         <tr>
@@ -308,13 +362,13 @@
                                                 <small class="text-muted"><t t-esc="job.booker"/></small>
                                             </td>
                                             <td class="text-end" t-if="this.hasFinancialAccess">Rs. <t t-esc="this.formatMoney(job.amount)"/></td>
-                                            <td class="text-end" t-attf-class="#{job.shopDue &gt; 0 ? 'text-danger fw-bold' : ''}">Rs. <t t-esc="this.formatMoney(job.shopDue)"/></td>
+                                            <td class="text-end" t-if="this.hasFinancialAccess" t-attf-class="#{job.shopDue &gt; 0 ? 'text-danger fw-bold' : ''}">Rs. <t t-esc="this.formatMoney(job.shopDue)"/></td>
                                             <td><span t-attf-class="badge #{this.stockStateBadgeClass(job.state)}"><t t-esc="this.stockStateLabel(job.state)"/></span></td>
                                             <td><span t-attf-class="badge #{this.fieldStateBadgeClass(job.fieldState)}"><t t-esc="this.fieldStateLabel(job.fieldState)"/></span></td>
                                             <td class="text-end pe-4">
                                                 <button class="btn btn-sm btn-outline-dark fw-bold me-1" t-on-click="() => this.viewDmJob(job)">View</button>
-                                                <button t-if="this.canResetField(job)" class="btn btn-sm btn-outline-secondary fw-bold me-1" t-on-click="() => this.resetDmJobField(job.id)">Reset</button>
-                                                <button t-if="this.canReturnWarehouse(job)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(job.id)">Return WH</button>
+                                                <button t-if="this.canMutate and this.canResetField(job)" class="btn btn-sm btn-outline-secondary fw-bold me-1" t-on-click="() => this.resetDmJobField(job.id)">Reset</button>
+                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(job)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(job.id)">Return WH</button>
                                             </td>
                                         </tr>
                                     </t>
@@ -346,6 +400,9 @@
                         <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.sessions.dateFrom" t-on-change="() => this.onFilterChange('sessions')"/>
                         <span class="text-muted small align-self-center">to</span>
                         <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.sessions.dateTo" t-on-change="() => this.onFilterChange('sessions')"/>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('sessions')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
                     </div>
                     <div class="position-relative">
                         <t t-if="this.state.isLoadingList">
@@ -377,7 +434,7 @@
                                             <td><t t-esc="sess.departed"/></td>
                                             <td><t t-esc="sess.ended"/></td>
                                             <td class="text-end pe-4">
-                                                <button t-if="sess.state !== 'office'" class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.resetSession(sess.id)">Reset to office</button>
+                                                <button t-if="this.canMutate and sess.state !== 'office'" class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.resetSession(sess.id)">Reset to office</button>
                                             </td>
                                         </tr>
                                     </t>
@@ -399,7 +456,7 @@
                     </div>
                 </t>
 
-                <t t-if="this.hasFinancialAccess and !this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'recovery'">
+                <t t-if="this.canSeeDelivery('recovery') and !this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'recovery'">
                     <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2">
                         <div class="input-group input-group-sm shadow-sm" style="max-width: 240px;">
                             <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
@@ -416,6 +473,22 @@
                         <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.collections.dateFrom" t-on-change="() => this.onFilterChange('collections')"/>
                         <span class="text-muted small align-self-center">to</span>
                         <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.collections.dateTo" t-on-change="() => this.onFilterChange('collections')"/>
+                        <select class="form-select form-select-sm" style="max-width: 160px;" t-model="this.state.filters.collections.state" t-on-change="() => this.onFilterChange('collections')">
+                            <option value="all">All states</option>
+                            <option value="draft">Draft</option>
+                            <option value="in_process">Partial</option>
+                            <option value="paid">Paid</option>
+                            <option value="canceled">Canceled</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="posted">Posted</option>
+                            <option value="reconciled">Reconciled</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printRecovery" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                            <i class="fa fa-print me-1"/> Print
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('collections')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
                     </div>
                     <div class="position-relative">
                         <t t-if="this.state.isLoadingList">
@@ -432,12 +505,13 @@
                                         <th class="border-top-0">Shop</th>
                                         <th class="border-top-0">Delivery man</th>
                                         <th class="text-end border-top-0">Amount</th>
+                                        <th class="border-top-0">State</th>
                                         <th class="text-end pe-4 border-top-0">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <t t-if="!this.state.tableCollections.length and !this.state.isLoadingList">
-                                        <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No wallet collections for these filters.</td></tr>
+                                        <tr><td colspan="7" class="text-center py-5 text-muted fw-bold">No wallet collections for these filters.</td></tr>
                                     </t>
                                     <t t-foreach="this.state.tableCollections" t-as="pay" t-key="pay.id">
                                         <tr>
@@ -446,6 +520,7 @@
                                             <td><t t-esc="pay.shop"/></td>
                                             <td><t t-esc="pay.dm"/></td>
                                             <td class="text-end">Rs. <t t-esc="this.formatMoney(pay.amount)"/></td>
+                                            <td><span t-attf-class="badge #{this.recoveryStateBadgeClass(pay.state)}"><t t-esc="this.recoveryStateLabel(pay.state)"/></span></td>
                                             <td class="text-end pe-4">
                                                 <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewRecovery(pay)">View</button>
                                             </td>
@@ -469,7 +544,7 @@
                     </div>
                 </t>
 
-                <t t-if="this.hasFinancialAccess and !this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'settlements'">
+                <t t-if="this.canSeeDelivery('settlements') and !this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'settlements'">
                     <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
                         <div class="input-group input-group-sm shadow-sm" style="max-width: 240px;">
                             <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
@@ -483,10 +558,22 @@
                                 <option t-att-value="dm.id"><t t-esc="dm.name"/></option>
                             </t>
                         </select>
+                        <select class="form-select form-select-sm" style="max-width: 220px;" t-model="this.state.filters.settlements.journal" t-on-change="() => this.onFilterChange('settlements')">
+                            <option value="all">All journals</option>
+                            <t t-foreach="this.state.lookupJournals" t-as="journal" t-key="'set-j-' + journal.id">
+                                <option t-att-value="journal.id"><t t-esc="journal.name"/></option>
+                            </t>
+                        </select>
                         <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.settlements.dateFrom" t-on-change="() => this.onFilterChange('settlements')"/>
                         <span class="text-muted small align-self-center">to</span>
                         <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.settlements.dateTo" t-on-change="() => this.onFilterChange('settlements')"/>
-                        <button class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openSettleModal()">Settle Wallet</button>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printSettlements" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                            <i class="fa fa-print me-1"/> Print
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('settlements')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
+                        <button t-if="this.canSettleWallet" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openSettleModal()">Settle Wallet</button>
                     </div>
                     <div class="position-relative">
                         <t t-if="this.state.isLoadingList">
@@ -518,7 +605,7 @@
                                             <td class="text-end">Rs. <t t-esc="this.formatMoney(setl.amount)"/></td>
                                             <td><t t-esc="setl.journal"/></td>
                                             <td><t t-esc="setl.settledBy"/></td>
-                                            <td><span class="badge bg-light text-dark text-capitalize"><t t-esc="setl.state"/></span></td>
+                                            <td><span t-attf-class="badge #{this.settlementStateBadgeClass(setl.state)}"><t t-esc="this.settlementStateLabel(setl.state)"/></span></td>
                                             <td class="text-end pe-4">
                                                 <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewSettlement(setl)">View</button>
                                             </td>
@@ -546,7 +633,7 @@
                     <div class="p-4">
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                             <button class="btn btn-sm btn-light border fw-bold" t-on-click="closeRecovery">← Back to Recovery</button>
-                            <button class="btn btn-sm btn-dark text-white fw-bold"
+                            <button t-if="this.canSettleWallet" class="btn btn-sm btn-dark text-white fw-bold"
                                     t-on-click="openRecoverySettle"
                                     t-att-disabled="!this.state.selectedRecovery.dmId">
                                 Settle Wallet
@@ -560,7 +647,7 @@
                                 <div class="col-md-6"><span class="text-muted small d-block">Date</span><span class="fw-bold"><t t-esc="this.state.selectedRecovery.date"/></span></div>
                                 <div class="col-md-6"><span class="text-muted small d-block">Amount</span><span class="fw-bold text-success">Rs. <t t-esc="this.formatMoney(this.state.selectedRecovery.amount)"/></span></div>
                                 <div class="col-md-6"><span class="text-muted small d-block">Payment method</span><span><t t-esc="this.state.selectedRecovery.channelLabel"/></span></div>
-                                <div class="col-md-6"><span class="text-muted small d-block">State</span><span class="text-capitalize"><t t-esc="this.state.selectedRecovery.state"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">State</span><span t-attf-class="badge #{this.recoveryStateBadgeClass(this.state.selectedRecovery.state)}"><t t-esc="this.recoveryStateLabel(this.state.selectedRecovery.state)"/></span></div>
                                 <div class="col-md-6"><span class="text-muted small d-block">Journal</span><span><t t-esc="this.state.selectedRecovery.journal || '—'"/></span></div>
                                 <div class="col-md-6"><span class="text-muted small d-block">Journal entry</span><span><t t-esc="this.state.selectedRecovery.move || '—'"/></span></div>
                                 <div class="col-md-6" t-if="this.state.selectedRecovery.job">
@@ -579,9 +666,45 @@
                                     <span class="text-muted small d-block">Customer account</span>
                                     <span><t t-esc="this.state.selectedRecovery.accountNumber"/></span>
                                 </div>
-                                <div class="col-12" t-if="this.state.selectedRecovery.invoiceLabel">
-                                    <span class="text-muted small d-block">Invoices</span>
-                                    <span><t t-esc="this.state.selectedRecovery.invoiceLabel"/></span>
+                                <div class="col-md-6" t-if="this.state.selectedRecovery.invoiceReady">
+                                    <span class="text-muted small d-block">Invoice total</span>
+                                    <span class="fw-bold">Rs. <t t-esc="this.formatMoney(this.state.selectedRecovery.invoiceTotal)"/></span>
+                                </div>
+                                <div class="col-md-6" t-if="this.state.selectedRecovery.invoiceReady">
+                                    <span class="text-muted small d-block">Invoice remaining</span>
+                                    <span class="fw-bold">Rs. <t t-esc="this.formatMoney(this.state.selectedRecovery.invoiceRemaining)"/></span>
+                                </div>
+                                <div class="col-12" t-if="this.state.selectedRecovery.invoiceReady">
+                                    <span class="text-muted small d-block mb-2">Invoice details</span>
+                                    <t t-if="this.state.selectedRecovery.invoiceLines.length">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered mb-1 align-middle">
+                                                <thead class="bg-light small text-muted">
+                                                    <tr>
+                                                        <th>Invoice</th>
+                                                        <th class="text-end">Total</th>
+                                                        <th class="text-end">Remaining</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr t-foreach="this.state.selectedRecovery.invoiceLines" t-as="inv" t-key="inv.id">
+                                                        <td><t t-esc="inv.name"/></td>
+                                                        <td class="text-end">Rs. <t t-esc="this.formatMoney(inv.total)"/></td>
+                                                        <td class="text-end">Rs. <t t-esc="this.formatMoney(inv.remaining)"/></td>
+                                                        <td><t t-esc="inv.status"/></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <small class="text-muted">This collection: Rs. <t t-esc="this.formatMoney(this.state.selectedRecovery.amount)"/></small>
+                                    </t>
+                                    <span t-elif="this.state.selectedRecovery.invoiceLabel" class="fw-bold">
+                                        <t t-esc="this.state.selectedRecovery.invoiceLabel"/>
+                                    </span>
+                                    <span t-else="" class="text-muted">
+                                        <t t-esc="this.state.selectedRecovery.invoiceNote || 'No invoice linked to this collection.'"/>
+                                    </span>
                                 </div>
                                 <div class="col-12">
                                     <span class="text-muted small d-block">Notes</span>
@@ -608,7 +731,7 @@
                                 <div class="col-md-6"><span class="text-muted small d-block">Deposit journal</span><span><t t-esc="this.state.selectedSettlement.journal"/></span></div>
                                 <div class="col-md-6"><span class="text-muted small d-block">Journal entry</span><span><t t-esc="this.state.selectedSettlement.move"/></span></div>
                                 <div class="col-md-6"><span class="text-muted small d-block">Settled by</span><span><t t-esc="this.state.selectedSettlement.settledBy"/></span></div>
-                                <div class="col-md-6"><span class="text-muted small d-block">State</span><span class="text-capitalize"><t t-esc="this.state.selectedSettlement.state"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">State</span><span t-attf-class="badge #{this.settlementStateBadgeClass(this.state.selectedSettlement.state)}"><t t-esc="this.settlementStateLabel(this.state.selectedSettlement.state)"/></span></div>
                                 <div class="col-12"><span class="text-muted small d-block">Notes</span><span><t t-esc="this.state.selectedSettlement.notes || '—'"/></span></div>
                             </div>
                         </div>
@@ -630,10 +753,10 @@
 
                         <div class="d-flex align-items-center gap-2">
                             <t t-if="!this.state.isEditingDelivery">
-                                <button t-if="this.state.deliveriesSubTab === 'dispatch' and this.canAssignDeliveryMan(this.state.selectedDelivery)" class="btn btn-sm btn-dark text-white shadow-sm fw-bold px-3" t-on-click="() => this.openAssignModal(this.state.selectedDelivery.odoo_id)">Assign / Split</button>
+                                <button t-if="this.canDispatchOrders and this.state.deliveriesSubTab === 'dispatch' and this.canAssignDeliveryMan(this.state.selectedDelivery)" class="btn btn-sm btn-dark text-white shadow-sm fw-bold px-3" t-on-click="() => this.openAssignModal(this.state.selectedDelivery.odoo_id)">Assign / Split</button>
 
                                     <!-- Create Invoice Button -->
-                                <t t-if="this.canCreateInvoice(this.state.selectedDelivery)">
+                                <t t-if="this.canDispatchOrders and this.canCreateInvoice(this.state.selectedDelivery)">
                                     <button class="btn btn-sm btn-success text-white shadow-sm fw-bold px-3" t-on-click="createInvoiceFromDelivery" t-att-disabled="this.state.isCreatingInvoice" title="Invoice ordered quantities, then post. Required before assigning a delivery man.">
                                         <t t-if="this.state.isCreatingInvoice">
                                             <span class="spinner-border spinner-border-sm me-1"/>
@@ -642,10 +765,16 @@
                                         <t t-else="">Create Invoice</t>
                                     </button>
                                 </t>
+                                <t t-if="this.state.deliveriesSubTab === 'dispatch' and this.canConfirmDraftInvoice(this.state.selectedDelivery)">
+                                    <button class="btn btn-sm btn-success text-white shadow-sm fw-bold px-3" t-on-click="() => this.confirmDraftInvoiceFromDispatch(this.state.selectedDelivery)" t-att-disabled="this.state.isConfirmingInvoice" title="Post this draft invoice so the order can be dispatched.">
+                                        <t t-if="this.state.confirmingInvoiceOrderId === this.state.selectedDelivery.odoo_id">Confirming...</t>
+                                        <t t-else="">Confirm Invoice</t>
+                                    </button>
+                                </t>
 
                                     <!-- NEW: Auto-Hiding Mark Delivery Button -->
                                 <t t-set="hasPendingDelivery" t-value="this.state.selectedDelivery.full_lines and this.state.selectedDelivery.full_lines.some(l => l.qty > l.delivered)"/>
-                                <t t-if="hasPendingDelivery and this.state.selectedDelivery.status !== 'Cancelled' and this.state.selectedDelivery.orderState !== 'cancel'">
+                                <t t-if="this.canMutate and this.showDmOverwriteButtons and hasPendingDelivery and this.state.selectedDelivery.status !== 'Cancelled' and this.state.selectedDelivery.orderState !== 'cancel'">
                                     <button class="btn btn-sm btn-primary shadow-sm fw-bold px-3 text-white d-flex align-items-center" t-on-click="() => this.openDeliveryCustom(this.state.selectedDelivery.odoo_id)">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-package-check me-1">
                                             <path d="m16 16 2 2 4-4"/>
@@ -658,7 +787,7 @@
                                 </t>
 
                                     <!-- Edit Details Button -->
-                                <button t-if="this.hasFinancialAccess" class="btn btn-sm btn-dark shadow-sm fw-bold px-3 d-flex align-items-center" t-on-click="toggleEditDelivery">
+                                <button t-if="this.canEditDispatchDetails and this.hasFinancialAccess" class="btn btn-sm btn-dark shadow-sm fw-bold px-3 d-flex align-items-center" t-on-click="toggleEditDelivery">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil me-1">
                                         <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
                                         <path d="m15 5 4 4"/>
@@ -670,7 +799,7 @@
                                 <button class="btn btn-sm btn-outline-secondary shadow-sm fw-bold px-3" t-on-click="toggleEditDelivery">
                                         Discard
                                 </button>
-                                <button class="btn btn-sm btn-success shadow-sm fw-bold px-4 text-white d-flex align-items-center" t-on-click="saveDeliveryChanges">
+                                <button t-if="this.canEditDispatchDetails" class="btn btn-sm btn-success shadow-sm fw-bold px-4 text-white d-flex align-items-center" t-on-click="saveDeliveryChanges">
                                     <i class="fa fa-save me-2"></i> Save Changes
                                 </button>
                             </t>
@@ -720,7 +849,7 @@
                         </div>
 
                         <div class="border-top">
-                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0"
+                            <button type="button" class="btn shahtaj-accordion-toggle w-100 text-start d-flex align-items-center justify-content-between p-3"
                                     t-on-click="toggleShopSnapshot" title="Show or hide shop credit and sales history">
                                 <div class="d-flex align-items-center flex-wrap gap-2">
                                     <h6 class="mb-0 fw-bold text-dark text-uppercase small">Shop Snapshot</h6>
@@ -975,7 +1104,7 @@
                                 <h5 class="fw-bold mb-0"><t t-esc="this.state.assignModal.readOnly ? 'DM Assignment' : 'Assign / Split'"/></h5>
                                 <small class="text-muted"><t t-esc="this.state.assignModal.orderName"/> · <t t-esc="this.state.assignModal.shop"/></small>
                             </div>
-                            <button type="button" class="btn btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 40px; height: 40px; font-size: 22px;" t-on-click="closeAssignModal" title="Close" aria-label="Close">
+                            <button type="button" class="shahtaj-assign-close border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 40px; height: 40px; font-size: 22px;" t-on-click="closeAssignModal" title="Close" aria-label="Close">
                                 <i class="fa fa-times"></i>
                             </button>
                         </div>
@@ -1012,25 +1141,92 @@
                                         </t>
                                     </tbody>
                                 </table>
+                                <hr class="my-3"/>
+                                <p class="mb-2 small">
+                                    <b>Delivery progress</b>
+                                    <span class="text-muted"> (read-only — from saved DM jobs)</span>
+                                </p>
+                                    <t t-if="this.assignDeliveryProgress.empty">
+                                        <p class="mb-0 small text-muted">No DM jobs yet. Save assignments first.</p>
+                                    </t>
+                                    <t t-else="">
+                                        <table class="table table-sm table-bordered mb-2">
+                                            <thead>
+                                                <tr>
+                                                    <th>Delivery Man</th>
+                                                    <th class="text-end">Assigned</th>
+                                                    <th class="text-end">Picked</th>
+                                                    <th class="text-end">Delivered</th>
+                                                    <th>Stock</th>
+                                                    <th>Stop</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-foreach="this.assignDeliveryProgress.jobs" t-as="prow" t-key="prow.id">
+                                                    <tr>
+                                                        <td><t t-esc="prow.dm"/></td>
+                                                        <td class="text-end"><t t-esc="prow.assigned"/></td>
+                                                        <td class="text-end"><t t-esc="prow.picked"/></td>
+                                                        <td class="text-end"><t t-esc="prow.delivered"/></td>
+                                                        <td>
+                                                            <span t-if="prow.stockState" t-attf-class="badge #{this.stockStateBadgeClass(prow.stockState)}"><t t-esc="prow.stock"/></span>
+                                                            <t t-else="">—</t>
+                                                        </td>
+                                                        <td><t t-esc="prow.stop"/></td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                        <table class="table table-sm table-bordered mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Product</th>
+                                                    <th class="text-end">Ordered</th>
+                                                    <th class="text-end">Assigned</th>
+                                                    <th class="text-end">Picked</th>
+                                                    <th class="text-end">Delivered</th>
+                                                    <th>Per DM (A/P/D)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-if="!this.assignDeliveryProgress.products.length">
+                                                    <tr><td colspan="6" class="text-muted">No products</td></tr>
+                                                </t>
+                                                <t t-foreach="this.assignDeliveryProgress.products" t-as="prow" t-key="'prog-' + prow.id">
+                                                    <tr>
+                                                        <td><t t-esc="prow.product"/></td>
+                                                        <td class="text-end"><t t-esc="prow.ordered"/></td>
+                                                        <td class="text-end"><t t-esc="prow.assigned"/></td>
+                                                        <td class="text-end"><t t-esc="prow.picked"/></td>
+                                                        <td class="text-end"><t t-esc="prow.delivered"/></td>
+                                                        <td class="small"><t t-esc="prow.perDm"/></td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </t>
+                            </div>
+                            <div class="mb-3" style="max-width: 240px;">
+                                <label class="small fw-bold">Planned Delivery Date</label>
+                                <input type="date" class="form-control form-control-sm" t-model="this.state.assignModal.plannedDeliveryDate" t-att-disabled="this.state.assignModal.readOnly || !this.state.assignModal.canEditDeliveryDate"/>
                             </div>
                             <t t-foreach="this.state.assignModal.jobs" t-as="job" t-key="job.id">
                                 <div class="border rounded-3 p-3 mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="small fw-bold">Delivery man</span>
+                                        <span t-if="job.stockState" t-attf-class="badge #{this.stockStateBadgeClass(job.stockState)}"><t t-esc="this._stockProgressLabel(job.stockState)"/></span>
+                                    </div>
                                     <div class="row g-2 mb-2">
-                                        <div class="col-md-6">
-                                            <label class="small fw-bold">Delivery man</label>
-                                            <select class="form-select form-select-sm" t-att-disabled="this.state.assignModal.readOnly" t-on-change="(ev) => this.setAssignDeliveryMan(job, ev.target.value)">
+                                        <div t-attf-class="#{this.state.assignModal.readOnly ? 'col-12' : 'col-md-10'}">
+                                            <select class="form-select form-select-sm" t-att-disabled="this.state.assignModal.readOnly || !job.canRemove" t-att-title="job.canRemove ? '' : 'This delivery man has already picked or delivered stock'" t-on-change="(ev) => this.setAssignDeliveryMan(job, ev.target.value)">
                                                 <option value="" t-att-selected="this.isSelectedId(job.deliveryManId, '')">Select</option>
                                                 <t t-foreach="this.assignDmOptions(job)" t-as="dm" t-key="dm.id">
                                                     <option t-att-value="this.optionId(dm.id)" t-att-selected="this.isSelectedId(job.deliveryManId, dm.id)"><t t-esc="dm.name"/></option>
                                                 </t>
                                             </select>
                                         </div>
-                                        <div class="col-md-4">
-                                            <label class="small fw-bold">Delivery day</label>
-                                            <input type="date" class="form-control form-control-sm" t-model="job.scheduledDate" t-att-disabled="this.state.assignModal.readOnly"/>
-                                        </div>
-                                        <div class="col-md-2 d-flex align-items-end">
-                                            <button class="btn btn-sm btn-outline-danger fw-bold w-100" t-on-click="() => this.removeAssignDeliveryMan(job.id)" t-att-disabled="this.state.assignModal.readOnly || this.state.assignModal.saving || !job.canRemove" title="Remove this delivery man">Remove</button>
+                                        <div class="col-md-2 d-flex align-items-end" t-if="!this.state.assignModal.readOnly">
+                                            <button t-if="this.canMutate and !this.state.assignModal.readOnly" class="btn btn-sm btn-outline-danger fw-bold w-100" t-on-click="() => this.removeAssignDeliveryMan(job.id)" t-att-disabled="this.state.assignModal.saving || !job.canRemove" title="Remove this delivery man">Remove</button>
                                         </div>
                                     </div>
                                     <table class="table table-sm mb-0">
@@ -1050,8 +1246,8 @@
                                 </div>
                             </t>
                             <div class="d-flex justify-content-between" t-if="!this.state.assignModal.readOnly">
-                                <button class="btn btn-primary text-white fw-bold shadow-sm" t-on-click="addAssignDeliveryMan" t-att-disabled="this.state.assignModal.saving">Add delivery man</button>
-                                <button class="btn btn-dark text-white fw-bold" t-on-click="confirmAssign" t-att-disabled="this.state.assignModal.saving">Confirm assign</button>
+                                <button t-if="this.canMutate and !this.state.assignModal.readOnly" class="btn btn-primary text-white fw-bold shadow-sm" t-on-click="addAssignDeliveryMan" t-att-disabled="this.state.assignModal.saving">Add delivery man</button>
+                                <button t-if="this.canMutate and !this.state.assignModal.readOnly" class="btn btn-dark text-white fw-bold" t-on-click="confirmAssign" t-att-disabled="this.state.assignModal.saving">Confirm assign</button>
                             </div>
                         </div>
                     </div>
@@ -1083,7 +1279,7 @@
                                 </tbody>
                             </table>
                             <div class="text-end">
-                                <button class="btn btn-dark text-white fw-bold" t-on-click="confirmPick" t-att-disabled="this.state.pickModal.saving">Confirm pick</button>
+                                <button t-if="this.canMutate" class="btn btn-dark text-white fw-bold" t-on-click="confirmPick" t-att-disabled="this.state.pickModal.saving">Confirm pick</button>
                             </div>
                         </div>
                     </div>
@@ -1102,10 +1298,10 @@
                         </div>
                         <div class="p-4">
                             <label class="small fw-bold">Delivery man</label>
-                            <select class="form-select mb-3" t-model="this.state.settleModal.dmId" t-on-change="onSettleDmChange">
-                                <option value="">Select delivery man</option>
-                                <t t-foreach="this.state.lookupDeliveryMen" t-as="dm" t-key="'settle-' + dm.id">
-                                    <option t-att-value="dm.id"><t t-esc="dm.name"/></option>
+                            <select class="form-select mb-3" t-on-change="onSettleDmChange">
+                                <option value="" t-att-selected="this.isSelectedId(this.state.settleModal.dmId, '')">Select delivery man</option>
+                                <t t-foreach="this.settleDmOptions()" t-as="dm" t-key="'settle-' + dm.id">
+                                    <option t-att-value="this.optionId(dm.id)" t-att-selected="this.isSelectedId(this.state.settleModal.dmId, dm.id)"><t t-esc="dm.name"/></option>
                                 </t>
                             </select>
                             <label class="small fw-bold">Wallet Balance</label>
@@ -1113,10 +1309,10 @@
                             <label class="small fw-bold">Settle Amount</label>
                             <input type="number" class="form-control mb-3" t-model.number="this.state.settleModal.amount" min="0"/>
                             <label class="small fw-bold">Deposit to</label>
-                            <select class="form-select mb-3" t-model="this.state.settleModal.bankJournalId">
-                                <option value="">Select journal</option>
+                            <select class="form-select mb-3" t-on-change="setSettleJournal">
+                                <option value="" t-att-selected="this.isSelectedId(this.state.settleModal.bankJournalId, '')">Select journal</option>
                                 <t t-foreach="this.state.settleModal.journals" t-as="jnl" t-key="jnl.id">
-                                    <option t-att-value="jnl.id"><t t-esc="jnl.name"/></option>
+                                    <option t-att-value="this.optionId(jnl.id)" t-att-selected="this.isSelectedId(this.state.settleModal.bankJournalId, jnl.id)"><t t-esc="jnl.name"/></option>
                                 </t>
                             </select>
                             <label class="small fw-bold">Notes</label>
@@ -1124,7 +1320,7 @@
                         </div>
                         <div class="p-4 pt-0 d-flex justify-content-end gap-2">
                             <button class="btn btn-outline-secondary fw-bold" t-on-click="closeSettle">Cancel</button>
-                            <button class="btn btn-dark text-white fw-bold" t-on-click="confirmSettle" t-att-disabled="this.state.settleModal.saving">Confirm</button>
+                            <button t-if="this.canSettleWallet" class="btn btn-dark text-white fw-bold" t-on-click="confirmSettle" t-att-disabled="this.state.settleModal.saving">Confirm</button>
                         </div>
                     </div>
                 </div>
@@ -1197,7 +1393,7 @@
 <div class="d-flex justify-content-between align-items-center">
 <div class="d-flex gap-2">
     <button class="btn btn-light fw-bold px-4 border shadow-sm" t-on-click="closeDeliveryModal">Cancel</button>
-    <button class="btn btn-success fw-bold px-4 shadow-sm text-white d-flex align-items-center" t-on-click="confirmDeliveryCustom">
+    <button t-if="this.canMutate" class="btn btn-success fw-bold px-4 shadow-sm text-white d-flex align-items-center" t-on-click="confirmDeliveryCustom">
         <i class="fa fa-save me-2"></i> Confirm Delivery
     </button>
 </div>

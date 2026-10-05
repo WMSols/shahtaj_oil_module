@@ -9,12 +9,15 @@
                 <sheet>
                     <div class="oe_title">
                         <h1>Shop Accounting</h1>
-                        <p class="text-muted">
+                        <p class="text-muted" groups="shahtaj_oil.group_shahtaj_ui_pack_finance">
                             Bill shops for field orders, record payments, and issue credit notes for returns.
+                        </p>
+                        <p class="text-muted" groups="shahtaj_oil.group_shahtaj_manager">
+                            Review customer invoices, payments, credit notes, expenses, and shop balances.
                         </p>
                     </div>
                     <group string="Overview">
-                        <group>
+                        <group groups="shahtaj_oil.group_shahtaj_ui_pack_finance">
                             <field name="field_order_count" readonly="1"/>
                             <field name="orders_to_deliver_count" readonly="1"/>
                             <field name="orders_to_invoice_count" readonly="1"/>
@@ -25,16 +28,14 @@
                             <field name="expense_invoice_count" readonly="1"/>
                             <field name="shop_count" readonly="1"/>
                         </group>
-                        <group string="Purchase (stock in)" groups="purchase.group_purchase_user">
-                            <field name="purchase_order_count" readonly="1"
-                                   groups="purchase.group_purchase_user"/>
-                            <field name="incoming_receipt_count" readonly="1"
-                                   groups="purchase.group_purchase_user"/>
-                            <field name="vendor_bill_count" readonly="1"
-                                   groups="purchase.group_purchase_user"/>
+                        <group string="Purchase (stock in)" groups="shahtaj_oil.group_shahtaj_ui_pack_finance">
+                            <field name="purchase_order_count" readonly="1"/>
+                            <field name="incoming_receipt_count" readonly="1"/>
+                            <field name="vendor_bill_count" readonly="1"/>
                         </group>
                     </group>
-                    <div class="alert alert-info" role="alert">
+                    <div class="alert alert-info" role="alert"
+                         groups="shahtaj_oil.group_shahtaj_ui_pack_finance">
                         <strong>Typical workflow</strong>
                         <ol class="mb-0 mt-2">
                             <li>Order bookers place orders during shop visits.</li>
@@ -48,8 +49,16 @@
                             <li>Review each shop's balance under Shop Balances.</li>
                         </ol>
                     </div>
+                    <div class="alert alert-info" role="alert"
+                         groups="shahtaj_oil.group_shahtaj_manager">
+                        <strong>Manager focus</strong>
+                        <ol class="mb-0 mt-2">
+                            <li>Open <b>Customer Invoices &amp; Credit Notes</b> or payments under Billing &amp; Returns.</li>
+                            <li>Use <b>Shop Balances</b> to review each shop's outstanding.</li>
+                        </ol>
+                    </div>
                     <group string="Open a section">
-                        <group string="Step 1 — Sales">
+                        <group string="Step 1 — Sales" groups="shahtaj_oil.group_shahtaj_ui_pack_finance">
                             <button name="action_open_field_sales_orders" type="object"
                                     string="Field Sales Orders"
                                     class="btn btn-primary mb-2"
@@ -63,7 +72,8 @@
                                     class="btn btn-secondary mb-2"
                                     icon="fa-file-text-o"/>
                         </group>
-                        <group string="Step 2 — Billing &amp; Returns">
+                        <group string="Step 2 — Billing &amp; Returns"
+                               groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance">
                             <button name="action_open_customer_invoices" type="object"
                                     string="Customer Invoices &amp; Credit Notes"
                                     class="btn btn-primary mb-2"
@@ -87,13 +97,14 @@
                         </group>
                     </group>
                     <group>
-                        <group string="Step 3 — Shop balances">
+                        <group string="Step 3 — Shop balances"
+                               groups="shahtaj_oil.group_shahtaj_ui_pack_shop_trading,shahtaj_oil.group_shahtaj_ui_pack_finance">
                             <button name="action_open_shop_balances" type="object"
                                     string="Shop Balances"
                                     class="btn btn-primary mb-2"
                                     icon="fa-balance-scale"/>
                         </group>
-                        <group string="Stock in — Purchase" groups="purchase.group_purchase_user">
+                        <group string="Stock in — Purchase" groups="shahtaj_oil.group_shahtaj_ui_pack_finance">
                             <button name="action_open_vendors" type="object"
                                     string="Vendors"
                                     class="btn btn-secondary mb-2"
@@ -112,7 +123,7 @@
                                     icon="fa-file-text"/>
                         </group>
                     </group>
-                    <group>
+                    <group groups="shahtaj_oil.group_shahtaj_ui_pack_finance">
                         <group string="Step 4 — Tax &amp; Financial Statements">
                             <button name="action_open_tax_ledger" type="object"
                                     string="Tax Ledger"

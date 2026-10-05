@@ -72,7 +72,9 @@ class ShahtajAccountingHub(models.TransientModel):
         Partner = self.env['res.partner'].sudo()
         for hub in self:
             hub.field_order_count = SaleOrder.search_count([
+                '|',
                 ('shahtaj_visit_id', '!=', False),
+                ('shahtaj_is_walk_in', '=', True),
             ])
             hub.orders_to_invoice_count = SaleOrder.search_count([
                 ('shahtaj_visit_id', '!=', False),
@@ -85,13 +87,17 @@ class ShahtajAccountingHub(models.TransientModel):
             ])
             hub.open_invoice_count = AccountMove.search_count([
                 ('move_type', '=', 'out_invoice'),
+                '|',
                 ('partner_id.is_shahtaj_shop', '=', True),
+                ('shahtaj_is_walk_in', '=', True),
                 ('state', '=', 'posted'),
                 ('payment_state', 'in', ('not_paid', 'partial')),
             ])
             hub.credit_note_count = AccountMove.search_count([
                 ('move_type', '=', 'out_refund'),
+                '|',
                 ('partner_id.is_shahtaj_shop', '=', True),
+                ('shahtaj_is_walk_in', '=', True),
                 ('state', '=', 'posted'),
             ])
             hub.expense_invoice_count = self.env['shahtaj.expense'].sudo().search_count([
@@ -159,6 +165,21 @@ class ShahtajAccountingHub(models.TransientModel):
     def action_open_customer_payments(self):
         return self.env['ir.actions.act_window']._for_xml_id(
             'shahtaj_oil.action_shahtaj_customer_payments',
+        )
+
+    def action_open_walk_in_orders(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_walk_in_orders',
+        )
+
+    def action_open_walk_in_invoices(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_walk_in_invoices',
+        )
+
+    def action_open_walk_in_payments(self):
+        return self.env['ir.actions.act_window']._for_xml_id(
+            'shahtaj_oil.action_shahtaj_walk_in_payments',
         )
 
     def action_open_shop_balances(self):

@@ -19,7 +19,9 @@
                             <field name="delivery_man_count" readonly="1"/>
                             <field name="dm_jobs_today_count" readonly="1"/>
                             <field name="dm_jobs_active_count" readonly="1"/>
+                            <field name="dm_jobs_overdue_count" readonly="1"/>
                             <field name="dispatch_orders_count" readonly="1"/>
+                            <field name="walk_in_order_count" readonly="1"/>
                         </group>
                         <group string="Day vs stop (do not mix)">
                             <field name="dm_out_on_route_count" readonly="1"/>
@@ -53,7 +55,8 @@
                             <button name="action_open_create_delivery_man" type="object"
                                     string="Create Delivery Man"
                                     class="btn btn-secondary mb-2"
-                                    icon="fa-user-plus"/>
+                                    icon="fa-user-plus"
+                                    groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                         </group>
                         <group string="Dispatch &amp; Delivery">
                             <button name="action_open_dispatch_orders" type="object"
@@ -64,18 +67,27 @@
                                     string="Delivery Jobs"
                                     class="btn btn-secondary mb-2"
                                     icon="fa-list-alt"/>
+                            <button name="action_open_overdue_jobs" type="object"
+                                    string="Overdue / Not Done"
+                                    class="btn btn-warning mb-2"
+                                    icon="fa-exclamation-triangle"/>
                             <button name="action_open_all_deliveries" type="object"
                                     string="All Delivery Orders"
                                     class="btn btn-secondary mb-2"
                                     icon="fa-archive"/>
                             <button name="action_open_visit_tasks_progress" type="object"
-                                    string="DM Visit Tasks Progress"
+                                    string="DM Daily Progress"
                                     class="btn btn-secondary mb-2"
                                     icon="fa-tasks"/>
                             <button name="action_open_orders_hub" type="object"
                                     string="Field Orders Overview"
                                     class="btn btn-link mb-2"
-                                    icon="fa-dashboard"/>
+                                    icon="fa-dashboard"
+                                    groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            <button name="action_open_walk_in_orders" type="object"
+                                    string="Walk-in (tagged in Field Orders)"
+                                    class="btn btn-secondary mb-2"
+                                    icon="fa-shopping-bag"/>
                         </group>
                     </group>
                 </sheet>

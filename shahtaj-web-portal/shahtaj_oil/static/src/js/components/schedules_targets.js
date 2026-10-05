@@ -14,6 +14,7 @@ export class SchedulesTargets extends Component {
         this.orm = useService("orm");
         const ITEMS_PER_PAGE = 50;
         this.notification = useService("notification");
+        this._listFetchToken = 0;
         this.state = useState({
             activeMainTab: this.props.requestedSubTab || 'schedules',
             viewMode: 'list',
@@ -110,6 +111,13 @@ export class SchedulesTargets extends Component {
         this.debouncedFetchBookers();
     }
 
+    clearFilters(listKey = "bookers") {
+        this.state.filters.bookers = { search: "" };
+        this.state.pagination.bookers.page = 1;
+        this.state.tableBookers = [];
+        this.fetchBookersList();
+    }
+
     changePage(direction) {
         const pag = this.state.pagination.bookers;
         const newPage = pag.page + direction;
@@ -122,6 +130,7 @@ export class SchedulesTargets extends Component {
     }
 
     async fetchBookersList() {
+        const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
         try {
             const pag = this.state.pagination.bookers;
@@ -144,6 +153,10 @@ export class SchedulesTargets extends Component {
                 })
             ]);
 
+            if (fetchToken !== this._listFetchToken) {
+                return;
+            }
+
             this.state.pagination.bookers.total = total;
             this.state.tableBookers = users.map(u => ({
                 id: u.id,
@@ -155,7 +168,9 @@ export class SchedulesTargets extends Component {
         } catch (error) {
             this.notification.add("Failed to fetch bookers: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
-            this.state.isLoadingList = false;
+            if (fetchToken === this._listFetchToken) {
+                this.state.isLoadingList = false;
+            }
         }
     }
 
@@ -265,7 +280,7 @@ export class SchedulesTargets extends Component {
             'shahtaj.visit.target',
             [['order_booker_id', '=', bookerId]],
             [
-                'id', 'name', 'date_start', 'date_end', 'target_type',
+                'id', 'name', 'date_start', 'date_end', 'period_status', 'target_type',
                 'target_value', 'achieved_value', 'remaining_value', 'progress_percent',
                 'product_id', 'currency_id', 'target_weight_uom', 'active'
             ],
@@ -280,6 +295,7 @@ export class SchedulesTargets extends Component {
             name: r.name,
             startDate: r.date_start,
             endDate: r.date_end,
+            periodStatus: r.period_status || '',
             type: r.target_type,
             amount: r.target_value,
             achievedAmount: r.achieved_value,
@@ -292,8 +308,10 @@ export class SchedulesTargets extends Component {
             product: r.product_id ? r.product_id[1] : null,
             currency_id_raw: r.currency_id ? r.currency_id[0] : '',
             currency: r.currency_id ? r.currency_id[1] : null,
-            status: r.active ? 'Active' : 'Deactivated',
+            status: this._targetShowActive(r.active, r.date_end) ? 'Active' : 'Inactive',
             isActive: !!r.active,
+            showActive: this._targetShowActive(r.active, r.date_end),
+            periodComplete: this._targetPeriodComplete(r.date_end),
             lines: [],
             isExpandable: ['collective_qty', 'collective_weight', 'product_bundle'].includes(r.target_type),
             expanded: false,
@@ -689,6 +707,20 @@ export class SchedulesTargets extends Component {
         };
     }
 
+    /** True once the target end date is before today in Pakistan. */
+    _targetPeriodComplete(endDate) {
+        if (!endDate) {
+            return false;
+        }
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' });
+        return String(endDate).slice(0, 10) < today;
+    }
+
+    /** Active only while the distributor left it on and the period has not ended. */
+    _targetShowActive(active, endDate) {
+        return !!active && !this._targetPeriodComplete(endDate);
+    }
+
     editTarget(tgt) {
         this.state.errorMessage = '';
         this.state.targetForm = {
@@ -699,7 +731,7 @@ export class SchedulesTargets extends Component {
             product_id: tgt.product_id_raw,
             currency_id: tgt.currency_id_raw,
             target_weight_uom: tgt.weightUom || 'kg',
-            is_active: tgt.isActive !== false && tgt.status !== 'Deactivated',
+            is_active: !!tgt.isActive,
             lines: (tgt.lines || []).map((line) => ({
                 product_id: line.product_id ? parseInt(line.product_id, 10) : '',
                 product_name: line.product_name || '',

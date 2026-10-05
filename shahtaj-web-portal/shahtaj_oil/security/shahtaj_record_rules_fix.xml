@@ -26,20 +26,24 @@
                 ('shahtaj_is_delivery_man', '=', True),
                 ('id', '=', user.id),
             ]</field>
-            <field name="groups" eval="[(4, ref('group_shahtaj_distributor'))]"/>
+            <field name="groups" eval="[(4, ref('group_shahtaj_office_ops'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
         </record>
         <!-- Delivery man: see SOs from assigned bookers OR own DM delivery jobs (M1/M2) -->
+        <!-- Comment for file change detection -->
         <record id="rule_shahtaj_delivery_man_sale_order" model="ir.rule">
             <field name="name">Delivery Man: assigned booker orders or own delivery jobs</field>
             <field name="model_id" ref="sale.model_sale_order"/>
             <field name="domain_force">[
-                '|',
+                '|', '|',
                 ('shahtaj_order_booker_id', 'in', user.shahtaj_assigned_booker_ids.ids),
                 ('shahtaj_dm_delivery_ids.delivery_man_id', '=', user.id),
+                '&amp;',
+                ('partner_id.shahtaj_is_walk_in', '=', True),
+                ('user_id', '=', user.id),
             ]</field>
             <field name="groups" eval="[(4, ref('group_shahtaj_delivery_man'))]"/>
             <field name="perm_read" eval="True"/>
@@ -53,9 +57,12 @@
             <field name="name">Delivery Man: lines for assigned booker orders or own delivery jobs</field>
             <field name="model_id" ref="sale.model_sale_order_line"/>
             <field name="domain_force">[
-                '|',
+                '|', '|',
                 ('order_id.shahtaj_order_booker_id', 'in', user.shahtaj_assigned_booker_ids.ids),
                 ('order_id.shahtaj_dm_delivery_ids.delivery_man_id', '=', user.id),
+                '&amp;',
+                ('order_id.partner_id.shahtaj_is_walk_in', '=', True),
+                ('order_id.user_id', '=', user.id),
             ]</field>
             <field name="groups" eval="[(4, ref('group_shahtaj_delivery_man'))]"/>
             <field name="perm_read" eval="True"/>
@@ -69,10 +76,12 @@
             <field name="name">Delivery Man: shops from assigned orders</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="domain_force">[
-                '|', '|',
+                '|', '|', '|', '|',
                 ('is_shahtaj_shop', '=', True),
+                ('shahtaj_is_walk_in', '=', True),
                 ('partner_share', '=', False),
                 ('id', '=', user.partner_id.id),
+                ('id', '=', user.company_id.partner_id.id),
             ]</field>
             <field name="groups" eval="[(4, ref('group_shahtaj_delivery_man'))]"/>
             <field name="perm_read" eval="True"/>

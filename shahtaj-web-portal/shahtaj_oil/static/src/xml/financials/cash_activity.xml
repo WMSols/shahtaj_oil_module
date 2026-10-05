@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <div class="p-3">
-                    <BankTransactions t-props="{ embedded: true, initialDirection: this.state.cashDirection }"/>
+                    <BankTransactions t-props="{ embedded: true, initialDirection: this.state.cashDirection, initialDateFrom: this.state.cashDateFrom, initialDateTo: this.state.cashDateTo }"/>
                 </div>
             </t>
     </t>

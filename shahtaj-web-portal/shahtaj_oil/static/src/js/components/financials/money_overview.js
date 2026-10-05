@@ -1,8 +1,9 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onMounted, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { hasFinancialAccess, notifyPortalBusy } from "../../shahtaj_access";
+import { cachedRead } from "../../shahtaj_read_cache";
 import { formatDate, requestFinancialTabSwitch } from "./financials_cache";
 import { setPendingCashDirection } from "./po_prefill";
 
@@ -21,21 +22,23 @@ export class MoneyOverview extends Component {
             money: {
                 date_from: formatDate(firstDay),
                 date_to: formatDate(today),
-                isLoading: false,
+                isLoading: true,
                 collected: 0, paidOut: 0, netCash: 0, stillOwed: 0,
                 openInvoiceAmount: 0, paymentCountIn: 0, paymentCountOut: 0,
             },
         });
-        onWillUpdateProps(async (nextProps) => {
+        onWillUpdateProps((nextProps) => {
             if (nextProps.refreshNonce !== this.props.refreshNonce) {
-                await this.loadMoneyOverview();
+                this.loadMoneyOverview({ force: true });
             }
         });
-        onWillStart(async () => {
+        this._moneyLoadToken = 0;
+        onMounted(() => {
             if (!hasFinancialAccess()) {
+                this.state.money.isLoading = false;
                 return;
             }
-            await this.loadMoneyOverview();
+            this.loadMoneyOverview();
         });
     }
 
@@ -56,69 +59,37 @@ export class MoneyOverview extends Component {
         this.requestTabSwitch("financials", "credit_notes");
     }
 
-    async loadMoneyOverview() {
+    async loadMoneyOverview(options = {}) {
+        const force = Boolean(options && options.force);
+        const token = ++this._moneyLoadToken;
+        const from = this.state.money.date_from;
+        const to = this.state.money.date_to;
         this.state.money.isLoading = true;
         notifyPortalBusy(true);
+        const key = ["money", from, to].join("|");
         try {
-            const from = this.state.money.date_from;
-            const to = this.state.money.date_to;
-            const payments = await this.orm.searchRead(
-                "account.payment",
-                [
-                    ["journal_id.type", "in", ["bank", "cash"]],
-                    ["date", ">=", from],
-                    ["date", "<=", to],
-                    ["state", "in", ["paid", "in_process", "posted", "reconciled"]],
-                ],
-                ["amount", "amount_signed", "payment_type"]
-            );
-
-            let collected = 0;
-            let paidOut = 0;
-            let paymentCountIn = 0;
-            let paymentCountOut = 0;
-            for (const payment of payments) {
-                const amount = Math.abs(payment.amount_signed || payment.amount || 0);
-                if (payment.payment_type === "outbound") {
-                    paidOut += amount;
-                    paymentCountOut += 1;
-                } else {
-                    collected += amount;
-                    paymentCountIn += 1;
-                }
+            const summary = await cachedRead(key, () => this.orm.call(
+                "shahtaj.portal.read",
+                "shahtaj_cash_summary",
+                [from, to],
+            ), { force }) || {};
+            if (token !== this._moneyLoadToken || from !== this.state.money.date_from || to !== this.state.money.date_to) {
+                return;
             }
-
-            const shopsData = await this.orm.searchRead(
-                "res.partner",
-                [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]],
-                ["outstanding_balance"]
-            );
-            const stillOwed = shopsData.reduce((sum, shop) => sum + (shop.outstanding_balance || 0), 0);
-
-            const invoicesData = await this.orm.searchRead(
-                "account.move",
-                [
-                    ["move_type", "=", "out_invoice"],
-                    ["partner_id.is_shahtaj_shop", "=", true],
-                    ["state", "=", "posted"],
-                    ["payment_state", "in", ["not_paid", "partial"]],
-                ],
-                ["amount_residual"]
-            );
-            const openInvoiceAmount = invoicesData.reduce((sum, inv) => sum + (inv.amount_residual || 0), 0);
-
-            this.state.money.collected = collected;
-            this.state.money.paidOut = paidOut;
-            this.state.money.netCash = collected - paidOut;
-            this.state.money.stillOwed = stillOwed;
-            this.state.money.openInvoiceAmount = openInvoiceAmount;
-            this.state.money.paymentCountIn = paymentCountIn;
-            this.state.money.paymentCountOut = paymentCountOut;
+            this.state.money.collected = summary.collected || 0;
+            this.state.money.paidOut = summary.paidOut || 0;
+            this.state.money.netCash = summary.netCash || 0;
+            this.state.money.stillOwed = summary.stillOwed || 0;
+            this.state.money.openInvoiceAmount = summary.openInvoiceAmount || 0;
+            this.state.money.paymentCountIn = summary.paymentCountIn || 0;
+            this.state.money.paymentCountOut = summary.paymentCountOut || 0;
         } catch (error) {
             console.error("Money Overview Fetch Error:", error);
             this.notification.add("Failed to load money overview: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
-            this.state.money.isLoading = false;
+            if (token === this._moneyLoadToken) {
+                this.state.money.isLoading = false;
+            }
             notifyPortalBusy(false);
         }
     }

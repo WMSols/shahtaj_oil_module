@@ -12,7 +12,7 @@
             <field name="name">Distributor: read shops and staff contacts</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="domain_force">[
-                '|', '|', '|', '|', '|', '|', '|', '|', '|',
+                '|', '|', '|', '|', '|', '|', '|', '|', '|', '|',
                 ('is_shahtaj_shop', '=', True),
                 ('parent_id.is_shahtaj_shop', '=', True),
                 ('commercial_partner_id.is_shahtaj_shop', '=', True),
@@ -23,8 +23,9 @@
                 ('user_ids.shahtaj_is_order_booker', '=', True),
                 ('user_ids.shahtaj_is_delivery_man', '=', True),
                 ('supplier_rank', '>', 0),
+                ('shahtaj_is_walk_in', '=', True),
             ]</field>
-            <field name="groups" eval="[(6, 0, [ref('group_shahtaj_distributor')])]"/>
+            <field name="groups" eval="[(6, 0, [ref('group_shahtaj_office_ops')])]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
@@ -35,7 +36,7 @@
             <field name="name">Distributor: read vendor contacts</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="domain_force">[('supplier_rank', '>', 0)]</field>
-            <field name="groups" eval="[(6, 0, [ref('group_shahtaj_distributor')])]"/>
+            <field name="groups" eval="[(6, 0, [ref('group_shahtaj_office_ops')])]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>

@@ -580,6 +580,9 @@
                                 <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
                                 <input type="text" class="form-control border-start-0 ps-0" placeholder="Search entries..." t-att-value="this.state.filters.entries.search" t-on-input="(ev) => this.onSearchInput(ev, 'entries')"/>
                             </div>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('entries')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
                         </div>
                         <div class="position-relative overflow-hidden">
                             <t t-if="this.state.isLoadingList">
@@ -660,6 +663,9 @@
                                 <option value="miscellaneous">Miscellaneous</option>
                                 <option value="archived">Archived</option>
                             </select>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('journals')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
                             <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="() => this.openJournalForm()">New Journal</button>
                         </div>
                     </div>
@@ -847,6 +853,9 @@
                                 <option value="inactive">Inactive</option>
                                 <option value="all">All Statuses</option>
                             </select>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('accounts')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
                             <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="() => this.openAccountForm()">New Account</button>
                         </div>
                     </div>
@@ -940,6 +949,9 @@
                         </select>
                         <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-model="this.state.filters.audit.dateFrom" t-on-change="() => this.onFilterChange('audit')"/>
                         <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-model="this.state.filters.audit.dateTo" t-on-change="() => this.onFilterChange('audit')"/>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('audit')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
                     </div>
                 </div>
                 <div class="position-relative overflow-hidden">

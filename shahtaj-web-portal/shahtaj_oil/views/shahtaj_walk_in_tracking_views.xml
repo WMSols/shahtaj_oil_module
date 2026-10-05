@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Shortcut into Field Sales Orders with Walk-in filter pre-applied.
+         Walk-ins live in the same SO / invoice / payment lists (tagged). -->
+    <record id="action_shahtaj_walk_in_orders" model="ir.actions.act_window">
+        <field name="name">Walk-in Orders</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form,kanban,pivot,graph</field>
+        <field name="domain">[('shahtaj_is_walk_in', '=', True)]</field>
+        <field name="context">{
+            'create': False,
+            'search_default_sales': 1,
+            'search_default_walk_in': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No walk-in orders yet
+            </p>
+            <p>
+                Same Field Sales Orders list, filtered to Walk-in van cash sales.
+                Clear the Walk-in filter to see shop visit orders together.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_walk_in_invoices" model="ir.actions.act_window">
+        <field name="name">Walk-in Invoices</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="domain">[
+            ('move_type', 'in', ('out_invoice', 'out_refund', 'out_receipt')),
+            ('shahtaj_is_walk_in', '=', True),
+        ]</field>
+        <field name="context">{
+            'create': False,
+            'default_move_type': 'out_invoice',
+            'search_default_walk_in': 1,
+            'search_default_all_documents': 1,
+        }</field>
+        <field name="search_view_id" ref="view_shahtaj_customer_invoice_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No walk-in invoices yet
+            </p>
+            <p>
+                Same Customer Invoices list, filtered to Walk-in. Clear the filter
+                to see shop and walk-in invoices together.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_walk_in_payments" model="ir.actions.act_window">
+        <field name="name">Walk-in Payments</field>
+        <field name="res_model">account.payment</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="view_id" ref="view_account_payment_tree_shahtaj"/>
+        <field name="domain">[
+            ('partner_type', '=', 'customer'),
+            ('shahtaj_is_walk_in', '=', True),
+        ]</field>
+        <field name="context">{
+            'create': False,
+            'default_payment_type': 'inbound',
+            'default_partner_type': 'customer',
+            'search_default_walk_in': 1,
+            'search_default_inbound_filter': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No walk-in payments yet
+            </p>
+            <p>
+                Same Customer Payments list, filtered to Walk-in wallet collections.
+            </p>
+        </field>
+    </record>
+
+</odoo>

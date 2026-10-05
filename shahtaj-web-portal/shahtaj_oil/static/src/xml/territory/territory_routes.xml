@@ -17,16 +17,16 @@
                 </div>
             </div>
             <t t-if="this.state.activeSubTab === 'areas'">
-                <TerritoryZones requestedSubTab="'areas'" refreshNonce="this.state.refreshNonce"/>
+                <TerritoryZones requestedSubTab="'areas'" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
             <t t-if="this.state.activeSubTab === 'routes'">
-                <TerritoryRouteList requestedSubTab="'routes'" refreshNonce="this.state.refreshNonce"/>
+                <TerritoryRouteList requestedSubTab="'routes'" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
             <t t-if="this.state.activeSubTab === 'shops'">
-                <TerritoryShops requestedSubTab="'shops'" refreshNonce="this.state.refreshNonce"/>
+                <TerritoryShops requestedSubTab="'shops'" requestedShopStatus="this.props.requestedShopStatus" requestedShopRegisteredOn="this.props.requestedShopRegisteredOn" requestedShopRegistrar="this.props.requestedShopRegistrar" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
             <t t-if="this.state.activeSubTab === 'archive'">
-                <TerritoryArchive requestedSubTab="'archive'" previousSubTab="this.state.previousSubTab" onBack.bind="closeArchive" refreshNonce="this.state.refreshNonce"/>
+                <TerritoryArchive requestedSubTab="'archive'" previousSubTab="this.state.previousSubTab" onBack.bind="closeArchive" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
         </div>
     </t>

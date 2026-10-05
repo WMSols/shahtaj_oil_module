@@ -16,6 +16,7 @@ export class Expenses extends Component {
     setup() {
         this.notification = useService("notification");
         this.orm = useService("orm");
+        this._listFetchToken = 0;
         const today = new Date();
         const ITEMS_PER_PAGE = 50;
         this.state = useState({
@@ -111,6 +112,26 @@ export class Expenses extends Component {
         this.fetchActiveList(); // Dropdowns don't need debouncing, fetch immediately
     }
 
+    clearFilters(listKey) {
+        const defaults = {
+            expenses: { search: "", status: "all" },
+            expenseCategories: { search: "" },
+        };
+        if (!defaults[listKey]) {
+            return;
+        }
+        this.state.filters[listKey] = { ...defaults[listKey] };
+        if (this.state.pagination[listKey]) {
+            this.state.pagination[listKey].page = 1;
+        }
+        if (listKey === "expenses") {
+            this.state.tableExpenses = [];
+        } else if (listKey === "expenseCategories") {
+            this.state.tableExpenseCategories = [];
+        }
+        this.fetchActiveList();
+    }
+
     changePage(listKey, direction) {
         const pag = this.state.pagination[listKey];
         const newPage = pag.page + direction;
@@ -144,6 +165,7 @@ export class Expenses extends Component {
             : (this.state.activeSubTab === 'expenses' ? tabMap[this.state.expenseSubTab] : (this.state.activeSubTab === 'po_management' ? tabMap[this.state.poSubTab] : tabMap[this.state.invoiceSubTab]));
         if (!config) return;
 
+        const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
         notifyPortalBusy(true);
         try {
@@ -233,20 +255,30 @@ export class Expenses extends Component {
             // outstanding_balance is computed/non-stored, so shop balances must be sorted in JS
             // (highest outstanding first) then sliced to keep pagination ranking correct.
             const sortShopBalances = stateKey === 'credits' && this.state.creditSubView === 'balances';
-            const searchReadOptions = sortShopBalances
-                ? { context: queryContext }
-                : { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: "id desc", context: queryContext };
-            const [total, fetchedRecords] = await Promise.all([
-                sortShopBalances ? Promise.resolve(0) : this.orm.searchCount(model, domain, { context: queryContext }),
-                this.orm.searchRead(model, domain, fields, searchReadOptions)
-            ]);
-            let records = fetchedRecords;
+            let records;
             if (sortShopBalances) {
-                records = [...fetchedRecords].sort((a, b) => (b.outstanding_balance || 0) - (a.outstanding_balance || 0));
-                this.state.pagination[stateKey].total = records.length;
-                const start = (pag.page - 1) * pag.limit;
-                records = records.slice(start, start + pag.limit);
+                const page = await this.orm.call(
+                    "shahtaj.portal.read",
+                    "shahtaj_credit_balance_page",
+                    [{
+                        search: (filters && filters.search) || "",
+                        hasCreditLimit: Boolean(this.state.filters.credits && this.state.filters.credits.hasCreditLimit),
+                        creditSubView: "balances",
+                    }, pag.page, pag.limit],
+                );
+                records = page.records || [];
+                this.state.pagination[stateKey].total = page.total || 0;
             } else {
+                const [total, fetchedRecords] = await Promise.all([
+                    this.orm.searchCount(model, domain, { context: queryContext }),
+                    this.orm.searchRead(model, domain, fields, {
+                        limit: pag.limit,
+                        offset: (pag.page - 1) * pag.limit,
+                        order: "id desc",
+                        context: queryContext,
+                    }),
+                ]);
+                records = fetchedRecords;
                 this.state.pagination[stateKey].total = total;
             }
             // 5. MAP DATA TO UI
@@ -356,10 +388,14 @@ export class Expenses extends Component {
                 this.state.tableExpenseCategories = records;
             }
         } catch (error) {
-            this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
+            if (fetchToken === this._listFetchToken) {
+                this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
+            }
         } finally {
-            this.state.isLoadingList = false;
-            notifyPortalBusy(false);
+            if (fetchToken === this._listFetchToken) {
+                this.state.isLoadingList = false;
+                notifyPortalBusy(false);
+            }
         }
     }
     showConfirm(title, message, onConfirmCallback) {

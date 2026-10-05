@@ -44,15 +44,9 @@
                                        t-att-value="this.state.filters.allOrders.search" 
                                        t-on-input="(ev) => this.onSearchInput(ev, 'allOrders')"/>
                             </div>
-                            <select class="form-select form-select-sm shadow-sm" style="width: 200px;"
-                                    t-model="this.state.filters.allOrders.shop"
-                                    t-on-change="() => this.onFilterChange('allOrders')"
-                                    title="Filter by shop">
-                                <option value="all">All Shops</option>
-                                <t t-foreach="this.state.invoiceShops" t-as="shop" t-key="shop.id">
-                                    <option t-att-value="shop.id"><t t-esc="shop.name"/></option>
-                                </t>
-                            </select>
+                            <ShopFilter shopId="this.state.filters.allOrders.shop"
+                                        shopName="this.state.filters.allOrders.shopName"
+                                        onSelect="(shopId, shopName) => this.onShopFilterSelect('allOrders', shopId, shopName)"/>
                             <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;"
                                    t-model="this.state.filters.allOrders.dateFrom"
                                    t-on-change="() => this.onFilterChange('allOrders')"
@@ -69,6 +63,9 @@
                                 <option value="Draft">Draft</option>
                                 <option value="Cancelled">Cancelled</option>
                             </select>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('allOrders')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
                         </div>
 
                         <div class="position-relative">
@@ -135,10 +132,10 @@
                     <t t-else="">
                         <div class="p-4 bg-light">
                             <div class="d-flex justify-content-between mb-4">
-                                <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm" t-on-click="() => this.state.selectedOrder = null">
+                                <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm" t-on-click="() => this.closeOrderDetail('allOrders')">
                                     <i class="fa fa-arrow-left me-1"></i> Back to Orders
                                 </button>
-                                <button t-if="this.state.selectedOrder.invoice_status === 'to invoice'" class="btn btn-primary fw-bold text-white shadow-sm px-4" t-on-click="() => this.triggerCreateInvoice(this.state.selectedOrder)" t-att-disabled="this.state.isCreatingInvoice">
+                                <button t-if="this.canMutate and this.state.selectedOrder.invoice_status === 'to invoice'" class="btn btn-primary fw-bold text-white shadow-sm px-4" t-on-click="() => this.triggerCreateInvoice(this.state.selectedOrder)" t-att-disabled="this.state.isCreatingInvoice">
                                     <span t-if="this.state.isCreatingInvoice" class="spinner-border spinner-border-sm me-2"/>
                                     <t t-if="this.state.isCreatingInvoice">Generating...</t>
                                     <t t-else="">
@@ -269,15 +266,9 @@
                                        t-att-value="this.state.filters.orders.search" 
                                        t-on-input="(ev) => this.onSearchInput(ev, 'orders')"/>
                             </div>
-                            <select class="form-select form-select-sm shadow-sm" style="width: 200px;"
-                                    t-model="this.state.filters.orders.shop"
-                                    t-on-change="() => this.onFilterChange('orders')"
-                                    title="Filter by shop">
-                                <option value="all">All Shops</option>
-                                <t t-foreach="this.state.invoiceShops" t-as="shop" t-key="shop.id">
-                                    <option t-att-value="shop.id"><t t-esc="shop.name"/></option>
-                                </t>
-                            </select>
+                            <ShopFilter shopId="this.state.filters.orders.shop"
+                                        shopName="this.state.filters.orders.shopName"
+                                        onSelect="(shopId, shopName) => this.onShopFilterSelect('orders', shopId, shopName)"/>
                             <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;"
                                    t-model="this.state.filters.orders.dateFrom"
                                    t-on-change="() => this.onFilterChange('orders')"
@@ -286,6 +277,9 @@
                                    t-model="this.state.filters.orders.dateTo"
                                    t-on-change="() => this.onFilterChange('orders')"
                                    title="To date"/>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('orders')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
                         </div>
 
                         <div class="position-relative">
@@ -324,7 +318,7 @@
                                                     <td><span class="badge bg-secondary text-dark"><i class="fa fa-user me-1"></i><t t-esc="ord.booker"/></span><small class="d-block text-muted mt-1">Booker ID: <t t-esc="ord.bookerId"/></small></td>
                                                     <td class="text-muted"><t t-esc="ord.date"/></td>
                                                     <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/></td>
-                                                    <td class="text-end pe-4"><button class="btn btn-sm btn-dark fw-bold px-3" t-on-click="() => this.viewOrder(ord)" title="Open this order to verify items and generate a bill">View &amp; Invoice</button></td>
+                                                    <td class="text-end pe-4"><button class="btn btn-sm btn-dark fw-bold px-3" t-on-click="() => this.viewOrder(ord)" t-att-title="this.isKpo ? 'Open this order to verify items' : 'Open this order to verify items and generate a bill'"><t t-if="this.isKpo">View</t><t t-else="">View &amp; Invoice</t></button></td>
                                         </tr>
                                             </t>
                                     </t>
@@ -352,10 +346,10 @@
                     <t t-else="">
                         <div class="p-4 bg-light">
                             <div class="d-flex justify-content-between mb-4">
-                                <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm" t-on-click="() => this.state.selectedOrder = null" title="Go back to the pending orders list">
+                                <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm" t-on-click="() => this.closeOrderDetail('orders')" title="Go back to the pending orders list">
                                     <i class="fa fa-arrow-left me-1"></i> Back to Orders
                                 </button>
-                                <button class="btn btn-primary fw-bold text-white shadow-sm px-4" t-on-click="() => this.triggerCreateInvoice(this.state.selectedOrder)" t-att-disabled="this.state.isCreatingInvoice">
+                                <button t-if="this.canMutate" class="btn btn-primary fw-bold text-white shadow-sm px-4" t-on-click="() => this.triggerCreateInvoice(this.state.selectedOrder)" t-att-disabled="this.state.isCreatingInvoice">
                                     <span t-if="this.state.isCreatingInvoice" class="spinner-border spinner-border-sm me-2"/>
                                     <t t-if="this.state.isCreatingInvoice">Generating...</t>
                                     <t t-else="">
@@ -483,15 +477,9 @@
                                        t-att-value="this.state.filters.invoices.search" 
                                        t-on-input="(ev) => this.onSearchInput(ev, 'invoices')"/>
                             </div>
-                            <select class="form-select form-select-sm shadow-sm" style="width: 200px;"
-                                    t-model="this.state.filters.invoices.shop"
-                                    t-on-change="() => this.onFilterChange('invoices')"
-                                    title="Filter by shop">
-                                <option value="all">All Shops</option>
-                                <t t-foreach="this.state.invoiceShops" t-as="shop" t-key="shop.id">
-                                    <option t-att-value="shop.id"><t t-esc="shop.name"/></option>
-                                </t>
-                            </select>
+                            <ShopFilter shopId="this.state.filters.invoices.shop"
+                                        shopName="this.state.filters.invoices.shopName"
+                                        onSelect="(shopId, shopName) => this.onShopFilterSelect('invoices', shopId, shopName)"/>
                             <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;"
                                    t-model="this.state.filters.invoices.dateFrom"
                                    t-on-change="() => this.onFilterChange('invoices')"
@@ -504,12 +492,31 @@
                                     t-model="this.state.filters.invoices.status" 
                                     t-on-change="() => this.onFilterChange('invoices')">
                                 <option value="all">All Statuses</option>
+                                <option value="Open">Open (unpaid or partial)</option>
                                 <option value="Posted">Posted (Open)</option>
                                 <option value="Partial">Partially Paid</option>
                                 <option value="Paid">Paid</option>
                                 <option value="Draft">Draft</option>
                                 <option value="Cancelled">Cancelled</option>
                             </select>
+                            <div class="form-check form-switch mb-0 d-flex align-items-center">
+                                <input class="form-check-input mt-0" type="checkbox" role="switch" id="customerInvoicesWalkIn"
+                                       t-att-checked="this.state.filters.invoices.walkIn"
+                                       t-on-change="onInvoicesWalkInToggle"/>
+                                <label class="form-check-label small fw-bold text-nowrap ms-2" for="customerInvoicesWalkIn">Walk In</label>
+                            </div>
+                            <div class="form-check form-switch mb-0 d-flex align-items-center">
+                                <input class="form-check-input mt-0" type="checkbox" role="switch" id="customerInvoicesLegacyBalance"
+                                       t-att-checked="this.state.filters.invoices.legacyBalance"
+                                       t-on-change="onInvoicesLegacyBalanceToggle"/>
+                                <label class="form-check-label small fw-bold text-nowrap ms-2" for="customerInvoicesLegacyBalance">Legacy Balance</label>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold ms-auto" t-on-click="printCustomerInvoices" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                                <i class="fa fa-print me-1"/> Print
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('invoices')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
                         </div>
 
                         <!-- LIST CONTAINER WITH LOADER AND FOOTER -->
@@ -544,7 +551,11 @@
                                     </t>
                                         <t t-foreach="this.state.invoices" t-as="inv" t-key="inv.id">
                                             <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewInvoice(inv)">
-                                                <td class="ps-4 fw-bold text-primary"><t t-esc="inv.display_name"/></td>
+                                                <td class="ps-4 fw-bold text-primary">
+                                                    <t t-esc="inv.display_name"/>
+                                                    <span t-if="inv.isWalkIn" class="badge bg-warning text-dark ms-2">Walk-in</span>
+                                                    <span t-if="inv.isLegacyBalance" class="badge bg-info text-white ms-2">Legacy Balance</span>
+                                                </td>
                                                 <td class="fw-bold"><t t-esc="inv.shop"/></td>
                                                 <td><t t-esc="inv.date"/></td>
                                                 <td class="text-end fw-bold">Rs. <t t-esc="inv.amount"/></td>
@@ -583,11 +594,11 @@
                         <div class="p-4 bg-light">
                             <div class="d-flex justify-content-between mb-4">
                                 <div class="d-flex gap-2">
-                                    <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm" t-on-click="() => this.state.selectedInvoice = null">
+                                    <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm" t-on-click="() => this.closeInvoiceDetail('invoices')">
                                         <i class="fa fa-arrow-left me-1"></i> Back
                                     </button>
                                     <t t-if="this.state.isEditingInvoice">
-                                        <button class="btn btn-sm btn-success fw-bold text-white px-3 shadow-sm" t-on-click="saveInvoiceEdits" t-att-disabled="this.state.isSavingInvoice">
+                                        <button t-if="this.canMutate" class="btn btn-sm btn-success fw-bold text-white px-3 shadow-sm" t-on-click="saveInvoiceEdits" t-att-disabled="this.state.isSavingInvoice">
                                             <span t-if="this.state.isSavingInvoice" class="spinner-border spinner-border-sm me-2"/>
                                             <t t-if="this.state.isSavingInvoice">Saving...</t>
                                             <t t-else="">
@@ -605,35 +616,35 @@
                                             <i class="fa fa-print me-1"></i> Print PDF
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Draft'" class="btn btn-outline-primary fw-bold bg-white px-3" t-on-click="toggleEditInvoice" title="Modify quantities and prices">
+                                        <button t-if="this.canMutate and this.state.selectedInvoice.status === 'Draft'" class="btn btn-outline-primary fw-bold bg-white px-3" t-on-click="toggleEditInvoice" title="Modify quantities and prices">
                                             <i class="fa fa-pencil me-1"></i> Edit Lines
                                         </button>
-                                        <button t-if="this.state.selectedInvoice.status === 'Draft'" class="btn btn-outline-danger fw-bold bg-white px-3" t-on-click="() => this.actionCancelInvoice(this.state.selectedInvoice)" t-att-disabled="this.state.isCancelling" title="Cancel this draft refund">
+                                        <button t-if="this.canMutate and this.state.selectedInvoice.status === 'Draft'" class="btn btn-outline-danger fw-bold bg-white px-3" t-on-click="() => this.actionCancelInvoice(this.state.selectedInvoice)" t-att-disabled="this.state.isCancelling" title="Cancel this draft refund">
                                             <span t-if="this.state.isCancelling" class="spinner-border spinner-border-sm me-2"/>
                                             <i t-else="" class="fa fa-times me-1"></i>
                                             <t t-if="this.state.isCancelling">Cancelling...</t>
                                             <t t-else="">Cancel</t>
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Posted' or this.state.selectedInvoice.status === 'Cancelled'" class="btn btn-warning fw-bold text-dark px-3" t-on-click="() => this.actionResetToDraft(this.state.selectedInvoice)" t-att-disabled="this.state.isResetting" title="Revert back to draft">
+                                        <button t-if="this.canMutate and (this.state.selectedInvoice.status === 'Posted' or this.state.selectedInvoice.status === 'Cancelled')" class="btn btn-warning fw-bold text-dark px-3" t-on-click="() => this.actionResetToDraft(this.state.selectedInvoice)" t-att-disabled="this.state.isResetting" title="Revert back to draft">
                                             <span t-if="this.state.isResetting" class="spinner-border spinner-border-sm me-2"/>
                                             <i t-else="" class="fa fa-undo me-1"></i>
                                             <t t-if="this.state.isResetting">Resetting...</t>
                                             <t t-else="">Reset to Draft</t>
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Draft'" class="btn btn-success fw-bold text-white px-3 shadow-sm" t-on-click="() => this.actionConfirmInvoice(this.state.selectedInvoice)" t-att-disabled="this.state.isConfirming" title="Finalize this refund">
+                                        <button t-if="this.canMutate and this.state.selectedInvoice.status === 'Draft'" class="btn btn-success fw-bold text-white px-3 shadow-sm" t-on-click="() => this.actionConfirmInvoice(this.state.selectedInvoice)" t-att-disabled="this.state.isConfirming" title="Finalize this refund">
                                             <span t-if="this.state.isConfirming" class="spinner-border spinner-border-sm me-2"/>
                                             <i t-else="" class="fa fa-check me-1"></i>
                                             <t t-if="this.state.isConfirming">Confirming...</t>
                                             <t t-else="">Confirm Invoice</t>
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Posted' or this.state.selectedInvoice.status === 'Partial'" class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="openPaymentModal" title="Record outgoing payment for this refund">
+                                        <button t-if="this.canMutate and (this.state.selectedInvoice.status === 'Posted' or this.state.selectedInvoice.status === 'Partial')" class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="openPaymentModal" title="Record outgoing payment for this refund">
                                             <i class="fa fa-money me-1"></i> Register Payment
                                         </button>
 
-                                        <button t-if="this.canIssueCreditNote(this.state.selectedInvoice)" class="btn btn-danger fw-bold text-white px-3 shadow-sm" t-on-click="openRefundModal" title="Create a full or partial Credit Note for this invoice">
+                                        <button t-if="this.canMutate and this.canIssueCreditNote(this.state.selectedInvoice)" class="btn btn-danger fw-bold text-white px-3 shadow-sm" t-on-click="openRefundModal" title="Create a full or partial Credit Note for this invoice">
                                             <i class="fa fa-reply me-1"></i> Refund / Credit Note
                                         </button>
                                     </div>
@@ -643,7 +654,9 @@
                             <div t-attf-class="card p-0 shadow-sm border-0 border-start border-4 #{this.state.selectedInvoice.status === 'Paid' ? 'border-success' : this.state.selectedInvoice.status === 'Posted' ? 'border-info' : this.state.selectedInvoice.status === 'Partial' ? 'border-warning text-dark' : this.state.selectedInvoice.status === 'Cancelled' ? 'border-danger' : 'border-secondary '}">
                                 <div class="p-4 bg-white border-bottom">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h4 class="text-dark fw-bold mb-0">Invoice: <t t-esc="this.state.selectedInvoice.display_name"/>
+                                        <h4 class="text-dark fw-bold mb-0 d-flex align-items-center flex-wrap gap-2">Invoice: <t t-esc="this.state.selectedInvoice.display_name"/>
+                                            <span t-if="this.state.selectedInvoice.isWalkIn" class="badge bg-warning text-dark">Walk-in Delivery</span>
+                                            <span t-if="this.state.selectedInvoice.isLegacyBalance" class="badge bg-info text-white">Legacy Balance</span>
                                         </h4>
                                         <span t-attf-class="badge fs-6 #{this.state.selectedInvoice.status === 'Paid' ? 'bg-success text-white' : this.state.selectedInvoice.status === 'Posted' ? 'bg-info text-white' : this.state.selectedInvoice.status === 'Partial' ? 'bg-warning text-dark' : this.state.selectedInvoice.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-secondary text-dark'} px-3 py-2 shadow-sm">
                                             <t t-esc="this.state.selectedInvoice.status"/>
@@ -882,7 +895,7 @@
                                         </div>
                                         <div class="d-flex gap-2">
                                         <button class="btn btn-light fw-bold border px-4" t-on-click="closeRefundModal" t-att-disabled="this.state.isRefunding">Cancel</button>
-                                        <button class="btn btn-danger fw-bold text-white px-4 shadow-sm" t-on-click="processRefund" t-att-disabled="this.state.isRefunding">
+                                        <button t-if="this.canMutate" class="btn btn-danger fw-bold text-white px-4 shadow-sm" t-on-click="processRefund" t-att-disabled="this.state.isRefunding">
                                             <span t-if="this.state.isRefunding" class="spinner-border spinner-border-sm me-2"/>
                                             <t t-if="this.state.isRefunding">Processing...</t>
                                                 <t t-else="">Create Credit Note</t>
@@ -968,7 +981,7 @@
 
                                     <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-2">
                                         <button class="btn btn-light fw-bold border px-4" t-on-click="closePaymentModal" t-att-disabled="this.state.isPaying">Cancel</button>
-                                        <button class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="processPayment" t-att-disabled="this.state.isPaying">
+                                        <button t-if="this.canMutate" class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="processPayment" t-att-disabled="this.state.isPaying">
                                             <span t-if="this.state.isPaying" class="spinner-border spinner-border-sm me-2"/>
                                             <t t-if="this.state.isPaying">Validating...</t>
                                             <t t-else="">Validate &amp; Pay</t>
@@ -992,15 +1005,9 @@
                                        t-att-value="this.state.filters.payments.search"
                                        t-on-input="(ev) => this.onSearchInput(ev, 'payments')"/>
                             </div>
-                            <select class="form-select form-select-sm shadow-sm" style="width: 200px;"
-                                    t-model="this.state.filters.payments.shop"
-                                    t-on-change="() => this.onFilterChange('payments')"
-                                    title="Filter by shop">
-                                <option value="all">All Shops</option>
-                                <t t-foreach="this.state.invoiceShops" t-as="shop" t-key="shop.id">
-                                    <option t-att-value="shop.id"><t t-esc="shop.name"/></option>
-                                </t>
-                            </select>
+                            <ShopFilter shopId="this.state.filters.payments.shop"
+                                        shopName="this.state.filters.payments.shopName"
+                                        onSelect="(shopId, shopName) => this.onShopFilterSelect('payments', shopId, shopName)"/>
                             <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;"
                                    t-model="this.state.filters.payments.dateFrom"
                                    t-on-change="() => this.onFilterChange('payments')"
@@ -1009,8 +1016,14 @@
                                    t-model="this.state.filters.payments.dateTo"
                                    t-on-change="() => this.onFilterChange('payments')"
                                    title="To date"/>
-                            <div class="ms-auto">
-                                <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm"
+                            <div class="ms-auto d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printCustomerPayments" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                                    <i class="fa fa-print me-1"/> Print
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('payments')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                    <i class="fa fa-times me-1"/> Clear filters
+                                </button>
+                                <button t-if="this.canMutate" class="btn btn-sm btn-dark fw-bold text-white shadow-sm"
                                         t-on-click="openCollectModal"
                                         t-att-disabled="this.state.collectModal.loading">
                                     Collect Payment
@@ -1081,7 +1094,7 @@
                     </t>
                     <t t-else="">
                         <div class="p-4 bg-light">
-                            <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm mb-4" t-on-click="() => this.state.selectedPayment = null">
+                            <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm mb-4" t-on-click="() => this.closePaymentDetail()">
                                 <i class="fa fa-arrow-left me-1"></i> Back to Payment Log
                             </button>
                             <div class="card p-4 shadow-sm border-0 border-start border-4 border-success">
@@ -1178,15 +1191,9 @@
                                        t-att-value="this.state.filters.creditNotes.search"
                                        t-on-input="(ev) => this.onSearchInput(ev, 'creditNotes')"/>
                             </div>
-                            <select class="form-select form-select-sm shadow-sm" style="width: 200px;"
-                                    t-model="this.state.filters.creditNotes.shop"
-                                    t-on-change="() => this.onFilterChange('creditNotes')"
-                                    title="Filter by shop">
-                                <option value="all">All Shops</option>
-                                <t t-foreach="this.state.invoiceShops" t-as="shop" t-key="shop.id">
-                                    <option t-att-value="shop.id"><t t-esc="shop.name"/></option>
-                                </t>
-                            </select>
+                            <ShopFilter shopId="this.state.filters.creditNotes.shop"
+                                        shopName="this.state.filters.creditNotes.shopName"
+                                        onSelect="(shopId, shopName) => this.onShopFilterSelect('creditNotes', shopId, shopName)"/>
                             <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;"
                                    t-model="this.state.filters.creditNotes.dateFrom"
                                    t-on-change="() => this.onFilterChange('creditNotes')"
@@ -1204,6 +1211,12 @@
                                 <option value="Draft">Draft</option>
                                 <option value="Cancelled">Cancelled</option>
                             </select>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold ms-auto" t-on-click="printCreditNotes" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                                <i class="fa fa-print me-1"/> Print
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('creditNotes')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
                         </div>
                         
                         <div class="position-relative">
@@ -1272,11 +1285,11 @@
                         <div class="p-4 bg-light">
                             <div class="d-flex justify-content-between mb-4">
                                 <div class="d-flex gap-2">
-                                    <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm" t-on-click="() => this.state.selectedInvoice = null">
+                                    <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm" t-on-click="() => this.closeInvoiceDetail('creditNotes')">
                                         <i class="fa fa-arrow-left me-1"></i> Back
                                     </button>
                                     <t t-if="this.state.isEditingInvoice">
-                                        <button class="btn btn-sm btn-success fw-bold text-white px-3 shadow-sm" t-on-click="saveInvoiceEdits" t-att-disabled="this.state.isSavingInvoice">
+                                        <button t-if="this.canMutate" class="btn btn-sm btn-success fw-bold text-white px-3 shadow-sm" t-on-click="saveInvoiceEdits" t-att-disabled="this.state.isSavingInvoice">
                                             <span t-if="this.state.isSavingInvoice" class="spinner-border spinner-border-sm me-2"/>
                                             <t t-if="this.state.isSavingInvoice">Saving...</t>
                                             <t t-else="">
@@ -1294,31 +1307,31 @@
                                             <i class="fa fa-print me-1"></i> Print PDF
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Draft'" class="btn btn-outline-primary fw-bold bg-white px-3" t-on-click="toggleEditInvoice" title="Modify quantities and prices">
+                                        <button t-if="this.canMutate and this.state.selectedInvoice.status === 'Draft'" class="btn btn-outline-primary fw-bold bg-white px-3" t-on-click="toggleEditInvoice" title="Modify quantities and prices">
                                             <i class="fa fa-pencil me-1"></i> Edit Lines
                                         </button>
-                                        <button t-if="this.state.selectedInvoice.status === 'Draft'" class="btn btn-outline-danger fw-bold bg-white px-3" t-on-click="() => this.actionCancelInvoice(this.state.selectedInvoice)" t-att-disabled="this.state.isCancelling" title="Cancel this draft refund">
+                                        <button t-if="this.canMutate and this.state.selectedInvoice.status === 'Draft'" class="btn btn-outline-danger fw-bold bg-white px-3" t-on-click="() => this.actionCancelInvoice(this.state.selectedInvoice)" t-att-disabled="this.state.isCancelling" title="Cancel this draft refund">
                                             <span t-if="this.state.isCancelling" class="spinner-border spinner-border-sm me-2"/>
                                             <i t-else="" class="fa fa-times me-1"></i>
                                             <t t-if="this.state.isCancelling">Cancelling...</t>
                                             <t t-else="">Cancel</t>
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Posted' or this.state.selectedInvoice.status === 'Cancelled'" class="btn btn-warning fw-bold text-dark px-3" t-on-click="() => this.actionResetToDraft(this.state.selectedInvoice)" t-att-disabled="this.state.isResetting" title="Revert back to draft">
+                                        <button t-if="this.canMutate and (this.state.selectedInvoice.status === 'Posted' or this.state.selectedInvoice.status === 'Cancelled')" class="btn btn-warning fw-bold text-dark px-3" t-on-click="() => this.actionResetToDraft(this.state.selectedInvoice)" t-att-disabled="this.state.isResetting" title="Revert back to draft">
                                             <span t-if="this.state.isResetting" class="spinner-border spinner-border-sm me-2"/>
                                             <i t-else="" class="fa fa-undo me-1"></i>
                                             <t t-if="this.state.isResetting">Resetting...</t>
                                             <t t-else="">Reset to Draft</t>
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Draft'" class="btn btn-success fw-bold text-white px-3 shadow-sm" t-on-click="() => this.actionConfirmInvoice(this.state.selectedInvoice)" t-att-disabled="this.state.isConfirming" title="Finalize this refund">
+                                        <button t-if="this.canMutate and this.state.selectedInvoice.status === 'Draft'" class="btn btn-success fw-bold text-white px-3 shadow-sm" t-on-click="() => this.actionConfirmInvoice(this.state.selectedInvoice)" t-att-disabled="this.state.isConfirming" title="Finalize this refund">
                                             <span t-if="this.state.isConfirming" class="spinner-border spinner-border-sm me-2"/>
                                             <i t-else="" class="fa fa-check me-1"></i>
                                             <t t-if="this.state.isConfirming">Confirming...</t>
                                             <t t-else="">Confirm Refund</t>
                                         </button>
 
-                                        <button t-if="this.state.selectedInvoice.status === 'Posted' or this.state.selectedInvoice.status === 'Partial'" class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="openPaymentModal" title="Record outgoing payment for this refund">
+                                        <button t-if="this.canMutate and (this.state.selectedInvoice.status === 'Posted' or this.state.selectedInvoice.status === 'Partial')" class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="openPaymentModal" title="Record outgoing payment for this refund">
                                             <i class="fa fa-money me-1"></i> Register Payment
                                         </button>
                                     </div>
@@ -1565,7 +1578,7 @@
 
                                     <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-2">
                                         <button class="btn btn-light fw-bold border px-4" t-on-click="closePaymentModal" t-att-disabled="this.state.isPaying">Cancel</button>
-                                        <button class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="processPayment" t-att-disabled="this.state.isPaying">
+                                        <button t-if="this.canMutate" class="btn btn-success fw-bold text-white px-4 shadow-sm" t-on-click="processPayment" t-att-disabled="this.state.isPaying">
                                             <span t-if="this.state.isPaying" class="spinner-border spinner-border-sm me-2"/>
                                             <t t-if="this.state.isPaying">Validating...</t>
                                             <t t-else="">Validate &amp; Pay</t>
@@ -1629,7 +1642,7 @@
                             </div>
                             <div class="modal-footer">
                                 <button class="btn btn-outline-secondary" t-on-click="closeCollectModal">Cancel</button>
-                                <button class="btn btn-dark text-white" t-on-click="confirmCollect" t-att-disabled="this.state.collectModal.loading or !this.state.collectModal.wizardId">Confirm</button>
+                                <button t-if="this.canMutate" class="btn btn-dark text-white" t-on-click="confirmCollect" t-att-disabled="this.state.collectModal.loading or !this.state.collectModal.wizardId">Confirm</button>
                             </div>
                         </div>
                     </div>

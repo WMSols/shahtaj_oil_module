@@ -41,17 +41,22 @@
 <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
     <small class="fw-bold text-muted">Filters: </small>
     <select class="form-select form-select-sm shadow-sm" style="max-width: 200px;" 
-            t-model="this.state.filters.schedules.booker" 
-            t-on-change="() => this.onFilterChange('schedules')">
-        <option value="all">All Bookers</option>
+            t-on-change="(ev) => this.onFilterField('schedules', 'booker', ev)">
+        <option value="all" t-att-selected="this.isFilterOptionSelected('schedules', 'booker', 'all')">All Bookers</option>
         <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
-            <option t-att-value="b.id"><t t-esc="b.name"/></option>
+            <option t-att-value="this.filterOptionValue(b.id)" t-att-selected="this.isFilterOptionSelected('schedules', 'booker', b.id)"><t t-esc="b.name"/></option>
         </t>
     </select>
     <input type="date" class="form-control form-control-sm shadow-sm" style="max-width: 160px;"
-           t-model="this.state.filters.schedules.date"
-           t-on-change="() => this.onFilterChange('schedules')"
+           t-att-value="this.state.filters.schedules.date"
+           t-on-change="(ev) => this.onFilterField('schedules', 'date', ev)"
            title="Optional: show this booker's performance on a specific date"/>
+    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printBookerPerformance" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+        <i class="fa fa-print me-1"/> Print
+    </button>
+    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('schedules')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+        <i class="fa fa-times me-1"/> Clear filters
+    </button>
 </div>
 <div class="position-relative">
     <t t-if="this.state.isLoadingList">
@@ -214,6 +219,119 @@
         </div>
     </div>
 </div>
+<div class="card p-4 shadow-sm border-0 mt-4">
+    <style>
+        .so-visit-badge {
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        .so-badge-complete { background-color: #15803d !important; color: #fff !important; }
+        .so-badge-order { background-color: #16a34a !important; color: #fff !important; }
+        .so-badge-incomplete { background-color: #dc2626 !important; color: #fff !important; }
+        .so-badge-undone { background-color: #9f1239 !important; color: #fff !important; }
+        .so-badge-no-order { background-color: #d97706 !important; color: #fff !important; }
+        .so-badge-closed { background-color: #c2410c !important; color: #fff !important; }
+        .so-badge-progress { background-color: #2563eb !important; color: #fff !important; }
+        .so-badge-pending { background-color: #64748b !important; color: #fff !important; }
+    </style>
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+            <h5 class="text-dark fw-bold mb-1">Shop Visits</h5>
+            <small class="text-muted">
+                <t t-esc="this.formatScheduleVisitDate(this.state.selectedSchedule.visitDate)"/>
+                <t t-if="this.state.selectedSchedule.visitDateIsInferred"> · latest matching weekday</t>
+            </small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-outline-secondary fw-bold"
+                    t-on-click="printScheduleVisits"
+                    t-att-disabled="this.state.isPrintingList or this.state.scheduleVisitsLoading"
+                    title="Print the shop visits that match the current filters">
+                <i class="fa fa-print me-1"/> Print
+            </button>
+            <span class="badge bg-light text-dark border px-3 py-2">
+                <t t-esc="this.scheduleVisitRows().length"/> shown
+            </span>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <small class="fw-bold text-muted text-uppercase" style="min-width: 5.5rem;">Completion</small>
+        <div class="d-flex flex-wrap gap-1">
+            <t t-foreach="this.scheduleVisitCompletionFilters()" t-as="opt" t-key="opt.key">
+                <button type="button" t-att-class="this.scheduleVisitFilterClass('completion', opt.key)"
+                        t-on-click="() => this.setScheduleVisitFilter('completion', opt.key)">
+                    <t t-esc="opt.label"/>
+                    <span class="ms-1 opacity-75">(<t t-esc="this.scheduleVisitCount('completion', opt.key)"/>)</span>
+                </button>
+            </t>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <small class="fw-bold text-muted text-uppercase" style="min-width: 5.5rem;">Outcome</small>
+        <div class="d-flex flex-wrap gap-1">
+            <t t-foreach="this.scheduleVisitOutcomeFilters()" t-as="opt" t-key="opt.key">
+                <button type="button" t-att-class="this.scheduleVisitFilterClass('outcome', opt.key)"
+                        t-on-click="() => this.setScheduleVisitFilter('outcome', opt.key)">
+                    <t t-esc="opt.label"/>
+                    <span class="ms-1 opacity-75">(<t t-esc="this.scheduleVisitCount('outcome', opt.key)"/>)</span>
+                </button>
+            </t>
+        </div>
+    </div>
+    <div class="position-relative">
+        <t t-if="this.state.scheduleVisitsLoading">
+            <div class="d-flex justify-content-center align-items-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        </t>
+        <div class="table-responsive" t-else="">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                    <tr>
+                        <th class="ps-3">Shop</th>
+                        <th>Check-in</th>
+                        <th>Status</th>
+                        <th>Outcome</th>
+                        <th>Duration</th>
+                        <th class="text-end">Order Total</th>
+                        <th class="pe-3" style="min-width: 220px;">Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-if="this.scheduleVisitRows().length === 0">
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">No shop visits for this date and these filters.</td>
+                        </tr>
+                    </t>
+                    <t t-foreach="this.scheduleVisitRows()" t-as="row" t-key="row.id">
+                        <tr>
+                            <td class="ps-3">
+                                <div class="fw-bold text-dark"><t t-esc="row.shop"/></div>
+                                <small class="text-muted" t-if="row.orderName"><t t-esc="row.orderName"/></small>
+                            </td>
+                            <td class="text-nowrap small"><t t-esc="row.checkIn"/></td>
+                            <td>
+                                <span t-attf-class="badge so-visit-badge #{this.scheduleVisitStatusClass(row)} px-2 py-1">
+                                    <t t-esc="row.statusLabel"/>
+                                </span>
+                            </td>
+                            <td>
+                                <span t-attf-class="badge so-visit-badge #{this.scheduleVisitOutcomeClass(row.outcomeKey)} px-2 py-1">
+                                    <t t-esc="row.outcomeLabel"/>
+                                </span>
+                            </td>
+                            <td class="text-nowrap small"><t t-esc="row.durationLabel"/></td>
+                            <td class="text-end fw-bold text-nowrap"><t t-esc="row.orderLabel"/></td>
+                            <td class="pe-3 small text-muted" style="white-space: pre-wrap; max-width: 320px;">
+                                <t t-esc="row.notes || '—'"/>
+                            </td>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 </div>
 </t>
 </t>
@@ -223,22 +341,27 @@
 <div class="p-3 bg-light border-bottom d-flex gap-2">
     <small class="fw-bold text-muted">Filters: </small>
     <select class="form-select form-select-sm shadow-sm w-25" 
-            t-model="this.state.filters.targets.booker" 
-            t-on-change="() => this.onFilterChange('targets')">
-        <option value="all">All Bookers</option>
+            t-on-change="(ev) => this.onFilterField('targets', 'booker', ev)">
+        <option value="all" t-att-selected="this.isFilterOptionSelected('targets', 'booker', 'all')">All Bookers</option>
         <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
-            <option t-att-value="b.id"><t t-esc="b.name"/></option>
+            <option t-att-value="this.filterOptionValue(b.id)" t-att-selected="this.isFilterOptionSelected('targets', 'booker', b.id)"><t t-esc="b.name"/></option>
         </t>
     </select>
 
     <select class="form-select form-select-sm shadow-sm w-25" 
-            t-model="this.state.filters.targets.type" 
-            t-on-change="() => this.onFilterChange('targets')">
+            t-att-value="this.state.filters.targets.type" 
+            t-on-change="(ev) => this.onFilterField('targets', 'type', ev)">
         <option value="all">All Target Types</option>
         <t t-foreach="this.state.lookupTargetTypes" t-as="type" t-key="type.value">
             <option t-att-value="type.value"><t t-esc="type.label"/></option>
         </t>
     </select>
+    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printBookerPerformance" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+        <i class="fa fa-print me-1"/> Print
+    </button>
+    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('targets')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+        <i class="fa fa-times me-1"/> Clear filters
+    </button>
 </div>
 <div class="position-relative">
     <t t-if="this.state.isLoadingList">
@@ -266,7 +389,15 @@
                     <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewTarget(tgt)">
                         <td class="ps-4 text-nowrap"><div class="fw-bold text-dark"><t t-esc="tgt.bookerName"/></div></td>
                         <td class="align-middle"><div class="text-primary fw-bold"><t t-esc="tgt.displayType"/></div></td>
-                        <td class="align-middle text-nowrap"><div class="fw-bold small text-dark"><t t-esc="tgt.startDate"/></div><div class="text-muted small">to <t t-esc="tgt.endDate"/></div></td>
+                        <td class="align-middle text-nowrap">
+                            <div class="fw-bold small text-dark"><t t-esc="tgt.startDate"/></div>
+                            <div class="text-muted small">to <t t-esc="tgt.endDate"/></div>
+                            <div class="mt-1">
+                                <span t-if="tgt.periodStatus === 'upcoming'" class="badge rounded-pill px-2 py-1 text-white" style="background-color: #17a2b8;">Upcoming</span>
+                                <span t-elif="tgt.periodStatus === 'current'" class="badge rounded-pill bg-success text-white px-2 py-1">Current</span>
+                                <span t-elif="tgt.periodStatus === 'ended'" class="badge rounded-pill px-2 py-1" style="background-color: #e9ecef; color: #6c757d;">Ended</span>
+                            </div>
+                        </td>
                         <td class="align-middle text-center fw-bold text-dark text-nowrap"><span class="text-success"><t t-esc="tgt.achievedValue"/></span><span class="text-muted mx-1">/</span><t t-esc="tgt.targetValue"/></td>
                         <td class="align-middle text-center">
                             <div class="d-flex align-items-center justify-content-center w-100">
@@ -274,7 +405,9 @@
                                 <small class="fw-bold text-success"><t t-esc="tgt.progress.toFixed(0)"/>%</small>
                             </div>
                         </td>
-                        <td class="align-middle text-end pe-4 text-nowrap"><span t-attf-class="badge #{tgt.active ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm"><t t-esc="tgt.active ? 'Active' : 'Deactivated'"/></span></td>
+                        <td class="align-middle text-end pe-4 text-nowrap">
+                            <span t-attf-class="badge #{tgt.showActive ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm"><t t-esc="tgt.showActive ? 'Active' : 'Inactive'"/></span>
+                        </td>
                     </tr>
                 </t>
             </tbody>
@@ -307,9 +440,14 @@
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
         <h4 class="text-dark fw-bold mb-0">Target: <t t-esc="this.state.selectedTarget.name"/>
         </h4>
-        <span t-attf-class="badge #{this.state.selectedTarget.active ? 'text-success' : 'text-secondary'}  px-3 py-2 shadow-sm fs-6">
-            <t t-esc="this.state.selectedTarget.active ? 'Active Target' : 'Deactivated'"/>
-        </span>
+        <div class="d-flex align-items-center gap-2">
+            <span t-if="this.state.selectedTarget.periodStatus === 'upcoming'" class="badge rounded-pill px-3 py-2 text-white fs-6" style="background-color: #17a2b8;">Upcoming</span>
+            <span t-elif="this.state.selectedTarget.periodStatus === 'current'" class="badge rounded-pill bg-success text-white px-3 py-2 fs-6">Current</span>
+            <span t-elif="this.state.selectedTarget.periodStatus === 'ended'" class="badge rounded-pill px-3 py-2 fs-6" style="background-color: #e9ecef; color: #6c757d;">Ended</span>
+            <span t-attf-class="badge #{this.state.selectedTarget.showActive ? 'text-success' : 'text-secondary'} px-3 py-2 shadow-sm fs-6">
+                <t t-esc="this.state.selectedTarget.showActive ? 'Active Target' : 'Inactive'"/>
+            </span>
+        </div>
     </div>
     <div class="row g-4">
         <div class="col-md-6">

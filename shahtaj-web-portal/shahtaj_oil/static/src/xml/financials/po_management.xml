@@ -69,9 +69,12 @@
                                     <label class="small fw-bold">Expected Delivery</label>
                                     <input type="date" class="form-control" t-model="this.state.purchaseOrderForm.date_planned"/>
                                 </div>
-                                <div class="col-md-4 d-flex align-items-end">
-                                    <button class="btn btn-outline-dark fw-bold me-2" t-on-click="openVendorForm">New Vendor</button>
-                                    <button class="btn btn-success fw-bold text-white" t-on-click="savePurchaseOrder">Save Purchase Order</button>
+                                <div class="col-md-4">
+                                    <label class="small fw-bold d-block invisible" aria-hidden="true">Actions</label>
+                                    <div class="d-flex align-items-center">
+                                        <button class="btn btn-outline-dark fw-bold me-2" t-on-click="openVendorForm">New Vendor</button>
+                                        <button class="btn btn-success fw-bold text-white" t-on-click="savePurchaseOrder">Save Purchase Order</button>
+                                    </div>
                                 </div>
                             </div>
                             <t t-if="this.state.showVendorForm">
@@ -176,6 +179,14 @@
                                 <input type="text" class="form-control border-start-0 ps-0" placeholder="Search POs or vendors..." t-att-value="this.state.filters.purchaseOrders.search" t-on-input="(ev) => this.onSearchInput(ev, 'purchaseOrders')"/>
                             </div>
                             <div class="d-flex gap-2 flex-wrap">
+                                <select class="form-select form-select-sm shadow-sm" style="width: 180px;" t-model="this.state.filters.purchaseOrders.vendor" t-on-change="() => this.onFilterChange('purchaseOrders')" title="Filter by vendor">
+                                    <option value="all">All Vendors</option>
+                                    <t t-foreach="this.state.poLookups.vendors" t-as="vendor" t-key="vendor.id">
+                                        <option t-att-value="vendor.id"><t t-esc="vendor.name"/></option>
+                                    </t>
+                                </select>
+                                <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-model="this.state.filters.purchaseOrders.dateFrom" t-on-change="() => this.onFilterChange('purchaseOrders')" title="Order date from"/>
+                                <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-model="this.state.filters.purchaseOrders.dateTo" t-on-change="() => this.onFilterChange('purchaseOrders')" title="Order date to"/>
                                 <select class="form-select form-select-sm shadow-sm" style="width: 180px;" t-model="this.state.filters.purchaseOrders.status" t-on-change="() => this.onFilterChange('purchaseOrders')">
                                     <option value="all">All PO Statuses</option>
                                     <option value="Draft">Draft</option>
@@ -183,6 +194,12 @@
                                     <option value="To Bill">To Bill</option>
                                     <option value="Cancelled">Cancelled</option>
                                 </select>
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printPurchaseOrders" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                                    <i class="fa fa-print me-1"/> Print
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('purchaseOrders')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                    <i class="fa fa-times me-1"/> Clear filters
+                                </button>
                                 <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="openPurchaseOrderForm">New PO</button>
                             </div>
                         </div>
@@ -215,7 +232,10 @@
                                                 <td><div class="fw-bold small"><t t-esc="po.date"/></div><div class="text-muted small">Expected: <t t-esc="po.expectedDate"/></div></td>
                                                 <td class="text-end fw-bold text-success">Rs. <t t-esc="po.amount"/></td>
                                                 <td class="text-center"><span t-attf-class="badge px-2 py-1 shadow-sm #{this.statusBadgeClass(po.status)}"><t t-esc="po.status"/></span></td>
-                                                <td class="text-end pe-4"><button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewPurchaseOrder(po)">View Details</button></td>
+                                                <td class="text-end pe-4 text-nowrap">
+                                                    <button t-if="po.status === 'Confirmed' and po.invoice_status === 'to invoice'" class="btn btn-sm btn-success fw-bold text-white shadow-sm me-1" t-on-click="() => this.actionCreateVendorBill(po)">Create Bill</button>
+                                                    <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewPurchaseOrder(po)">View Details</button>
+                                                </td>
                                             </tr>
                                         </t>
                                     </tbody>
@@ -362,13 +382,26 @@
                                 <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
                                 <input type="text" class="form-control border-start-0 ps-0" placeholder="Search receipts or returns..." t-att-value="this.state.filters.receipts.search" t-on-input="(ev) => this.onSearchInput(ev, 'receipts')"/>
                             </div>
-                            <select class="form-select form-select-sm shadow-sm" style="width: 200px;" t-model="this.state.filters.receipts.status" t-on-change="() => this.onFilterChange('receipts')">
+                            <div class="d-flex gap-2 flex-wrap">
+                                <select class="form-select form-select-sm shadow-sm" style="width: 180px;" t-att-value="this.state.filters.receipts.vendor" t-on-change="(ev) => this.onFilterField('receipts', 'vendor', ev)" title="Filter by vendor">
+                                    <option value="all">All Vendors</option>
+                                    <t t-foreach="this.state.poLookups.vendors" t-as="vendor" t-key="vendor.id">
+                                        <option t-att-value="this.filterOptionValue(vendor.id)"><t t-esc="vendor.name"/></option>
+                                    </t>
+                                </select>
+                                <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-att-value="this.state.filters.receipts.dateFrom" t-on-change="(ev) => this.onFilterField('receipts', 'dateFrom', ev)" title="Scheduled date from"/>
+                                <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-att-value="this.state.filters.receipts.dateTo" t-on-change="(ev) => this.onFilterField('receipts', 'dateTo', ev)" title="Scheduled date to"/>
+                                <select class="form-select form-select-sm shadow-sm" style="width: 200px;" t-att-value="this.state.filters.receipts.status" t-on-change="(ev) => this.onFilterField('receipts', 'status', ev)">
                                 <option value="all">All Receipt Statuses</option>
                                 <option value="Ready">Ready / Waiting</option>
                                 <option value="Product Received">Product Received</option>
                                 <option value="Returned">Returned</option>
                                 <option value="Cancelled">Cancelled</option>
                             </select>
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('receipts')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                    <i class="fa fa-times me-1"/> Clear filters
+                                </button>
+                            </div>
                         </div>
                         <div class="position-relative">
                             <t t-if="this.state.isLoadingList">
@@ -405,7 +438,10 @@
                                                 <td><t t-esc="receipt.origin"/></td>
                                                 <td><t t-esc="receipt.scheduledDate"/></td>
                                                 <td class="text-center"><span t-attf-class="badge px-2 py-1 shadow-sm #{this.statusBadgeClass(receipt.status)}"><t t-esc="receipt.status"/></span></td>
-                                                <td class="text-end pe-4"><button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewReceipt(receipt)">View Details</button></td>
+                                                <td class="text-end pe-4 text-nowrap">
+                                                    <button t-if="receipt.canCreateBill" class="btn btn-sm btn-success fw-bold text-white shadow-sm me-1" t-on-click="() => this.actionCreateVendorBill({ id: receipt.purchaseId })">Create Bill</button>
+                                                    <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewReceipt(receipt)">View Details</button>
+                                                </td>
                                             </tr>
                                         </t>
                                     </tbody>
@@ -436,6 +472,7 @@
                                     <button t-if="this.state.selectedReceipt.state === 'draft'" class="btn btn-primary fw-bold text-white shadow-sm" t-on-click="() => this.actionConfirmReceipt(this.state.selectedReceipt)">Confirm</button>
                                     <button t-if="this.state.selectedReceipt.state === 'waiting' or this.state.selectedReceipt.state === 'confirmed' or this.state.selectedReceipt.state === 'partially_available'" class="btn btn-outline-dark fw-bold shadow-sm" t-on-click="() => this.actionCheckReceiptAvailability(this.state.selectedReceipt)">Check Availability</button>
                                     <button t-if="this.state.selectedReceipt.state !== 'done' and this.state.selectedReceipt.state !== 'cancel'" class="btn btn-success fw-bold text-white shadow-sm" t-on-click="() => this.actionValidateReceipt(this.state.selectedReceipt)">Validate</button>
+                                    <button t-if="this.state.selectedReceipt.canCreateBill" class="btn btn-success fw-bold text-white shadow-sm" t-on-click="() => this.actionCreateVendorBill({ id: this.state.selectedReceipt.purchaseId })">Create Bill</button>
                                     <button t-if="this.state.selectedReceipt.state === 'done' and !this.state.selectedReceipt.isReturn" class="btn btn-outline-danger fw-bold shadow-sm" t-on-click="openReturnModal">Return</button>
                                     <button class="btn btn-outline-dark fw-bold shadow-sm" t-on-click="() => this.actionPrintReceipt(this.state.selectedReceipt)">
                                         <i class="fa fa-print me-1"></i> Print
@@ -495,13 +532,29 @@
                                 <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
                                 <input type="text" class="form-control border-start-0 ps-0" placeholder="Search bills or vendors..." t-att-value="this.state.filters.vendorBills.search" t-on-input="(ev) => this.onSearchInput(ev, 'vendorBills')"/>
                             </div>
-                            <select class="form-select form-select-sm shadow-sm" style="width: 180px;" t-model="this.state.filters.vendorBills.status" t-on-change="() => this.onFilterChange('vendorBills')">
-                                <option value="all">All Bill Statuses</option>
-                                <option value="Draft">Draft</option>
-                                <option value="Posted">Posted</option>
-                                <option value="Paid">Paid</option>
-                                <option value="Cancelled">Cancelled</option>
-                            </select>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <select class="form-select form-select-sm shadow-sm" style="width: 180px;" t-att-value="this.state.filters.vendorBills.vendor" t-on-change="(ev) => this.onFilterField('vendorBills', 'vendor', ev)" title="Filter by vendor">
+                                    <option value="all">All Vendors</option>
+                                    <t t-foreach="this.state.poLookups.vendors" t-as="vendor" t-key="vendor.id">
+                                        <option t-att-value="this.filterOptionValue(vendor.id)"><t t-esc="vendor.name"/></option>
+                                    </t>
+                                </select>
+                                <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-att-value="this.state.filters.vendorBills.dateFrom" t-on-change="(ev) => this.onFilterField('vendorBills', 'dateFrom', ev)" title="Bill date from"/>
+                                <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-att-value="this.state.filters.vendorBills.dateTo" t-on-change="(ev) => this.onFilterField('vendorBills', 'dateTo', ev)" title="Bill date to"/>
+                                <select class="form-select form-select-sm shadow-sm" style="width: 180px;" t-att-value="this.state.filters.vendorBills.status" t-on-change="(ev) => this.onFilterField('vendorBills', 'status', ev)">
+                                    <option value="all">All Bill Statuses</option>
+                                    <option value="Draft">Draft</option>
+                                    <option value="Posted">Posted</option>
+                                    <option value="Paid">Paid</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printVendorBills" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                                    <i class="fa fa-print me-1"/> Print
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('vendorBills')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                    <i class="fa fa-times me-1"/> Clear filters
+                                </button>
+                            </div>
                         </div>
                         <div class="position-relative">
                             <t t-if="this.state.isLoadingList">
@@ -728,6 +781,9 @@
                                         Archived (<t t-esc="this.state.archivedVendorsCount || 0"/>)
                                     </button>
                                 </div>
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('vendors')" t-att-disabled="this.state.isLoadingList" title="Clear search on this list">
+                                    <i class="fa fa-times me-1"/> Clear Search
+                                </button>
                             </div>
                             <button t-if="this.state.vendorViewMode !== 'archived'" class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="openVendorForm">
                                 <i class="fa fa-plus me-1"></i> New Vendor
@@ -771,7 +827,7 @@
                                                         <button class="btn btn-sm btn-success fw-bold text-white me-1" t-on-click="() => this.toggleArchiveVendor(vendor, true)" title="Restore Vendor">
                                                             <i class="fa fa-undo me-1"></i> Restore
                                                         </button>
-                                                        <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.deleteVendor(vendor)" title="Delete Vendor">
+                                                        <button t-if="!this.isKpo" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.deleteVendor(vendor)" title="Delete Vendor">
                                                             <i class="fa fa-trash"></i>
                                                         </button>
                                                     </t>
@@ -779,7 +835,7 @@
                                                         <button class="btn btn-sm btn-outline-warning text-dark fw-bold me-1" t-on-click="() => this.toggleArchiveVendor(vendor, false)" title="Archive Vendor">
                                                             <i class="fa fa-archive me-1"></i> Archive
                                                         </button>
-                                                        <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.deleteVendor(vendor)" title="Delete Vendor">
+                                                        <button t-if="!this.isKpo" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.deleteVendor(vendor)" title="Delete Vendor">
                                                             <i class="fa fa-trash"></i>
                                                         </button>
                                                     </t>
@@ -829,7 +885,7 @@
                                             <i class="fa fa-undo me-1"></i> Restore Vendor
                                         </button>
                                     </t>
-                                    <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.deleteVendor(this.state.selectedVendor)">
+                                    <button t-if="!this.isKpo" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.deleteVendor(this.state.selectedVendor)">
                                         <i class="fa fa-trash me-1"></i> Delete Vendor
                                     </button>
                                 </div>

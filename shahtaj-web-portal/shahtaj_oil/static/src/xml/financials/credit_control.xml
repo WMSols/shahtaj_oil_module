@@ -32,6 +32,12 @@
                                    t-on-change="onHasCreditLimitFilterChange"/>
                             <label class="form-check-label small fw-bold text-nowrap ms-2" for="filterCreditLimitGtZero">Credit Limit &gt; 0</label>
                         </div>
+                        <button t-if="this.state.creditSubView === 'balances' and !this.state.selectedShopBalance" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printShopBalances" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                            <i class="fa fa-print me-1"/> Print
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('credits')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
                             </div>
                         </div>
 
@@ -85,20 +91,24 @@
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0">
                                     <thead class="bg-light text-uppercase small fw-bold text-muted">
-                                        <tr><th class="ps-4 py-3">Shop Name</th><th>Shop Owner</th><th class="text-end">Credit Limit</th><th class="text-end">Outstanding (Receivable)</th><th class="text-end pe-4">Action</th></tr>
+                                        <tr><th class="ps-4 py-3">Shop Name</th><th>Shop Owner</th><th class="text-end">Credit Limit</th><th class="text-end">Outstanding (Receivable)</th><th class="text-end">Available Credit</th><th class="text-end pe-4">Action</th></tr>
                                     </thead>
                                     <tbody>
                                         <t t-if="this.state.credits.length === 0 and !this.state.isLoadingList">
-                                            <tr><td colspan="5" class="text-center py-5 text-muted fw-bold"><i class="fa fa-balance-scale fs-1 mb-3 opacity-50"></i><p class="mb-1 fs-5 text-dark">No shops found.</p></td></tr>
+                                            <tr><td colspan="6" class="text-center py-5 text-muted fw-bold"><i class="fa fa-balance-scale fs-1 mb-3 opacity-50"></i><p class="mb-1 fs-5 text-dark">No shops found.</p></td></tr>
                                         </t>
                                         <t t-foreach="this.sortedShopBalances" t-as="bal" t-key="bal.id">
-                                            <tr style="cursor:pointer;" t-on-click="() => this.viewShopBalance(bal)">
+                                            <tr t-att-style="this.canMutate ? 'cursor:pointer;' : ''" t-on-click="() => this.viewShopBalance(bal)">
                                                 <td class="ps-4 fw-bold text-dark"><t t-esc="bal.shop"/><small class="d-block text-muted fw-normal">ID: <t t-esc="bal.shopId"/></small></td>
                                                 <td><t t-esc="bal.owner"/></td>
                                                 <td class="text-end fw-bold">Rs. <t t-esc="bal.limit"/></td>
                                                 <td class="text-end text-danger fw-bold">Rs. <t t-esc="bal.outstanding"/></td>
+                                                <td class="text-end fw-bold">
+                                                    <t t-if="bal.limit === 'N/A'">N/A</t>
+                                                    <t t-else="">Rs. <t t-esc="bal.available"/></t>
+                                                </td>
                                                 <td class="text-end pe-4">
-                                                    <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click.stop="() => this.viewShopBalance(bal)">
+                                                    <button t-if="this.canMutate" class="btn btn-sm btn-outline-dark fw-bold" t-on-click.stop="() => this.viewShopBalance(bal)">
                                                         <i class="fa fa-pencil me-1"></i> Edit Limit
                                                     </button>
                                                 </td>

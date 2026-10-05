@@ -67,7 +67,7 @@
                   decoration-info="state == 'ready'"
                   decoration-warning="state in ('picked', 'partial') or field_state in ('not_attended', 'failed')"
                   decoration-success="state == 'delivered' or field_state == 'done'"
-                  decoration-danger="state == 'returned' or field_state == 'failed'">
+                  decoration-danger="state == 'returned' or field_state == 'failed' or is_overdue">
                 <header>
                     <button name="action_refresh_for_current_user" type="object"
                             string="Refresh" class="btn-secondary" icon="fa-refresh"
@@ -77,28 +77,35 @@
                             groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 </header>
                 <field name="scheduled_date" optional="show"/>
+                <field name="schedule_status" string="Schedule" widget="badge" optional="show"
+                       decoration-danger="schedule_status in ('overdue', 'unscheduled')"
+                       decoration-warning="schedule_status == 'future'"
+                       decoration-info="schedule_status == 'today'"
+                       decoration-muted="schedule_status == 'closed'"/>
+                <field name="is_overdue" column_invisible="1"/>
                 <field name="picked_at" optional="hide"/>
                 <field name="delivered_at" optional="show"/>
                 <field name="receiver_name" optional="hide"/>
                 <field name="has_delivery_proof" string="Proof" optional="hide"/>
                 <field name="sale_order_id"/>
                 <field name="partner_id"/>
+                <field name="is_walk_in" string="Walk-in" optional="show"/>
                 <field name="order_booker_id"/>
                 <field name="delivery_man_id" optional="hide"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="assignment_mode" optional="hide"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="order_date" optional="hide"/>
                 <field name="amount_total" sum="Total"/>
                 <field name="shop_outstanding_balance" string="Shop Due" optional="show"
                        decoration-danger="shop_outstanding_balance &gt; 0"
-                       groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                       groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="shop_unpaid_invoice_count" string="Open Inv." optional="hide"
-                       groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                       groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="qty_assigned_total" string="Assigned Qty" optional="show"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="is_split_share" optional="hide"
-                       groups="shahtaj_oil.group_shahtaj_distributor"/>
+                       groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="state" string="Stock" widget="badge"
                        decoration-danger="state in ('not_ready', 'returned')"
                        decoration-info="state == 'ready'"
@@ -112,24 +119,24 @@
                        decoration-success="field_state == 'done'"/>
                 <button name="action_pick_stock" type="object"
                         string="Pick Stock" icon="fa-cube"
-                        invisible="state not in ('ready', 'picked', 'partial')"
-                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                        invisible="is_walk_in or state not in ('ready', 'picked', 'partial')"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                 <button name="action_field_in_transit" type="object"
                         string="Heading to Shop" icon="fa-road"
-                        invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
+                        invisible="is_walk_in or state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 <button name="action_deliver_to_shop" type="object"
                         string="Deliver (GPS)" icon="fa-map-marker"
-                        invisible="state not in ('picked', 'partial')"
+                        invisible="is_walk_in or state not in ('picked', 'partial')"
                         groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                 <button name="action_return_to_warehouse" type="object"
                         string="Return WH" icon="fa-undo"
-                        invisible="state not in ('picked', 'partial')"
-                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                        invisible="is_walk_in or state not in ('picked', 'partial')"
+                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                 <button name="action_undo_delivery_to_shop" type="object"
                         string="Undo Deliver" icon="fa-reply"
-                        invisible="state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
-                        groups="shahtaj_oil.group_shahtaj_distributor"
+                        invisible="is_walk_in or state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
+                        groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"
                         confirm="Reverse shop handoff or repair Stop/visit? Only before invoicing."/>
                 <button name="action_print_invoice" type="object"
                         string="Print Invoice" icon="fa-print"
@@ -138,11 +145,11 @@
                 <button name="action_view_shop_invoices" type="object"
                         string="Shop Due" icon="fa-money"
                         invisible="not partner_id"
-                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                 <button name="action_collect_shop_payment" type="object"
                         string="Collect" icon="fa-university"
                         invisible="not partner_id"
-                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
             </list>
         </field>
     </record>
@@ -156,45 +163,45 @@
                 <header>
                     <button name="action_pick_stock" type="object"
                             string="Pick Stock from Warehouse" class="oe_highlight"
-                            invisible="state not in ('ready', 'picked', 'partial')"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            invisible="is_walk_in or state not in ('ready', 'picked', 'partial')"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                     <button name="action_field_in_transit" type="object"
                             string="Heading to Shop" class="btn-secondary"
-                            invisible="state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
+                            invisible="is_walk_in or state not in ('picked', 'partial') or field_state in ('in_transit', 'done')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"
                             confirm="Mark this shop stop as Heading to Shop? This does not change your day Left Office status."/>
                     <button name="action_field_not_attended" type="object"
                             string="Shop Closed" class="btn-warning"
-                            invisible="state not in ('picked', 'partial') or field_state == 'done'"
+                            invisible="is_walk_in or state not in ('picked', 'partial') or field_state == 'done'"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"
                             confirm="Mark shop closed / not attended? Add a note first if empty."/>
                     <button name="action_field_failed" type="object"
                             string="Could Not Deliver" class="btn-danger"
-                            invisible="state not in ('picked', 'partial') or field_state == 'done'"
+                            invisible="is_walk_in or state not in ('picked', 'partial') or field_state == 'done'"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"
                             confirm="Mark could not deliver? Stock stays on the van. Add a note first if empty."/>
                     <button name="action_deliver_to_shop" type="object"
                             string="Deliver to Shop (GPS)" class="oe_highlight"
-                            invisible="state not in ('picked', 'partial')"
+                            invisible="is_walk_in or state not in ('picked', 'partial')"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                     <button name="action_return_to_warehouse" type="object"
                             string="Return Undelivered to Warehouse" class="btn-warning"
-                            invisible="state not in ('picked', 'partial')"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
+                            invisible="is_walk_in or state not in ('picked', 'partial')"
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"
                             confirm="Return undelivered van stock for this shop back to the warehouse?"/>
                     <button name="action_undo_delivery_to_shop" type="object"
                             string="Undo Delivery to Shop" class="btn-danger"
-                            invisible="state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
-                            groups="shahtaj_oil.group_shahtaj_distributor"
+                            invisible="is_walk_in or state not in ('partial', 'delivered', 'ready', 'picked') or (state in ('ready', 'picked') and field_state != 'done')"
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"
                             confirm="Reverse this shop handoff (or repair Stop/visit if stock already cleared)? Only allowed before invoicing."/>
                     <button name="action_refresh_delivery_status" type="object"
                             string="Refresh Status" class="btn-secondary"
-                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"
                             icon="fa-refresh"/>
                     <button name="action_field_reset_pending" type="object"
                             string="Reset Stop" class="btn-secondary"
                             invisible="field_state not in ('in_transit', 'not_attended', 'failed', 'done') or state in ('delivered', 'returned')"
-                            groups="shahtaj_oil.group_shahtaj_distributor"/>
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                     <button name="action_print_invoice" type="object"
                             string="Print Invoice" class="btn-secondary"
                             invisible="state == 'not_ready'"
@@ -203,16 +210,16 @@
                             string="Shop Invoices &amp; Balance" class="btn-secondary"
                             icon="fa-money"
                             invisible="not partner_id"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_collect_shop_payment" type="object"
                             string="Collect Payment" class="oe_highlight"
                             icon="fa-university"
                             invisible="not partner_id"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_view_van_quants" type="object"
                             string="Open Van Stock" class="btn-secondary"
                             invisible="not van_location_id"
-                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                     <button name="action_view_sale_order" type="object"
                             string="View Sale Order" class="btn-secondary"/>
                     <field name="state" widget="statusbar"
@@ -223,7 +230,7 @@
                         <button name="action_view_shop_invoices" type="object"
                                 class="oe_stat_button" icon="fa-file-text-o"
                                 invisible="not partner_id"
-                                groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui">
+                                groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui">
                             <div class="o_stat_info">
                                 <span class="o_stat_value">
                                     <field name="shop_unpaid_invoice_count" nolabel="1"/>
@@ -252,17 +259,26 @@
                         <group string="Order Details">
                             <field name="sale_order_id" readonly="1"/>
                             <field name="partner_id" readonly="1"/>
-                            <field name="order_booker_id" readonly="1"/>
+                            <field name="is_walk_in" readonly="1"/>
+                            <field name="order_booker_id" readonly="1"
+                                   invisible="is_walk_in"/>
                             <field name="order_date" readonly="1"/>
                         </group>
                         <group string="Delivery Info">
                             <field name="shahtaj_processing_locked" invisible="1"/>
+                            <field name="shahtaj_can_edit_schedule" invisible="1"/>
                             <field name="delivery_man_id"
                                    readonly="shahtaj_processing_locked"/>
                             <field name="scheduled_date"
-                                   readonly="shahtaj_processing_locked"/>
+                                   readonly="not shahtaj_can_edit_schedule"/>
+                            <field name="schedule_status" widget="badge" readonly="1"
+                                   decoration-danger="schedule_status in ('overdue', 'unscheduled')"
+                                   decoration-warning="schedule_status == 'future'"
+                                   decoration-info="schedule_status == 'today'"
+                                   decoration-muted="schedule_status == 'closed'"/>
+                            <field name="is_overdue" invisible="1"/>
                             <field name="scheduled_time" widget="float_time"
-                                   readonly="shahtaj_processing_locked"/>
+                                   readonly="not shahtaj_can_edit_schedule"/>
                             <field name="picked_at" readonly="1"
                                    invisible="not picked_at"/>
                             <field name="delivered_at" readonly="1"
@@ -275,14 +291,14 @@
                                    decoration-success="field_state == 'done'"
                                    readonly="1"/>
                             <field name="assignment_mode" readonly="1"
-                                   groups="shahtaj_oil.group_shahtaj_distributor"/>
+                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                             <field name="assigned_by_id" readonly="1"
-                                   groups="shahtaj_oil.group_shahtaj_distributor"
+                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"
                                    invisible="not assigned_by_id"/>
                             <field name="amount_total" readonly="1"/>
                             <field name="qty_assigned_total" readonly="1"/>
                             <field name="is_split_share" readonly="1"
-                                   groups="shahtaj_oil.group_shahtaj_distributor"/>
+                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                             <field name="invoice_status" readonly="1"/>
                             <field name="van_location_id" readonly="1"
                                    invisible="not van_location_id"/>
@@ -307,7 +323,7 @@
                             <button name="action_view_shop_invoices" type="object"
                                     string="Open Invoice List" class="btn-link"
                                     icon="fa-external-link"
-                                    groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                                    groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                         </group>
                     </group>
                     <group string="Last GPS deliver" invisible="not gps_verified">
@@ -361,7 +377,7 @@
                                 <button name="action_collect_shop_payment" type="object"
                                         string="Collect Payment to Wallet" class="btn-primary"
                                         icon="fa-university"
-                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                             </div>
                             <group>
                                 <group string="Summary">
@@ -410,17 +426,17 @@
                                 <button name="action_view_van_quants" type="object"
                                         string="Open Full Van Inventory" class="btn-primary"
                                         icon="fa-cubes"
-                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                                 <button name="action_pick_stock" type="object"
                                         string="Pick More to Van" class="btn-secondary"
                                         icon="fa-cube"
-                                        invisible="state not in ('ready', 'picked', 'partial')"
-                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                                        invisible="is_walk_in or state not in ('ready', 'picked', 'partial')"
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                                 <button name="action_return_to_warehouse" type="object"
                                         string="Return Leftover to Warehouse" class="btn-warning"
                                         icon="fa-undo"
-                                        invisible="state not in ('picked', 'partial')"
-                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
+                                        invisible="is_walk_in or state not in ('picked', 'partial')"
+                                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"
                                         confirm="Return undelivered van stock for this shop back to the warehouse?"/>
                             </div>
                             <group string="This shop — quantities">
@@ -469,6 +485,12 @@
                 <field name="scheduled_date"/>
                 <filter string="Today" name="today"
                         domain="[('scheduled_date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Today Not Done" name="today_not_done"
+                        domain="[('scheduled_date', '=', context_today().strftime('%Y-%m-%d')), ('state', 'in', ('not_ready', 'ready', 'picked', 'partial'))]"/>
+                <filter string="Overdue / Not Done" name="overdue"
+                        domain="[('is_overdue', '=', True)]"/>
+                <filter string="Unscheduled" name="unscheduled"
+                        domain="[('state', 'in', ('not_ready', 'ready', 'picked', 'partial')), ('scheduled_date', '=', False)]"/>
                 <filter string="This Week" name="this_week"
                         domain="[('scheduled_date', '&gt;=', ((context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d'))), ('scheduled_date', '&lt;=', ((context_today() + datetime.timedelta(days=6 - context_today().weekday())).strftime('%Y-%m-%d')))]"/>
                 <separator/>
@@ -476,6 +498,10 @@
                         domain="[('assignment_mode', '=', 'manual')]"/>
                 <filter string="Auto Assign" name="auto_assign"
                         domain="[('assignment_mode', '=', 'auto')]"/>
+                <filter string="Walk-in" name="walk_in"
+                        domain="[('is_walk_in', '=', True)]"/>
+                <filter string="Shop deliveries" name="shop_deliveries"
+                        domain="[('is_walk_in', '!=', True)]"/>
                 <separator/>
                 <filter string="Waiting Invoice" name="not_ready"
                         domain="[('state', '=', 'not_ready')]"/>
@@ -551,7 +577,9 @@
             </p>
             <p>
                 Jobs assigned to you appear here after the distributor assigns
-                a sales order (or after invoice sync). Use Today / This Week filters.
+                a sales order (or after invoice sync). Default filter is
+                <b>Today</b> — only jobs scheduled for today. Overdue jobs are
+                handled by the distributor (reschedule Delivery Day).
                 Stock: Ready → Loaded → Delivered. Stop: Heading to Shop / Shop Closed / Done. Day: Leave Office is on My Day Session.
             </p>
         </field>
@@ -577,8 +605,29 @@
             </p>
             <p>
                 Assign confirmed sales orders to delivery men from Field Sales
-                Orders or Dispatch Orders (Assign Delivery Man). Use Stop filters
-                (Shop Closed / Could Not Deliver) to see blocked stops.
+                Orders or Dispatch Orders (Assign Delivery Man). <b>Walk-in</b>
+                van cash sales also appear here as completed jobs (filter Walk-in).
+                Use <b>Overdue / Not Done</b> for open jobs past their delivery day,
+                then edit Delivery Day to reschedule. Stop filters cover Shop Closed /
+                Could Not Deliver.
+            </p>
+        </field>
+    </record>
+
+    <!-- Distributor: overdue / not-done open jobs (reschedule from form) -->
+    <record id="action_shahtaj_dm_overdue_jobs" model="ir.actions.act_window">
+        <field name="name">Overdue / Not Done</field>
+        <field name="res_model">shahtaj.dm.delivery</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shahtaj_dm_delivery_search"/>
+        <field name="context">{'search_default_overdue': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No overdue delivery jobs
+            </p>
+            <p>
+                Open jobs with a past delivery day (or no day) appear here.
+                Edit <b>Delivery Day</b> to put them back on a DM's today plan.
             </p>
         </field>
     </record>

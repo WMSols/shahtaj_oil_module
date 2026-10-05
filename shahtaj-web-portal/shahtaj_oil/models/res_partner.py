@@ -7,16 +7,20 @@ Distributors approve shops and may set legacy balance, which posts to Odoo accou
 import math
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import float_is_zero
 
 MAX_REGISTRATION_DISTANCE_M = 100.0
 
-# Let distributor and booker edit credit fields without full Invoicing app rights.
+# Approvers (Dist + Manager via order_approver), bookers, KPO, and Warehouse
+# can read credit fields without full Invoicing app rights.
 _SHAHTAJ_CREDIT_GROUPS = (
     'account.group_account_invoice,account.group_account_readonly,'
-    'shahtaj_oil.group_shahtaj_distributor,'
-    'shahtaj_oil.group_shahtaj_order_booker'
+    'shahtaj_oil.group_shahtaj_office_ops,'
+    'shahtaj_oil.group_shahtaj_order_approver,'
+    'shahtaj_oil.group_shahtaj_order_booker,'
+    'shahtaj_oil.group_shahtaj_kpo,'
+    'shahtaj_oil.group_shahtaj_warehouse'
 )
 
 
@@ -37,14 +41,15 @@ class ResPartner(models.Model):
         return super().name_get()
 
     def _check_access(self, operation):
-        """Let distributors read company partners required by accounting screens."""
+        """Let Dist/Manager/KPO read company partners required by accounting screens."""
         result = super()._check_access(operation)
         if (
             result is not None
             and operation == 'read'
             and not self.env.su
-            and self.env.user.has_group(
-                'shahtaj_oil.group_shahtaj_distributor',
+            and (
+                self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+                or self.env.user.has_group('shahtaj_oil.group_shahtaj_kpo')
             )
         ):
             forbidden, make_error = result
@@ -513,7 +518,7 @@ class ResPartner(models.Model):
                     'shahtaj_oil.group_shahtaj_order_booker',
                 )
                 and not self.env.user.has_group(
-                    'shahtaj_oil.group_shahtaj_distributor',
+                    'shahtaj_oil.group_shahtaj_office_ops',
                 )
             ):
                 vals.setdefault('shop_approval_state', 'pending')
@@ -1335,11 +1340,11 @@ class ResPartner(models.Model):
         if not self.is_shahtaj_shop:
             raise UserError(_('Only shops can have field verification reset.'))
         if not (
-            self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             or self.env.user.has_group('account.group_account_manager')
             or self.env.is_admin()
         ):
-            raise AccessError(_('Only distributors or administrators can reset shop verification.'))
+            raise AccessError(_('Only distributors, managers, or administrators can reset shop verification.'))
 
         old_lat = self.partner_latitude
         old_lng = self.partner_longitude

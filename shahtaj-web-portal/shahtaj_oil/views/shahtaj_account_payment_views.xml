@@ -13,13 +13,15 @@
             </list>
             <field name="partner_id" position="attributes">
                 <attribute name="domain">[
-                    '|', '|',
+                    '|', '|', '|',
                     ('is_shahtaj_shop', '=', True),
                     ('parent_id.is_shahtaj_shop', '=', True),
                     ('commercial_partner_id.is_shahtaj_shop', '=', True),
+                    ('shahtaj_is_walk_in', '=', True),
                 ]</attribute>
             </field>
             <field name="journal_id" position="after">
+                <field name="shahtaj_is_walk_in" string="Walk-in" optional="show"/>
                 <field name="payment_type" string="Direction" optional="show"/>
                 <field name="shahtaj_payment_channel" optional="show"/>
                 <field name="shahtaj_payer_bank_name" optional="hide"/>
@@ -86,6 +88,21 @@
         </field>
     </record>
 
+    <record id="view_account_payment_search_shahtaj_walk_in" model="ir.ui.view">
+        <field name="name">account.payment.search.shahtaj.walk.in</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_search"/>
+        <field name="arch" type="xml">
+            <filter name="inbound_filter" position="after">
+                <separator/>
+                <filter string="Walk-in" name="walk_in"
+                        domain="[('shahtaj_is_walk_in', '=', True)]"/>
+                <filter string="Shops only" name="shops_only"
+                        domain="[('shahtaj_is_walk_in', '!=', True)]"/>
+            </filter>
+        </field>
+    </record>
+
     <record id="view_account_payment_register_shahtaj" model="ir.ui.view">
         <field name="name">account.payment.register.form.shahtaj</field>
         <field name="model">account.payment.register</field>
@@ -131,6 +148,7 @@
                        decoration-success="payment_type == 'inbound'"
                        decoration-warning="payment_type == 'outbound'"/>
                 <field name="partner_id" string="Shop / Customer"/>
+                <field name="shahtaj_is_walk_in" string="Walk-in" optional="show"/>
                 <field name="shahtaj_payment_channel" string="Method"/>
                 <field name="shahtaj_payer_bank_name" optional="show"/>
                 <field name="shahtaj_payer_account_number" optional="show"/>
@@ -157,6 +175,7 @@
                 <separator/>
                 <filter name="bank" string="Bank" domain="[('journal_id.type', '=', 'bank')]"/>
                 <filter name="cash" string="Cash" domain="[('journal_id.type', '=', 'cash')]"/>
+                <filter name="walk_in" string="Walk-in" domain="[('shahtaj_is_walk_in', '=', True)]"/>
                 <filter name="payment_date" string="Payment Date" date="date"/>
                 <separator/>
                 <filter name="group_journal" string="Bank / Cash Journal"

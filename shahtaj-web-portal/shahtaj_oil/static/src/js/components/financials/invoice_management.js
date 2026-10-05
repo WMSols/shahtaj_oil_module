@@ -1,9 +1,11 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onMounted, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { hasFinancialAccess, notifyPortalBusy } from "../../shahtaj_access";
+import { canMutate, canSee, hasFinancialAccess, loadPortalAccess, notifyPortalBusy, portalAccessState } from "../../shahtaj_access";
+import { printFilter, printListPdf } from "../../shahtaj_list_export";
 import { ConfirmModal } from "../confirm_modal";
+import { ShopFilter } from "./shop_filter";
 import {
     applyLookupsToState,
     getFinancialLookups,
@@ -13,9 +15,10 @@ import {
 } from "./financials_cache";
 
 export class InvoiceManagement extends Component {
-    static components = { ConfirmModal };
+    static components = { ConfirmModal, ShopFilter };
     static props = {
         requestedInvoiceSubTab: { type: String, optional: true },
+        requestedInvoiceStatus: { type: String, optional: true },
         refreshNonce: { type: Number, optional: true },
         onStatsRefresh: { type: Function, optional: true },
     };
@@ -24,6 +27,7 @@ export class InvoiceManagement extends Component {
         this.notification = useService("notification");
         this.orm = useService("orm");
         this.action = useService("action");
+        this._listFetchToken = 0;
         const ITEMS_PER_PAGE = 50;
         this.state = useState({
             activeSubTab: "invoices",
@@ -41,7 +45,6 @@ export class InvoiceManagement extends Component {
             isPaying: false,
             isRefunding: false,
             isLoadingLines: false,
-            invoiceShops: [],
             selectedPayment: null,
             selectedShop: null,
             showPaymentModal: false,
@@ -60,11 +63,11 @@ export class InvoiceManagement extends Component {
             creditNotes: [],
             payments: [],
             filters: {
-                allOrders: { search: "", status: "all", shop: "all", dateFrom: "", dateTo: "" },
-                orders: { search: "", shop: "all", dateFrom: "", dateTo: "" },
-                invoices: { search: "", status: "all", shop: "all", dateFrom: "", dateTo: "" },
-                creditNotes: { search: "", status: "all", shop: "all", dateFrom: "", dateTo: "" },
-                payments: { search: "", shop: "all", dateFrom: "", dateTo: "" },
+                allOrders: { search: "", status: "all", shop: "all", shopName: "", dateFrom: "", dateTo: "" },
+                orders: { search: "", shop: "all", shopName: "", dateFrom: "", dateTo: "" },
+                invoices: { search: "", status: this.props.requestedInvoiceStatus || "all", shop: "all", shopName: "", dateFrom: "", dateTo: "", walkIn: false, legacyBalance: false },
+                creditNotes: { search: "", status: "all", shop: "all", shopName: "", dateFrom: "", dateTo: "" },
+                payments: { search: "", shop: "all", shopName: "", dateFrom: "", dateTo: "" },
             },
             paymentForm: {
                 journal_id: "", amount: 0, date: "", invoice_id: null, invoice_name: "",
@@ -86,7 +89,8 @@ export class InvoiceManagement extends Component {
                 loading: false,
             },
             itemsPerPage: ITEMS_PER_PAGE,
-            isLoadingList: false,
+            isLoadingList: true,
+            isPrintingList: false,
             searchTimeout: null,
             pagination: {
                 allOrders: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
@@ -103,21 +107,49 @@ export class InvoiceManagement extends Component {
             };
         };
         this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
-        onWillUpdateProps(async (nextProps) => {
-            if (nextProps.requestedInvoiceSubTab && nextProps.requestedInvoiceSubTab !== this.props.requestedInvoiceSubTab) {
+        this._lookupsPromise = null;
+        onWillUpdateProps((nextProps) => {
+            const status = nextProps.requestedInvoiceStatus || "all";
+            const statusChanged = status !== (this.props.requestedInvoiceStatus || "all");
+            if (statusChanged) {
+                this.state.filters.invoices.status = status;
+                this.state.pagination.invoices.page = 1;
+            }
+            const subChanged = nextProps.requestedInvoiceSubTab && nextProps.requestedInvoiceSubTab !== this.props.requestedInvoiceSubTab;
+            if (subChanged) {
                 this.setInvoiceSubTab(nextProps.requestedInvoiceSubTab);
+            } else if (statusChanged && this.state.invoiceSubTab === "customer_invoices") {
+                this.fetchActiveList();
             }
             if (nextProps.refreshNonce !== this.props.refreshNonce) {
-                await this.reloadFromRefresh();
+                this.reloadFromRefresh();
             }
         });
-        onWillStart(async () => {
-            if (!hasFinancialAccess()) {
-                return;
-            }
-            await this.loadLookups();
-            await this.fetchActiveList();
+        onMounted(() => {
+            this._bootInvoices();
         });
+    }
+
+    async _bootInvoices() {
+        await loadPortalAccess();
+        if (!hasFinancialAccess() && !canSee("financials", "invoices")) {
+            this.state.isLoadingList = false;
+            return;
+        }
+        if (canMutate()) {
+            this._ensureLookups();
+        }
+        await this.fetchActiveList();
+    }
+
+    _ensureLookups() {
+        if (!this._lookupsPromise) {
+            this._lookupsPromise = this.loadLookups().catch((error) => {
+                this._lookupsPromise = null;
+                throw error;
+            });
+        }
+        return this._lookupsPromise;
     }
 
     async loadLookups({ force = false } = {}) {
@@ -125,8 +157,18 @@ export class InvoiceManagement extends Component {
         applyLookupsToState(this.state, lookups);
     }
 
+    get canMutate() {
+        return canMutate();
+    }
+
+    get isKpo() {
+        return portalAccessState.role === "kpo";
+    }
+
     async reloadFromRefresh() {
-        await this.loadLookups();
+        if (canMutate()) {
+            await this.loadLookups();
+        }
         await this.fetchActiveList();
     }
 
@@ -166,21 +208,64 @@ export class InvoiceManagement extends Component {
         this.fetchActiveList(); // Dropdowns don't need debouncing, fetch immediately
     }
 
-    async ensureInvoiceShopLookup() {
-        if (this.state.invoiceShops.length) {
+    onShopFilterSelect(listKey, shopId, shopName) {
+        const filters = this.state.filters[listKey];
+        if (!filters) {
             return;
         }
-        try {
-            const shops = await this.orm.searchRead(
-                "res.partner",
-                [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"], ["active", "=", true]],
-                ["id", "name"],
-                { order: "name asc", limit: 500 }
-            );
-            this.state.invoiceShops = shops || [];
-        } catch (error) {
-            this.state.invoiceShops = [];
+        filters.shop = shopId || "all";
+        filters.shopName = shopId && shopId !== "all" ? (shopName || "") : "";
+        this.onFilterChange(listKey);
+    }
+
+    onInvoicesWalkInToggle(ev) {
+        this.state.filters.invoices.walkIn = ev.target.checked;
+        this.onFilterChange('invoices');
+    }
+
+    onInvoicesLegacyBalanceToggle(ev) {
+        this.state.filters.invoices.legacyBalance = ev.target.checked;
+        this.onFilterChange('invoices');
+    }
+
+    _defaultInvoiceFilters(key) {
+        const defaults = {
+            allOrders: { search: "", status: "all", shop: "all", shopName: "", dateFrom: "", dateTo: "" },
+            orders: { search: "", shop: "all", shopName: "", dateFrom: "", dateTo: "" },
+            invoices: { search: "", status: "all", shop: "all", shopName: "", dateFrom: "", dateTo: "", walkIn: false, legacyBalance: false },
+            creditNotes: { search: "", status: "all", shop: "all", shopName: "", dateFrom: "", dateTo: "" },
+            payments: { search: "", shop: "all", shopName: "", dateFrom: "", dateTo: "" },
+        };
+        return { ...(defaults[key] || {}) };
+    }
+
+    closeInvoiceDetail(listKey = "invoices") {
+        this.state.selectedInvoice = null;
+        this.state.selectedInvoiceLines = [];
+        this.state.isEditingInvoice = false;
+    }
+
+    closeOrderDetail(listKey = "orders") {
+        this.state.selectedOrder = null;
+        this.state.selectedOrderLines = [];
+    }
+
+    closePaymentDetail() {
+        this.state.selectedPayment = null;
+    }
+
+    clearFilters(listKey) {
+        if (!this.state.filters[listKey]) {
+            return;
         }
+        this.state.filters[listKey] = this._defaultInvoiceFilters(listKey);
+        if (this.state.pagination[listKey]) {
+            this.state.pagination[listKey].page = 1;
+        }
+        if (Array.isArray(this.state[listKey])) {
+            this.state[listKey] = [];
+        }
+        this.fetchActiveList();
     }
 
     _applyInvoiceListFilters(domain, stateKey, filters) {
@@ -247,13 +332,99 @@ export class InvoiceManagement extends Component {
         }
         this.fetchActiveList(); 
     }
+
+    _listDomain(stateKey, filters) {
+        filters = filters || {};
+        const domain = [];
+        if (stateKey === "allOrders") domain.push(["shahtaj_visit_id", "!=", false]);
+        if (stateKey === "orders") domain.push(["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]);
+        if (stateKey === "invoices") {
+            domain.push(["move_type", "in", ["out_invoice"]]);
+            if (filters.legacyBalance) {
+                domain.push(["shahtaj_is_legacy_balance", "=", true]);
+            } else if (filters.walkIn) {
+                domain.push(["shahtaj_is_walk_in", "=", true]);
+            } else {
+                domain.push("|", ["partner_id.is_shahtaj_shop", "=", true], ["shahtaj_is_walk_in", "=", true]);
+            }
+        }
+        if (stateKey === "creditNotes") domain.push(["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]);
+        if (stateKey === "payments") domain.push(["partner_id.is_shahtaj_shop", "=", true]);
+        if (stateKey === "purchaseOrders") domain.push(["partner_id.supplier_rank", ">", 0]);
+        if (stateKey === "receipts") domain.push(...this._receiptsListDomain());
+        if (stateKey === "vendorBills") domain.push(["move_type", "in", ["in_invoice", "in_refund"]]);
+        if (stateKey === "vendors") {
+            domain.push(["supplier_rank", ">", 0], ["is_shahtaj_shop", "=", false]);
+            if (this.state.vendorViewMode === "archived") {
+                domain.push(["active", "=", false]);
+            } else {
+                domain.push(["active", "=", true]);
+            }
+        }
+        if (stateKey === "credits") {
+            domain.push(["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]);
+            if (this.state.creditSubView === "risk") {
+                domain.push(["shahtaj_shop_category", "=", "credit"]);
+            }
+            if (this.state.creditSubView === "balances" && this.state.filters.credits.hasCreditLimit) {
+                domain.push(["credit_limit", ">", 0]);
+            }
+        }
+        if (filters.search) {
+            if (stateKey === "credits") {
+                domain.push("|", ["name", "ilike", filters.search], ["owner_name", "ilike", filters.search]);
+            } else if (stateKey === "vendors") {
+                domain.push("|", "|", ["name", "ilike", filters.search], ["phone", "ilike", filters.search], ["email", "ilike", filters.search]);
+            } else if (stateKey === "receipts") {
+                domain.push("|", "|", ["name", "ilike", filters.search], ["origin", "ilike", filters.search], ["partner_id.name", "ilike", filters.search]);
+            } else {
+                domain.push("|", ["name", "ilike", filters.search], ["partner_id.name", "ilike", filters.search]);
+            }
+        }
+        if (filters.status && filters.status !== "all") {
+            if (stateKey === "invoices" || stateKey === "creditNotes") {
+                if (filters.status === "Open") domain.push(["state", "=", "posted"], ["payment_state", "in", ["not_paid", "partial"]]);
+                if (filters.status === "Posted") domain.push(["state", "=", "posted"], ["payment_state", "in", ["not_paid"]]);
+                if (filters.status === "Paid" || filters.status === "Paid/Reconciled") domain.push(["payment_state", "in", ["paid", "in_payment", "reversed"]]);
+                if (filters.status === "Partial") domain.push(["payment_state", "=", "partial"]);
+                if (filters.status === "Draft") domain.push(["state", "=", "draft"]);
+                if (filters.status === "Cancelled") domain.push(["state", "=", "cancel"]);
+            }
+            if (stateKey === "allOrders") {
+                if (filters.status === "Confirmed") domain.push(["state", "not in", ["draft", "cancel"]]);
+                if (filters.status === "Draft") domain.push(["state", "=", "draft"]);
+                if (filters.status === "Cancelled") domain.push(["state", "=", "cancel"]);
+            }
+            if (stateKey === "purchaseOrders") {
+                if (filters.status === "Draft") domain.push(["state", "in", ["draft", "sent"]]);
+                if (filters.status === "Confirmed") domain.push(["state", "=", "purchase"]);
+                if (filters.status === "Cancelled") domain.push(["state", "=", "cancel"]);
+                if (filters.status === "To Bill") domain.push(["invoice_status", "=", "to invoice"]);
+            }
+            if (stateKey === "receipts") {
+                if (filters.status === "Ready") domain.push(["state", "in", ["assigned", "confirmed", "waiting"]]);
+                if (filters.status === "Product Received") domain.push(["state", "=", "done"], ["picking_type_code", "=", "incoming"]);
+                if (filters.status === "Returned") domain.push(["state", "=", "done"], ["picking_type_code", "=", "outgoing"]);
+                if (filters.status === "Cancelled") domain.push(["state", "=", "cancel"]);
+            }
+            if (stateKey === "vendorBills") {
+                if (filters.status === "Draft") domain.push(["state", "=", "draft"]);
+                if (filters.status === "Posted") domain.push(["state", "=", "posted"], ["payment_state", "not in", ["paid", "in_payment", "reversed"]]);
+                if (filters.status === "Paid") domain.push(["payment_state", "in", ["paid", "in_payment", "reversed"]]);
+                if (filters.status === "Cancelled") domain.push(["state", "=", "cancel"]);
+            }
+        }
+        this._applyInvoiceListFilters(domain, stateKey, filters);
+        return domain;
+    }
+
     async fetchActiveList() {
         if (!['invoices', 'expenses', 'credit', 'po_management'].includes(this.state.activeSubTab)) return;
         
         const tabMap = {
             'all_orders': { stateKey: 'allOrders', model: 'sale.order', fields: ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"] },
             'orders': { stateKey: 'orders', model: 'sale.order', fields: ["name", "partner_id", "date_order", "amount_total", "amount_untaxed", "state", "user_id", "payment_term_id", "pricelist_id", "shahtaj_visit_id", "invoice_status"] },
-            'customer_invoices': { stateKey: 'invoices', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"] },
+            'customer_invoices': { stateKey: 'invoices', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id", "shahtaj_is_walk_in", "shahtaj_is_legacy_balance"] },
             'credit_notes': { stateKey: 'creditNotes', model: 'account.move', fields: ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"] },
             'payments': { stateKey: 'payments', model: 'account.payment', fields: ["name", "partner_id", "date", "amount", "journal_id", "memo", "state", "shahtaj_payment_channel", "shahtaj_payer_bank_name", "shahtaj_payer_account_number", "shahtaj_instrument_reference", "shahtaj_payment_notes"] },
             'purchase_orders': { stateKey: 'purchaseOrders', model: 'purchase.order', fields: ["name", "partner_id", "date_order", "date_planned", "amount_untaxed", "amount_tax", "amount_total", "state", "invoice_status", "currency_id"] },
@@ -268,111 +439,55 @@ export class InvoiceManagement extends Component {
         const config = this.state.activeSubTab === 'credit' 
             ? tabMap['credit'] 
             : (this.state.activeSubTab === 'expenses' ? tabMap[this.state.expenseSubTab] : (this.state.activeSubTab === 'po_management' ? tabMap[this.state.poSubTab] : tabMap[this.state.invoiceSubTab]));
-        if (!config) return;
+        if (!config) {
+            this.state.isLoadingList = false;
+            return;
+        }
 
+        const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
         notifyPortalBusy(true);
         try {
             const { stateKey, model, fields } = config;
             const pag = this.state.pagination[stateKey];
             const filters = this.state.filters[stateKey];
-            let domain = [];
-            if (["allOrders", "orders", "invoices", "creditNotes", "payments"].includes(stateKey)) {
-                await this.ensureInvoiceShopLookup();
-            }
-            
-            if (stateKey === 'allOrders') domain.push(["shahtaj_visit_id", "!=", false]);
-            if (stateKey === 'orders') domain.push(["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]);
-            if (stateKey === 'invoices') domain.push(["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]);
-            if (stateKey === 'creditNotes') domain.push(["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]);
-            if (stateKey === 'payments') domain.push(["partner_id.is_shahtaj_shop", "=", true]);
-            if (stateKey === 'purchaseOrders') domain.push(["partner_id.supplier_rank", ">", 0]);
-            if (stateKey === 'receipts') domain.push(...this._receiptsListDomain());
-            if (stateKey === 'vendorBills') domain.push(["move_type", "in", ["in_invoice", "in_refund"]]);
-            if (stateKey === 'vendors') {
-                domain.push(["supplier_rank", ">", 0], ["is_shahtaj_shop", "=", false]);
-                if (this.state.vendorViewMode === 'archived') {
-                    domain.push(["active", "=", false]);
-                } else {
-                    domain.push(["active", "=", true]);
-                }
-            }
-            if (stateKey === 'credits') {
-                domain.push(["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]);
-                if (this.state.creditSubView === 'risk') {
-                    domain.push(["shahtaj_shop_category", "=", "credit"]);
-                }
-                if (this.state.creditSubView === 'balances' && this.state.filters.credits.hasCreditLimit) {
-                    domain.push(["credit_limit", ">", 0]);
-                }
-            }
-
-            if (filters.search) {
-                if (stateKey === 'credits') {
-                    domain.push('|', ['name', 'ilike', filters.search], ['owner_name', 'ilike', filters.search]);
-                } else if (stateKey === 'vendors') {
-                    domain.push('|', '|', ['name', 'ilike', filters.search], ['phone', 'ilike', filters.search], ['email', 'ilike', filters.search]);
-                } else if (stateKey === 'receipts') {
-                    domain.push('|', '|', ['name', 'ilike', filters.search], ['origin', 'ilike', filters.search], ['partner_id.name', 'ilike', filters.search]);
-                } else {
-                    domain.push('|', ['name', 'ilike', filters.search], ['partner_id.name', 'ilike', filters.search]);
-                }
-            }
-
-            if (filters.status && filters.status !== 'all') {
-                if (stateKey === 'invoices' || stateKey === 'creditNotes') {
-                    if (filters.status === 'Posted') domain.push(['state', '=', 'posted'], ['payment_state', 'in', ['not_paid']]);
-                    if (filters.status === 'Paid' || filters.status === 'Paid/Reconciled') domain.push(['payment_state', 'in', ['paid', 'in_payment', 'reversed']]);
-                    if (filters.status === 'Partial') domain.push(['payment_state', '=', 'partial']);
-                    if (filters.status === 'Draft') domain.push(['state', '=', 'draft']);
-                    if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancel']);
-                }
-                if (stateKey === 'allOrders') {
-                    if (filters.status === 'Confirmed') domain.push(['state', 'not in', ['draft', 'cancel']]);
-                    if (filters.status === 'Draft') domain.push(['state', '=', 'draft']);
-                    if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancel']);
-                }
-                if (stateKey === 'purchaseOrders') {
-                    if (filters.status === 'Draft') domain.push(['state', 'in', ['draft', 'sent']]);
-                    if (filters.status === 'Confirmed') domain.push(['state', '=', 'purchase']);
-                    if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancel']);
-                    if (filters.status === 'To Bill') domain.push(['invoice_status', '=', 'to invoice']);
-                }
-                if (stateKey === 'receipts') {
-                    if (filters.status === 'Ready') domain.push(['state', 'in', ['assigned', 'confirmed', 'waiting']]);
-                    if (filters.status === 'Product Received') domain.push(['state', '=', 'done'], ['picking_type_code', '=', 'incoming']);
-                    if (filters.status === 'Returned') domain.push(['state', '=', 'done'], ['picking_type_code', '=', 'outgoing']);
-                    if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancel']);
-                }
-                if (stateKey === 'vendorBills') {
-                    if (filters.status === 'Draft') domain.push(['state', '=', 'draft']);
-                    if (filters.status === 'Posted') domain.push(['state', '=', 'posted'], ['payment_state', 'not in', ['paid', 'in_payment', 'reversed']]);
-                    if (filters.status === 'Paid') domain.push(['payment_state', 'in', ['paid', 'in_payment', 'reversed']]);
-                    if (filters.status === 'Cancelled') domain.push(['state', '=', 'cancel']);
-                }
-            }
-
-            this._applyInvoiceListFilters(domain, stateKey, filters);
+            const domain = this._listDomain(stateKey, filters);
 
             // 4. FIRE DUAL QUERIES (Total Count + Paged Records)
             const queryContext = (stateKey === 'vendors' && this.state.vendorViewMode === 'archived') ? { active_test: false } : {};
             // outstanding_balance is computed/non-stored, so shop balances must be sorted in JS
             // (highest outstanding first) then sliced to keep pagination ranking correct.
             const sortShopBalances = stateKey === 'credits' && this.state.creditSubView === 'balances';
-            const searchReadOptions = sortShopBalances
-                ? { context: queryContext }
-                : { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: "id desc", context: queryContext };
-            const [total, fetchedRecords] = await Promise.all([
-                sortShopBalances ? Promise.resolve(0) : this.orm.searchCount(model, domain, { context: queryContext }),
-                this.orm.searchRead(model, domain, fields, searchReadOptions)
-            ]);
-            let records = fetchedRecords;
+            let records;
             if (sortShopBalances) {
-                records = [...fetchedRecords].sort((a, b) => (b.outstanding_balance || 0) - (a.outstanding_balance || 0));
-                this.state.pagination[stateKey].total = records.length;
-                const start = (pag.page - 1) * pag.limit;
-                records = records.slice(start, start + pag.limit);
+                const page = await this.orm.call(
+                    "shahtaj.portal.read",
+                    "shahtaj_credit_balance_page",
+                    [{
+                        search: (filters && filters.search) || "",
+                        hasCreditLimit: Boolean(this.state.filters.credits && this.state.filters.credits.hasCreditLimit),
+                        creditSubView: "balances",
+                    }, pag.page, pag.limit],
+                );
+                if (fetchToken !== this._listFetchToken) {
+                    return;
+                }
+                records = page.records || [];
+                this.state.pagination[stateKey].total = page.total || 0;
             } else {
+                const [total, fetchedRecords] = await Promise.all([
+                    this.orm.searchCount(model, domain, { context: queryContext }),
+                    this.orm.searchRead(model, domain, fields, {
+                        limit: pag.limit,
+                        offset: (pag.page - 1) * pag.limit,
+                        order: "id desc",
+                        context: queryContext,
+                    }),
+                ]);
+                if (fetchToken !== this._listFetchToken) {
+                    return;
+                }
+                records = fetchedRecords;
                 this.state.pagination[stateKey].total = total;
             }
             // 5. MAP DATA TO UI
@@ -410,6 +525,8 @@ export class InvoiceManagement extends Component {
                         date: inv.invoice_date || "Not set", amount: (inv.amount_total || 0).toLocaleString(),
                         residual: (inv.amount_residual || 0).toLocaleString(), rawResidual: inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total,
                         status, journal_id: inv.journal_id ? inv.journal_id[0] : false,
+                        isWalkIn: !!inv.shahtaj_is_walk_in,
+                        isLegacyBalance: !!inv.shahtaj_is_legacy_balance,
                     };
                 });
             }
@@ -482,10 +599,14 @@ export class InvoiceManagement extends Component {
                 this.state.tableExpenseCategories = records;
             }
         } catch (error) {
-            this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
+            if (fetchToken === this._listFetchToken) {
+                this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
+            }
         } finally {
-            this.state.isLoadingList = false;
-            notifyPortalBusy(false);
+            if (fetchToken === this._listFetchToken) {
+                this.state.isLoadingList = false;
+                notifyPortalBusy(false);
+            }
         }
     }
     showConfirm(title, message, onConfirmCallback) {
@@ -520,7 +641,7 @@ export class InvoiceManagement extends Component {
             const records = await this.orm.searchRead(
                 "account.move", 
                 [["id", "=", invoiceId]], 
-                ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id"]
+                ["name", "partner_id", "invoice_date", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "payment_state", "state", "journal_id", "shahtaj_is_walk_in", "shahtaj_is_legacy_balance"]
             );
             
             if (records.length > 0) {
@@ -546,6 +667,8 @@ export class InvoiceManagement extends Component {
                     rawResidual: inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total,
                     status: status, 
                     journal_id: inv.journal_id ? inv.journal_id[0] : false,
+                    isWalkIn: !!inv.shahtaj_is_walk_in,
+                    isLegacyBalance: !!inv.shahtaj_is_legacy_balance,
                 };
                 
                 // Automatically pipe it into viewInvoice to fetch the lines and restore the UI
@@ -735,7 +858,14 @@ export class InvoiceManagement extends Component {
         });
     }
 
-    toggleEditInvoice() { 
+    async toggleEditInvoice() {
+        if (canMutate()) {
+            try {
+                await this._ensureLookups();
+            } catch (error) {
+                console.error("Failed to load invoice lookups", error);
+            }
+        }
         this.state.isEditingInvoice = true; 
         this.state.removedLineIds = [];
         
@@ -750,7 +880,14 @@ export class InvoiceManagement extends Component {
         this.viewInvoice(this.state.selectedInvoice); 
     }
 
-    addLine() {
+    async addLine() {
+        if (canMutate()) {
+            try {
+                await this._ensureLookups();
+            } catch (error) {
+                console.error("Failed to load invoice lookups", error);
+            }
+        }
         const newLine = {
             id: 'new_' + Date.now(),
             product_id: '',
@@ -1314,6 +1451,147 @@ export class InvoiceManagement extends Component {
             await this.refreshFinancialLists();
             this.state.selectedShop = null;
         } catch (error) { this.notification.add("Failed to save limit. Ensure you have distributor rights.", { type: "danger" }); }
+    }
+
+    _shopFilterName(filters) {
+        if (!filters || !filters.shop || filters.shop === "all") {
+            return "";
+        }
+        return filters.shopName || "";
+    }
+
+    _moveStatus(move, creditNote) {
+        if (move.state === "cancel") return "Cancelled";
+        if (move.state !== "posted") return "Draft";
+        if (["paid", "in_payment", "reversed"].includes(move.payment_state)) {
+            return creditNote ? "Paid/Reconciled" : "Paid";
+        }
+        if (move.payment_state === "partial") return "Partial";
+        return "Posted";
+    }
+
+    async _loadPrintMoves(stateKey) {
+        const fields = ["name", "partner_id", "invoice_date", "amount_total", "amount_residual", "payment_state", "state", "journal_id"];
+        if (stateKey === "invoices") fields.push("shahtaj_is_walk_in", "shahtaj_is_legacy_balance");
+        return this.orm.searchRead("account.move", this._listDomain(stateKey, this.state.filters[stateKey]), fields, { order: "id desc" });
+    }
+
+    async _openListPrint(title, filters, columns, rows) {
+        if (!rows.length) {
+            this.notification.add("No rows match the current filters.", { type: "warning" });
+            return;
+        }
+        await printListPdf(this.orm, this.action, { title, filters, columns, rows });
+    }
+
+    async printCustomerInvoices() {
+        if (this.state.isPrintingList) return;
+        this.state.isPrintingList = true;
+        try {
+            const filters = this.state.filters.invoices;
+            const statusLabels = {
+                Open: "Open (unpaid or partial)",
+                Posted: "Posted (Open)",
+                Partial: "Partially Paid",
+                Paid: "Paid",
+                Draft: "Draft",
+                Cancelled: "Cancelled",
+            };
+            const records = await this._loadPrintMoves("invoices");
+            await this._openListPrint(
+                "Customer Invoices",
+                [
+                    printFilter("Search", filters.search),
+                    printFilter("Shop", this._shopFilterName(filters)),
+                    printFilter("From", filters.dateFrom),
+                    printFilter("To", filters.dateTo),
+                    printFilter("Status", statusLabels[filters.status]),
+                    printFilter("Walk In", filters.walkIn ? "Yes" : ""),
+                    printFilter("Legacy Balance", filters.legacyBalance ? "Yes" : ""),
+                ],
+                ["Invoice #", "Walk-in", "Legacy Balance", "Billed Shop", "Date", "Total Amount", "Amount Due", "Billing Status"],
+                records.map((inv) => [
+                    inv.name && inv.name !== "/" ? inv.name : `Draft Document (*${inv.id})`,
+                    inv.shahtaj_is_walk_in ? "Yes" : "",
+                    inv.shahtaj_is_legacy_balance ? "Yes" : "",
+                    inv.partner_id ? inv.partner_id[1] : "Unknown",
+                    inv.invoice_date || "Not set",
+                    `Rs. ${(inv.amount_total || 0).toLocaleString()}`,
+                    `Rs. ${(inv.amount_residual !== undefined ? inv.amount_residual : inv.amount_total || 0).toLocaleString()}`,
+                    this._moveStatus(inv, false),
+                ]),
+            );
+        } catch (error) {
+            this.notification.add(error?.data?.message || error?.message || "Print failed.", { type: "danger" });
+        } finally {
+            this.state.isPrintingList = false;
+        }
+    }
+
+    async printCustomerPayments() {
+        if (this.state.isPrintingList) return;
+        this.state.isPrintingList = true;
+        try {
+            const filters = this.state.filters.payments;
+            const records = await this.orm.searchRead(
+                "account.payment",
+                this._listDomain("payments", filters),
+                ["name", "partner_id", "amount", "journal_id", "memo"],
+                { order: "id desc" }
+            );
+            await this._openListPrint(
+                "Customer Payments",
+                [
+                    printFilter("Search", filters.search),
+                    printFilter("Shop", this._shopFilterName(filters)),
+                    printFilter("From", filters.dateFrom),
+                    printFilter("To", filters.dateTo),
+                ],
+                ["Receipt #", "Paid By Shop", "Journal / Bank", "Ref / Memo", "Received Amount"],
+                records.map((pay) => [
+                    pay.name ? pay.name : `Processing... (#${pay.id})`,
+                    pay.partner_id ? pay.partner_id[1] : "Unknown",
+                    pay.journal_id ? pay.journal_id[1] : "Manual",
+                    pay.memo || "N/A",
+                    `Rs. ${(pay.amount || 0).toLocaleString()}`,
+                ]),
+            );
+        } catch (error) {
+            this.notification.add(error?.data?.message || error?.message || "Print failed.", { type: "danger" });
+        } finally {
+            this.state.isPrintingList = false;
+        }
+    }
+
+    async printCreditNotes() {
+        if (this.state.isPrintingList) return;
+        this.state.isPrintingList = true;
+        try {
+            const filters = this.state.filters.creditNotes;
+            const records = await this._loadPrintMoves("creditNotes");
+            await this._openListPrint(
+                "Credit Notes",
+                [
+                    printFilter("Search", filters.search),
+                    printFilter("Shop", this._shopFilterName(filters)),
+                    printFilter("From", filters.dateFrom),
+                    printFilter("To", filters.dateTo),
+                    printFilter("Status", filters.status),
+                ],
+                ["Refund Ref #", "Customer Shop", "Date", "Refund Amount", "Status"],
+                records.map((inv) => [
+                    inv.name && inv.name !== "/" ? inv.name : `Draft Document (*${inv.id})`,
+                    inv.partner_id ? inv.partner_id[1] : "Unknown",
+                    inv.invoice_date || "Not set",
+                    `Rs. ${(inv.amount_total || 0).toLocaleString()}`,
+                    this._moveStatus(inv, true),
+                ]),
+            );
+        } catch (error) {
+            this.notification.add(error?.data?.message || error?.message || "Print failed.", { type: "danger" });
+        } finally {
+            this.state.isPrintingList = false;
+        }
     }
 
     _receiptFields() {

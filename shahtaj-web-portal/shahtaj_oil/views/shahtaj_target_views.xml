@@ -9,6 +9,10 @@
                 <field name="order_booker_id"/>
                 <field name="date_start"/>
                 <field name="date_end"/>
+                <field name="period_status" string="Period" widget="badge"
+                       decoration-info="period_status == 'upcoming'"
+                       decoration-success="period_status == 'current'"
+                       decoration-muted="period_status == 'ended'"/>
                 <field name="target_type"/>
                 <field name="target_value"/>
                 <field name="target_weight_uom" optional="hide"/>
@@ -35,6 +39,10 @@
                             <field name="order_booker_id" required="1"/>
                             <field name="date_start" required="1"/>
                             <field name="date_end" required="1"/>
+                            <field name="period_status" widget="badge" readonly="1"
+                                   decoration-info="period_status == 'upcoming'"
+                                   decoration-success="period_status == 'current'"
+                                   decoration-muted="period_status == 'ended'"/>
                             <field name="active"/>
                         </group>
                         <group>
@@ -85,10 +93,32 @@
         </field>
     </record>
 
+    <record id="view_shahtaj_visit_target_search" model="ir.ui.view">
+        <field name="name">shahtaj.visit.target.search</field>
+        <field name="model">shahtaj.visit.target</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="order_booker_id"/>
+                <field name="target_type"/>
+                <filter string="Current" name="period_current"
+                        domain="[('period_status', '=', 'current')]"/>
+                <filter string="Upcoming" name="period_upcoming"
+                        domain="[('period_status', '=', 'upcoming')]"/>
+                <filter string="Ended" name="period_ended"
+                        domain="[('period_status', '=', 'ended')]"/>
+                <separator/>
+                <filter string="Archived" name="inactive"
+                        domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
     <record id="action_shahtaj_visit_target" model="ir.actions.act_window">
         <field name="name">Order Booker Targets</field>
         <field name="res_model">shahtaj.visit.target</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shahtaj_visit_target_search"/>
+        <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Set a target for an order booker
@@ -96,6 +126,8 @@
             <p>
                 Use Collective Quantity, Collective Weight, or Combined Product Targets.
                 Progress uses confirmed orders (booked qty), not delivery.
+                Period badge: Current / Upcoming / Ended (does not auto-archive).
+                Use search filters to narrow by period.
             </p>
         </field>
     </record>
@@ -106,6 +138,7 @@
         <field name="view_mode">list,form</field>
         <field name="domain">[('order_booker_id', '=', uid), ('active', '=', True)]</field>
         <field name="context">{'create': False, 'edit': False}</field>
+        <field name="search_view_id" ref="view_shahtaj_visit_target_search"/>
     </record>
 
 </odoo>

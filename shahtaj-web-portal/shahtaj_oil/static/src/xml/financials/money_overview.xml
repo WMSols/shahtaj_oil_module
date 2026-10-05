@@ -17,7 +17,7 @@
                                 <label class="small fw-bold text-muted mb-1">To</label>
                                 <input type="date" class="form-control form-control-sm" t-model="this.state.money.date_to"/>
                             </div>
-                            <button class="btn btn-dark fw-bold text-white" t-on-click="loadMoneyOverview" t-att-disabled="this.state.money.isLoading">
+                            <button class="btn btn-dark fw-bold text-white" t-on-click="() => this.loadMoneyOverview({ force: true })" t-att-disabled="this.state.money.isLoading">
                                 <t t-if="this.state.money.isLoading">
                                     <span class="spinner-border spinner-border-sm me-1"/> Loading...
                                 </t>
@@ -26,6 +26,11 @@
                         </div>
                     </div>
 
+                    <div class="position-relative">
+                    <div t-if="this.state.money.isLoading" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center" style="z-index: 5; background: rgba(255, 255, 255, 0.94);">
+                        <span class="spinner-border text-primary" role="status"></span>
+                        <span class="small fw-bold text-muted mt-2">Loading money overview...</span>
+                    </div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-3 col-6">
                             <button class="card border-0 shadow-sm p-3 h-100 rounded-4 text-start w-100 bg-white" t-on-click="() => this.openCashActivity('inbound')" title="Open collected cash activity">
@@ -91,6 +96,7 @@
                                 </p>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             </t>

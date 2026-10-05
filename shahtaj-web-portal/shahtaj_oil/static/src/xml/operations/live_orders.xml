@@ -11,7 +11,7 @@
                 Live Orders
             </button>
         </li>
-        <li class="nav-item">
+        <li class="nav-item" t-if="this.canMutate">
             <button t-on-click="() => this.setOrdersSubTab('verification')" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 fs-6 d-inline-flex align-items-center #{this.state.ordersSubTab === 'verification' ? 'text-warning border-bottom border-warning border-3 rounded-0' : 'text-muted'}">
                 Needs Verification
                 <span t-if="this.state.verificationCount &gt; 0" class="ms-2 fw-bold text-white" style="background-color: #ea580c; border-radius: 999px; min-width: 1.4rem; height: 1.4rem; padding: 0 0.4rem; font-size: 0.75rem; line-height: 1.4rem; display: inline-block; text-align: center;"><t t-esc="this.state.verificationCount"/></span>
@@ -24,8 +24,14 @@
     <div class="p-4 bg-light border-bottom">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <h4 class="fw-bold mb-0">Create Sales Order</h4>
-                <small class="text-muted">Place an order for a shop directly from the portal.</small>
+                <h4 class="fw-bold mb-0">
+                    <t t-if="this.state.saleOrderForm.order_id">Edit <t t-esc="this.state.saleOrderForm.order_name"/></t>
+                    <t t-else="">Create Sales Order</t>
+                </h4>
+                <small class="text-muted">
+                    <t t-if="this.state.saleOrderForm.order_id">Change the lines, prices, and taxes, then save.</t>
+                    <t t-else="">Place an order for a shop directly from the portal.</t>
+                </small>
             </div>
             <button type="button" class="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 32px; height: 32px;" t-on-click="closeSaleOrderForm" title="Close" aria-label="Close">
                 <i class="fa fa-times"></i>
@@ -34,23 +40,32 @@
         <div class="row g-3 mb-3">
             <div class="col-md-5">
                 <label class="small fw-bold">Shop <span class="text-danger">*</span></label>
-                <select class="form-select" t-model="this.state.saleOrderForm.partner_id">
-                    <option value="">-- Select Shop --</option>
-                    <t t-foreach="this.state.lookupShops" t-as="shop" t-key="shop.id">
-                        <option t-att-value="shop.id"><t t-esc="shop.name"/></option>
-                    </t>
-                </select>
+                <t t-if="this.state.saleOrderForm.order_id">
+                    <input type="text" class="form-control" readonly="readonly"
+                           t-att-value="this.saleOrderShopLabel()"/>
+                </t>
+                <t t-else="">
+                    <select class="form-select" t-on-change="(ev) => this.onSaleOrderShopChange(ev)">
+                        <option value="" t-att-selected="this.isSelectedId(this.state.saleOrderForm.partner_id, '')">-- Select Shop --</option>
+                        <t t-foreach="this.saleOrderShopOptions()" t-as="shop" t-key="shop.id">
+                            <option t-att-value="this.optionId(shop.id)" t-att-selected="this.isSelectedId(this.state.saleOrderForm.partner_id, shop.id)"><t t-esc="shop.name"/></option>
+                        </t>
+                    </select>
+                </t>
             </div>
             <div class="col-md-3">
                 <label class="small fw-bold">Order Date</label>
                 <input type="date" class="form-control" t-model="this.state.saleOrderForm.date_order"/>
             </div>
             <div class="col-md-4 d-flex align-items-end">
-                <button class="btn btn-success fw-bold text-white" t-on-click="saveSaleOrder" t-att-disabled="this.state.isSavingSaleOrder">
+                <button t-if="this.canMutate" class="btn btn-success fw-bold text-white" t-on-click="saveSaleOrder" t-att-disabled="this.state.isSavingSaleOrder">
                     <t t-if="this.state.isSavingSaleOrder">
                         <span class="spinner-border spinner-border-sm me-2"/> Saving...
                     </t>
-                    <t t-else="">Save Sales Order</t>
+                    <t t-else="">
+                        <t t-if="this.state.saleOrderForm.order_id">Save Changes</t>
+                        <t t-else="">Save Sales Order</t>
+                    </t>
                 </button>
             </div>
         </div>
@@ -70,10 +85,10 @@
                     <t t-foreach="this.state.saleOrderForm.lines" t-as="line" t-key="line.id">
                         <tr>
                             <td class="ps-3">
-                                <select class="form-select form-select-sm" t-model="line.product_id" t-on-change="() => this.onSaleOrderProductChange(line)">
-                                    <option value="">-- Select Product --</option>
-                                    <t t-foreach="this.state.saleProducts" t-as="product" t-key="product.id">
-                                        <option t-att-value="product.id"><t t-esc="product.name"/></option>
+                                <select class="form-select form-select-sm" t-on-change="(ev) => this.onSaleOrderProductSelect(line, ev)">
+                                    <option value="" t-att-selected="this.isSelectedId(line.product_id, '')">-- Select Product --</option>
+                                    <t t-foreach="this.saleOrderProductOptions(line)" t-as="product" t-key="product.id">
+                                        <option t-att-value="this.optionId(product.id)" t-att-selected="this.isSelectedId(line.product_id, product.id)"><t t-esc="product.name"/></option>
                                     </t>
                                 </select>
                             </td>
@@ -95,21 +110,21 @@
                                 <input type="number" min="0" step="any" class="form-control form-control-sm text-end" t-model="line.price"/>
                             </td>
                             <td t-if="this.hasFinancialAccess">
-                                <select class="form-select form-select-sm" t-model="line.tax_id">
-                                    <option value="">No Tax</option>
+                                <select class="form-select form-select-sm" t-on-change="(ev) => this.onSaleOrderTaxSelect(line, ev)">
+                                    <option value="" t-att-selected="this.isSelectedId(line.tax_id, '')">No Tax</option>
                                     <t t-foreach="this.state.saleTaxes" t-as="tax" t-key="tax.id">
-                                        <option t-att-value="tax.id"><t t-esc="tax.name"/></option>
+                                        <option t-att-value="this.optionId(tax.id)" t-att-selected="this.isSelectedId(line.tax_id, tax.id)"><t t-esc="tax.name"/></option>
                                     </t>
                                 </select>
                             </td>
                             <td class="text-end pe-3">
-                                <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.removeSaleOrderLine(line.id)">Remove</button>
+                                <button t-if="this.canMutate" class="btn btn-sm btn-outline-danger" t-on-click="() => this.removeSaleOrderLine(line.id)">Remove</button>
                             </td>
                         </tr>
                     </t>
                     <tr>
                         <td t-att-colspan="this.hasFinancialAccess ? 6 : 4" class="ps-3 py-3">
-                            <button class="btn btn-sm btn-outline-primary fw-bold" t-on-click="addSaleOrderLine">
+                            <button t-if="this.canMutate" class="btn btn-sm btn-outline-primary fw-bold" t-on-click="addSaleOrderLine">
                                 <i class="fa fa-plus me-1"></i> Add Product Line
                             </button>
                         </td>
@@ -126,23 +141,43 @@
                                t-on-input="(ev) => this.onSearchInput(ev, 'orders')"/>
                         <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
                         <select class="form-select form-select-sm" style="max-width: 200px;"
-                                t-model="this.state.filters.orders.booker"
-                                t-on-change="() => this.onFilterChange('orders')">
-                            <option value="all">All Order Bookers</option>
+                                t-on-change="(ev) => this.onFilterField('orders', 'booker', ev)">
+                            <option value="all" t-att-selected="this.isFilterOptionSelected('orders', 'booker', 'all')">All Order Bookers</option>
                             <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
-                                <option t-att-value="b.id"><t t-esc="b.name"/></option>
+                                <option t-att-value="this.filterOptionValue(b.id)" t-att-selected="this.isFilterOptionSelected('orders', 'booker', b.id)"><t t-esc="b.name"/></option>
                             </t>
                         </select>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;"
+                               t-att-value="this.state.filters.orders.dateFrom"
+                               t-on-change="(ev) => this.onFilterField('orders', 'dateFrom', ev)"
+                               title="From date"/>
+                        <span class="text-muted small align-self-center">to</span>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;"
+                               t-att-value="this.state.filters.orders.dateTo"
+                               t-on-change="(ev) => this.onFilterField('orders', 'dateTo', ev)"
+                               title="To date"/>
                         <select class="form-select form-select-sm" style="max-width: 240px;" 
-                                t-model="this.state.filters.orders.status" 
-                                t-on-change="() => this.onFilterChange('orders')">
+                                t-att-value="this.state.filters.orders.status" 
+                                t-on-change="(ev) => this.onFilterField('orders', 'status', ev)">
                             <option value="">All Order Statuses</option>
                             <option value="Draft">Draft</option>
                             <option value="To Invoice">To Invoice</option>
-                            <option value="Delivered">Delivered</option>
+                            <option value="Invoiced">Invoiced</option>
                             <option value="Cancelled">Cancelled</option>
                         </select>
-                        <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm ms-auto" t-on-click="openSaleOrderForm">
+                        <div class="form-check form-switch mb-0 d-flex align-items-center">
+                            <input class="form-check-input mt-0" type="checkbox" role="switch" id="liveOrdersWalkIn"
+                                   t-att-checked="this.state.filters.orders.walkIn"
+                                   t-on-change="onOrdersWalkInToggle"/>
+                            <label class="form-check-label small fw-bold text-nowrap ms-2" for="liveOrdersWalkIn">Walk In</label>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printLiveOrders" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                            <i class="fa fa-print me-1"/> Print
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('orders')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
+                        <button t-if="this.canMutate" class="btn btn-sm btn-dark fw-bold text-white shadow-sm ms-auto" t-on-click="openSaleOrderForm">
                             <i class="fa fa-plus me-1"></i> New Sales Order
                         </button>
                     </div>
@@ -177,7 +212,10 @@
                                         <tr>
                                             <td class="ps-4 fw-bold align-middle text-dark"><t t-esc="ord.id"/></td>
                                             <td class="align-middle">
-                                                <div class="text-dark fw-bold"><t t-esc="ord.shop"/></div>
+                                                <div class="text-dark fw-bold d-flex align-items-center flex-wrap gap-2">
+                                                    <t t-esc="ord.shop"/>
+                                                    <span t-if="ord.isWalkIn" class="badge bg-warning text-dark">Walk-in</span>
+                                                </div>
                                                 <small class="text-muted">Shop ID: <t t-esc="ord.shopId"/> · Booker ID: <t t-esc="ord.bookerId"/> · <t t-esc="ord.booker"/></small>
                                             </td>
                                             <td class="align-middle text-nowrap text-muted fw-bold"><t t-esc="ord.date"/></td>
@@ -192,7 +230,8 @@
                                             </td>
                                             <td class="align-middle text-end pe-4">
                                                 <button class="btn btn-sm btn-outline-dark fw-bold me-1" t-on-click="() => this.viewOrder(ord)">View Details →</button>
-                                                <button t-if="this.canCancelOrder(ord)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click.stop="() => this.requestCancelOrder(ord)" t-att-disabled="this.state.isCancellingOrder">Cancel</button>
+                                                <button t-if="this.orderCanResetToDraft(ord)" class="btn btn-sm btn-outline-primary fw-bold me-1" t-on-click.stop="() => this.requestResetOrderToDraft(ord)" t-att-disabled="this.state.isResettingOrder">Reset to Draft</button>
+                                                <button t-if="this.isDistributorPortal and this.canCancelOrder(ord)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click.stop="() => this.requestCancelOrder(ord)" t-att-disabled="this.state.isCancellingOrder">Cancel</button>
                                             </td>
                                         </tr>
                                     </t>
@@ -230,7 +269,10 @@
 </div>
 <div class="d-flex align-items-center">
     <t t-if="this.state.selectedOrder.status === 'Draft'">
-        <button class="btn btn-sm btn-primary text-white shadow-sm fw-bold px-3 d-flex align-items-center me-2" t-on-click="confirmSelectedOrder" t-att-disabled="this.state.isConfirmingOrder" title="Confirm this draft sales order">
+        <button t-if="this.canResetOrderToDraft" class="btn btn-sm btn-outline-primary shadow-sm fw-bold px-3 d-flex align-items-center me-2" t-on-click="() => this.openEditSaleOrder(this.state.selectedOrder)" title="Edit shop, lines, prices, and taxes">
+            Edit Order
+        </button>
+        <button t-if="this.canMutate" class="btn btn-sm btn-primary text-white shadow-sm fw-bold px-3 d-flex align-items-center me-2" t-on-click="confirmSelectedOrder" t-att-disabled="this.state.isConfirmingOrder" title="Confirm this draft sales order">
             <t t-if="this.state.isConfirmingOrder">
                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                                             Confirming...
@@ -239,7 +281,7 @@
         </button>
     </t>
     <t t-if="this.canCreateInvoice(this.state.selectedOrder)">
-        <button class="btn btn-sm btn-success text-white shadow-sm fw-bold px-3 d-flex align-items-center" t-on-click="createInvoice" t-att-disabled="this.state.isCreatingInvoice" title="Invoice ordered quantities and post. Required before assigning a delivery man.">
+        <button t-if="this.canMutate" class="btn btn-sm btn-success text-white shadow-sm fw-bold px-3 d-flex align-items-center" t-on-click="createInvoice" t-att-disabled="this.state.isCreatingInvoice" title="Invoice ordered quantities and post. Required before assigning a delivery man.">
             <t t-if="this.state.isCreatingInvoice">
                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                                             Generating...
@@ -254,8 +296,17 @@
             </t>
         </button>
     </t>
+    <t t-if="this.orderCanResetToDraft(this.state.selectedOrder)">
+        <button class="btn btn-sm btn-outline-primary fw-bold px-3 d-flex align-items-center ms-2" t-on-click="() => this.requestResetOrderToDraft(this.state.selectedOrder)" t-att-disabled="this.state.isResettingOrder" title="Return this order to draft so lines and taxes can be edited">
+            <t t-if="this.state.isResettingOrder">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Resetting...
+            </t>
+            <t t-else="">Reset to Draft</t>
+        </button>
+    </t>
     <t t-if="this.canCancelOrder(this.state.selectedOrder)">
-        <button class="btn btn-sm btn-outline-danger fw-bold px-3 d-flex align-items-center ms-2" t-on-click="() => this.requestCancelOrder(this.state.selectedOrder)" t-att-disabled="this.state.isCancellingOrder" title="Cancel this order. Cancelled orders cannot be invoiced or delivered.">
+        <button t-if="this.isDistributorPortal" class="btn btn-sm btn-outline-danger fw-bold px-3 d-flex align-items-center ms-2" t-on-click="() => this.requestCancelOrder(this.state.selectedOrder)" t-att-disabled="this.state.isCancellingOrder" title="Cancel this order. Cancelled orders cannot be invoiced or delivered.">
             <t t-if="this.state.isCancellingOrder">
                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                                             Cancelling...
@@ -274,32 +325,19 @@
 <div class="col-md-6 mb-3 mb-md-0">
     <div class="card border-0 shadow-sm p-4 h-100 rounded-3">
         <h6 class="text-muted text-uppercase small fw-bold mb-3">Customer Details</h6>
-        <h5 class="fw-bold text-dark mb-1">
+        <h5 class="fw-bold text-dark mb-1 d-flex align-items-center flex-wrap gap-2">
             <t t-esc="this.state.selectedOrder.shop"/>
+            <span t-if="this.state.selectedOrder.isWalkIn" class="badge bg-warning text-dark fs-6">Walk-in Delivery</span>
         </h5>
         <p class="text-muted mb-1 small">
-            <strong>Shop ID:</strong>
+            <strong>Shop ID: </strong>
             <t t-esc="this.state.selectedOrder.shopId"/>
         </p>
-        <p class="text-muted mb-1 small d-flex align-items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin me-1">
-                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-                <circle cx="12" cy="10" r="3"/>
-            </svg>
-            <t t-esc="this.state.selectedOrder.address"/>
-        </p>
-        <p class="text-muted mb-1 small d-flex align-items-center">
+        <p class="text-muted mb-0 small d-flex align-items-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-phone me-1">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
             </svg>
             <t t-esc="this.state.selectedOrder.phone"/>
-        </p>
-        <p class="text-muted mb-0 small d-flex align-items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail me-1">
-                <rect width="20" height="16" x="2" y="4" rx="2"/>
-                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-            </svg>
-            <t t-esc="this.state.selectedOrder.email"/>
         </p>
     </div>
 </div>
@@ -331,6 +369,7 @@
 </div>
 </div>
 
+<t t-if="!this.state.selectedOrder.isWalkIn">
 <div class="card border-0 shadow-sm rounded-3 mb-4 overflow-hidden">
     <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0"
             t-on-click="toggleShopSnapshot" title="Show or hide shop credit and sales history">
@@ -449,6 +488,7 @@
         </div>
     </t>
 </div>
+</t>
 
 <div class="card border-0 shadow-sm overflow-hidden rounded-3">
 <div class="bg-dark text-white p-3">
@@ -534,21 +574,23 @@
                    t-on-input="(ev) => this.onSearchInput(ev, 'verification')"/>
             <small class="fw-bold text-muted">Filters: </small>
             <select class="form-select form-select-sm" style="max-width: 200px;"
-                    t-model="this.state.filters.verification.booker"
-                    t-on-change="() => this.onFilterChange('verification')">
-                <option value="all">All Order Bookers</option>
+                    t-on-change="(ev) => this.onFilterField('verification', 'booker', ev)">
+                <option value="all" t-att-selected="this.isFilterOptionSelected('verification', 'booker', 'all')">All Order Bookers</option>
                 <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
-                    <option t-att-value="b.id"><t t-esc="b.name"/></option>
+                    <option t-att-value="this.filterOptionValue(b.id)" t-att-selected="this.isFilterOptionSelected('verification', 'booker', b.id)"><t t-esc="b.name"/></option>
                 </t>
             </select>
             <select class="form-select form-select-sm" style="max-width: 220px;"
-                    t-model="this.state.filters.verification.reason"
-                    t-on-change="() => this.onFilterChange('verification')">
+                    t-att-value="this.state.filters.verification.reason"
+                    t-on-change="(ev) => this.onFilterField('verification', 'reason', ev)">
                 <option value="all">All Reasons</option>
                 <option value="discount">Discount</option>
                 <option value="credit">Credit Limit</option>
                 <option value="both">Discount + Credit</option>
             </select>
+            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('verification')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                <i class="fa fa-times me-1"/> Clear filters
+            </button>
         </div>
         <div class="position-relative">
             <t t-if="this.state.isLoadingList">
@@ -623,8 +665,8 @@
                     Back to Verification Queue
                 </button>
                 <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="openRejectModal" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">Reject</button>
-                    <button class="btn btn-sm btn-success text-white fw-bold" t-on-click="approveSelectedOrder" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">
+                    <button t-if="this.canMutate" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="openRejectModal" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">Reject</button>
+                    <button t-if="this.canMutate" class="btn btn-sm btn-success text-white fw-bold" t-on-click="approveSelectedOrder" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">
                         <t t-if="this.state.isApprovingOrder"><span class="spinner-border spinner-border-sm me-1"/> Approving...</t>
                         <t t-else="">Approve Order</t>
                     </button>
@@ -712,7 +754,7 @@
             <textarea class="form-control mb-3" rows="4" t-model="this.state.rejectReason" placeholder="Explain why this order or discount is rejected..."></textarea>
             <div class="d-flex justify-content-end gap-2">
                 <button class="btn btn-light border fw-bold" t-on-click="closeRejectModal">Cancel</button>
-                <button class="btn btn-danger fw-bold text-white" t-on-click="rejectSelectedOrder" t-att-disabled="this.state.isRejectingOrder">
+                <button t-if="this.canMutate" class="btn btn-danger fw-bold text-white" t-on-click="rejectSelectedOrder" t-att-disabled="this.state.isRejectingOrder">
                     <t t-if="this.state.isRejectingOrder">Rejecting...</t>
                     <t t-else="">Confirm Rejection</t>
                 </button>
@@ -742,7 +784,7 @@
             <textarea class="form-control mb-3" rows="3" t-model="this.state.creditOverride.note" placeholder="Reason for approving above the credit limit"></textarea>
             <div class="d-flex justify-content-end gap-2">
                 <button class="btn btn-light border fw-bold" t-on-click="closeCreditOverride">Cancel</button>
-                <button class="btn btn-danger fw-bold text-white" t-on-click="proceedCreditOverride" t-att-disabled="this.state.isProcessingOverride">
+                <button t-if="this.canMutate" class="btn btn-danger fw-bold text-white" t-on-click="proceedCreditOverride" t-att-disabled="this.state.isProcessingOverride">
                     <t t-if="this.state.isProcessingOverride">Processing...</t>
                     <t t-else="">Proceed Anyway</t>
                 </button>

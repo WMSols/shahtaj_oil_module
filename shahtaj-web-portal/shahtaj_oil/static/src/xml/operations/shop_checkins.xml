@@ -32,6 +32,49 @@
                     color: #c2410c;
                     border: 1px solid #fed7aa;
                 }
+                .so-gps-timeline {
+                    margin-left: 0.35rem;
+                    padding-left: 1.15rem;
+                    border-left: 2px solid #e2e8f0;
+                }
+                .so-gps-step {
+                    position: relative;
+                    padding-bottom: 0.9rem;
+                }
+                .so-gps-step-btn {
+                    cursor: pointer;
+                    border-radius: 0.4rem;
+                    margin-right: -0.25rem;
+                    padding-right: 0.25rem;
+                }
+                .so-gps-step-btn:hover {
+                    background: #f8fafc;
+                }
+                .so-gps-step-active {
+                    background: #ecfeff;
+                }
+                .so-gps-step:last-child {
+                    padding-bottom: 0;
+                }
+                .so-gps-dot {
+                    position: absolute;
+                    left: -1.48rem;
+                    top: 0.35rem;
+                    width: 0.7rem;
+                    height: 0.7rem;
+                    border-radius: 50%;
+                    border: 2px solid #fff;
+                    box-shadow: 0 0 0 1px #e2e8f0;
+                }
+                .so-gps-dot-ok {
+                    background: #0f766e;
+                }
+                .so-gps-dot-blocked {
+                    background: #be123c;
+                }
+                .so-gps-dot-warn {
+                    background: #c2410c;
+                }
             </style>
         <!-- Shop Checkins Tab (GPS attempts: success + blocked) -->
         <t t-if="this.state.activeSubTab === 'checkins'">
@@ -42,35 +85,47 @@
                            t-on-input="(ev) => this.onSearchInput(ev, 'checkins')"/>
                      <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
                     <select class="form-select form-select-sm" style="max-width: 200px;"
-                            t-model="this.state.filters.checkins.booker"
-                            t-on-change="() => this.onFilterChange('checkins')">
-                        <option value="all">All Field Users</option>
+                            t-on-change="(ev) => this.onFilterField('checkins', 'booker', ev)">
+                        <option value="all" t-att-selected="this.isFilterOptionSelected('checkins', 'booker', 'all')">All Field Users</option>
                         <t t-foreach="this.state.lookupFieldUsers" t-as="b" t-key="b.id">
-                            <option t-att-value="b.id"><t t-esc="b.name"/></option>
+                            <option t-att-value="this.filterOptionValue(b.id)" t-att-selected="this.isFilterOptionSelected('checkins', 'booker', b.id)"><t t-esc="b.name"/></option>
                         </t>
                     </select>
                     <input type="date" class="form-control form-control-sm" style="max-width: 160px;"
-                           t-model="this.state.filters.checkins.date"
-                           t-on-change="() => this.onFilterChange('checkins')"
+                           t-att-value="this.state.filters.checkins.date"
+                           t-on-change="(ev) => this.onFilterField('checkins', 'date', ev)"
                            title="Optional: show GPS attempts for this date only"/>
                     <select class="form-select form-select-sm" style="max-width: 180px;"
-                            t-model="this.state.filters.checkins.purpose"
-                            t-on-change="() => this.onFilterChange('checkins')">
+                            t-att-value="this.state.filters.checkins.purpose"
+                            t-on-change="(ev) => this.onFilterField('checkins', 'purpose', ev)">
                         <option value="all">All Purposes</option>
                         <option value="check_in">Check-in</option>
                         <option value="place_order">Place Order</option>
                         <option value="deliver">Deliver to Shop</option>
+                        <option value="walk_in">Walk In</option>
                     </select>
                     <select class="form-select form-select-sm" style="max-width: 180px;"
-                            t-model="this.state.filters.checkins.role"
-                            t-on-change="() => this.onFilterChange('checkins')">
+                            t-att-value="this.state.filters.checkins.role"
+                            t-on-change="(ev) => this.onFilterField('checkins', 'role', ev)">
                         <option value="all">All Roles</option>
                         <option value="order_booker">Order Bookers</option>
                         <option value="delivery_man">Delivery Men</option>
                     </select>
+                    <select class="form-select form-select-sm" style="max-width: 200px;"
+                            t-att-value="this.state.filters.checkins.outcome"
+                            t-on-change="(ev) => this.onFilterField('checkins', 'outcome', ev)"
+                            title="Filter by the linked shop visit outcome">
+                        <option value="all">All Visit Outcomes</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="order">Order Placed</option>
+                        <option value="no_order">No Order</option>
+                        <option value="incomplete">Incomplete</option>
+                        <option value="undone">Undone</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
                     <select class="form-select form-select-sm" style="max-width: 240px;" 
-                            t-model="this.state.filters.checkins.status" 
-                            t-on-change="() => this.onFilterChange('checkins')">
+                            t-att-value="this.state.filters.checkins.status" 
+                            t-on-change="(ev) => this.onFilterField('checkins', 'status', ev)">
                         <option value="">All GPS Results</option>
                         <option value="ok">GPS OK</option>
                         <option value="blocked">All Blocked</option>
@@ -78,6 +133,12 @@
                         <option value="blocked_too_close">Blocked — Too Close</option>
                         <option value="blocked_missing">Blocked — Missing / Invalid GPS</option>
                     </select>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="printCheckins" t-att-disabled="this.state.isPrintingList or this.state.isLoadingList" title="Print the rows that match the current filters">
+                        <i class="fa fa-print me-1"/> Print
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('checkins')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                        <i class="fa fa-times me-1"/> Clear filters
+                    </button>
                 </div>
 
                 <div class="position-relative">
@@ -105,20 +166,22 @@
                                         <small class="text-muted">
                                             <t t-esc="log.purposeLabel"/> · <t t-esc="log.roleLabel"/> ·
                                             Shop ID: <t t-esc="log.shopId"/> ·
-                                            <t t-esc="log.booker"/> · <t t-esc="log.time"/>
+                                            <t t-esc="log.booker"/>
+                                            <t t-if="this.checkinShowsGps(log)"> · <t t-esc="log.time"/></t>
+                                            <t t-if="log.checkpointCount &gt; 1"> · <t t-esc="log.checkpointCount"/> checkpoints</t>
                                         </small>
                                     </div>
                                 </div>
                                 <div class="text-end d-flex align-items-center">
-                                    <div class="me-3 text-end">
+                                    <div class="me-3 text-end" t-if="this.checkinShowsGps(log)">
                                         <span t-attf-class="badge so-gps-tag mb-1 d-inline-block #{this._gpsListTagClass(log.result)}"><t t-esc="log.status"/></span>
                                         <div class="text-muted fw-bold small"><t t-esc="log.distLabel"/></div>
                                         <div class="text-muted fw-bold small" title="Total time spent at the shop">
                                             <t t-esc="log.duration"/>
                                         </div>
                                     </div>
-                                    <div t-if="log.isOk" class="me-3 text-end" style="min-width: 7.5rem;">
-                                        <span t-attf-class="badge p-2 fs-6 d-inline-block #{log.hasOrder ? 'bg-success text-white' : 'bg-light text-dark border'}">
+                                    <div t-if="log.isOk and log.purpose !== 'walk_in'" class="me-3 text-end" style="min-width: 7.5rem;">
+                                        <span t-attf-class="badge p-2 fs-6 d-inline-block #{log.outcomeBadgeClass || (log.hasOrder ? 'bg-success text-white' : 'bg-light text-dark border')}">
                                             <t t-esc="log.orderLabel"/>
                                         </span>
                                     </div>
@@ -154,7 +217,7 @@
                 </svg>
                                 Back to List
             </button>
-            <div>
+            <div t-if="this.checkinShowsGps(this.state.selectedCheckin)">
                 <span t-attf-class="badge #{this._gpsStatusBadgeClass(this.state.selectedCheckin.result)} p-2 fs-6 text-uppercase shadow-sm" style="letter-spacing: 1px;">
                     <t t-esc="this.state.selectedCheckin.status"/>
                 </span>
@@ -169,24 +232,24 @@
                         <t t-esc="this.state.selectedCheckin.shop"/>
                     </h5>
                     <p class="text-muted mb-1 small">
-                        <strong>Shop ID:</strong>
+                        <strong>Shop ID: </strong>
                         <t t-esc="this.state.selectedCheckin.shopId"/>
                     </p>
                     <p class="text-muted mb-1 small">
-                        <strong>User:</strong>
+                        <strong>User: </strong>
                         <t t-esc="this.state.selectedCheckin.booker"/>
                         <span class="ms-1">(ID: <t t-esc="this.state.selectedCheckin.bookerId"/>)</span>
                     </p>
                     <p class="text-muted mb-1 small">
-                        <strong>Role:</strong>
+                        <strong>Role: </strong>
                         <t t-esc="this.state.selectedCheckin.roleLabel"/>
                     </p>
                     <p class="text-muted mb-1 small">
-                        <strong>Purpose:</strong>
+                        <strong>Purpose: </strong>
                         <t t-esc="this.state.selectedCheckin.purposeLabel"/>
                     </p>
-                    <p class="text-muted mb-0 small" title="Linked task or delivery job">
-                        <strong>Reference:</strong>
+                    <p class="text-muted mb-0 small" t-if="this.state.selectedCheckin.purpose !== 'walk_in'" title="Linked task or delivery job">
+                        <strong>Reference: </strong>
                         <t t-esc="this.state.selectedCheckin.taskRef"/>
                     </p>
                     <p class="bg-info text-white mb-0 p-2 small mt-3" t-if="this.state.selectedCheckin.isOk" title="Linked visit notes">
@@ -197,57 +260,81 @@
                         <strong>Notes: </strong>
                         <t t-esc="this.state.selectedCheckin.notes"/>
                     </p>
+                    <div class="mt-3" t-if="this.checkinShowsGps(this.state.selectedCheckin) and this.state.selectedCheckin.checkpoints and this.state.selectedCheckin.checkpoints.length">
+                        <span class="text-muted small text-uppercase fw-bold d-block mb-2">Checkpoints</span>
+                        <div class="so-gps-timeline">
+                            <t t-foreach="this.state.selectedCheckin.checkpoints" t-as="cp" t-key="cp.id">
+                                    <div t-attf-class="so-gps-step so-gps-step-btn #{cp.id === this.state.selectedCheckin.selectedCheckpointId ? 'so-gps-step-active' : ''}" t-on-click="() => this.selectCheckinCheckpoint(cp)" title="Show this checkpoint on the map">
+                                    <span t-attf-class="so-gps-dot #{cp.isOk ? 'so-gps-dot-ok' : (cp.result === 'blocked_too_far' or cp.result === 'blocked_too_close' ? 'so-gps-dot-blocked' : 'so-gps-dot-warn')}"></span>
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <span t-attf-class="badge so-gps-tag #{this._gpsListTagClass(cp.result)}">
+                                                <t t-esc="cp.label"/>
+                                            </span>
+                                            <div class="text-muted small mt-1"><t t-esc="cp.time"/></div>
+                                        </div>
+                                        <span class="fw-bold text-dark small text-nowrap"><t t-esc="cp.distLabel"/></span>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="card border-0 shadow-sm p-4 h-100 rounded-3">
-                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Distance &amp; Result</h6>
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <span class="text-muted small">Attempted At:</span>
-                        <span class="fw-bold text-dark">
-                            <t t-esc="this.state.selectedCheckin.time"/>
-                        </span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <span class="text-muted small">Ended At:</span>
-                        <span class="fw-bold text-dark">
-                            <t t-esc="this.state.selectedCheckin.endTime || '—'"/>
-                        </span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <span class="text-muted small">Time Spent:</span>
-                        <span class="fw-bold text-dark" title="Total time spent at the shop">
-                            <t t-esc="this.state.selectedCheckin.duration || '—'"/>
-                        </span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <span class="text-muted small">Distance:</span>
-                        <span class="fw-bold text-dark">
-                            <t t-esc="this.state.selectedCheckin.distLabel"/>
-                        </span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <span class="text-muted small">Allowed Range:</span>
-                        <span class="fw-bold text-dark">
-                            <t t-esc="Math.round(this.state.selectedCheckin.min_distance_m || 0)"/>–
-                            <t t-esc="Math.round(this.state.selectedCheckin.max_distance_m || 0)"/> m
-                        </span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom" t-if="this.state.selectedCheckin.isOk and this.state.selectedCheckin.visitOutcome">
+                    <h6 class="text-muted text-uppercase small fw-bold mb-3">
+                        <t t-if="this.checkinShowsGps(this.state.selectedCheckin)">Distance &amp; Result</t>
+                        <t t-else="">Visit</t>
+                    </h6>
+                    <t t-if="this.checkinShowsGps(this.state.selectedCheckin)">
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="text-muted small">Attempted At:</span>
+                            <span class="fw-bold text-dark">
+                                <t t-esc="this.state.selectedCheckin.time"/>
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom" t-if="this.state.selectedCheckin.purpose !== 'walk_in'">
+                            <span class="text-muted small">Ended At:</span>
+                            <span class="fw-bold text-dark">
+                                <t t-esc="this.state.selectedCheckin.endTime || '—'"/>
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom" t-if="this.state.selectedCheckin.purpose !== 'walk_in'">
+                            <span class="text-muted small">Time Spent:</span>
+                            <span class="fw-bold text-dark" title="Total time spent at the shop">
+                                <t t-esc="this.state.selectedCheckin.duration || '—'"/>
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom" t-if="this.state.selectedCheckin.purpose !== 'walk_in'">
+                            <span class="text-muted small">Distance:</span>
+                            <span class="fw-bold text-dark">
+                                <t t-esc="this.state.selectedCheckin.distLabel"/>
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom" t-if="this.state.selectedCheckin.purpose !== 'walk_in'">
+                            <span class="text-muted small">Allowed Range:</span>
+                            <span class="fw-bold text-dark">
+                                <t t-esc="Math.round(this.state.selectedCheckin.min_distance_m || 0)"/>–
+                                <t t-esc="Math.round(this.state.selectedCheckin.max_distance_m || 0)"/> m
+                            </span>
+                        </div>
+                    </t>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom" t-if="this.state.selectedCheckin.isOk and this.state.selectedCheckin.purpose !== 'walk_in' and this.state.selectedCheckin.visitOutcome">
                         <span class="text-muted small">Visit Outcome:</span>
-                        <span t-attf-class="fw-bold #{this.state.selectedCheckin.visitOutcome === 'Order Placed' or this.state.selectedCheckin.visitOutcome === 'Delivered' ? 'text-success' : 'text-warning'}">
+                        <span t-attf-class="fw-bold #{this._checkinVisitOutcomeClass(this.state.selectedCheckin.visitOutcome)}">
                             <t t-esc="this.state.selectedCheckin.visitOutcome"/>
                         </span>
                     </div>
-                    <div class="mt-2">
+                    <div class="mt-2" t-if="this.checkinShowsGps(this.state.selectedCheckin)">
                         <span class="text-muted small d-block mb-1">System Message:</span>
                         <p t-attf-class="mb-0 small p-2 rounded #{this.state.selectedCheckin.isOk ? 'bg-success text-white' : 'bg-danger text-white'}">
                             <t t-esc="this.state.selectedCheckin.message || '—'"/>
                         </p>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" t-if="this.state.selectedCheckin.isOk">
-                        <span class="text-muted small"><t t-esc="this.state.selectedCheckin.isDeliveryCheckin ? 'Delivery:' : 'Order:'"/></span>
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" t-if="this.state.selectedCheckin.isOk and (this.state.selectedCheckin.purpose !== 'walk_in' or this.state.selectedCheckin.sale_order_id)">
+                        <span class="text-muted small"><t t-esc="this.state.selectedCheckin.purpose === 'walk_in' or !this.state.selectedCheckin.isDeliveryCheckin ? 'Order:' : 'Delivery:'"/></span>
                         <t t-if="this.state.selectedCheckin.sale_order_id">
                             <button class="btn btn-sm btn-primary shadow-sm fw-bold" t-on-click="() => this.viewOrderFromCheckin(this.state.selectedCheckin)" title="Open the sales order linked to this visit">
                                 <t t-esc="this.state.selectedCheckin.sale_order_id[1]"/>
@@ -263,7 +350,7 @@
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm rounded-3 mb-4 mt-3 overflow-hidden">
+        <div t-if="this.state.selectedCheckin.purpose !== 'walk_in'" class="card border-0 shadow-sm rounded-3 mb-4 mt-3 overflow-hidden">
             <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0"
                     t-on-click="toggleShopSnapshot" title="Show or hide shop credit and sales history">
                 <div class="d-flex align-items-center flex-wrap gap-2">
@@ -382,7 +469,7 @@
             </t>
         </div>
 
-        <div class="row mt-3">
+        <div class="row mt-3" t-if="this.checkinShowsGps(this.state.selectedCheckin)">
             <div class="col-12">
                 <div class="card border-0 shadow-sm p-4 rounded-3">
                     <h6 class="fw-bold text-info d-flex align-items-center mb-3">
@@ -398,6 +485,9 @@
                         <span><span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#198754;"></span> GPS OK attempt</span>
                         <span><span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#dc3545;"></span> Blocked attempt</span>
                         <span class="text-muted">Dashed blue circle = max allowed distance</span>
+                    </div>
+                    <div class="small fw-bold text-dark mb-2" t-if="this.state.selectedCheckin.mapAttemptLabel">
+                        Showing: <t t-esc="this.state.selectedCheckin.mapAttemptLabel"/>
                     </div>
                     <div t-ref="checkinMapContainer" class="w-100 rounded-3 shadow-sm border border-2" style="height: 300px; z-index: 1; position: relative; background-color: #f8f9fa;">
                         <t t-if="(!this.state.selectedCheckin.shop_latitude or !this.state.selectedCheckin.shop_longitude) and (!this.state.selectedCheckin.attempt_latitude or !this.state.selectedCheckin.attempt_longitude)">

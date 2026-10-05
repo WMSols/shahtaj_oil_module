@@ -67,7 +67,7 @@ class SaleOrderLine(models.Model):
         user = self.env.user
         if user.has_group('stock.group_stock_user'):
             return False
-        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
+        return user.has_group('shahtaj_oil.group_shahtaj_office_ops')
 
     _SHAHTAJ_DISCOUNT_LINE_FIELDS = frozenset({
         'price_unit', 'product_id', 'product_uom_qty', 'discount',

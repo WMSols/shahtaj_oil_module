@@ -74,6 +74,7 @@ export class Accounting extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this._listFetchToken = 0;
         this.state = useState({
             activeSubTab: this._normalizeSubTab(this.props.requestedSubTab || "journals"),
             isLoadingList: false,
@@ -532,6 +533,32 @@ export class Accounting extends Component {
         this.fetchActiveList();
     }
 
+    clearFilters(listKey) {
+        const defaults = {
+            journals: { search: "", type: "all" },
+            accounts: { search: "", typeGroup: "all", prefix: "", status: "active" },
+            entries: { search: "" },
+            audit: { search: "", model: "all", dateFrom: "", dateTo: "" },
+        };
+        if (!defaults[listKey]) {
+            return;
+        }
+        this.state.filters[listKey] = { ...defaults[listKey] };
+        if (this.state.pagination[listKey]) {
+            this.state.pagination[listKey].page = 1;
+        }
+        if (listKey === "journals") {
+            this.state.tableJournals = [];
+        } else if (listKey === "accounts") {
+            this.state.tableAccounts = [];
+        } else if (listKey === "entries") {
+            this.state.tableEntries = [];
+        } else if (listKey === "audit") {
+            this.state.tableAudit = [];
+        }
+        this.fetchActiveList();
+    }
+
     setAccountPrefix(prefix) {
         this.state.filters.accounts.prefix = this.state.filters.accounts.prefix === prefix ? "" : prefix;
         this.state.pagination.accounts.page = 1;
@@ -626,6 +653,7 @@ export class Accounting extends Component {
         if (!hasFinancialAccess()) {
             return;
         }
+        const fetchToken = ++this._listFetchToken;
         const tab = this.state.activeSubTab;
         this.state.isLoadingList = true;
         notifyPortalBusy(true);
@@ -641,11 +669,16 @@ export class Accounting extends Component {
             } else {
                 await this._fetchAccounts();
             }
+            if (fetchToken !== this._listFetchToken) {
+                return;
+            }
         } catch (error) {
             this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
-            this.state.isLoadingList = false;
-            notifyPortalBusy(false);
+            if (fetchToken === this._listFetchToken) {
+                this.state.isLoadingList = false;
+                notifyPortalBusy(false);
+            }
         }
     }
 

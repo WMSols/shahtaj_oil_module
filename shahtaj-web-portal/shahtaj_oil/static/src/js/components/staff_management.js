@@ -3,16 +3,26 @@
 import { Component, useState, onWillStart, onWillUpdateProps, onMounted, onWillUnmount } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmModal } from "./confirm_modal";
-import { hasFinancialAccess, notifyPortalBusy } from "../shahtaj_access";
+import {
+    canManageStaff,
+    canMutate,
+    canSee,
+    defaultStaffRole,
+    hasFinancialAccess,
+    loadPortalAccess,
+    notifyPortalBusy,
+} from "../shahtaj_access";
 
 export class StaffManagement extends Component {
     static components = { ConfirmModal };
     static props = {
         requestedStaffRole: { type: String, optional: true },
+        requestedStaffStatus: { type: String, optional: true },
     };
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this._listFetchToken = 0;
         const ITEMS_PER_PAGE = 50;
         const initialRole = this.props.requestedStaffRole === "delivery_man"
             ? "delivery_man"
@@ -37,6 +47,8 @@ export class StaffManagement extends Component {
                 onVanForShops: 0,
                 pickedToday: 0,
                 deliveredToday: 0,
+                locationName: "",
+                lines: [],
             },
 
             loading: {
@@ -77,7 +89,7 @@ export class StaffManagement extends Component {
                 detailJobs: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
             },
             filters: {
-                staff: { search: "", status: "all" },
+                staff: { search: "", status: this.props.requestedStaffStatus || "all" },
                 archive: { search: "" },
             },
         });
@@ -93,13 +105,26 @@ export class StaffManagement extends Component {
         this.debouncedFetchStaffData = this.debounceSearch(() => this.fetchStaffData(), 400);
 
         onWillStart(async () => {
+            await loadPortalAccess();
+            if (!canSee("staff", this.state.activeTab)) {
+                this.state.activeTab = defaultStaffRole();
+            }
             await this.fetchStaffData();
         });
 
         onWillUpdateProps((nextProps) => {
+            const status = nextProps.requestedStaffStatus || "all";
+            const statusChanged = status !== (this.props.requestedStaffStatus || "all");
+            if (statusChanged) {
+                this.state.filters.staff.status = status;
+                this.state.pagination.staff.page = 1;
+            }
             const role = nextProps.requestedStaffRole;
-            if (role && role !== this.state.activeTab && this.state.viewMode === "list" && !this.state.showForm) {
+            const roleChanged = role && role !== this.state.activeTab && this.state.viewMode === "list" && !this.state.showForm;
+            if (roleChanged) {
                 this.switchTab(role);
+            } else if (statusChanged && this.state.viewMode === "list" && !this.state.showForm) {
+                this.fetchStaffData();
             }
         });
 
@@ -108,7 +133,7 @@ export class StaffManagement extends Component {
                 if (!this.state.loading.save && !this.state.loading.toggle && !this.state.showForm && this.state.viewMode !== "detail") {
                     this.fetchStaffData(true);
                 }
-            }, 15000);
+            }, 150000);
         });
 
         onWillUnmount(() => {
@@ -118,6 +143,18 @@ export class StaffManagement extends Component {
 
     get hasFinancialAccess() {
         return hasFinancialAccess();
+    }
+
+    get canMutate() {
+        return canMutate();
+    }
+
+    get canManageStaff() {
+        return canManageStaff();
+    }
+
+    canSeeStaffRole(role) {
+        return canSee("staff", role);
     }
 
     get isDeliveryManTab() {
@@ -132,6 +169,26 @@ export class StaffManagement extends Component {
 
     onFilterChange(tabName) {
         this.state.pagination[tabName].page = 1;
+        this.fetchStaffData();
+    }
+
+    clearFilters(listKey) {
+        const defaults = {
+            staff: { search: "", status: "all" },
+            archive: { search: "" },
+        };
+        if (!defaults[listKey]) {
+            return;
+        }
+        this.state.filters[listKey] = { ...defaults[listKey] };
+        if (this.state.pagination[listKey]) {
+            this.state.pagination[listKey].page = 1;
+        }
+        if (listKey === "staff") {
+            this.state.tableStaff = [];
+        } else if (listKey === "archive") {
+            this.state.archivedStaffTable = [];
+        }
         this.fetchStaffData();
     }
 
@@ -214,6 +271,7 @@ export class StaffManagement extends Component {
     }
 
     async fetchStaffData(isBackgroundPoll = false) {
+        const fetchToken = isBackgroundPoll ? this._listFetchToken : ++this._listFetchToken;
         if (!isBackgroundPoll) {
             this.state.loading.fetch = true;
             notifyPortalBusy(true);
@@ -253,6 +311,10 @@ export class StaffManagement extends Component {
                 ),
             ]);
 
+            if (fetchToken !== this._listFetchToken) {
+                return;
+            }
+
             this.state.pagination[tab].total = total;
             const mapped = users.map((u) => this._mapStaffRow(u));
             if (tab === "archive") this.state.archivedStaffTable = mapped;
@@ -262,7 +324,7 @@ export class StaffManagement extends Component {
                 this.notification.add("Failed to fetch data: " + (error.data?.message || error.message), { type: "danger" });
             }
         } finally {
-            if (!isBackgroundPoll) {
+            if (!isBackgroundPoll && fetchToken === this._listFetchToken) {
                 this.state.loading.fetch = false;
                 notifyPortalBusy(false);
             }
@@ -286,6 +348,9 @@ export class StaffManagement extends Component {
     }
 
     openArchive() {
+        if (!canManageStaff()) {
+            return;
+        }
         this.state.viewMode = "archive";
         this.state.pagination.archive.page = 1;
         this.fetchStaffData();
@@ -311,6 +376,11 @@ export class StaffManagement extends Component {
     formatMoney(value) {
         const amount = Number(value) || 0;
         return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    formatQty(value) {
+        const amount = Number(value) || 0;
+        return String(parseFloat(amount.toFixed(6)));
     }
 
     async openDetails(staff) {
@@ -346,7 +416,7 @@ export class StaffManagement extends Component {
         this.state.detailTargets = await this.orm.searchRead(
             "shahtaj.visit.target",
             [["order_booker_id", "=", staff.id]],
-            ["id", "date_start", "date_end", "target_type", "target_value", "achieved_value", "progress_percent", "active"],
+            ["id", "date_start", "date_end", "period_status", "target_type", "target_value", "achieved_value", "progress_percent", "active"],
             {
                 context: { active_test: false },
                 order: "date_start desc, active desc, id desc",
@@ -386,6 +456,7 @@ export class StaffManagement extends Component {
             "res.users",
             [userId],
             [
+                "shahtaj_van_location_id",
                 "shahtaj_van_qty_on_hand",
                 "shahtaj_van_sku_count",
                 "shahtaj_dm_on_van_for_shops",
@@ -397,12 +468,35 @@ export class StaffManagement extends Component {
             ],
         );
         if (!rec) return;
+        const location = rec.shahtaj_van_location_id;
+        const locationId = Array.isArray(location) ? location[0] : location;
+        let lines = [];
+        if (locationId) {
+            try {
+                const quants = await this.orm.searchRead(
+                    "stock.quant",
+                    [["location_id", "=", locationId], ["quantity", ">", 0]],
+                    ["product_id", "quantity", "product_uom_id"],
+                    { order: "product_id asc", limit: 200 },
+                );
+                lines = quants.map((quant) => ({
+                    id: quant.id,
+                    product: quant.product_id ? quant.product_id[1] : "—",
+                    qty: quant.quantity || 0,
+                    uom: quant.product_uom_id ? quant.product_uom_id[1] : "",
+                }));
+            } catch (error) {
+                console.error("Failed to load van stock", error);
+            }
+        }
         this.state.vanSnapshot = {
             qtyOnHand: rec.shahtaj_van_qty_on_hand || 0,
             skuCount: rec.shahtaj_van_sku_count || 0,
             onVanForShops: rec.shahtaj_dm_on_van_for_shops || 0,
             pickedToday: rec.shahtaj_dm_picked_today || 0,
             deliveredToday: rec.shahtaj_dm_delivered_today || 0,
+            locationName: Array.isArray(location) ? location[1] : "",
+            lines,
         };
         if (this.state.selectedStaff) {
             this.state.selectedStaff.wallet = rec.shahtaj_dm_wallet_balance || 0;
@@ -413,6 +507,9 @@ export class StaffManagement extends Component {
     }
 
     switchTab(tabName) {
+        if (!canSee("staff", tabName)) {
+            return;
+        }
         this.state.activeTab = tabName;
         this.state.viewMode = "list";
         this.state.showForm = false;
@@ -428,6 +525,9 @@ export class StaffManagement extends Component {
     }
 
     openForm() {
+        if (!canManageStaff()) {
+            return;
+        }
         this.state.formData = {
             name: "",
             employee_code: "",
@@ -453,6 +553,9 @@ export class StaffManagement extends Component {
     }
 
     editStaff(staff) {
+        if (!canManageStaff()) {
+            return;
+        }
         this.state.formData = {
             name: staff.name,
             employee_code: staff.employee_code || "",
@@ -465,6 +568,9 @@ export class StaffManagement extends Component {
     }
 
     async saveStaff() {
+        if (!canManageStaff()) {
+            return;
+        }
         this.state.loading.save = true;
         try {
             const role = this.state.formData.role || this.state.activeTab;
@@ -507,6 +613,9 @@ export class StaffManagement extends Component {
     }
 
     toggleActiveStatus(staffId, currentStatus) {
+        if (!canManageStaff()) {
+            return;
+        }
         const newStatus = !currentStatus;
         const actionTitle = newStatus ? "Restore Account" : "Deactivate & Archive Account";
         const actionMessage = newStatus
@@ -536,7 +645,7 @@ export class StaffManagement extends Component {
     }
 
     async openSettleModal() {
-        if (!this.state.selectedStaff) return;
+        if (!canManageStaff() || !this.state.selectedStaff) return;
         this.state.loading.wallet = true;
         try {
             const wizardIds = await this.orm.create(

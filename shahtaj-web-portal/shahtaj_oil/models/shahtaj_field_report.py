@@ -131,7 +131,7 @@ class ShahtajFieldReport(models.Model):
     def _shahtaj_is_office_user(self):
         user = self.env.user
         return bool(
-            user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
             or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
             or user.has_group('base.group_system')
         )
@@ -235,6 +235,59 @@ class ShahtajFieldReport(models.Model):
             raise AccessError(_(
                 'Only distributors or administrators can change report status.'
             ))
+
+    def _shahtaj_is_distributor_user(self):
+        user = self.env.user
+        return bool(
+            user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
+        )
+
+    def _shahtaj_distributor_comment_count(self, partner):
+        self.ensure_one()
+        if not partner:
+            return 0
+        comment_subtype = self.env.ref('mail.mt_comment', raise_if_not_found=False)
+        domain = [
+            ('model', '=', self._name),
+            ('res_id', '=', self.id),
+            ('message_type', '=', 'comment'),
+            ('author_id', '=', partner.id),
+        ]
+        if comment_subtype:
+            domain.append(('subtype_id', '=', comment_subtype.id))
+        return self.env['mail.message'].sudo().search_count(domain)
+
+    def _shahtaj_post_is_user_comment(self, message_type, kwargs):
+        if message_type != 'comment':
+            return False
+        subtype_xmlid = kwargs.get('subtype_xmlid')
+        if subtype_xmlid:
+            return subtype_xmlid == 'mail.mt_comment'
+        subtype_id = kwargs.get('subtype_id')
+        comment_subtype = self.env.ref('mail.mt_comment', raise_if_not_found=False)
+        if subtype_id and comment_subtype:
+            return subtype_id == comment_subtype.id
+        # message_post treats a comment with no subtype as mt_comment.
+        return not subtype_id
+
+    def message_post(self, **kwargs):
+        """A distributor may leave only one comment on a report."""
+        message_type = kwargs.get('message_type') or 'notification'
+        author = self.env.user.partner_id
+        if kwargs.get('author_id'):
+            author = self.env['res.partner'].browse(kwargs['author_id'])
+        if (
+            self._shahtaj_post_is_user_comment(message_type, kwargs)
+            and author == self.env.user.partner_id
+            and self._shahtaj_is_distributor_user()
+        ):
+            for rec in self:
+                if rec._shahtaj_distributor_comment_count(author):
+                    raise UserError(_(
+                        'You can add only one comment on this report.'
+                    ))
+        return super().message_post(**kwargs)
 
     # ── API helpers (used by OB / DM controllers) ─────────────────────
 

@@ -16,10 +16,29 @@
             .smooth-accordion-inner {
                 overflow: hidden;
             }
-
             .so-ov-page {
                 max-width: 1320px;
                 margin: 0 auto;
+            }
+            .so-ov-board {
+                display: grid;
+                grid-template-columns: repeat(12, minmax(0, 1fr));
+                gap: 1rem;
+                align-items: stretch;
+                position: relative;
+            }
+            .so-ov-board > div {
+                grid-column: span 12;
+                min-width: 0;
+            }
+            @media (min-width: 992px) {
+                .so-ov-board > .so-ov-span-4 { grid-column: span 4; }
+                .so-ov-board > .so-ov-span-6 { grid-column: span 6; }
+            }
+            @media (min-width: 1200px) {
+                .so-ov-board > .so-ov-span-5 { grid-column: span 5; }
+                .so-ov-board > .so-ov-span-7 { grid-column: span 7; }
+                .so-ov-board > .so-ov-span-8 { grid-column: span 8; }
             }
             .so-ov-card {
                 background: #ffffff;
@@ -128,12 +147,7 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 8px;
-                cursor: pointer;
-                transition: transform 0.15s ease, box-shadow 0.15s ease;
-            }
-            .so-ov-chip:hover {
-                transform: translateY(-1px);
-                box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+                cursor: default;
             }
             .so-ov-chip--warn { background: #fff7ed; color: #c2410c; }
             .so-ov-chip--amber { background: #fef3c7; color: #b45309; }
@@ -234,6 +248,24 @@
                 z-index: 1;
                 margin-top: 8px;
             }
+            .so-ov-loading {
+                position: absolute;
+                inset: 0;
+                z-index: 4;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                background: rgba(255, 255, 255, 0.78);
+                backdrop-filter: blur(2px);
+            }
+            .so-ov-finance .so-ov-loading {
+                background: rgba(239, 246, 255, 0.78);
+            }
+            .so-ov-loading--board {
+                background: rgba(255, 255, 255, 0.94);
+            }
             .so-ov-bills-metric .so-ov-metric-value {
                 font-size: 1.5rem;
             }
@@ -243,7 +275,7 @@
 
             <div t-if="this.state.isSidebarOpen" class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-md-none" style="z-index: 1040;" t-on-click="toggleSidebar"></div>
 
-            <div t-attf-class="bg-white border-end shadow-sm flex-column overflow-y-auto transition-all #{this.state.isSidebarOpen ? 'position-fixed top-0 start-0 d-flex h-100' : 'd-none d-md-flex h-100 position-relative'}" t-att-style="'width: 280px; min-width: 280px; z-index: 1050;' + (this.state.isSwitchingTab ? ' cursor: wait;' : '')">
+            <div t-attf-class="bg-white border-end shadow-sm flex-column overflow-y-auto transition-all #{this.state.isSidebarOpen ? 'position-fixed top-0 start-0 d-flex h-100' : 'd-none d-md-flex h-100 position-relative'}" style="width: 280px; min-width: 280px; z-index: 1050;">
 
                 <div class="p-4 border-bottom text-center bg-white position-relative">
                     <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 d-md-none shadow-sm" t-on-click="toggleSidebar">
@@ -253,13 +285,13 @@
                         </svg>
                     </button>
                     <img src="/web/binary/company_logo" alt="Shahtaj Oil Logo" style="max-height: 100px; width: 100%; object-fit: contain;" class="mb-2 mt-2 mt-md-0"/>
-                    <h6 class="mb-0 fw-bold text-dark mt-2">Distributor Portal</h6>
+                    <h6 class="mb-0 fw-bold text-dark mt-2" t-esc="this.portalTitle"/>
                 </div>
 
                 <div class="list-group list-group-flush p-3 fw-bold flex-grow-1">                
                     <!-- NEW: Dashboard Overview Button -->
                     <div class="mb-2">
-                        <button t-on-click="() => this.switchTab('overview')" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center transition-all w-100" t-att-style="this.state.activeTab === 'overview' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                        <button t-on-click="() => this.switchTab('overview')" data-shahtaj-nav="overview" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center transition-all w-100" t-att-style="this.state.activeTab === 'overview' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                             <span class="me-3 d-flex align-items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard">
                                     <rect width="7" height="9" x="3" y="3" rx="1"/>
@@ -271,9 +303,9 @@
                             Dashboard Overview
                         </button>
                     </div>
-                    <div class="mb-2">
+                    <div class="mb-2" t-if="this.canSeeMenu('territory')">
                         
-                        <button t-on-click="() => this.toggleMenu('territory', 'areas')" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'territory' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                        <button t-on-click="() => this.toggleMenu('territory', 'areas')" data-shahtaj-nav="territory" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'territory' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                             <div class="d-flex align-items-center">
                                 <span class="me-3 d-flex align-items-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map">
@@ -293,16 +325,16 @@
                         <div t-attf-class="smooth-accordion #{this.state.expandedMenus.territory ? 'open' : ''}">
                             <div class="smooth-accordion-inner">
                                 <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
-                                    <button t-on-click="() => this.switchTab('territory', 'areas')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'territory' and this.state.activeSubTab === 'areas' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Zones</button>
-                                    <button t-on-click="() => this.switchTab('territory', 'routes')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'territory' and this.state.activeSubTab === 'routes' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Routes</button>
-                                    <button t-on-click="() => this.switchTab('territory', 'shops')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'territory' and this.state.activeSubTab === 'shops' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Shops</button>
+                                    <button t-if="this.canSee('territory', 'areas')" t-on-click="() => this.switchTab('territory', 'areas')" data-shahtaj-nav="territory" data-shahtaj-sub="areas" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'territory' and this.state.activeSubTab === 'areas' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Zones</button>
+                                    <button t-if="this.canSee('territory', 'routes')" t-on-click="() => this.switchTab('territory', 'routes')" data-shahtaj-nav="territory" data-shahtaj-sub="routes" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'territory' and this.state.activeSubTab === 'routes' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Routes</button>
+                                    <button t-if="this.canSee('territory', 'shops')" t-on-click="() => this.switchTab('territory', 'shops')" data-shahtaj-nav="territory" data-shahtaj-sub="shops" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'territory' and this.state.activeSubTab === 'shops' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Shops</button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mb-2">
-                        <button t-on-click="() => this.toggleMenu('warehouse', 'inventory')" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'warehouse' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                    <div class="mb-2" t-if="this.canSeeMenu('warehouse')">
+                        <button t-on-click="() => this.toggleMenu('warehouse', 'inventory')" data-shahtaj-nav="warehouse" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'warehouse' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                             <div class="d-flex align-items-center">
                                 <span class="me-3 d-flex align-items-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-warehouse">
@@ -323,16 +355,16 @@
                         <div t-attf-class="smooth-accordion #{this.state.expandedMenus.warehouse ? 'open' : ''}">
                             <div class="smooth-accordion-inner">
                                 <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
-                                    <button t-if="this.hasFinancialAccess" t-on-click="() => this.switchTab('warehouse', 'inventory')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'warehouse' and this.state.activeSubTab === 'inventory' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Product List</button>
-                                    <button t-on-click="() => this.switchTab('warehouse', 'management')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'warehouse' and this.state.activeSubTab === 'management' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Stock Overview</button>
-                                    <button t-if="this.hasFinancialAccess" t-on-click="() => this.switchTab('warehouse', 'taxes')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'warehouse' and this.state.activeSubTab === 'taxes' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Sales Taxes</button>
+                                    <button t-if="this.canSee('warehouse', 'inventory')" t-on-click="() => this.switchTab('warehouse', 'inventory')" data-shahtaj-nav="warehouse" data-shahtaj-sub="inventory" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'warehouse' and this.state.activeSubTab === 'inventory' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Product List</button>
+                                    <button t-if="this.canSee('warehouse', 'management')" t-on-click="() => this.switchTab('warehouse', 'management')" data-shahtaj-nav="warehouse" data-shahtaj-sub="management" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'warehouse' and this.state.activeSubTab === 'management' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Stock Overview</button>
+                                    <button t-if="this.canSee('warehouse', 'taxes')" t-on-click="() => this.switchTab('warehouse', 'taxes')" data-shahtaj-nav="warehouse" data-shahtaj-sub="taxes" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'warehouse' and this.state.activeSubTab === 'taxes' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Sales Taxes</button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mb-2">
-                        <button t-on-click="() => this.toggleMenu('operations', 'checkins')" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'operations' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                    <div class="mb-2" t-if="this.canSeeMenu('operations')">
+                        <button t-on-click="() => this.toggleMenu('operations', 'checkins')" data-shahtaj-nav="operations" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'operations' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                             <div class="d-flex align-items-center">
                                 <span class="me-3 d-flex align-items-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity">
@@ -350,11 +382,11 @@
                         <div t-attf-class="smooth-accordion #{this.state.expandedMenus.operations ? 'open' : ''}">
                             <div class="smooth-accordion-inner">
                                 <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
-                                    <button t-on-click="() => this.openCheckins()" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'checkins' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Shop Check-ins/GPS</button>
-                                    <button t-on-click="() => this.openDeliveries('dispatch')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'deliveries' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">DM Operations</button>
-                                    <button t-on-click="() => this.switchTab('operations', 'orders')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'orders' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Live Orders</button>
-                                    <button t-on-click="() => this.switchTab('operations', 'performance')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'performance' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Bookers Performance</button>
-                                    <button t-on-click="() => this.switchTab('operations', 'dm_performance')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'dm_performance' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">DM Performance</button>
+                                    <button t-if="this.canSee('operations', 'checkins')" t-on-click="() => this.openCheckins()" data-shahtaj-nav="operations" data-shahtaj-sub="checkins" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'checkins' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Shop Check-ins/GPS</button>
+                                    <button t-if="this.canSee('operations', 'deliveries')" t-on-click="() => this.openDmOperations()" data-shahtaj-nav="operations" data-shahtaj-sub="deliveries" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'deliveries' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">DM Operations</button>
+                                    <button t-if="this.canSee('operations', 'orders')" t-on-click="() => this.switchTab('operations', 'orders')" data-shahtaj-nav="operations" data-shahtaj-sub="orders" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'orders' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Live Orders</button>
+                                    <button t-if="this.canSee('operations', 'performance')" t-on-click="() => this.switchTab('operations', 'performance')" data-shahtaj-nav="operations" data-shahtaj-sub="performance" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'performance' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Bookers Performance</button>
+                                    <button t-if="this.canSee('operations', 'dm_performance')" t-on-click="() => this.switchTab('operations', 'dm_performance')" data-shahtaj-nav="operations" data-shahtaj-sub="dm_performance" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'operations' and this.state.activeSubTab === 'dm_performance' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">DM Performance</button>
                                     
                                    
                                 </div>
@@ -362,8 +394,8 @@
                         </div>
                     </div>
 
-                    <div class="mb-2" t-if="this.hasFinancialAccess">
-                        <button t-on-click="() => this.toggleMenu('financials', 'money')" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'financials' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                    <div class="mb-2" t-if="this.canSeeMenu('financials')">
+                        <button t-on-click="() => this.toggleMenu('financials', 'money')" data-shahtaj-nav="financials" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'financials' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                             <div class="d-flex align-items-center">
                                 <span class="me-3 d-flex align-items-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-dollar-sign">
@@ -383,23 +415,23 @@
                         <div t-attf-class="smooth-accordion #{this.state.expandedMenus.financials ? 'open' : ''}">
                             <div class="smooth-accordion-inner">
                                 <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
-                                    <button t-on-click="() => this.switchTab('financials', 'money')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'money' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Money Overview</button>
-                                    <button t-on-click="() => this.switchTab('financials', 'cash')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'cash' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Cash Activity</button>
-                                    <button t-on-click="() => this.switchTab('financials', 'invoices')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and ['invoices', 'all_orders', 'orders', 'customer_invoices', 'payments', 'credit_notes'].includes(this.state.activeSubTab) ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Invoice Management</button>
-                                    <button t-on-click="() => this.switchTab('financials', 'po_management')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and ['po_management', 'purchase_orders', 'receipts', 'vendor_bills', 'vendors'].includes(this.state.activeSubTab) ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">PO Management</button>
-                                    <button t-on-click="() => this.switchTab('financials', 'credit')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and ['credit', 'balances'].includes(this.state.activeSubTab) ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Credit Risk Control</button>
+                                    <button t-if="this.canSee('financials', 'money')" t-on-click="() => this.switchTab('financials', 'money')" data-shahtaj-nav="financials" data-shahtaj-sub="money" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'money' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Money Overview</button>
+                                    <button t-if="this.canSee('financials', 'cash')" t-on-click="() => this.switchTab('financials', 'cash')" data-shahtaj-nav="financials" data-shahtaj-sub="cash" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'cash' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Cash Activity</button>
+                                    <button t-if="this.canSee('financials', 'invoices')" t-on-click="() => this.switchTab('financials', 'invoices')" data-shahtaj-nav="financials" data-shahtaj-sub-group="invoices,all_orders,orders,customer_invoices,payments,credit_notes" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and ['invoices', 'all_orders', 'orders', 'customer_invoices', 'payments', 'credit_notes'].includes(this.state.activeSubTab) ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Invoice Management</button>
+                                    <button t-if="this.canSee('financials', 'po_management')" t-on-click="() => this.switchTab('financials', 'po_management')" data-shahtaj-nav="financials" data-shahtaj-sub-group="po_management,purchase_orders,receipts,vendor_bills,vendors" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and ['po_management', 'purchase_orders', 'receipts', 'vendor_bills', 'vendors'].includes(this.state.activeSubTab) ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">PO Management</button>
+                                    <button t-if="this.canSee('financials', 'credit')" t-on-click="() => this.switchTab('financials', 'credit')" data-shahtaj-nav="financials" data-shahtaj-sub-group="credit,balances" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and ['credit', 'balances'].includes(this.state.activeSubTab) ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Credit Risk Control</button>
                                     <!-- Hidden for now; uncomment to restore
-                                    <button t-on-click="() => this.switchTab('financials', 'tax_ledger')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'tax_ledger' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Tax Ledger</button>
-                                    <button t-on-click="() => this.switchTab('financials', 'expenses')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'expenses' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Expense Management</button>
-                                    <button t-on-click="() => this.switchTab('financials', 'pnl')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'pnl' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Profit &amp; Loss</button>
+                                    <button t-on-click="() => this.switchTab('financials', 'tax_ledger')" data-shahtaj-nav="financials" data-shahtaj-sub="tax_ledger" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'tax_ledger' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Tax Ledger</button>
+                                    <button t-on-click="() => this.switchTab('financials', 'expenses')" data-shahtaj-nav="financials" data-shahtaj-sub="expenses" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'expenses' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Expense Management</button>
+                                    <button t-on-click="() => this.switchTab('financials', 'pnl')" data-shahtaj-nav="financials" data-shahtaj-sub="pnl" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'financials' and this.state.activeSubTab === 'pnl' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Profit &amp; Loss</button>
                                     -->
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mb-2">
-                        <button t-on-click="() => this.toggleMenu('schedules', 'schedules')" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'schedules' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                    <div class="mb-2" t-if="this.canSeeMenu('schedules')">
+                        <button t-on-click="() => this.toggleMenu('schedules', 'schedules')" data-shahtaj-nav="schedules" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'schedules' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                             <div class="d-flex align-items-center">
                                 <span class="me-3 d-flex align-items-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-days">
@@ -426,14 +458,14 @@
                         <div t-attf-class="smooth-accordion #{this.state.expandedMenus.schedules ? 'open' : ''}">
                             <div class="smooth-accordion-inner">
                                 <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
-                                    <button t-on-click="() => this.switchTab('schedules', 'schedules')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'schedules' and this.state.activeSubTab === 'schedules' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Weekly Schedules</button>
-                                    <button t-on-click="() => this.switchTab('schedules', 'targets')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'schedules' and this.state.activeSubTab === 'targets' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Performance Targets</button>
+                                    <button t-if="this.canSee('schedules', 'schedules')" t-on-click="() => this.switchTab('schedules', 'schedules')" data-shahtaj-nav="schedules" data-shahtaj-sub="schedules" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'schedules' and this.state.activeSubTab === 'schedules' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Weekly Schedules</button>
+                                    <button t-if="this.canSee('schedules', 'targets')" t-on-click="() => this.switchTab('schedules', 'targets')" data-shahtaj-nav="schedules" data-shahtaj-sub="targets" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'schedules' and this.state.activeSubTab === 'targets' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Performance Targets</button>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <hr class="my-2"/>
-                    <button t-on-click="() => this.switchTab('staff')" class="list-group-item list-group-item-action border-0 rounded mb-2 text-start d-flex align-items-center transition-all" t-att-style="this.state.activeTab === 'staff' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                    <button t-if="this.canSeeMenu('staff')" t-on-click="() => this.switchTab('staff')" data-shahtaj-nav="staff" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded mb-2 text-start d-flex align-items-center transition-all" t-att-style="this.state.activeTab === 'staff' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                         <span class="me-3 d-flex align-items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users">
                                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -444,35 +476,8 @@
                         </span>
                         Staff Management
                     </button>
-
-                    <div class="mb-2">
-                        <button t-on-click="() => this.toggleMenu('reports', 'field_reports')" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'reports' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
-                            <div class="d-flex align-items-center">
-                                <span class="me-3 d-flex align-items-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-flag">
-                                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-                                        <line x1="4" x2="4" y1="22" y2="15"/>
-                                    </svg>
-                                </span>
-                                Reports
-                            </div>
-                            <span class="d-flex align-items-center transition-all" t-att-style="this.state.expandedMenus.reports ? 'transform: rotate(180deg);' : ''">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down">
-                                    <path d="m6 9 6 6 6-6"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <div t-attf-class="smooth-accordion #{this.state.expandedMenus.reports ? 'open' : ''}">
-                            <div class="smooth-accordion-inner">
-                                <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
-                                    <button t-on-click="() => this.switchTab('reports', 'field_reports')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'reports' and this.state.activeSubTab === 'field_reports' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Field Reports</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-2" t-if="this.hasFinancialAccess">
-                        <button t-on-click="() => this.toggleMenu('accounting', 'journals')" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'accounting' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+ <div class="mb-2" t-if="this.canSeeMenu('accounting')">
+                        <button t-on-click="() => this.toggleMenu('accounting', 'journals')" data-shahtaj-nav="accounting" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'accounting' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                             <div class="d-flex align-items-center">
                                 <span class="me-3 d-flex align-items-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open">
@@ -491,15 +496,43 @@
                         <div t-attf-class="smooth-accordion #{this.state.expandedMenus.accounting ? 'open' : ''}">
                             <div class="smooth-accordion-inner">
                                 <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
-                                    <button t-on-click="() => this.switchTab('accounting', 'journals')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'accounting' and this.state.activeSubTab === 'journals' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Journals</button>
-                                    <button t-on-click="() => this.switchTab('accounting', 'accounts')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'accounting' and this.state.activeSubTab === 'accounts' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Chart of Accounts</button>
-                                    <button t-on-click="() => this.switchTab('accounting', 'audit')" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'accounting' and this.state.activeSubTab === 'audit' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Audit Trail</button>
+                                    <button t-if="this.canSee('accounting', 'journals')" t-on-click="() => this.switchTab('accounting', 'journals')" data-shahtaj-nav="accounting" data-shahtaj-sub="journals" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'accounting' and this.state.activeSubTab === 'journals' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Journals</button>
+                                    <button t-if="this.canSee('accounting', 'accounts')" t-on-click="() => this.switchTab('accounting', 'accounts')" data-shahtaj-nav="accounting" data-shahtaj-sub="accounts" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'accounting' and this.state.activeSubTab === 'accounts' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Chart of Accounts</button>
+                                    <button t-if="this.canSee('accounting', 'audit')" t-on-click="() => this.switchTab('accounting', 'audit')" data-shahtaj-nav="accounting" data-shahtaj-sub="audit" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'accounting' and this.state.activeSubTab === 'audit' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Audit Trail</button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <button t-on-click="() => this.switchTab('settings')" class="list-group-item list-group-item-action border-0 rounded mb-2 text-start d-flex align-items-center transition-all" t-att-style="this.state.activeTab === 'settings' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                    <div class="mb-2" t-if="this.canSeeMenu('reports')">
+                        <button t-on-click="() => this.toggleMenu('reports', 'field_reports')" data-shahtaj-nav="reports" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center justify-content-between transition-all w-100" t-att-style="this.state.activeTab === 'reports' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
+                            <div class="d-flex align-items-center">
+                                <span class="me-3 d-flex align-items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-flag">
+                                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                                        <line x1="4" x2="4" y1="22" y2="15"/>
+                                    </svg>
+                                </span>
+                                Reports
+                            </div>
+                            <span class="d-flex align-items-center transition-all" t-att-style="this.state.expandedMenus.reports ? 'transform: rotate(180deg);' : ''">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down">
+                                    <path d="m6 9 6 6 6-6"/>
+                                </svg>
+                            </span>
+                        </button>
+                        <div t-attf-class="smooth-accordion #{this.state.expandedMenus.reports ? 'open' : ''}">
+                            <div class="smooth-accordion-inner">
+                                <div class="d-flex flex-column ps-4 mt-1 pe-2 gap-1 border-start ms-3 border-2 border-light mb-1">
+                                    <button t-if="this.canSee('reports', 'field_reports')" t-on-click="() => this.switchTab('reports', 'field_reports')" data-shahtaj-nav="reports" data-shahtaj-sub="field_reports" class="list-group-item list-group-item-action border-0 rounded text-start py-2 px-3 small transition-all" t-att-style="this.state.activeTab === 'reports' and this.state.activeSubTab === 'field_reports' ? 'color: #0f172a; background-color: #e2e8f0; font-weight: 700;' : 'color: #6b7280; background-color: transparent;'">Field Reports</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                   
+
+                    <button t-if="this.canSeeMenu('settings')" t-on-click="() => this.switchTab('settings')" data-shahtaj-nav="settings" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded mb-2 text-start d-flex align-items-center transition-all" t-att-style="this.state.activeTab === 'settings' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">
                         <span class="me-3 d-flex align-items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings">
                                 <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
@@ -532,9 +565,9 @@
                     
 
                     <!-- THE LOGO LOADING OVERLAY -->
-                    <t t-if="this.state.isSwitchingTab">
+                    <t t-if="!this.contentReady">
 
-                        <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center" style="background-color: rgba(248, 250, 252, 0.85); z-index: 1000; backdrop-filter: blur(3px); pointer-events: auto; cursor: wait;" t-on-click.stop.prevent="" t-on-mousedown.stop.prevent="">
+                        <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center" style="background-color: rgba(248, 250, 252, 0.85); z-index: 1000; backdrop-filter: blur(3px); pointer-events: auto;" t-on-click.stop.prevent="" t-on-mousedown.stop.prevent="">
 
                             <!-- Bouncing Logo -->
                             <div>
@@ -554,19 +587,18 @@
                     </t>
 
                     <!-- MASTER DASHBOARD OVERVIEW -->
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'overview'" class="h-100 p-2 p-md-3">
+                    <div t-if="this.contentReady and this.state.renderedTab === 'overview'" class="h-100 p-2 p-md-3">
                         <div class="so-ov-page">
 
                             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
                                 <div>
                                     <div class="d-flex align-items-center gap-2 mb-1">
                                         <h2 class="fw-bold text-dark mb-0">System Overview</h2>
-                                        <span class="badge rounded-pill" style="background: #fef3c7; color: #92400e;">Preview</span>
                                     </div>
                                     <div class="text-muted">A snapshot of your network, field activity, and stock.</div>
                                     <div class="small text-secondary mt-1" t-esc="this.overviewDateLabel"/>
                                 </div>
-                                <button class="btn btn-dark fw-bold shadow-sm d-inline-flex align-items-center px-3 py-2 rounded-3" t-on-click="fetchMasterKPIs" t-att-disabled="this.state.isLoadingKpis" title="Refresh KPIs">
+                                <button class="btn btn-dark fw-bold shadow-sm d-inline-flex align-items-center px-3 py-2 rounded-3" t-on-click="() => this.fetchMasterKPIs({ force: true })" t-att-disabled="this.state.isLoadingKpis" title="Refresh KPIs">
                                     <span t-if="this.state.isLoadingKpis" class="spinner-border spinner-border-sm me-2" role="status"></span>
                                     <i t-else="" class="fa fa-refresh me-2"></i>
                                     Refresh
@@ -574,28 +606,29 @@
                             </div>
 
                             <div t-if="this.hasAttentionItems" class="d-flex flex-wrap gap-2 mb-4">
-                                <button t-if="this.state.kpis.pendingShops > 0" class="so-ov-chip so-ov-chip--warn" t-on-click="() => this.switchTab('territory', 'shops')">
+                                <span t-if="this.canSeeCard('territory') and this.state.kpis.pendingShops > 0" class="so-ov-chip so-ov-chip--warn">
                                     <t t-esc="this.state.kpis.pendingShops"/> shops awaiting approval
-                                </button>
-                                <button t-if="this.state.kpis.pendingDeliveries > 0" class="so-ov-chip so-ov-chip--amber" t-on-click="() => this.openDeliveries('dispatch')">
+                                </span>
+                                <span t-if="this.canSeeCard('deliveryJobs') and this.state.kpis.pendingDeliveries > 0" class="so-ov-chip so-ov-chip--amber">
                                     <t t-esc="this.state.kpis.pendingDeliveries"/> pending deliveries
-                                </button>
-                                <button t-if="this.state.kpis.ordersToDispatch > 0" class="so-ov-chip so-ov-chip--amber" t-on-click="() => this.openDeliveries('dispatch')">
+                                </span>
+                                <span t-if="this.canSeeCard('dispatch') and this.state.kpis.ordersToDispatch > 0" class="so-ov-chip so-ov-chip--amber">
                                     <t t-esc="this.state.kpis.ordersToDispatch"/> orders to dispatch
-                                </button>
-                                <button t-if="this.state.kpis.dmInTransit > 0" class="so-ov-chip so-ov-chip--amber" t-on-click="() => this.openDeliveries('jobs')">
+                                </span>
+                                <span t-if="this.canSeeCard('deliveryJobs') and this.state.kpis.dmInTransit > 0" class="so-ov-chip so-ov-chip--amber">
                                     <t t-esc="this.state.kpis.dmInTransit"/> jobs in transit
-                                </button>
-                                <button t-if="this.state.kpis.outOfStockProducts > 0" class="so-ov-chip so-ov-chip--red" t-on-click="() => this.switchTab('warehouse', 'management')">
+                                </span>
+                                <span t-if="this.canSeeCard('warehouse') and this.state.kpis.outOfStockProducts > 0" class="so-ov-chip so-ov-chip--red">
                                     <t t-esc="this.state.kpis.outOfStockProducts"/> products out of stock
-                                </button>
-                                <button t-if="this.hasFinancialAccess and this.state.kpis.toInvoice > 0" class="so-ov-chip so-ov-chip--warn" t-on-click="() => this.switchTab('financials', 'orders')">
+                                </span>
+                                <span t-if="this.canSeeCard('invoices') and this.state.kpis.toInvoice > 0" class="so-ov-chip so-ov-chip--warn">
                                     <t t-esc="this.state.kpis.toInvoice"/> orders to invoice
-                                </button>
+                                </span>
                             </div>
 
-                            <div class="row g-3 mb-3">
-                                <div class="col-12 col-xl-7">
+                            <div class="position-relative">
+                            <div class="so-ov-board">
+                                <div t-if="this.canSeeCard('territory')" t-att-class="this.overviewSpanClass('territory')">
                                     <div class="so-ov-card p-4">
                                         <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
                                             <div class="d-flex align-items-center gap-3">
@@ -632,16 +665,16 @@
                                                 </div>
                                             </div>
                                             <div class="col-6 col-md-3">
-                                                <div t-attf-class="so-ov-metric #{this.state.kpis.pendingShops > 0 ? 'so-ov-metric--warn' : ''}" t-on-click="() => this.switchTab('territory', 'shops')">
+                                                <div t-attf-class="so-ov-metric #{this.state.kpis.pendingShops > 0 ? 'so-ov-metric--warn' : ''}" t-on-click="() => this.openShops({ shopStatus: 'pending' })">
                                                     <div class="so-ov-metric-label">Pending</div>
                                                     <div class="d-flex align-items-center justify-content-between gap-2">
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.pendingShops"/>
-                                                        <span t-if="this.state.kpis.pendingShops > 0" class="badge rounded-pill bg-danger">Review</span>
+                                                        <span t-if="this.state.kpis.pendingShops > 0" class="badge rounded-pill bg-warning ">Review</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div class="col-12">
-                                                <div class="so-ov-metric" style="cursor: default;">
+                                                <div class="so-ov-metric" t-on-click="openRegisteredShops">
                                                     <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
                                                         <div class="so-ov-metric-label mb-0">Shops registered by OBs</div>
                                                         <input type="date" class="form-control form-control-sm" style="max-width: 150px;"
@@ -656,8 +689,8 @@
                                     </div>
                                 </div>
 
-                                <div class="col-12 col-xl-5">
-                                    <div class="so-ov-card p-4">
+                                <div t-if="this.showFieldCard" t-att-class="this.overviewSpanClass('field')">
+                                    <div class="so-ov-card p-4 position-relative">
                                         <div class="d-flex align-items-start justify-content-between gap-3 mb-4 flex-wrap">
                                             <div class="d-flex align-items-center gap-3">
                                                 <div class="so-ov-icon so-ov-icon--teal">
@@ -673,6 +706,7 @@
                                             <div class="d-flex align-items-center gap-2">
                                                 <input type="date" class="form-control form-control-sm" style="max-width: 150px;"
                                                        t-att-value="this.state.opsDate"
+                                                       t-att-disabled="this.state.isLoadingOps"
                                                        t-on-click.stop=""
                                                        t-on-change="onOpsDateChange"/>
                                                 <span t-if="this.isOpsDateToday" class="badge rounded-pill d-inline-flex align-items-center gap-2 px-3 py-2" style="background: #ecfdf5; color: #047857;">
@@ -681,52 +715,53 @@
                                                 </span>
                                             </div>
                                         </div>
-                                        <div class="so-ov-ops-group">
+                                        <div class="so-ov-ops-group" t-if="this.canSeeCard('checkins') or this.canSeeCard('orders')">
                                             <div class="so-ov-group-title">OB Operations</div>
                                             <div class="row g-2">
-                                                <div class="col-6">
+                                                <div t-att-class="this.obMetricColClass" t-if="this.canSeeCard('checkins')">
                                                     <div class="so-ov-metric" t-on-click="() => this.openTodayCheckins()">
                                                         <div class="so-ov-metric-label">Check-ins</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.todayCheckins"/>
                                                     </div>
                                                 </div>
-                                                <div class="col-6">
-                                                    <div class="so-ov-metric" t-on-click="() => this.switchTab('operations', 'orders')">
+                                                <div t-att-class="this.obMetricColClass" t-if="this.canSeeCard('orders')">
+                                                    <div class="so-ov-metric" t-on-click="openLiveOrders">
                                                         <div class="so-ov-metric-label">Orders</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.todayOrders"/>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="so-ov-ops-group mt-3">
+                                        <div class="so-ov-ops-group mt-3" t-if="this.canSeeCard('dispatch') or this.canSeeCard('deliveryJobs')">
                                             <div class="so-ov-group-title">DM Operations</div>
                                             <div class="row g-2">
-                                                <div class="col-6 col-sm-4">
-                                                    <div t-attf-class="so-ov-metric #{this.state.kpis.todayDeliveries > 0 ? 'so-ov-metric--warn' : ''}" t-on-click="() => this.openDeliveries('dispatch')">
-                                                        <div class="so-ov-metric-label">Active Deliveries</div>
+                                                <div t-att-class="this.dmMetricColClass" t-if="this.canSeeCard('dispatch')">
+                                                    <div t-attf-class="so-ov-metric #{this.state.kpis.todayDeliveries > 0 ? 'so-ov-metric--warn' : ''}" t-on-click="openToDispatch">
+                                                        <div class="so-ov-metric-label">To Dispatch</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.todayDeliveries"/>
                                                     </div>
                                                 </div>
-                                                <div class="col-6 col-sm-4">
-                                                    <div class="so-ov-metric" t-on-click="() => this.openDeliveries('jobs')">
+                                                <div t-att-class="this.dmMetricColClass" t-if="this.canSeeCard('deliveryJobs')">
+                                                    <div class="so-ov-metric" t-on-click="() => this.openDmJobs({ dmState: 'except_not_ready' })">
                                                         <div class="so-ov-metric-label">DM Jobs</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.dmJobsToday"/>
                                                     </div>
                                                 </div>
-                                                <div class="col-6 col-sm-4">
-                                                    <div t-attf-class="so-ov-metric #{this.state.kpis.todayInTransit > 0 ? 'so-ov-metric--warn' : ''}" t-on-click="() => this.openDeliveries('jobs')">
+                                                <div t-att-class="this.dmMetricColClass" t-if="this.canSeeCard('deliveryJobs')">
+                                                    <div t-attf-class="so-ov-metric #{this.state.kpis.todayInTransit > 0 ? 'so-ov-metric--warn' : ''}" t-on-click="() => this.openDmJobs({ dmFieldState: 'in_transit' })">
                                                         <div class="so-ov-metric-label">In Transit</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.todayInTransit"/>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+                                        <div t-if="this.state.isLoadingOps" class="so-ov-loading">
+                                            <span class="spinner-border text-primary" role="status"></span>
+                                            <span class="small fw-bold text-muted">Loading activity...</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="row g-3 mb-3">
-                                <div class="col-12 col-lg-4">
+                                <div t-if="this.showStaffCard" t-att-class="this.overviewSpanClass('staff')">
                                     <div class="so-ov-card p-4">
                                         <div class="d-flex align-items-center gap-3 mb-4">
                                             <div class="so-ov-icon so-ov-icon--violet">
@@ -743,14 +778,14 @@
                                             </div>
                                         </div>
                                         <div class="row g-2 mb-3">
-                                            <div class="col-6">
-                                                <div class="so-ov-metric" t-on-click="() => this.openStaff('order_booker')">
+                                            <div class="col-6" t-if="this.canSeeCard('staffBookers')">
+                                                <div class="so-ov-metric" t-on-click="() => this.openStaff('order_booker', 'all')">
                                                     <div class="so-ov-metric-label">Bookers</div>
                                                     <div class="so-ov-metric-value" t-esc="this.state.kpis.totalBookers"/>
                                                 </div>
                                             </div>
-                                            <div class="col-6">
-                                                <div t-attf-class="so-ov-metric #{this.state.kpis.onlineBookers > 0 ? 'so-ov-metric--live' : ''}" t-on-click="() => this.openStaff('order_booker')">
+                                            <div class="col-6" t-if="this.canSeeCard('staffBookers')">
+                                                <div t-attf-class="so-ov-metric #{this.state.kpis.onlineBookers > 0 ? 'so-ov-metric--live' : ''}" t-on-click="() => this.openStaff('order_booker', 'online')">
                                                     <div class="so-ov-metric-label">Bookers online</div>
                                                     <div class="d-flex align-items-center justify-content-between gap-2">
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.onlineBookers"/>
@@ -758,14 +793,14 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="col-6">
-                                                <div class="so-ov-metric" t-on-click="() => this.openStaff('delivery_man')">
+                                            <div class="col-6" t-if="this.canSeeCard('deliveryMen')">
+                                                <div class="so-ov-metric" t-on-click="() => this.openStaff('delivery_man', 'all')">
                                                     <div class="so-ov-metric-label">Delivery men</div>
                                                     <div class="so-ov-metric-value" t-esc="this.state.kpis.totalDeliveryMen"/>
                                                 </div>
                                             </div>
-                                            <div class="col-6">
-                                                <div t-attf-class="so-ov-metric #{this.state.kpis.onlineDeliveryMen > 0 ? 'so-ov-metric--live' : ''}" t-on-click="() => this.openStaff('delivery_man')">
+                                            <div class="col-6" t-if="this.canSeeCard('deliveryMen')">
+                                                <div t-attf-class="so-ov-metric #{this.state.kpis.onlineDeliveryMen > 0 ? 'so-ov-metric--live' : ''}" t-on-click="() => this.openStaff('delivery_man', 'online')">
                                                     <div class="so-ov-metric-label">DMs online</div>
                                                     <div class="d-flex align-items-center justify-content-between gap-2">
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.onlineDeliveryMen"/>
@@ -784,7 +819,7 @@
                                     </div>
                                 </div>
 
-                                <div class="col-12 col-lg-4">
+                                <div t-if="this.canSeeCard('warehouse')" t-att-class="this.overviewSpanClass('warehouse')">
                                     <div class="so-ov-card p-4">
                                         <div class="d-flex align-items-center gap-3 mb-4">
                                             <div class="so-ov-icon so-ov-icon--amber">
@@ -801,13 +836,13 @@
                                         </div>
                                         <div class="row g-2">
                                             <div class="col-6">
-                                                <div class="so-ov-metric" t-on-click="() => this.switchTab('warehouse', 'management')">
+                                                <div class="so-ov-metric" t-on-click="() => this.openStock('in_stock')">
                                                     <div class="so-ov-metric-label">In stock</div>
                                                     <div class="so-ov-metric-value" t-esc="this.inStockProducts"/>
                                                 </div>
                                             </div>
                                             <div class="col-6">
-                                                <div t-attf-class="so-ov-metric #{this.state.kpis.outOfStockProducts > 0 ? 'so-ov-metric--danger' : ''}" t-on-click="() => this.switchTab('warehouse', 'management')">
+                                                <div t-attf-class="so-ov-metric #{this.state.kpis.outOfStockProducts > 0 ? 'so-ov-metric--danger' : ''}" t-on-click="() => this.openStock('out_of_stock')">
                                                     <div class="so-ov-metric-label">Out of stock</div>
                                                     <div class="d-flex align-items-center justify-content-between gap-2">
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.outOfStockProducts"/>
@@ -822,7 +857,7 @@
                                     </div>
                                 </div>
 
-                                <div class="col-12 col-lg-4">
+                                <div t-if="this.canSeeCard('schedules')" t-att-class="this.overviewSpanClass('schedules')">
                                     <div class="so-ov-card p-4">
                                         <div class="d-flex align-items-center gap-3 mb-4">
                                             <div class="so-ov-icon so-ov-icon--sky">
@@ -860,11 +895,7 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <t t-if="this.hasFinancialAccess">
-                                <div class="row g-3">
-                                    <div class="col-12 col-xl-8">
+                                    <div t-if="this.canSeeCard('financials')" t-att-class="this.overviewSpanClass('financials')">
                                         <div class="so-ov-card so-ov-finance p-4">
                                             <div class="d-flex align-items-start justify-content-between gap-3 mb-4 position-relative" style="z-index: 1;">
                                                 <div class="d-flex align-items-center gap-3">
@@ -881,19 +912,19 @@
                                                     </div>
                                                 </div>
                                                 <div class="so-ov-range">
-                                                    <button t-att-class="this.state.cashRangeDays === 7 ? 'active' : ''" t-on-click="() => this.setCashRangeDays(7)">7 days</button>
-                                                    <button t-att-class="this.state.cashRangeDays === 30 ? 'active' : ''" t-on-click="() => this.setCashRangeDays(30)">30 days</button>
+                                                    <button t-att-class="this.state.cashRangeDays === 7 ? 'active' : ''" t-att-disabled="this.state.isLoadingCash" t-on-click="() => this.setCashRangeDays(7)">7 days</button>
+                                                    <button t-att-class="this.state.cashRangeDays === 30 ? 'active' : ''" t-att-disabled="this.state.isLoadingCash" t-on-click="() => this.setCashRangeDays(30)">30 days</button>
                                                 </div>
                                             </div>
                                             <div class="row g-2 position-relative mb-3" style="z-index: 1;">
                                                 <div class="col-6 col-lg-3">
-                                                    <div class="so-ov-finance-metric" t-on-click="() => this.switchTab('financials', 'cash')">
+                                                    <div class="so-ov-finance-metric" t-on-click="() => this.openCash('inbound')">
                                                         <div class="so-ov-finance-label">Cash in</div>
                                                         <div class="so-ov-finance-value" t-esc="this.formatMoney(this.state.kpis.cashIn)"/>
                                                     </div>
                                                 </div>
                                                 <div class="col-6 col-lg-3">
-                                                    <div class="so-ov-finance-metric" t-on-click="() => this.switchTab('financials', 'cash')">
+                                                    <div class="so-ov-finance-metric" t-on-click="() => this.openCash('outbound')">
                                                         <div class="so-ov-finance-label">Cash out</div>
                                                         <div class="so-ov-finance-value" t-esc="this.formatMoney(this.state.kpis.cashOut)"/>
                                                     </div>
@@ -914,9 +945,13 @@
                                             <div class="so-ov-chart">
                                                 <canvas t-ref="cashChart"/>
                                             </div>
+                                            <div t-if="this.state.isLoadingCash" class="so-ov-loading">
+                                                <span class="spinner-border text-primary" role="status"></span>
+                                                <span class="small fw-bold" style="color: #1e3a8a;">Loading financials...</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="col-12 col-xl-4">
+                                    <div t-if="this.canSeeCard('invoices')" t-att-class="this.overviewSpanClass('invoices')">
                                         <div class="so-ov-card p-4">
                                             <div class="d-flex align-items-center gap-3 mb-4">
                                                 <div class="so-ov-icon so-ov-icon--sky">
@@ -934,14 +969,14 @@
                                                 </div>
                                             </div>
                                             <div class="row g-2">
-                                                <div class="col-6">
-                                                    <div class="so-ov-metric so-ov-bills-metric" t-on-click="() => this.switchTab('financials', 'all_orders')">
+                                                <div t-att-class="this.invoiceMetricColClass">
+                                                    <div class="so-ov-metric so-ov-bills-metric" t-on-click="() => this.switchTab('financials', 'all_orders')" data-shahtaj-nav="financials" data-shahtaj-sub="all_orders">
                                                         <div class="so-ov-metric-label">Total orders</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.totalOrders"/>
                                                     </div>
                                                 </div>
-                                                <div class="col-6">
-                                                    <div t-attf-class="so-ov-metric so-ov-bills-metric #{this.state.kpis.toInvoice > 0 ? 'so-ov-metric--warn' : ''}" t-on-click="() => this.switchTab('financials', 'orders')">
+                                                <div t-att-class="this.invoiceMetricColClass">
+                                                    <div t-attf-class="so-ov-metric so-ov-bills-metric #{this.state.kpis.toInvoice > 0 ? 'so-ov-metric--warn' : ''}" t-on-click="() => this.switchTab('financials', 'orders')" data-shahtaj-nav="financials" data-shahtaj-sub="orders">
                                                         <div class="so-ov-metric-label">To invoice</div>
                                                         <div class="d-flex align-items-center justify-content-between gap-2">
                                                             <div class="so-ov-metric-value" t-esc="this.state.kpis.toInvoice"/>
@@ -949,20 +984,20 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div class="col-6">
-                                                    <div class="so-ov-metric so-ov-bills-metric" t-on-click="() => this.switchTab('financials', 'customer_invoices')">
+                                                <div t-att-class="this.invoiceMetricColClass">
+                                                    <div class="so-ov-metric so-ov-bills-metric" t-on-click="() => this.openCustomerInvoices('Open')">
                                                         <div class="so-ov-metric-label">Open invoices</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.openInvoices"/>
                                                     </div>
                                                 </div>
-                                                <div class="col-6">
-                                                    <div class="so-ov-metric so-ov-bills-metric" t-on-click="() => this.switchTab('financials', 'credit_notes')">
+                                                <div t-att-class="this.invoiceMetricColClass">
+                                                    <div class="so-ov-metric so-ov-bills-metric" t-on-click="() => this.switchTab('financials', 'credit_notes')" data-shahtaj-nav="financials" data-shahtaj-sub="credit_notes">
                                                         <div class="so-ov-metric-label">Credit notes</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.creditNotes"/>
                                                     </div>
                                                 </div>
-                                                <div class="col-12">
-                                                    <div class="so-ov-metric so-ov-bills-metric" t-on-click="() => this.switchTab('financials', 'vendor_bills')">
+                                                <div class="col-12" t-if="this.canSee('financials', 'vendor_bills')">
+                                                    <div class="so-ov-metric so-ov-bills-metric" t-on-click="() => this.switchTab('financials', 'vendor_bills')" data-shahtaj-nav="financials" data-shahtaj-sub="vendor_bills">
                                                         <div class="so-ov-metric-label">Vendor bills</div>
                                                         <div class="so-ov-metric-value" t-esc="this.state.kpis.vendorBills"/>
                                                     </div>
@@ -971,51 +1006,55 @@
                                         </div>
                                     </div>
                                 </div>
-                            </t>
+                                    <div t-if="this.state.isLoadingKpis" class="so-ov-loading so-ov-loading--board">
+                                        <span class="spinner-border text-primary" role="status"></span>
+                                        <span class="small fw-bold text-muted">Loading overview...</span>
+                                    </div>
+                                </div>
 
                         </div>
                     </div>
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'territory'" class="h-100">
-                        <TerritoryRoutes requestedSubTab="this.state.activeSubTab" />
+                    <div t-if="this.contentReady and this.state.renderedTab === 'territory'" class="h-100">
+                        <TerritoryRoutes requestedSubTab="this.state.renderedSubTab" requestedShopStatus="this.state.shopStatus" requestedShopRegisteredOn="this.state.shopRegisteredOn" requestedShopRegistrar="this.state.shopRegistrar" />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'warehouse'" class="h-100">
-                        <WarehouseInventory requestedSubTab="this.state.activeSubTab" />
+                    <div t-if="this.contentReady and this.state.renderedTab === 'warehouse'" class="h-100">
+                        <WarehouseInventory requestedSubTab="this.state.renderedSubTab" requestedStockStatus="this.state.stockStatus" />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'operations' and this.state.activeSubTab !== 'dm_performance'" class="h-100">
-                        <OperationsTracking requestedSubTab="this.state.activeSubTab" requestedDeliveriesSubTab="this.state.deliveriesSubTab" requestedCheckinPurpose="this.state.checkinPurpose" requestedCheckinRole="this.state.checkinRole" requestedCheckinDate="this.state.checkinDate" />
+                    <div t-if="this.contentReady and this.state.renderedTab === 'operations' and this.state.renderedSubTab !== 'dm_performance'" class="h-100">
+                        <OperationsTracking requestedSubTab="this.state.renderedSubTab" requestedDeliveriesSubTab="this.state.deliveriesSubTab" requestedCheckinPurpose="this.state.checkinPurpose" requestedCheckinRole="this.state.checkinRole" requestedCheckinDate="this.state.checkinDate" requestedOrderDate="this.state.orderDate" requestedDispatchDate="this.state.dispatchDate" requestedDmDate="this.state.dmDate" requestedDmFieldState="this.state.dmFieldState" requestedDmState="this.state.dmState" />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'operations' and this.state.activeSubTab === 'dm_performance'" class="h-100">
+                    <div t-if="this.contentReady and this.state.renderedTab === 'operations' and this.state.renderedSubTab === 'dm_performance'" class="h-100">
                         <DeliveryManPerformance />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.hasFinancialAccess and this.state.activeTab === 'financials'" class="h-100">
-                        <FinancialsInvoicing requestedSubTab="this.state.activeSubTab" />
+                    <div t-if="this.contentReady and this.canSee('financials', this.state.renderedSubTab) and this.state.renderedTab === 'financials'" class="h-100">
+                        <FinancialsInvoicing requestedSubTab="this.state.renderedSubTab" requestedInvoiceStatus="this.state.invoiceStatus" requestedCashDirection="this.state.cashDirection" requestedCashDateFrom="this.state.cashDateFrom" requestedCashDateTo="this.state.cashDateTo" />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'staff'" class="h-100">
-                        <StaffManagement requestedStaffRole="this.state.staffRole" />
+                    <div t-if="this.contentReady and this.state.renderedTab === 'staff'" class="h-100">
+                        <StaffManagement requestedStaffRole="this.state.staffRole" requestedStaffStatus="this.state.staffStatus" />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'reports'" class="h-100">
-                        <FieldReports requestedSubTab="this.state.activeSubTab" />
+                    <div t-if="this.contentReady and this.state.renderedTab === 'reports'" class="h-100">
+                        <FieldReports requestedSubTab="this.state.renderedSubTab" />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'schedules'" class="h-100">
-                        <SchedulesTargets requestedSubTab="this.state.activeSubTab" />
+                    <div t-if="this.contentReady and this.state.renderedTab === 'schedules'" class="h-100">
+                        <SchedulesTargets requestedSubTab="this.state.renderedSubTab" />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.hasFinancialAccess and this.state.activeTab === 'transactions'" class="h-100">
+                    <div t-if="this.contentReady and this.canSee('transactions') and this.state.renderedTab === 'transactions'" class="h-100">
                         <BankTransactions />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.hasFinancialAccess and this.state.activeTab === 'accounting'" class="w-100" style="min-width: 0;">
-                        <Accounting requestedSubTab="this.state.activeSubTab" />
+                    <div t-if="this.contentReady and this.canSee('accounting', this.state.renderedSubTab) and this.state.renderedTab === 'accounting'" class="w-100" style="min-width: 0;">
+                        <Accounting requestedSubTab="this.state.renderedSubTab" />
                     </div>
 
-                    <div t-if="!this.state.isSwitchingTab and this.state.activeTab === 'settings'" class="h-100">
+                    <div t-if="this.contentReady and this.state.renderedTab === 'settings'" class="h-100">
                         <PortalSettings />
                     </div>
 

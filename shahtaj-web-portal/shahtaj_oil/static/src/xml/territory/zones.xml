@@ -15,6 +15,9 @@
                             <input type="text" class="form-control border-start-0 ps-0" placeholder="Search zone name..." 
                                    t-model="this.state.areaSearchQuery" t-on-input="() => this.onSearchInput('areas')" />
                         </div>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('areas')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
                         <button class="btn btn-sm btn-dark d-flex align-items-center text-white ms-2 shadow-sm" t-on-click="() => this.state.showAreaForm = true" title="Create a new overarching zone">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
                                 <path d="M5 12h14"/>

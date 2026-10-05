@@ -21,13 +21,15 @@ class ShahtajDmApiService(models.AbstractModel):
 
     @api.model
     def _jobs_domain(self, dm, day=None, open_only=True):
+        """DM plan/list: only jobs scheduled for the given day (default today).
+
+        Overdue / unscheduled open jobs stay for the distributor to filter and
+        reschedule — they are not pushed into the DM day plan.
+        """
         day = day or self._today()
         domain = [
             ('delivery_man_id', '=', dm.id),
-            '|', '|',
             ('scheduled_date', '=', day),
-            ('scheduled_date', '=', False),
-            ('scheduled_date', '<', day),
         ]
         if open_only:
             domain.append(('state', 'in', ('not_ready', 'ready', 'picked', 'partial')))
@@ -107,6 +109,14 @@ class ShahtajDmApiService(models.AbstractModel):
         )
         for job in jobs:
             job.sudo()._sync_with_sale_order(ensure_visit_task=False)
+        # Sync: free van cover → qty_picked / Loaded (Dist + app agree).
+        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        # Mid-day Dist assigns while Left Office → Heading on load refresh.
+        Delivery._shahtaj_sync_route_after_dist_change(dm, day)
+        jobs = Delivery.search(
+            Delivery._shahtaj_today_open_jobs_domain(dm, day),
+            order='id',
+        )
         self._prefetch_jobs(jobs)
 
         shops = []
@@ -149,6 +159,8 @@ class ShahtajDmApiService(models.AbstractModel):
                 'state': job.state,
                 'field_state': job.field_state,
                 'scheduled_date': str(job.scheduled_date) if job.scheduled_date else False,
+                'is_overdue': bool(job.is_overdue),
+                'schedule_status': job.schedule_status or 'today',
                 'lines': lines,
             })
 
@@ -216,6 +228,12 @@ class ShahtajDmApiService(models.AbstractModel):
         )
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
+        # Attribute free van first so "need=0" jobs become Loaded before pick math.
+        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        deliveries = Delivery.search(
+            Delivery._shahtaj_today_open_jobs_domain(dm, day),
+            order='id',
+        )
 
         live_still = defaultdict(float)
         for delivery in deliveries:
@@ -254,6 +272,15 @@ class ShahtajDmApiService(models.AbstractModel):
                 wh_move[pid] = wh
 
         if not van_apply and not wh_move:
+            # Already fully covered/attributed — success, not an error.
+            if not any(q > 0 for q in live_still.values()):
+                return {
+                    'jobs_picked': 0,
+                    'van_skus_applied': 0,
+                    'warehouse_skus_picked': 0,
+                    'already_loaded': True,
+                    'load': self.get_today_load(dm, day),
+                }
             raise UserError(_(
                 'Nothing to load for today. Free van stock may already cover jobs, '
                 'or pick quantities are zero.'
@@ -406,12 +433,19 @@ class ShahtajDmApiService(models.AbstractModel):
 
     @api.model
     def get_plan(self, dm=None, day=None):
-        """Active visit/delivery plan for the day (refresh for live assigns)."""
+        """Delivery plan for jobs scheduled on this day only (default today)."""
         dm = dm or self._dm_user()
         day = day or self._today()
         Delivery = self.env['shahtaj.dm.delivery']
         jobs = Delivery.search(self._jobs_domain(dm, day, open_only=False), order='id')
         # Prefer open first in app sort
+        open_jobs = jobs.filtered(lambda j: j.state in ('not_ready', 'ready', 'picked', 'partial'))
+        for job in open_jobs:
+            job.sudo()._sync_with_sale_order(ensure_visit_task=False)
+        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        # Dist mid-day assigns while Left Office → correct Stop on pull refresh.
+        Delivery._shahtaj_sync_route_after_dist_change(dm, day)
+        jobs = Delivery.search(self._jobs_domain(dm, day, open_only=False), order='id')
         open_jobs = jobs.filtered(lambda j: j.state in ('not_ready', 'ready', 'picked', 'partial'))
         done_jobs = jobs - open_jobs
         ordered = open_jobs + done_jobs
@@ -425,6 +459,11 @@ class ShahtajDmApiService(models.AbstractModel):
                 'state': session.state,
                 'departed_at': session.departed_at.isoformat(sep=' ') if session.departed_at else False,
                 'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
+            },
+            'counts': {
+                'assigned': len(jobs),
+                'open': len(open_jobs),
+                'done': len(done_jobs),
             },
             'jobs': [self.job_brief(j) for j in ordered],
             'gps_criteria': {
@@ -448,6 +487,8 @@ class ShahtajDmApiService(models.AbstractModel):
             'state': job.state,
             'field_state': job.field_state,
             'scheduled_date': str(job.scheduled_date) if job.scheduled_date else False,
+            'is_overdue': bool(job.is_overdue),
+            'schedule_status': job.schedule_status or False,
             'qty_on_van': on_van,
             'notes': job.notes or '',
             'gps_verified': bool(job.gps_verified),
@@ -813,6 +854,17 @@ class ShahtajDmApiService(models.AbstractModel):
                 move.picked = True
         picking.with_context(skip_backorder=True, skip_sms=True).button_validate()
 
+        # Completed Delivery Job so distributors see walk-ins under Delivery Jobs.
+        job = Delivery._shahtaj_create_walk_in_job(
+            sale_order=order,
+            dm=dm,
+            picking=picking,
+            proof_vals=proof_vals,
+            notes=notes or '',
+            latitude=lat,
+            longitude=lng,
+        )
+
         invoices = order._create_invoices()
         if not invoices:
             raise UserError(_('Could not create an invoice for the walk-in order.'))
@@ -853,6 +905,7 @@ class ShahtajDmApiService(models.AbstractModel):
                 payment.shahtaj_instrument_reference or ''
             ) if payment and (channel or '') == 'cheque' else '',
             'picking_id': picking.id,
+            'dm_delivery_id': job.id if job else False,
             'receiver_name': proof_vals['receiver_name'],
             'has_delivery_proof': True,
             'notes': (notes or '').strip(),

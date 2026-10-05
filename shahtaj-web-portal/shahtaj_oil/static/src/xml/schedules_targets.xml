@@ -42,7 +42,7 @@
                 </div>
 
 
-                <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center gap-2 flex-wrap">
                     <div class="input-group input-group-sm w-50 shadow-sm">
                         <span class="input-group-text bg-white border-end-0">
                             <i class="fa fa-search text-muted"></i>
@@ -51,6 +51,9 @@
                                t-att-value="this.state.filters.bookers.search" 
                                t-on-input="onSearchInput"/>
                     </div>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('bookers')" t-att-disabled="this.state.isLoadingList" title="Clear search on this list">
+                        <i class="fa fa-times me-1"/> Clear Search
+                    </button>
                 </div>
                 
                 <div class="position-relative">
@@ -472,10 +475,15 @@
                                     <tr><td colspan="5" class="text-center py-4 text-muted">No targets configured for this booker.</td></tr>
                                 </t>
                                 <t t-foreach="currentBookerTargets" t-as="tgt" t-key="tgt.id">
-                                    <tr t-att-class="!tgt.isActive ? 'table-secondary' : ''">
+                                    <tr t-att-class="!tgt.showActive ? 'table-secondary' : ''">
                                         <td class="ps-4 align-middle">
                                             <div class="fw-bold small"><t t-esc="tgt.startDate"/></div>
                                             <div class="text-muted small">to <t t-esc="tgt.endDate"/></div>
+                                            <div class="mt-1">
+                                                <span t-if="tgt.periodStatus === 'upcoming'" class="badge rounded-pill px-2 py-1 text-white" style="background-color: #17a2b8;">Upcoming</span>
+                                                <span t-elif="tgt.periodStatus === 'current'" class="badge rounded-pill bg-success text-white px-2 py-1">Current</span>
+                                                <span t-elif="tgt.periodStatus === 'ended'" class="badge rounded-pill px-2 py-1" style="background-color: #e9ecef; color: #6c757d;">Ended</span>
+                                            </div>
                                         </td>
                                         <td class="align-middle">
                                             <div class="text-dark fw-bold text-capitalize">
@@ -540,7 +548,7 @@
                                             </t>
                                         </td>
                                         <td class="align-middle">
-                                            <span t-attf-class="badge #{tgt.isActive ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm"><t t-esc="tgt.status"/></span>
+                                            <span t-attf-class="badge #{tgt.showActive ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm"><t t-esc="tgt.status"/></span>
                                         </td>
                                         <td class="align-middle text-end pe-4">
                                             <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editTarget(tgt)" title="Edit target (includes Active toggle)">Edit</button>

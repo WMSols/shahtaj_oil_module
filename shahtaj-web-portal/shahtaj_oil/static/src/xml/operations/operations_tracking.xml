@@ -14,16 +14,16 @@
                 </div>
             </div>
             <t t-if="this.state.activeSubTab === 'checkins'">
-                <ShopCheckins requestedSubTab="'checkins'" requestedCheckinPurpose="this.props.requestedCheckinPurpose" requestedCheckinRole="this.props.requestedCheckinRole" requestedCheckinDate="this.props.requestedCheckinDate" refreshNonce="this.state.refreshNonce"/>
+                <ShopCheckins requestedSubTab="'checkins'" requestedCheckinPurpose="this.props.requestedCheckinPurpose" requestedCheckinRole="this.props.requestedCheckinRole" requestedCheckinDate="this.props.requestedCheckinDate" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
             <t t-if="this.state.activeSubTab === 'deliveries'">
-                <DmOperations requestedSubTab="'deliveries'" requestedDeliveriesSubTab="this.state.deliveriesSubTab" refreshNonce="this.state.refreshNonce"/>
+                <DmOperations requestedSubTab="'deliveries'" requestedDeliveriesSubTab="this.state.deliveriesSubTab" requestedDispatchDate="this.props.requestedDispatchDate" requestedDmDate="this.props.requestedDmDate" requestedDmFieldState="this.props.requestedDmFieldState" requestedDmState="this.props.requestedDmState" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
             <t t-if="this.state.activeSubTab === 'orders'">
-                <LiveOrders requestedSubTab="'orders'" refreshNonce="this.state.refreshNonce"/>
+                <LiveOrders requestedSubTab="'orders'" requestedOrderDate="this.props.requestedOrderDate" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
             <t t-if="this.state.activeSubTab === 'performance'">
-                <BookersPerformance requestedSubTab="'performance'" refreshNonce="this.state.refreshNonce"/>
+                <BookersPerformance requestedSubTab="'performance'" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
         </div>
     </t>

@@ -21,6 +21,12 @@ class ResCompany(models.Model):
         help='Booker must be within this many metres of the shop GPS for '
              'check-in and place-order. Takes effect immediately on save.',
     )
+    shahtaj_dm_overwrite_buttons = fields.Boolean(
+        string='DM Overwrite Buttons',
+        default=False,
+        help='When enabled, show Mark Delivery, Pick Stock, and Return WH '
+             'override actions in the portal DM Operations screens.',
+    )
 
     @api.constrains('shahtaj_min_shop_distance_m', 'shahtaj_max_shop_distance_m')
     def _check_shahtaj_shop_distance_limits(self):
@@ -43,7 +49,7 @@ class ResCompany(models.Model):
         user = self.env.user
         return (
             user.has_group('base.group_system')
-            or user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            or user.has_group('shahtaj_oil.group_shahtaj_office_ops')
         )
 
     @api.model
@@ -82,6 +88,32 @@ class ResCompany(models.Model):
                           max=company.shahtaj_max_shop_distance_m),
             )
         return self.shahtaj_get_shop_distance_limits()
+
+    @api.model
+    def shahtaj_get_dm_overwrite_buttons(self):
+        """Return whether DM overwrite buttons are enabled for this company."""
+        return {
+            'enabled': bool(self.env.company.shahtaj_dm_overwrite_buttons),
+        }
+
+    @api.model
+    def shahtaj_set_dm_overwrite_buttons(self, enabled=False):
+        """Portal/admin save — distributors and settings admins only."""
+        if not self._shahtaj_can_edit_company_settings():
+            raise AccessError(_(
+                'Only distributors or administrators can change DM overwrite settings.'
+            ))
+        company = self.env.company.sudo()
+        value = bool(enabled)
+        if company.shahtaj_dm_overwrite_buttons != value:
+            company.write({'shahtaj_dm_overwrite_buttons': value})
+            self.env['shahtaj.activity.log'].log_business(
+                operation='settings.dm_overwrite_buttons',
+                name='DM overwrite buttons updated',
+                related_record=company,
+                message=_('enabled=%s', value),
+            )
+        return self.shahtaj_get_dm_overwrite_buttons()
 
     def _shahtaj_get_default_expense_account(self):
         """Pick any active Expense account for operating expense posts."""

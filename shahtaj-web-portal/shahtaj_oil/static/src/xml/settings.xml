@@ -10,9 +10,6 @@
                 </div>
                 <div class="text-end">
                     <span class="badge bg-dark px-3 py-2 fs-6 text-white">Admin</span>
-                    <div t-if="this.state.appVersion" class="small text-muted mt-2">
-                        <span class="fw-semibold text-dark ms-1" t-esc="this.state.appVersion"/>
-                    </div>
                 </div>
             </div>
 
@@ -25,6 +22,27 @@
                 <div class="p-4">
                     <div class="row mb-4">
                         <div class="col-12">
+                            <div class="card border shadow-sm p-4 rounded-3 bg-white mb-4">
+                                <div class="d-flex justify-content-between align-items-center gap-3">
+                                    <div>
+                                        <h5 class="fw-bold mb-1">DM Overwrite Buttons</h5>
+                                        <small class="text-muted">
+                                            Show Mark Delivery, Pick Stock, and Return WH override actions in DM Operations.
+                                            Saved for this company — applies on the next Operations refresh.
+                                        </small>
+                                    </div>
+                                    <div class="form-check form-switch flex-shrink-0 mb-0">
+                                        <input class="form-check-input cursor-pointer" type="checkbox" role="switch"
+                                               id="dmOverwriteButtonsSwitch"
+                                               t-att-checked="this.state.dmOverwriteButtons"
+                                               t-att-disabled="this.state.isSavingDmOverwrite"
+                                               t-on-change="onDmOverwriteToggle"/>
+                                        <label class="form-check-label small fw-bold cursor-pointer" for="dmOverwriteButtonsSwitch">
+                                            <t t-esc="this.state.dmOverwriteButtons ? 'On' : 'Off'"/>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="card border shadow-sm p-4 rounded-3 bg-white">
                                 <div class="d-flex justify-content-between align-items-start mb-3">
                                     <div>
@@ -34,24 +52,24 @@
                                             Changes apply immediately on the next GPS check.
                                         </small>
                                     </div>
-                                    <span class="badge bg-dark text-white px-3 py-2">Live setting</span>
                                 </div>
-                                <div class="row g-3 align-items-end">
+                                <div class="row g-3 align-items-start">
                                     <div class="col-md-3">
-                                        <label class="small fw-bold text-muted mb-1">Min distance (metres)</label>
+                                        <label class="small fw-bold text-muted mb-1 d-block">Min distance (metres)</label>
                                         <input type="number" class="form-control" min="0" step="1"
                                                t-model="this.state.gpsForm.min_m"
                                                t-att-disabled="this.state.isSavingGps"/>
                                         <small class="text-muted">Use 0 for no minimum</small>
                                     </div>
                                     <div class="col-md-3">
-                                        <label class="small fw-bold text-muted mb-1">Max distance (metres)</label>
+                                        <label class="small fw-bold text-muted mb-1 d-block">Max distance (metres)</label>
                                         <input type="number" class="form-control" min="10" step="1"
                                                t-model="this.state.gpsForm.max_m"
                                                t-att-disabled="this.state.isSavingGps"/>
                                         <small class="text-muted">Recommended 150–200 if 100 is too strict</small>
                                     </div>
                                     <div class="col-md-3">
+                                        <label class="small fw-bold text-muted mb-1 d-block invisible" aria-hidden="true">Save</label>
                                         <button class="btn btn-dark fw-bold text-white px-4"
                                                 t-on-click="saveGpsSettings"
                                                 t-att-disabled="this.state.isSavingGps">
@@ -131,9 +149,46 @@
                         </div>
                     </div>
 
-                    
                 </div>
             </t>
+
+            <div class="px-4 pb-4">
+                <div class="border rounded-3 p-3 bg-light">
+                    <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
+                        <div>
+                            <div class="small fw-bold text-uppercase text-muted">Connection</div>
+                            <div class="small text-muted">Link is the path to the server. Server is the slowest portal request in the last few seconds.</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                            <span class="d-inline-flex align-items-end gap-1" style="height: 18px;" aria-hidden="true">
+                                <t t-foreach="[1, 2, 3, 4]" t-as="level" t-key="level">
+                                    <span t-att-style="this.linkBarStyle(level)"/>
+                                </t>
+                            </span>
+                            <span class="small fw-semibold" t-att-class="this.linkQualityClass" t-esc="this.linkQualityLabel"/>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-4 small">
+                        <span>Link <span class="fw-semibold text-dark" t-esc="this.formatDuration(this.state.linkMs)"/></span>
+                        <span>Server <span class="fw-semibold text-dark" t-esc="this.formatDuration(this.state.serverMs)"/></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 py-3 border-top small text-muted">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="flex-fill text-start">
+                        <i class="fa fa-copyright me-1" aria-hidden="true"/>
+                        <t t-esc="this.state.appName"/> <t t-esc="this.currentYear"/>
+                    </div>
+                    <div class="flex-fill text-center">
+                        Designed &amp; Developed by <a href="https://www.wmsols.com" target="_blank" class="text-dark">WMSols</a>
+                    </div>
+                    <div class="flex-fill text-end">
+                        System Version: <span class="fw-semibold text-dark" t-esc="this.state.appVersion"/>
+                    </div>
+                </div>
+            </div>
         </div>
     </t>
 </templates>

@@ -3,6 +3,7 @@
 import { Component, useState, onWillStart, useRef } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { rpc } from "@web/core/network/rpc";
+import { user } from "@web/core/user";
 
 const ODOO_COLORS = [
     "#E2E8F0",
@@ -86,6 +87,7 @@ export class FieldReports extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         this.threadRef = useRef("thread");
+        this._listFetchToken = 0;
         this.state = useState({
             pill: "reports",
             mode: "list",
@@ -96,19 +98,26 @@ export class FieldReports extends Component {
             draft: "",
             closingRemark: "",
             screenshotName: "",
-            filters: { search: "", state: "all", role: "all" },
+            filters: { search: "", state: "all", role: "all", booker: "all", deliveryMan: "all", dateFrom: "", dateTo: "" },
+            bookers: [],
+            deliveryMen: [],
             form: this._emptyForm(),
             tagForm: this._emptyTagForm(),
             editingTagId: null,
             isLoading: false,
+            isRefreshing: false,
+            isOpening: false,
             isSaving: false,
+            activeAction: null,
             isSending: false,
+            isLoadingMedia: false,
+            mediaSrc: "",
             page: 1,
             pageSize: 50,
             total: 0,
         });
         onWillStart(async () => {
-            await Promise.all([this.loadTags(), this.loadReports()]);
+            await Promise.all([this.loadTags(), this.loadPeople(), this.loadReports()]);
         });
     }
 
@@ -194,13 +203,21 @@ export class FieldReports extends Component {
     }
 
     async refreshReports() {
-        await this.loadTags();
-        if (this.state.mode === "detail" && this.state.selected) {
-            await this.openReport(this.state.selected.id);
+        if (this.state.isRefreshing) {
             return;
         }
-        if (this.state.mode === "list") {
-            await this.loadReports();
+        this.state.isRefreshing = true;
+        try {
+            await Promise.all([this.loadTags(), this.loadPeople()]);
+            if (this.state.mode === "detail" && this.state.selected) {
+                await this.openReport(this.state.selected.id);
+                return;
+            }
+            if (this.state.mode === "list") {
+                await this.loadReports();
+            }
+        } finally {
+            this.state.isRefreshing = false;
         }
     }
 
@@ -208,6 +225,32 @@ export class FieldReports extends Component {
         this.state.pill = pill;
         this.state.mode = "list";
         this.state.selected = null;
+    }
+
+    _pktDateToUtcBounds(dateStr) {
+        const start = new Date(`${dateStr}T00:00:00+05:00`);
+        const end = new Date(`${dateStr}T23:59:59+05:00`);
+        const toOdooUtc = (d) => d.toISOString().slice(0, 19).replace("T", " ");
+        return { start: toOdooUtc(start), end: toOdooUtc(end) };
+    }
+
+    async loadPeople() {
+        const [bookers, deliveryMen] = await Promise.all([
+            this.orm.searchRead(
+                "res.users",
+                [["shahtaj_is_order_booker", "=", true], ["active", "=", true]],
+                ["name"],
+                { order: "name, id" }
+            ),
+            this.orm.searchRead(
+                "res.users",
+                [["shahtaj_is_delivery_man", "=", true], ["active", "=", true]],
+                ["name"],
+                { order: "name, id" }
+            ),
+        ]);
+        this.state.bookers = bookers;
+        this.state.deliveryMen = deliveryMen;
     }
 
     async loadTags() {
@@ -220,6 +263,7 @@ export class FieldReports extends Component {
     }
 
     async loadReports() {
+        const fetchToken = ++this._listFetchToken;
         this.state.isLoading = true;
         try {
             const domain = [];
@@ -237,6 +281,21 @@ export class FieldReports extends Component {
             if (this.state.filters.role !== "all") {
                 domain.push(["reporter_role", "=", this.state.filters.role]);
             }
+            const bookerId = this.state.filters.booker !== "all" ? parseInt(this.state.filters.booker, 10) : false;
+            const dmId = this.state.filters.deliveryMan !== "all" ? parseInt(this.state.filters.deliveryMan, 10) : false;
+            if (bookerId && dmId) {
+                domain.push(["user_id", "in", [bookerId, dmId]]);
+            } else if (bookerId) {
+                domain.push(["user_id", "=", bookerId]);
+            } else if (dmId) {
+                domain.push(["user_id", "=", dmId]);
+            }
+            if (this.state.filters.dateFrom) {
+                domain.push(["create_date", ">=", this._pktDateToUtcBounds(this.state.filters.dateFrom).start]);
+            }
+            if (this.state.filters.dateTo) {
+                domain.push(["create_date", "<=", this._pktDateToUtcBounds(this.state.filters.dateTo).end]);
+            }
             const offset = (this.state.page - 1) * this.state.pageSize;
             const [total, rows] = await Promise.all([
                 this.orm.searchCount("shahtaj.field.report", domain),
@@ -247,13 +306,25 @@ export class FieldReports extends Component {
                     { limit: this.state.pageSize, offset, order: "create_date desc, id desc" }
                 ),
             ]);
+            if (fetchToken !== this._listFetchToken) {
+                return;
+            }
             this.state.total = total;
             this.state.reports = rows;
         } catch (error) {
             this.notification.add(error.data?.message || error.message || "Could not load reports.", { type: "danger" });
         } finally {
-            this.state.isLoading = false;
+            if (fetchToken === this._listFetchToken) {
+                this.state.isLoading = false;
+            }
         }
+    }
+
+    clearFilters(listKey = "reports") {
+        this.state.filters = { search: "", state: "all", role: "all", booker: "all", deliveryMan: "all", dateFrom: "", dateTo: "" };
+        this.state.page = 1;
+        this.state.reports = [];
+        this.loadReports();
     }
 
     onSearch(ev) {
@@ -292,6 +363,7 @@ export class FieldReports extends Component {
         this.state.thread = [];
         this.state.draft = "";
         this.state.closingRemark = "";
+        this.state.mediaSrc = "";
         this.loadReports();
     }
 
@@ -349,7 +421,7 @@ export class FieldReports extends Component {
     }
 
     async openReport(id) {
-        this.state.isLoading = true;
+        this.state.isOpening = true;
         try {
             const [report] = await this.orm.read(
                 "shahtaj.field.report",
@@ -357,18 +429,40 @@ export class FieldReports extends Component {
                 [
                     "name", "subject", "description", "state", "tag_ids", "user_id",
                     "reporter_role", "create_date", "device_info",
-                    "screenshot", "closed_at", "closed_by_id", "closing_remark",
+                    "has_screenshot", "closed_at", "closed_by_id", "closing_remark",
                 ]
             );
             this.state.selected = report;
             this.state.mode = "detail";
             this.state.draft = "";
+            this.state.mediaSrc = "";
             this.state.closingRemark = report.closing_remark || "";
             await this.loadThread();
         } catch (error) {
             this.notification.add(error.data?.message || error.message || "Could not open the report.", { type: "danger" });
         } finally {
-            this.state.isLoading = false;
+            this.state.isOpening = false;
+        }
+    }
+
+    async viewMedia() {
+        const report = this.state.selected;
+        if (!report || this.state.isLoadingMedia || this.state.mediaSrc) {
+            return;
+        }
+        this.state.isLoadingMedia = true;
+        try {
+            const [row] = await this.orm.read("shahtaj.field.report", [report.id], ["screenshot"]);
+            const src = row && row.screenshot ? this.screenshotSrc(row.screenshot) : "";
+            if (!src) {
+                this.notification.add("This report has no media.", { type: "warning" });
+                return;
+            }
+            this.state.mediaSrc = src;
+        } catch (error) {
+            this.notification.add(error.data?.message || error.message || "Could not load the media.", { type: "danger" });
+        } finally {
+            this.state.isLoadingMedia = false;
         }
     }
 
@@ -415,6 +509,7 @@ export class FieldReports extends Component {
                 id: message.id,
                 kind,
                 author: partners[authorId] || "",
+                authorId: authorId || false,
                 date: message.date,
                 body,
                 tracking,
@@ -450,6 +545,7 @@ export class FieldReports extends Component {
             return;
         }
         this.state.isSaving = true;
+        this.state.activeAction = method;
         try {
             if (closing) {
                 await this.orm.write("shahtaj.field.report", [report.id], {
@@ -462,13 +558,24 @@ export class FieldReports extends Component {
             this.notification.add(error.data?.message || error.message || "Could not update the status.", { type: "danger" });
         } finally {
             this.state.isSaving = false;
+            this.state.activeAction = null;
         }
+    }
+
+    hasOwnComment() {
+        const partnerId = Number(user.partnerId);
+        if (!partnerId) {
+            return false;
+        }
+        return this.state.thread.some(
+            (item) => item.kind === "message" && Number(item.authorId) === partnerId
+        );
     }
 
     async sendMessage() {
         const report = this.state.selected;
         const body = (this.state.draft || "").trim();
-        if (!report || !body || this.state.isSending) {
+        if (!report || !body || this.state.isSending || this.hasOwnComment()) {
             return;
         }
         this.state.isSending = true;
@@ -481,7 +588,7 @@ export class FieldReports extends Component {
             this.state.draft = "";
             await this.loadThread();
         } catch (error) {
-            this.notification.add(error.data?.message || error.message || "Could not send the message.", { type: "danger" });
+            this.notification.add(error.data?.message || error.message || "Could not add the comment.", { type: "danger" });
         } finally {
             this.state.isSending = false;
         }

@@ -7,16 +7,17 @@
                 <div>
                     <h2 class="h4 fw-bold text-dark mb-0">Staff &amp; Role Management</h2>
                     <small class="text-muted">Manage field personnel, assign roles, and track performance.</small>
+                    <small t-if="!this.state.showForm and this.state.viewMode === 'list'" class="text-muted d-block mt-1">Auto updates every 2:30 minutes. Click Refresh to update immediately.</small>
                 </div>
                 <div class="d-flex gap-2 w-100 w-md-auto" t-if="!this.state.showForm and this.state.viewMode === 'list'">
                     <button class="btn btn-outline-secondary fw-bold d-flex align-items-center justify-content-center shadow-sm" t-on-click="() => this.fetchStaffData(false)" t-att-disabled="this.state.loading.fetch" title="Refresh Data">
                         <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.loading.fetch}"></i> Refresh
                     </button>
-                    <button class="btn btn-outline-danger fw-bold d-flex align-items-center justify-content-center shadow-sm" t-on-click="openArchive" title="View Archived Staff">
+                    <button t-if="this.canManageStaff" class="btn btn-outline-danger fw-bold d-flex align-items-center justify-content-center shadow-sm" t-on-click="openArchive" title="View Archived Staff">
                         <i class="fa fa-archive me-2"></i> Archive
                     </button>
 
-                    <button class="btn btn-dark fw-bold d-flex align-items-center justify-content-center text-white" t-on-click="openForm">
+                    <button t-if="this.canManageStaff" class="btn btn-dark fw-bold d-flex align-items-center justify-content-center text-white" t-on-click="openForm">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
                             <path d="M5 12h14"/><path d="M12 5v14"/>
                         </svg>
@@ -113,11 +114,11 @@
             <t t-if="!this.state.showForm and this.state.viewMode === 'list'">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 border-bottom pb-3 gap-3">
                     <ul class="nav nav-pills flex-column flex-sm-row gap-2 mb-0 w-100 w-md-auto">
-                        <li class="nav-item">
-                            <button t-on-click="() => this.switchTab('order_booker')" t-attf-class="nav-link rounded-pill fw-bold px-4 py-2 border-0 w-100 #{this.state.activeTab === 'order_booker' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light'}">Order Bookers</button>
+                        <li class="nav-item" t-if="this.canSeeStaffRole('order_booker')">
+                            <button t-on-click="() => this.switchTab('order_booker')" t-attf-class="nav-link shahtaj-pill-tab rounded-pill fw-bold px-4 py-2 w-100 #{this.state.activeTab === 'order_booker' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light'}">Order Bookers</button>
                         </li>
-                        <li class="nav-item">
-                            <button t-on-click="() => this.switchTab('delivery_man')" t-attf-class="nav-link rounded-pill fw-bold px-4 py-2 border-0 w-100 #{this.state.activeTab === 'delivery_man' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light'}">Delivery Men</button>
+                        <li class="nav-item" t-if="this.canSeeStaffRole('delivery_man')">
+                            <button t-on-click="() => this.switchTab('delivery_man')" t-attf-class="nav-link shahtaj-pill-tab rounded-pill fw-bold px-4 py-2 w-100 #{this.state.activeTab === 'delivery_man' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light'}">Delivery Men</button>
                         </li>
                     </ul>
                     <div class="d-flex flex-column flex-md-row gap-2 w-100 w-md-auto">
@@ -133,6 +134,9 @@
                             <option value="all">All Statuses</option>
                             <option value="online">Currently Online</option>
                         </select>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('staff')" t-att-disabled="this.state.loading.fetch" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
                     </div>
                 </div>
 
@@ -198,8 +202,8 @@
                                         <td t-if="this.isDeliveryManTab" class="text-center"><t t-esc="staff.vanQty"/></td>
                                         <td t-if="this.isDeliveryManTab and this.hasFinancialAccess" class="text-end fw-bold">Rs. <t t-esc="this.formatMoney(staff.wallet)"/></td>
                                         <td class="text-end pe-4 text-nowrap">
-                                            <button class="btn btn-sm btn-outline-danger fw-bold d-inline-flex align-items-center me-2 shadow-sm" t-on-click="() => this.toggleActiveStatus(staff.id, staff.active)" title="Move to Archive" t-att-disabled="this.state.loading.toggle">Archive</button>
-                                            <button class="btn btn-sm btn-outline-secondary fw-bold d-inline-flex align-items-center me-2" t-on-click="() => this.editStaff(staff)" t-att-disabled="this.state.loading.toggle">
+                                            <button t-if="this.canManageStaff" class="btn btn-sm btn-outline-danger fw-bold d-inline-flex align-items-center me-2 shadow-sm" t-on-click="() => this.toggleActiveStatus(staff.id, staff.active)" title="Move to Archive" t-att-disabled="this.state.loading.toggle">Archive</button>
+                                            <button t-if="this.canManageStaff" class="btn btn-sm btn-outline-secondary fw-bold d-inline-flex align-items-center me-2" t-on-click="() => this.editStaff(staff)" t-att-disabled="this.state.loading.toggle">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil me-1"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg> Edit
                                             </button>
                                             <button class="btn btn-sm btn-outline-dark fw-bold d-inline-flex align-items-center" t-on-click="() => this.openDetails(staff)" t-att-disabled="this.state.loading.toggle">
@@ -242,11 +246,16 @@
                         <h2 class="fw-bold text-danger mb-1">Archived Staff</h2>
                         <small class="text-muted">Manage suspended or deactivated employee accounts.</small>
                     </div>
-                    <div class="input-group input-group-sm w-100 w-md-auto shadow-sm" style="max-width: 300px;">
-                        <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
-                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search archived staff..." 
-                               t-att-value="this.state.filters.archive.search" 
-                               t-on-input="(ev) => this.onSearchInput(ev, 'archive')" />
+                    <div class="d-flex align-items-center gap-2 w-100 w-md-auto" style="max-width: 420px;">
+                        <div class="input-group input-group-sm shadow-sm flex-grow-1">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search archived staff..." 
+                                   t-att-value="this.state.filters.archive.search" 
+                                   t-on-input="(ev) => this.onSearchInput(ev, 'archive')" />
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('archive')" t-att-disabled="this.state.loading.fetch" title="Clear all filters on this list">
+                            <i class="fa fa-times me-1"/> Clear filters
+                        </button>
                     </div>
                 </div>
 
@@ -284,7 +293,7 @@
                                             <span class="badge shadow-sm bg-secondary text-dark"><t t-esc="staff.role"/></span>
                                         </td>
                                         <td class="text-end pe-4 text-nowrap">
-                                            <button class="btn btn-sm btn-success fw-bold d-inline-flex align-items-center shadow-sm" t-on-click="() => this.toggleActiveStatus(staff.id, staff.active)" t-att-disabled="this.state.loading.toggle">
+                                            <button t-if="this.canManageStaff" class="btn btn-sm btn-success fw-bold d-inline-flex align-items-center shadow-sm" t-on-click="() => this.toggleActiveStatus(staff.id, staff.active)" t-att-disabled="this.state.loading.toggle">
                                                 <t t-if="this.state.loading.toggle"><i class="fa fa-circle-o-notch fa-spin me-1"></i></t>
                                                 Restore Account
                                             </button>
@@ -341,7 +350,7 @@
                                 </span>
                             </div>
                         </div>
-                        <button t-attf-class="btn fw-bold shadow-sm w-100 w-md-auto d-flex justify-content-center align-items-center #{this.state.selectedStaff.active ? 'btn-outline-danger' : 'btn-success text-white'}" t-on-click="() => this.toggleActiveStatus(this.state.selectedStaff.id, this.state.selectedStaff.active)" t-att-disabled="this.state.loading.toggle">
+                        <button t-if="this.canManageStaff" t-attf-class="btn fw-bold shadow-sm w-100 w-md-auto d-flex justify-content-center align-items-center #{this.state.selectedStaff.active ? 'btn-outline-danger' : 'btn-success text-white'}" t-on-click="() => this.toggleActiveStatus(this.state.selectedStaff.id, this.state.selectedStaff.active)" t-att-disabled="this.state.loading.toggle">
                             <t t-if="this.state.loading.toggle">
                                 <i class="fa fa-circle-o-notch fa-spin me-2"></i> Processing...
                             </t>
@@ -361,7 +370,7 @@
                             </t>
                         </button>
                     </div>
-                    <div t-if="this.state.selectedStaff.roleKey === 'delivery_man' and this.hasFinancialAccess" class="d-flex flex-wrap gap-2 mt-3">
+                    <div t-if="this.canManageStaff and this.state.selectedStaff.roleKey === 'delivery_man' and this.hasFinancialAccess" class="d-flex flex-wrap gap-2 mt-3">
                         <button class="btn btn-sm btn-dark fw-bold text-white" t-on-click="openSettleModal" t-att-disabled="this.state.loading.wallet">Settle Wallet</button>
                     </div>
                 </div>
@@ -397,6 +406,39 @@
                                 </h3>
                                 <small class="text-muted">Picked today <t t-esc="this.state.vanSnapshot.pickedToday"/> · Delivered <t t-esc="this.state.vanSnapshot.deliveredToday"/></small>
                             </div>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-muted text-uppercase small mb-3">Van Stock</h6>
+                    <div class="bg-white rounded-3 shadow-sm border mb-4">
+                        <div class="px-4 py-3 border-bottom">
+                            <t t-if="this.state.vanSnapshot.lines.length">
+                                <span class="fw-bold"><t t-esc="this.state.vanSnapshot.locationName"/></span>
+                                <span class="text-muted"> — <t t-esc="this.state.vanSnapshot.skuCount"/> product(s), <t t-esc="this.formatQty(this.state.vanSnapshot.qtyOnHand)"/> total units on van.</span>
+                            </t>
+                            <t t-else="">
+                                <span class="text-muted">No van stock yet.</span>
+                            </t>
+                        </div>
+                        <div class="table-responsive" t-if="this.state.vanSnapshot.lines.length">
+                            <table class="table table-hover table-striped mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 border-top-0">Product</th>
+                                        <th class="text-end border-top-0">On Van</th>
+                                        <th class="pe-4 border-top-0">UoM</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="this.state.vanSnapshot.lines" t-as="line" t-key="line.id">
+                                        <tr>
+                                            <td class="ps-4"><t t-esc="line.product"/></td>
+                                            <td class="text-end fw-bold"><t t-esc="this.formatQty(line.qty)"/></td>
+                                            <td class="pe-4 text-muted"><t t-esc="line.uom"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -552,6 +594,11 @@
                                         <td class="ps-4 align-middle text-nowrap">
                                             <div class="fw-bold small text-dark"><t t-esc="target.date_start"/></div>
                                             <div class="text-muted small">to <t t-esc="target.date_end"/></div>
+                                            <div class="mt-1">
+                                                <span t-if="target.period_status === 'upcoming'" class="badge rounded-pill px-2 py-1 text-white" style="background-color: #17a2b8;">Upcoming</span>
+                                                <span t-elif="target.period_status === 'current'" class="badge rounded-pill bg-success text-white px-2 py-1">Current</span>
+                                                <span t-elif="target.period_status === 'ended'" class="badge rounded-pill px-2 py-1" style="background-color: #e9ecef; color: #6c757d;">Ended</span>
+                                            </div>
                                         </td>
                                         <td class="align-middle">
                                             <div class="text-dark fw-bold text-capitalize text-nowrap">

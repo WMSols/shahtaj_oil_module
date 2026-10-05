@@ -39,3 +39,100 @@ body.o_shahtaj_custom_portal .o_user_menu {
 body.o_shahtaj_custom_portal .o_user_menu .oe_topbar_name {
     display: none !important;
 }
+
+/* DM job section headers: a light bar so the row reads as a control. */
+.shahtaj-accordion-toggle {
+    background: #f1f5f9 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+    color: #0f172a;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.shahtaj-accordion-toggle:hover,
+.shahtaj-accordion-toggle:focus-visible {
+    background: #e2e8f0 !important;
+}
+
+.shahtaj-accordion-toggle .fa,
+.shahtaj-accordion-toggle svg {
+    color: #475569 !important;
+}
+
+/* Inactive pills on Staff and DM Operations stay outlined and darken on hover. */
+.shahtaj-pill-tab {
+    border: 1px solid #cbd5e1 !important;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.shahtaj-pill-tab:not(.active):hover,
+.shahtaj-pill-tab:not(.active):focus-visible {
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+    border-color: #94a3b8 !important;
+}
+
+.shahtaj-assign-close {
+    color: #334155;
+    background: #f1f5f9;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.shahtaj-assign-close:hover,
+.shahtaj-assign-close:focus-visible {
+    background: #e11d48 !important;
+    color: #fff !important;
+}
+
+/* Odoo's native RPC badge is a 4px "Loading" chip. Make it obvious
+   so a missed local spinner still shows that a request is in flight. */
+.o_loading_indicator {
+    bottom: 18px !important;
+    right: 18px !important;
+    z-index: 10000 !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px 10px 14px !important;
+    border-radius: 999px;
+    background: #0f172a !important;
+    color: #fff !important;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.35);
+}
+
+.o_loading_indicator::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: shahtaj-native-spin 0.7s linear infinite;
+    flex: 0 0 auto;
+}
+
+.o_loading_indicator::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, #0f172a 0%, #2563eb 45%, #facc15 70%, #0f172a 100%);
+    background-size: 200% 100%;
+    animation: shahtaj-native-bar 1.1s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes shahtaj-native-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes shahtaj-native-bar {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+}

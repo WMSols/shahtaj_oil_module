@@ -7,7 +7,7 @@ from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
-RETENTION_DAYS = 2
+RETENTION_DAYS = 2  # fallback; live value from ir.config_parameter when set
 
 # Known operation codes for filters / HTML meta (even before any rows exist).
 KNOWN_OPERATIONS = (
@@ -39,6 +39,8 @@ KNOWN_OPERATIONS = (
     'schedule.delete',
     'schedule.update',
     'settings.gps_distance',
+    'settings.storage_retention',
+    'settings.storage_purge',
     'shop.approve',
     'shop.create',
     'shop.field_verify',
@@ -122,6 +124,7 @@ class ShahtajActivityLog(models.Model):
             ('delivery_man_api', 'Delivery Man API'),
             ('delivery_man_ui', 'Delivery Man UI'),
             ('distributor_ui', 'Distributor UI'),
+            ('kpo_ui', 'KPO UI'),
             ('admin_ui', 'Admin UI'),
             ('system', 'System'),
             ('cron', 'Cron'),
@@ -163,6 +166,7 @@ class ShahtajActivityLog(models.Model):
         [
             ('admin', 'Admin'),
             ('distributor', 'Distributor'),
+            ('kpo', 'KPO'),
             ('order_booker', 'Order Booker'),
             ('delivery_man', 'Delivery Man'),
             ('system', 'System'),
@@ -201,8 +205,10 @@ class ShahtajActivityLog(models.Model):
                 return 'system'
             if user.has_group('base.group_system'):
                 return 'admin'
-            if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
                 return 'distributor'
+            if user.has_group('shahtaj_oil.group_shahtaj_kpo'):
+                return 'kpo'
             if user.has_group('shahtaj_oil.group_shahtaj_delivery_man'):
                 return 'delivery_man'
             if user.has_group('shahtaj_oil.group_shahtaj_order_booker'):
@@ -243,8 +249,10 @@ class ShahtajActivityLog(models.Model):
                 return 'system'
             if user.has_group('base.group_system'):
                 return 'admin_ui'
-            if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+            if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
                 return 'distributor_ui'
+            if user.has_group('shahtaj_oil.group_shahtaj_kpo'):
+                return 'kpo_ui'
             if user.has_group('shahtaj_oil.group_shahtaj_delivery_man'):
                 return 'delivery_man_ui'
             if user.has_group('shahtaj_oil.group_shahtaj_order_booker'):
@@ -518,9 +526,23 @@ class ShahtajActivityLog(models.Model):
         ]
 
     @api.model
+    def _retention_days(self):
+        """Prefer Storage dashboard ICP; fall back to module default."""
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            'shahtaj.storage.retention.activity_log_days',
+            str(RETENTION_DAYS),
+        )
+        try:
+            days = int(raw)
+        except (TypeError, ValueError):
+            days = RETENTION_DAYS
+        return max(1, days)
+
+    @api.model
     def _cron_purge_old_logs(self):
-        """Delete activity rows older than RETENTION_DAYS (cron; catches up in batches)."""
-        cutoff = fields.Datetime.now() - timedelta(days=RETENTION_DAYS)
+        """Delete activity rows older than retention (cron; catches up in batches)."""
+        days = self._retention_days()
+        cutoff = fields.Datetime.now() - timedelta(days=days)
         Log = self.sudo()
         batch = Log.search(
             [('event_at', '<', cutoff)],
@@ -531,9 +553,10 @@ class ShahtajActivityLog(models.Model):
         if batch:
             batch.unlink()
             _logger.info(
-                'Shahtaj activity log purged %s rows older than %s',
+                'Shahtaj activity log purged %s rows older than %s (%s days)',
                 total,
                 cutoff,
+                days,
             )
         return True
 

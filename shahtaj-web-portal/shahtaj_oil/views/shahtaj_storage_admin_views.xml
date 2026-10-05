@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Main "Shahtaj Storage" menu + URL action live in shahtaj_activity_log_views.xml
+      (same Settings root as Activity Logs) so they always load with that file.
+    -->
+
+    <menuitem id="menu_shahtaj_admin_tools"
+              name="Shahtaj Admin Tools"
+              parent="base.menu_administration"
+              sequence="97"
+              groups="base.group_system"/>
+
+    <record id="view_shahtaj_storage_purge_log_list" model="ir.ui.view">
+        <field name="name">shahtaj.storage.purge.log.list</field>
+        <field name="model">shahtaj.storage.purge.log</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false">
+                <field name="create_date"/>
+                <field name="category"/>
+                <field name="older_than_days"/>
+                <field name="records_cleared"/>
+                <field name="estimated_bytes" optional="hide"/>
+                <field name="admin1_id"/>
+                <field name="requested_by_id"/>
+                <field name="is_auto" widget="boolean"/>
+                <field name="notes"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_shahtaj_storage_purge_log" model="ir.actions.act_window">
+        <field name="name">Storage Cleanup History</field>
+        <field name="res_model">shahtaj.storage.purge.log</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_shahtaj_storage_purge_log_list"/>
+    </record>
+
+    <menuitem id="menu_shahtaj_storage_purge_log"
+              name="Storage Cleanup History"
+              parent="menu_shahtaj_admin_tools"
+              action="action_shahtaj_storage_purge_log"
+              sequence="10"
+              groups="base.group_system"/>
+
+    <record id="menu_shahtaj_gps_attempts_admin" model="ir.ui.menu">
+        <field name="parent_id" ref="menu_shahtaj_admin_tools"/>
+        <field name="sequence">20</field>
+    </record>
+</odoo>

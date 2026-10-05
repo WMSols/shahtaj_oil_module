@@ -7,14 +7,16 @@
         <field name="model">account.move</field>
         <field name="priority">50</field>
         <field name="arch" type="xml">
-            <list string="Shop Invoices"
+            <list string="Customer Invoices"
                   decoration-muted="state == 'cancel'"
                   decoration-info="move_type == 'out_refund'"
                   decoration-danger="payment_state == 'not_paid' and move_type == 'out_invoice' and state == 'posted'"
-                  decoration-success="payment_state == 'paid' and move_type == 'out_invoice'">
+                  decoration-success="payment_state == 'paid' and move_type == 'out_invoice'"
+                  decoration-warning="shahtaj_is_walk_in">
                 <field name="name" string="Number"/>
                 <field name="invoice_date" string="Date"/>
-                <field name="partner_id" string="Shop"/>
+                <field name="partner_id" string="Customer"/>
+                <field name="shahtaj_is_walk_in" string="Walk-in" optional="show"/>
                 <field name="move_type" string="Type" widget="badge"
                        decoration-info="move_type == 'out_refund'"
                        decoration-success="move_type == 'out_invoice'"/>
@@ -42,7 +44,7 @@
         <field name="model">account.move</field>
         <field name="priority">50</field>
         <field name="arch" type="xml">
-            <search string="Shop Invoices">
+            <search string="Customer Invoices">
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="invoice_origin"/>
@@ -52,6 +54,11 @@
                         domain="[('move_type', '=', 'out_invoice')]"/>
                 <filter string="Credit Notes" name="credit_notes"
                         domain="[('move_type', '=', 'out_refund')]"/>
+                <separator/>
+                <filter string="Walk-in" name="walk_in"
+                        domain="[('shahtaj_is_walk_in', '=', True)]"/>
+                <filter string="Shops only" name="shops_only"
+                        domain="[('shahtaj_is_walk_in', '!=', True)]"/>
                 <separator/>
                 <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Posted" name="posted" domain="[('state', '=', 'posted')]"/>
@@ -68,11 +75,13 @@
                 <filter string="Opening Balance" name="legacy_balance"
                         domain="[('shahtaj_is_legacy_balance', '=', True)]"/>
                 <group>
-                    <filter string="Shop" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Customer" name="group_partner" context="{'group_by': 'partner_id'}"/>
                     <filter string="Type" name="group_type" context="{'group_by': 'move_type'}"/>
                     <filter string="Payment Status" name="group_payment"
                             context="{'group_by': 'payment_state'}"/>
                     <filter string="Date" name="group_date" context="{'group_by': 'invoice_date'}"/>
+                    <filter string="Walk-in" name="group_walk_in"
+                            context="{'group_by': 'shahtaj_is_walk_in'}"/>
                 </group>
             </search>
         </field>
@@ -141,12 +150,16 @@
         <field name="act_window_id" ref="action_shahtaj_shop_balances"/>
     </record>
 
-    <!-- Field sales orders (from shop visits) -->
+    <!-- Field sales orders (shop visits + walk-in van sales) -->
     <record id="action_shahtaj_field_sales_orders" model="ir.actions.act_window">
         <field name="name">Field Sales Orders</field>
         <field name="res_model">sale.order</field>
         <field name="view_mode">list,form,kanban,pivot,graph</field>
-        <field name="domain">[('shahtaj_visit_id', '!=', False)]</field>
+        <field name="domain">[
+            '|',
+            ('shahtaj_visit_id', '!=', False),
+            ('shahtaj_is_walk_in', '=', True),
+        ]</field>
         <field name="context">{
             'search_default_sales': 1,
             'search_default_this_week': 1,
@@ -156,9 +169,10 @@
                 No field orders yet
             </p>
             <p>
-                Orders appear here when order bookers place orders during shop visits.
-                Use <b>This Week</b> / <b>Today</b> filters. Create invoices from confirmed
-                orders, then register customer payments.
+                Orders from shop visits and <b>Walk-in</b> van cash sales.
+                Use the Walk-in filter to isolate cash-and-carry orders.
+                Create invoices from confirmed shop orders; walk-ins are already
+                invoiced and paid into the DM wallet.
             </p>
         </field>
     </record>
@@ -193,6 +207,7 @@
         <field name="domain">[
             ('state', 'in', ('sale', 'done')),
             ('shahtaj_delivery_status', 'in', ('pending', 'partial')),
+            ('partner_id.shahtaj_is_walk_in', '!=', True),
         ]</field>
         <field name="context">{'create': False}</field>
         <field name="help" type="html">
@@ -234,7 +249,9 @@
         <field name="view_mode">list,form,kanban</field>
         <field name="domain">[
             ('move_type', 'in', ('out_invoice', 'out_refund', 'out_receipt')),
+            '|',
             ('partner_id.is_shahtaj_shop', '=', True),
+            ('shahtaj_is_walk_in', '=', True),
         ]</field>
         <field name="context">{
             'default_move_type': 'out_invoice',
@@ -246,8 +263,8 @@
                 No customer invoices yet
             </p>
             <p>
-                Invoices and credit notes for retail shops. Use <b>Regular invoice</b>
-                from field sales orders. Credit notes appear here after you reverse an invoice.
+                Invoices and credit notes for retail shops and <b>Walk-in</b> van
+                sales. Use the Walk-in filter to isolate cash-and-carry invoices.
             </p>
         </field>
     </record>
@@ -329,10 +346,11 @@
         <field name="view_id" ref="view_account_payment_tree_shahtaj"/>
         <field name="domain">[
             ('partner_type', '=', 'customer'),
-            '|', '|',
+            '|', '|', '|',
             ('partner_id.is_shahtaj_shop', '=', True),
             ('partner_id.parent_id.is_shahtaj_shop', '=', True),
             ('partner_id.commercial_partner_id.is_shahtaj_shop', '=', True),
+            ('shahtaj_is_walk_in', '=', True),
         ]</field>
         <field name="context">{
             'default_payment_type': 'inbound',
@@ -345,7 +363,10 @@
             <p class="o_view_nocontent_smiling_face">
                 Record a customer payment
             </p>
-            <p>Register payments collected from shops against their invoices.</p>
+            <p>
+                Payments from shops and <b>Walk-in</b> van customers
+                (walk-in cash usually sits in the DM wallet until settled).
+            </p>
         </field>
     </record>
 

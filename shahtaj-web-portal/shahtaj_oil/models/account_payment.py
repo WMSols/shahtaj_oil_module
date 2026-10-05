@@ -37,6 +37,14 @@ class AccountPayment(models.Model):
         tracking=True,
         help='How the shop/customer paid or received a refund.',
     )
+    shahtaj_is_walk_in = fields.Boolean(
+        string='Walk-in',
+        related='partner_id.shahtaj_is_walk_in',
+        store=True,
+        index=True,
+        readonly=True,
+        help='Payment collected from a DM walk-in customer into the wallet.',
+    )
     shahtaj_payer_bank_name = fields.Char(
         string='Customer Bank',
         copy=False,
@@ -94,11 +102,143 @@ class AccountPayment(models.Model):
         index=True,
         ondelete='set null',
     )
+    # Ops-facing collection summary (Dist / KPO / Manager / DM wallet menus).
+    # Hides Odoo payment-document "In Process" — shows invoice Paid / Partial instead.
+    shahtaj_collection_status = fields.Selection(
+        [
+            ('collected', 'Collected'),
+            ('not_paid', 'Not Paid'),
+            ('partial', 'Partial'),
+            ('in_payment', 'In Payment'),
+            ('paid', 'Paid'),
+            ('canceled', 'Cancelled'),
+        ],
+        string='Collection Status',
+        compute='_compute_shahtaj_collection_invoice_info',
+        help=(
+            'Shop-facing status for DM wallet collections.\n'
+            'Paid / Partial / Not Paid come from linked invoices.\n'
+            'Collected = money in DM wallet with no invoice link yet.\n'
+            'Not the same as Odoo payment State (In Process).'
+        ),
+    )
+    shahtaj_invoice_names = fields.Char(
+        string='Invoices',
+        compute='_compute_shahtaj_collection_invoice_info',
+        help='Invoice numbers linked to this collection.',
+    )
+    shahtaj_invoice_amount_total = fields.Monetary(
+        string='Invoice Total',
+        compute='_compute_shahtaj_collection_invoice_info',
+        currency_field='currency_id',
+        help='Sum of linked invoice totals.',
+    )
+    shahtaj_invoice_amount_residual = fields.Monetary(
+        string='Invoice Remaining',
+        compute='_compute_shahtaj_collection_invoice_info',
+        currency_field='currency_id',
+        help='Sum of linked invoice amounts still unpaid after collections.',
+    )
+    shahtaj_invoice_summary_html = fields.Html(
+        string='Invoice Details',
+        compute='_compute_shahtaj_collection_invoice_info',
+        sanitize=True,
+    )
 
     @api.depends('shahtaj_cheque_image')
     def _compute_shahtaj_has_cheque_image(self):
         for payment in self:
             payment.shahtaj_has_cheque_image = bool(payment.shahtaj_cheque_image)
+
+    @api.depends(
+        'state',
+        'amount',
+        'currency_id',
+        'reconciled_invoice_ids',
+        'reconciled_invoice_ids.name',
+        'reconciled_invoice_ids.payment_state',
+        'reconciled_invoice_ids.amount_total',
+        'reconciled_invoice_ids.amount_residual',
+        'reconciled_invoice_ids.move_type',
+    )
+    def _compute_shahtaj_collection_invoice_info(self):
+        """Ops labels for DM wallet menus: invoice Paid/Partial + totals."""
+        for pay in self:
+            if pay.state == 'canceled':
+                pay.shahtaj_collection_status = 'canceled'
+                pay.shahtaj_invoice_names = False
+                pay.shahtaj_invoice_amount_total = 0.0
+                pay.shahtaj_invoice_amount_residual = 0.0
+                pay.shahtaj_invoice_summary_html = (
+                    '<p class="text-muted mb-0">Payment cancelled.</p>'
+                )
+                continue
+
+            invoices = pay.sudo().reconciled_invoice_ids.filtered(
+                lambda m: m.move_type in ('out_invoice', 'out_refund')
+            )
+            if not invoices:
+                pay.shahtaj_collection_status = 'collected'
+                pay.shahtaj_invoice_names = False
+                pay.shahtaj_invoice_amount_total = 0.0
+                pay.shahtaj_invoice_amount_residual = 0.0
+                pay.shahtaj_invoice_summary_html = (
+                    '<p class="text-muted mb-0">'
+                    'No invoice linked to this collection.'
+                    '</p>'
+                )
+                continue
+
+            names = invoices.mapped('name')
+            pay.shahtaj_invoice_names = ', '.join(n for n in names if n) or False
+            pay.shahtaj_invoice_amount_total = sum(abs(i.amount_total) for i in invoices)
+            pay.shahtaj_invoice_amount_residual = sum(
+                abs(i.amount_residual) for i in invoices
+            )
+
+            states = set(invoices.mapped('payment_state'))
+            if states <= {'paid'}:
+                pay.shahtaj_collection_status = 'paid'
+            elif states <= {'not_paid'}:
+                pay.shahtaj_collection_status = 'not_paid'
+            elif states <= {'in_payment'} or (
+                'in_payment' in states and not (states & {'partial', 'not_paid', 'paid'})
+            ):
+                pay.shahtaj_collection_status = 'in_payment'
+            else:
+                # partial, or mix of paid + open → Partial for ops
+                pay.shahtaj_collection_status = 'partial'
+
+            rows = []
+            for inv in invoices.sorted('id'):
+                label = {
+                    'not_paid': 'Not Paid',
+                    'partial': 'Partial',
+                    'in_payment': 'In Payment',
+                    'paid': 'Paid',
+                    'reversed': 'Reversed',
+                }.get(inv.payment_state, inv.payment_state or '—')
+                rows.append(
+                    '<tr>'
+                    f'<td>{inv.name or inv.display_name}</td>'
+                    f'<td class="text-end">{abs(inv.amount_total):,.2f}</td>'
+                    f'<td class="text-end">{abs(inv.amount_residual):,.2f}</td>'
+                    f'<td>{label}</td>'
+                    '</tr>'
+                )
+            pay.shahtaj_invoice_summary_html = (
+                '<table class="table table-sm table-bordered mb-0">'
+                '<thead><tr>'
+                '<th>Invoice</th>'
+                '<th class="text-end">Total</th>'
+                '<th class="text-end">Remaining</th>'
+                '<th>Status</th>'
+                '</tr></thead>'
+                f'<tbody>{"".join(rows)}</tbody></table>'
+                f'<p class="mb-0 mt-1 text-muted">'
+                f'This collection: {pay.amount:,.2f}'
+                f'</p>'
+            )
 
     @api.onchange('journal_id')
     def _onchange_shahtaj_journal_payment_details(self):

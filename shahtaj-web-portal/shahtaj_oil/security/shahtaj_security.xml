@@ -7,22 +7,108 @@
         <field name="placeholder">No</field>
     </record>
 
+    <!-- ── Shared capability (technical): Approve / Reject special field orders ── -->
+    <record id="group_shahtaj_order_approver" model="res.groups">
+        <field name="name">Order Approver</field>
+        <field name="sequence">5</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Technical: Approve/Reject special field orders (discount / credit). Implied by Distributor and Manager — use this on native approval buttons/views so future approver roles stay one-line changes.</field>
+    </record>
+
+    <!-- ── Native UI packs (technical): gate menus/views by capability, not by role name ──
+         Assign packs via role-specific native_*_ui groups (implied_ids).
+         KPO / Warehouse: native_kpo_ui + native_warehouse_ui (desk packs only). -->
+    <record id="group_shahtaj_ui_pack_ob_ops" model="res.groups">
+        <field name="name">UI Pack: Order Booker Ops</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native menus: OB overview, schedules, visits, targets, zones/routes/shops, order verification queue, GPS attempts.</field>
+    </record>
+
+    <record id="group_shahtaj_ui_pack_dm_ops" model="res.groups">
+        <field name="name">UI Pack: Delivery Man Ops</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native menus: DM staff, dispatch, delivery jobs, wallet settle.</field>
+    </record>
+
+    <record id="group_shahtaj_ui_pack_shop_trading" model="res.groups">
+        <field name="name">UI Pack: Shop Trading (Billing &amp; Balances)</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native Shop Accounting: Step 2 Billing &amp; Returns + Step 3 Shop balances (and related sidebar). Dist + Manager.</field>
+    </record>
+
+    <record id="group_shahtaj_ui_pack_finance" model="res.groups">
+        <field name="name">UI Pack: Finance &amp; Accounting</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native Dist-only: Shop Accounting Step 1/4, bank/journals, tax, P&amp;L / TB / BS, Orders to Invoice.</field>
+    </record>
+
+    <record id="group_shahtaj_ui_pack_catalog" model="res.groups">
+        <field name="name">UI Pack: Products &amp; Inventory</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native menus: Products, Inventory / stock.</field>
+    </record>
+
+    <record id="group_shahtaj_ui_pack_field_reports" model="res.groups">
+        <field name="name">UI Pack: Field Reports</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native menus: Field reports office MIS.</field>
+    </record>
+
+    <record id="group_shahtaj_ui_pack_staff_admin" model="res.groups">
+        <field name="name">UI Pack: Staff Create</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native menus: Create Order Booker / Create Delivery Man wizards.</field>
+    </record>
+
+    <record id="group_shahtaj_ui_pack_kpo" model="res.groups">
+        <field name="name">UI Pack: KPO Desk</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native menus for KPO only: orders-to-print, DM wallet collections/settle, purchase orders / receipts / vendors / vendor bills. Dist/Manager do not get this pack.</field>
+    </record>
+
+    <record id="group_shahtaj_ui_pack_warehouse" model="res.groups">
+        <field name="name">UI Pack: Warehouse Desk</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Native menus for Warehouse Incharge only: Overview, Delivery Men, Dispatch, Jobs, Overdue, Sessions, Progress, Stock, Products. No wallet. Dist/Manager/KPO do not get this pack.</field>
+    </record>
+
+    <!-- KPO-only model ACL (do not reuse Dist office_ops / financial). Dist ACL rows untouched. -->
+    <record id="group_shahtaj_kpo_acl" model="res.groups">
+        <field name="name">KPO Access (ACL)</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Technical: narrow ir.model.access for KPO workflow (orders read/print, wallet EOD, shop balances/payments, purchase orders full CRUD + receive/bill). Implied only by group_shahtaj_kpo.</field>
+    </record>
+
+    <!-- Warehouse-only model ACL (do not reuse Dist office_ops / financial / kpo_acl). Dist/KPO ACL rows untouched. -->
+    <record id="group_shahtaj_warehouse_acl" model="res.groups">
+        <field name="name">Warehouse Access (ACL)</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Technical: narrow ir.model.access for Warehouse DM ops desk (dispatch assign, delivery jobs RW, day sessions, walk-in, today load / van transfer, stock pickings RW, products/partners/orders R). No wallet settle/collect. Implied only by group_shahtaj_warehouse.</field>
+    </record>
+
+    <!-- Shared Dist+Manager model ACLs (temporary full mirror for Manager; cut gradually later) -->
+    <record id="group_shahtaj_office_ops" model="res.groups">
+        <field name="name">Shahtaj Office Ops Access</field>
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Technical: Dist-equivalent ir.model.access for office web roles. Implied by Distributor and Manager (not KPO — KPO uses group_shahtaj_kpo_acl).</field>
+    </record>
+
     <record id="group_shahtaj_distributor" model="res.groups">
         <field name="name">Distributor</field>
         <field name="sequence">10</field>
         <field name="privilege_id" ref="res_groups_privilege_shahtaj"/>
-        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-        <field name="comment">Distributor role: operations access. Financials require the Financial Access toggle.</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('group_shahtaj_order_approver')), (4, ref('group_shahtaj_office_ops'))]"/>
+        <field name="comment">Distributor role: full operations + financial access (always on). Custom portal optional.</field>
     </record>
 
     <record id="group_shahtaj_distributor_financial" model="res.groups">
         <field name="name">Distributor Financial Access</field>
         <field name="sequence">11</field>
         <field name="privilege_id" eval="False"/>
-        <field name="comment">Technical add-on (not a Shahtaj role): invoices, payments, P&amp;L, Trial Balance, Balance Sheet, bank/cash, and product pricing. Must stack with Distributor — never share the Shahtaj privilege or Odoo 19 drops the Distributor role.</field>
+        <field name="comment">Technical add-on (not a Shahtaj role): invoices, payments, P&amp;L, Trial Balance, Balance Sheet, bank/cash, and product pricing. Synced ON for Distributor; implied by Manager temporarily. KPO uses group_shahtaj_kpo_acl instead.</field>
     </record>
 
-    <!-- Native Odoo apps (Sales, Inventory, Accounting, …) — only for native-UI distributors -->
+    <!-- Native Odoo apps (Sales, Inventory, Accounting, …) — distributors (always financial) -->
     <record id="group_shahtaj_distributor_native_apps" model="res.groups">
         <field name="name">Distributor Native Odoo Apps</field>
         <field name="implied_ids" eval="[
@@ -33,19 +119,100 @@
             (4, ref('account.group_account_readonly')),
             (4, ref('purchase.group_purchase_manager')),
         ]"/>
-        <field name="comment">Technical: Purchase, Sales, Inventory, and invoicing ACLs for distributors with Financial Access (native and custom portal). Custom portal still hides native menus in the UI.</field>
+        <field name="comment">Technical: Purchase, Sales, Inventory, and invoicing ACLs for Dist and Manager (Manager temporary). KPO does not use this group.</field>
     </record>
 
-    <!-- Native Shahtaj menus (zones, routes, shops, …) — hidden when custom portal is enabled -->
+    <!-- Native Shahtaj menus for Distributor — implies all UI packs -->
     <record id="group_shahtaj_native_distributor_ui" model="res.groups">
         <field name="name">Distributor Native Shahtaj Menus</field>
-        <field name="comment">Technical: standard Shahtaj backend menus for native-UI distributors.</field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('group_shahtaj_ui_pack_ob_ops'),
+            ref('group_shahtaj_ui_pack_dm_ops'),
+            ref('group_shahtaj_ui_pack_shop_trading'),
+            ref('group_shahtaj_ui_pack_finance'),
+            ref('group_shahtaj_ui_pack_catalog'),
+            ref('group_shahtaj_ui_pack_field_reports'),
+            ref('group_shahtaj_ui_pack_staff_admin'),
+        ])]"/>
+        <field name="comment">Technical: full native Shahtaj backend (all UI packs). Synced for Distributor when Custom Frontend is off.</field>
+    </record>
+
+    <!-- Manager privilege role — distinct from Dist; ACL still Dist-equivalent for now; menus via native_manager_ui -->
+    <record id="group_shahtaj_manager" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="sequence">15</field>
+        <field name="privilege_id" ref="res_groups_privilege_shahtaj"/>
+        <field name="implied_ids" eval="[
+            (4, ref('base.group_user')),
+            (4, ref('group_shahtaj_order_approver')),
+            (4, ref('group_shahtaj_office_ops')),
+            (4, ref('group_shahtaj_distributor_financial')),
+            (4, ref('group_shahtaj_distributor_native_apps')),
+        ]"/>
+        <field name="comment">Manager role (distinct from Distributor). ACL/apps still Dist-equivalent; native menus via native_manager_ui (Shop Accounting trimmed to Billing &amp; Balances).</field>
+    </record>
+
+    <!-- Manager native menus: same ops packs as Dist, but shop_trading instead of full finance statements -->
+    <record id="group_shahtaj_native_manager_ui" model="res.groups">
+        <field name="name">Manager Native Shahtaj Menus</field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('group_shahtaj_ui_pack_ob_ops'),
+            ref('group_shahtaj_ui_pack_dm_ops'),
+            ref('group_shahtaj_ui_pack_shop_trading'),
+            ref('group_shahtaj_ui_pack_catalog'),
+            ref('group_shahtaj_ui_pack_field_reports'),
+            ref('group_shahtaj_ui_pack_staff_admin'),
+        ])]"/>
+        <field name="comment">Technical: Manager native menus. Shop Accounting = Billing &amp; Returns + Shop balances only (no Step 1/4, bank, P&amp;L/TB/BS).</field>
+    </record>
+
+    <!-- KPO privilege — distinct; ACL via kpo_acl only (not Dist office_ops / financial / native_apps). -->
+    <record id="group_shahtaj_kpo" model="res.groups">
+        <field name="name">KPO</field>
+        <field name="sequence">18</field>
+        <field name="privilege_id" ref="res_groups_privilege_shahtaj"/>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('base.group_user'),
+            ref('group_shahtaj_kpo_acl'),
+        ])]"/>
+        <field name="comment">KPO role (distinct). Model ACL = group_shahtaj_kpo_acl only. Native menus via native_kpo_ui. No order_approver / office_ops / distributor_financial / native_apps.</field>
+    </record>
+
+    <!-- KPO native menus — print/cash/ledger desk only (not Dist full copy) -->
+    <record id="group_shahtaj_native_kpo_ui" model="res.groups">
+        <field name="name">KPO Native Shahtaj Menus</field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('group_shahtaj_ui_pack_kpo'),
+            ref('group_shahtaj_ui_pack_shop_trading'),
+        ])]"/>
+        <field name="comment">Technical: KPO native menus — KPO desk (orders print, wallet, PO) + Shop Accounting billing/balances. No OB/DM dispatch/catalog/finance statements/staff.</field>
+    </record>
+
+    <!-- Warehouse Incharge privilege — distinct; ACL via warehouse_acl only. -->
+    <record id="group_shahtaj_warehouse" model="res.groups">
+        <field name="name">Warehouse Incharge</field>
+        <field name="sequence">19</field>
+        <field name="privilege_id" ref="res_groups_privilege_shahtaj"/>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('base.group_user'),
+            ref('group_shahtaj_warehouse_acl'),
+        ])]"/>
+        <field name="comment">Warehouse Incharge role (distinct). Model ACL = group_shahtaj_warehouse_acl only. Native menus via native_warehouse_ui. No order_approver / office_ops / distributor_financial / native_apps / kpo_acl.</field>
+    </record>
+
+    <!-- Warehouse native menus — load/stock desk only -->
+    <record id="group_shahtaj_native_warehouse_ui" model="res.groups">
+        <field name="name">Warehouse Native Shahtaj Menus</field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('group_shahtaj_ui_pack_warehouse'),
+        ])]"/>
+        <field name="comment">Technical: Warehouse native menus — Overview, Delivery Men, Dispatch Orders, Delivery Jobs, Overdue, All Deliveries, DM Daily Progress, Day Sessions, Stock Overview, Product List. No wallet/print/shop accounting/finance/OB/staff.</field>
     </record>
 
     <!-- OWL distributor portal only — assigned when user.shahtaj_custom_frontend is True -->
     <record id="group_shahtaj_custom_portal_user" model="res.groups">
         <field name="name">Distributor Custom Portal</field>
-        <field name="comment">Technical: OWL distributor portal UI only (no native Odoo / Shahtaj menus).</field>
+        <field name="comment">Technical: OWL custom web portal shell (Distributor today; Manager/KPO/Warehouse when their portal tabs exist). Assigned when Use Custom Frontend is ON.</field>
     </record>
 
     <record id="group_shahtaj_order_booker" model="res.groups">

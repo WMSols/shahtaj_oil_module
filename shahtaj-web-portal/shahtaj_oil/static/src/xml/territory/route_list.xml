@@ -18,17 +18,20 @@
                            <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
                                 <span class="input-group-text bg-white text-muted border-end-0"><i class="fa fa-search"></i></span>
                                 <input type="text" class="form-control border-start-0 ps-0" placeholder="Search route name..." 
-                                       t-model="this.state.routeSearchQuery" t-on-input="() => this.onSearchInput('routes')" />
+                                       t-att-value="this.state.routeSearchQuery" t-on-input="(ev) => this.onRouteSearchInput(ev)" />
                             </div>
                             <div class="d-flex gap-2">
-                                <select class="form-select form-select-sm shadow-sm" style="width: 150px;" t-model="this.state.routeFilterZone" t-on-change="() => this.onFilterChange('routes')">
+                                <select class="form-select form-select-sm shadow-sm" style="width: 150px;" t-att-value="this.state.routeFilterZone" t-on-change="(ev) => this.onRouteFilterField('routeFilterZone', ev)">
                                 <option value="all">All Zones</option>
                                 <t t-foreach="this.state.areas.filter(a => a.active)" t-as="a" t-key="a.id">
-                                        <option t-att-value="a.id">
+                                        <option t-att-value="this.filterOptionValue(a.id)">
                                             <t t-esc="a.name"/>
                                         </option>
                                     </t>
                             </select>
+                                <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('routes')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                    <i class="fa fa-times me-1"/> Clear filters
+                                </button>
                             </div>
                             
                             <button class="btn btn-sm btn-dark d-flex align-items-center text-white ms-2 shadow-sm" t-on-click="() => this.state.showRouteForm = true" title="Create a new travel route">

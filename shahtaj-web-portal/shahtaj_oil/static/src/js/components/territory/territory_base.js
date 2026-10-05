@@ -4,22 +4,32 @@ import { Component, useState, onWillStart, useEffect, useRef,onWillUpdateProps }
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmModal } from "../confirm_modal";
 import { hasFinancialAccess } from "../../shahtaj_access";
+import { printFilter, printListPdf } from "../../shahtaj_list_export";
+import { filterOptionValue, setScalarFilter } from "../../shahtaj_filter_ui";
 import { applyTerritoryDashboardToState, getTerritoryDashboard } from "./territory_cache";
+import { ensureLeaflet } from "../../shahtaj_leaflet";
+import { RouteFilter } from "./route_filter";
 
 export class TerritoryBase extends Component {
     static props = {
         requestedSubTab: { type: String, optional: true },
         refreshNonce: { type: Number, optional: true },
+        onRefreshSettled: { type: Function, optional: true },
         previousSubTab: { type: String, optional: true },
         onBack: { type: Function, optional: true },
+        requestedShopStatus: { type: String, optional: true },
+        requestedShopRegisteredOn: { type: String, optional: true },
+        requestedShopRegistrar: { type: String, optional: true },
     };
-    static components = { ConfirmModal };
+    static components = { ConfirmModal, RouteFilter };
     
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this.action = useService("action");
         this.mapRef = useRef("mapContainer");
-        this.mapInstance = null; 
+        this.mapInstance = null;
+        this._listFetchToken = 0;
         // Universal items per page shared across Zones, Routes, and Shops
         const ITEMS_PER_PAGE = 50;
         this.state = useState({
@@ -48,10 +58,13 @@ export class TerritoryBase extends Component {
 
             shopSearchQuery: '',
             shopFilterCategory: 'all',
-            shopFilterStatus: 'all',
+            shopFilterStatus: this.props.requestedShopStatus || 'all',
             shopFilterVerified: 'all',
-            shopFilterBooker: 'all', 
+            shopFilterBooker: 'all',
+            shopFilterRegisteredOn: this.props.requestedShopRegisteredOn || '',
+            shopFilterRegistrar: this.props.requestedShopRegistrar || 'all',
             shopFilterRoute: 'all',
+            shopFilterRouteName: '',
             routeFilterZone: 'all',  
             bookers: [],
             // Custom Modal State
@@ -76,6 +89,7 @@ export class TerritoryBase extends Component {
             // --- NEW: Backend Pagination & Loading ---
             itemsPerPage: ITEMS_PER_PAGE,
             isLoadingList: false,
+            isPrintingShops: false,
             searchTimeout: null,
             tableAreas: [],
             tableRoutes: [],
@@ -126,15 +140,28 @@ export class TerritoryBase extends Component {
             await this.fetchActiveList(); // Force the paginator to run on initial load
         });
         onWillUpdateProps((nextProps) => {
-            if (nextProps.requestedSubTab && nextProps.requestedSubTab !== this.props.requestedSubTab) {
+            const shopChanged = this._shopNavChanged(nextProps);
+            if (shopChanged) {
+                this._applyShopNav(nextProps);
+                this.state.pagination.shops.page = 1;
+            }
+            const subChanged = nextProps.requestedSubTab && nextProps.requestedSubTab !== this.props.requestedSubTab;
+            if (subChanged) {
                 this.setSubTab(nextProps.requestedSubTab);
+            } else if (shopChanged && this.state.activeSubTab === 'shops') {
+                this.fetchActiveList();
             }
             if (nextProps.refreshNonce !== undefined && nextProps.refreshNonce !== this.props.refreshNonce) {
-                this.reloadFromRefresh();
+                this.reloadFromRefresh().finally(() => {
+                    if (this.props.onRefreshSettled) {
+                        this.props.onRefreshSettled();
+                    }
+                });
             }
         });
 
         useEffect(() => {
+            let cancelled = false;
             if (this.mapInstance) {
                 this.mapInstance.remove();
                 this.mapInstance = null;
@@ -144,24 +171,26 @@ export class TerritoryBase extends Component {
             const shop = this.state.selectedShopDetails;
 
             if (mapEl && shop && shop.partner_latitude && shop.partner_longitude) {
-                if (typeof L !== 'undefined') {
+                ensureLeaflet().then((L) => {
+                    if (cancelled || !mapEl.isConnected) {
+                        return;
+                    }
                     this.mapInstance = L.map(mapEl).setView([shop.partner_latitude, shop.partner_longitude], 16);
-                    
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         maxZoom: 19,
                         attribution: '© OpenStreetMap'
                     }).addTo(this.mapInstance);
-
                     L.marker([shop.partner_latitude, shop.partner_longitude])
                         .addTo(this.mapInstance)
                         .bindPopup(`<b>${shop.name}</b><br/>${shop.owner_name}`)
                         .openPopup();
-                } else {
-                    console.warn("Leaflet library is missing! Check your __manifest__.py assets.");
-                }
+                }).catch((error) => {
+                    console.warn("Leaflet library failed to load.", error);
+                });
             }
-            
+
             return () => {
+                cancelled = true;
                 if (this.mapInstance) {
                     this.mapInstance.remove();
                     this.mapInstance = null;
@@ -180,6 +209,185 @@ export class TerritoryBase extends Component {
         this.fetchActiveList(); 
     }
 
+    onRouteFilterField(field, ev) {
+        setScalarFilter(this.state, field, ev.target.value);
+        this.onFilterChange("routes");
+    }
+
+    onRouteSearchInput(ev) {
+        this.state.routeSearchQuery = ev.target.value;
+        this.onSearchInput("routes");
+    }
+
+    filterOptionValue(id) {
+        return filterOptionValue(id);
+    }
+
+    clearFilters(listKey) {
+        if (listKey === "areas") {
+            this.state.areaSearchQuery = "";
+            this.state.areaFilterStatus = "all";
+            this.state.pagination.areas.page = 1;
+            this.state.tableAreas = [];
+        } else if (listKey === "routes") {
+            this.state.routeSearchQuery = "";
+            this.state.routeFilterStatus = "all";
+            this.state.routeFilterZone = "all";
+            this.state.pagination.routes.page = 1;
+            this.state.tableRoutes = [];
+        } else if (listKey === "shops") {
+            this.state.shopSearchQuery = "";
+            this.state.shopFilterCategory = "all";
+            this.state.shopFilterStatus = "all";
+            this.state.shopFilterVerified = "all";
+            this.state.shopFilterBooker = "all";
+            this.state.shopFilterRegisteredOn = "";
+            this.state.shopFilterRegistrar = "all";
+            this.state.shopFilterRoute = "all";
+            this.state.shopFilterRouteName = "";
+            this.state.pagination.shops.page = 1;
+            this.state.tableShops = [];
+        } else {
+            return;
+        }
+        this.fetchActiveList();
+    }
+
+    onShopRouteFilterSelect(routeId, routeName) {
+        this.state.shopFilterRoute = routeId || "all";
+        if (!routeId || routeId === "all") {
+            this.state.shopFilterRouteName = "";
+        } else if (routeId === "unassigned") {
+            this.state.shopFilterRouteName = "Unassigned Only";
+        } else {
+            this.state.shopFilterRouteName = routeName || "";
+        }
+        this.onFilterChange("shops");
+    }
+
+    _applyShopNav(props) {
+        this.state.shopFilterStatus = props.requestedShopStatus || 'all';
+        this.state.shopFilterRegisteredOn = props.requestedShopRegisteredOn || '';
+        this.state.shopFilterRegistrar = props.requestedShopRegistrar || 'all';
+    }
+
+    _shopNavChanged(nextProps) {
+        return (nextProps.requestedShopStatus || 'all') !== (this.props.requestedShopStatus || 'all')
+            || (nextProps.requestedShopRegisteredOn || '') !== (this.props.requestedShopRegisteredOn || '')
+            || (nextProps.requestedShopRegistrar || 'all') !== (this.props.requestedShopRegistrar || 'all');
+    }
+
+    _pktDateToUtcBounds(dateStr) {
+        const start = new Date(`${dateStr}T00:00:00+05:00`);
+        const end = new Date(`${dateStr}T23:59:59+05:00`);
+        const toOdooUtc = (d) => d.toISOString().slice(0, 19).replace("T", " ");
+        return { start: toOdooUtc(start), end: toOdooUtc(end) };
+    }
+
+    _shopsListDomain() {
+        const domain = [['is_shahtaj_shop', '=', true], ['active', '=', true]];
+        if (this.state.shopSearchQuery) {
+            domain.push('|', ['name', 'ilike', this.state.shopSearchQuery], ['owner_name', 'ilike', this.state.shopSearchQuery]);
+        }
+        if (this.state.shopFilterCategory !== 'all') {
+            domain.push(['shahtaj_shop_category', '=', this.state.shopFilterCategory]);
+        }
+        if (this.state.shopFilterStatus !== 'all') {
+            domain.push(['shop_approval_state', '=', this.state.shopFilterStatus]);
+        }
+        if (this.state.shopFilterVerified !== 'all') {
+            if (this.state.shopFilterVerified === 'verified') {
+                domain.push(['shahtaj_visit_tag', '=', 'visited']);
+            } else {
+                domain.push(['shahtaj_visit_tag', '!=', 'visited']);
+            }
+        }
+        if (this.state.shopFilterBooker !== 'all') {
+            domain.push(['registered_by_id', '=', parseInt(this.state.shopFilterBooker)]);
+        }
+        if (this.state.shopFilterRoute !== 'all') {
+            if (this.state.shopFilterRoute === 'unassigned') {
+                domain.push(['route_ids', '=', false]);
+            } else {
+                domain.push(['route_ids', 'in', [parseInt(this.state.shopFilterRoute)]]);
+            }
+        }
+        if (this.state.shopFilterRegistrar === 'order_booker') {
+            domain.push(['registered_by_id', '!=', false]);
+            domain.push(['registered_by_id.shahtaj_is_order_booker', '=', true]);
+        }
+        if (this.state.shopFilterRegisteredOn) {
+            const bounds = this._pktDateToUtcBounds(this.state.shopFilterRegisteredOn);
+            domain.push(['create_date', '>=', bounds.start]);
+            domain.push(['create_date', '<=', bounds.end]);
+        }
+        return domain;
+    }
+
+    _lookupName(list, id) {
+        const row = (list || []).find((item) => String(item.id) === String(id));
+        return row ? row.name : "";
+    }
+
+    async printShops() {
+        if (this.state.isPrintingShops) return;
+        this.state.isPrintingShops = true;
+        try {
+            const records = await this.orm.searchRead(
+                "res.partner",
+                this._shopsListDomain(),
+                ["name", "owner_name", "phone", "registered_by_id", "shahtaj_visit_tag", "shahtaj_shop_category", "shop_approval_state", "credit_limit", "outstanding_balance"],
+                { order: "id desc" }
+            );
+            if (!records.length) {
+                this.notification.add("No shops match the current filters.", { type: "warning" });
+                return;
+            }
+            const categoryLabels = { cash: "Cash Only", credit: "Credit Only" };
+            const statusLabels = { approved: "Approved", pending: "Pending Review", rejected: "Rejected" };
+            const verifiedLabels = { verified: "On-site Verified", unverified: "Not Verified" };
+            const routeLabel = this.state.shopFilterRoute === "unassigned"
+                ? "Unassigned Only"
+                : (this.state.shopFilterRouteName || this._lookupName(this.state.routes, this.state.shopFilterRoute));
+            await printListPdf(this.orm, this.action, {
+                title: "Registered Shops",
+                filters: [
+                    printFilter("Search", this.state.shopSearchQuery),
+                    printFilter("Type", categoryLabels[this.state.shopFilterCategory]),
+                    printFilter("Status", statusLabels[this.state.shopFilterStatus]),
+                    printFilter("Verification", verifiedLabels[this.state.shopFilterVerified]),
+                    printFilter("Registered On", this.state.shopFilterRegisteredOn),
+                    printFilter("Registrar", this.state.shopFilterRegistrar === "order_booker" ? "Order bookers" : ""),
+                    printFilter("Order Booker", this._lookupName(this.state.bookers, this.state.shopFilterBooker)),
+                    printFilter("Route", this.state.shopFilterRoute === "all" ? "" : routeLabel),
+                ],
+                columns: ["Shop", "Shop ID", "Owner", "Phone", "Registered By", "Registered By ID", "On-site Verified", "Category", "Status", "Credit Limit", "Outstanding Balance"],
+                rows: records.map((shop) => {
+                    const cash = shop.shahtaj_shop_category === "cash";
+                    const registeredBy = shop.registered_by_id ? shop.registered_by_id[1] : "";
+                    const registeredById = shop.registered_by_id ? shop.registered_by_id[0] : "";
+                    return [
+                        shop.name || "",
+                        shop.id,
+                        shop.owner_name || "N/A",
+                        shop.phone || "N/A",
+                        registeredBy,
+                        registeredById,
+                        shop.shahtaj_visit_tag === "visited" ? "Verified" : "Not Verified",
+                        cash ? "Cash" : "Credit",
+                        (shop.shop_approval_state || "").toUpperCase(),
+                        cash ? "N/A" : `Rs. ${(shop.credit_limit || 0).toLocaleString()}`,
+                        `Rs. ${(shop.outstanding_balance || 0).toLocaleString()}`,
+                    ];
+                }),
+            });
+        } catch (error) {
+            this.notification.add(error?.data?.message || error?.message || "Print failed.", { type: "danger" });
+        } finally {
+            this.state.isPrintingShops = false;
+        }
+    }
+
     changePage(tabName, direction) {
         const pag = this.state.pagination[tabName];
         const newPage = pag.page + direction;
@@ -196,6 +404,7 @@ export class TerritoryBase extends Component {
         const tab = this.state.activeSubTab;
         if (!['areas', 'routes', 'shops'].includes(tab)) return;
 
+        const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
         try {
             const pag = this.state.pagination[tab];
@@ -223,34 +432,7 @@ export class TerritoryBase extends Component {
                 model = 'res.partner';
                 fields = ["id", "name", "owner_name", "phone", "route_ids", "shahtaj_route_tag", "shop_approval_state", "shahtaj_shop_category", "registered_by_id", "active", "shahtaj_visit_tag"];
                 targetState = 'tableShops';
-                domain = [['is_shahtaj_shop', '=', true], ['active', '=', true]]; 
-                
-                if (this.state.shopSearchQuery) {
-                    domain.push('|', ['name', 'ilike', this.state.shopSearchQuery], ['owner_name', 'ilike', this.state.shopSearchQuery]);
-                }
-                if (this.state.shopFilterCategory !== 'all') {
-                    domain.push(['shahtaj_shop_category', '=', this.state.shopFilterCategory]);
-                }
-                if (this.state.shopFilterStatus !== 'all') {
-                    domain.push(['shop_approval_state', '=', this.state.shopFilterStatus]);
-                }
-                if (this.state.shopFilterVerified !== 'all') {
-                    if (this.state.shopFilterVerified === 'verified') {
-                        domain.push(['shahtaj_visit_tag', '=', 'visited']);
-                    } else {
-                        domain.push(['shahtaj_visit_tag', '!=', 'visited']);
-                    }
-                }
-                if (this.state.shopFilterBooker !== 'all') {
-                    domain.push(['registered_by_id', '=', parseInt(this.state.shopFilterBooker)]);
-                }
-                if (this.state.shopFilterRoute !== 'all') {
-                    if (this.state.shopFilterRoute === 'unassigned') {
-                        domain.push(['route_ids', '=', false]);
-                    } else {
-                        domain.push(['route_ids', 'in', [parseInt(this.state.shopFilterRoute)]]);
-                    }
-                }
+                domain = this._shopsListDomain();
             }
 
             const requests = [
@@ -272,6 +454,10 @@ export class TerritoryBase extends Component {
 
             const [total, records, assignedShops] = await Promise.all(requests);
 
+            if (fetchToken !== this._listFetchToken) {
+                return;
+            }
+
             this.state.pagination[tab].total = total;
             this.state[targetState] = records;
             if (tab === 'routes') {
@@ -281,7 +467,9 @@ export class TerritoryBase extends Component {
         } catch (error) {
             this.notification.add("Failed to fetch data: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
-            this.state.isLoadingList = false;
+            if (fetchToken === this._listFetchToken) {
+                this.state.isLoadingList = false;
+            }
         }
     }
     async refreshData() {
@@ -1537,6 +1725,12 @@ export class TerritoryBase extends Component {
             this.notification.add("Shop name is required.", { type: "warning" });
             return;
         }
+        const isCreditShop = (this.state.shopForm.shopCategory || 'cash') === 'credit';
+        const creditLimit = parseFloat(this.state.shopForm.creditLimit);
+        if (isCreditShop && !(creditLimit > 0)) {
+            this.notification.add("Credit limit must be greater than 0 for a credit shop.", { type: "warning" });
+            return;
+        }
 
         this.state.isLoading = true;
         
@@ -1551,9 +1745,7 @@ export class TerritoryBase extends Component {
                 phone: phone || false,
                 owner_cnic_number: cnic || false,
                 shop_license_number: this.state.shopForm.shop_license_number || false,
-                credit_limit: this.state.shopForm.shopCategory === 'credit'
-                    ? (parseFloat(this.state.shopForm.creditLimit) || 0.0)
-                    : 0.0,
+                credit_limit: isCreditShop ? creditLimit : 0.0,
                 legacy_balance: parseFloat(this.state.shopForm.legacyBalance) || 0.0,
             };
 

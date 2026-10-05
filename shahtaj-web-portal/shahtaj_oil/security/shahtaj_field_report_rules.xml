@@ -30,7 +30,7 @@
             <field name="name">Distributor: all field reports</field>
             <field name="model_id" ref="model_shahtaj_field_report"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_shahtaj_distributor'))]"/>
+            <field name="groups" eval="[(4, ref('group_shahtaj_office_ops'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
@@ -56,7 +56,7 @@
             <field name="groups" eval="[
                 (4, ref('group_shahtaj_order_booker')),
                 (4, ref('group_shahtaj_delivery_man')),
-                (4, ref('group_shahtaj_distributor')),
+                (4, ref('group_shahtaj_office_ops')),
                 (4, ref('group_shahtaj_native_distributor_ui')),
             ]"/>
             <field name="perm_read" eval="True"/>
@@ -70,7 +70,7 @@
             <field name="model_id" ref="model_shahtaj_field_report_tag"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[
-                (4, ref('group_shahtaj_distributor')),
+                (4, ref('group_shahtaj_office_ops')),
                 (4, ref('group_shahtaj_native_distributor_ui')),
             ]"/>
             <field name="perm_read" eval="True"/>

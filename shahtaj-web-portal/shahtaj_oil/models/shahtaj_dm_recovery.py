@@ -10,13 +10,30 @@ class ShahtajDmRecoveryService(models.AbstractModel):
     _description = 'Delivery Man Recovery Service'
 
     @api.model
+    def _shahtaj_user_can_settle_wallet(self):
+        """Dist/Manager (office/financial) or KPO desk."""
+        user = self.env.user
+        return bool(
+            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
+            or user.has_group('shahtaj_oil.group_shahtaj_distributor_financial')
+            or user.has_group('shahtaj_oil.group_shahtaj_kpo')
+            or user.has_group('shahtaj_oil.group_shahtaj_kpo_acl')
+        )
+
+    @api.model
     def _assert_can_collect(self, delivery_man):
         user = self.env.user
         if not delivery_man or not delivery_man.shahtaj_is_delivery_man:
             raise UserError(_('Select a valid delivery man.'))
-        if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+        if user.has_group('shahtaj_oil.group_shahtaj_office_ops'):
             return
         if user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui'):
+            return
+        # KPO desk may post office-side collections during EOD validation.
+        if user.has_group('shahtaj_oil.group_shahtaj_kpo') or user.has_group(
+            'shahtaj_oil.group_shahtaj_kpo_acl'
+        ):
             return
         if user.shahtaj_is_delivery_man and user.id == delivery_man.id:
             return
@@ -24,14 +41,11 @@ class ShahtajDmRecoveryService(models.AbstractModel):
 
     @api.model
     def _assert_can_settle(self):
-        user = self.env.user
-        if user.has_group('shahtaj_oil.group_shahtaj_distributor'):
+        if self._shahtaj_user_can_settle_wallet():
             return
-        if user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui'):
-            return
-        if user.has_group('shahtaj_oil.group_shahtaj_distributor_financial'):
-            return
-        raise AccessError(_('Only distributors can settle the DM wallet to bank.'))
+        raise AccessError(_(
+            'Only distributors, managers, or KPO can settle the DM wallet to bank.'
+        ))
 
     @api.model
     def _dmcash_journal(self, company=None):
@@ -93,6 +107,29 @@ class ShahtajDmRecoveryService(models.AbstractModel):
         ], order='invoice_date desc, id desc', limit=limit)
 
     @api.model
+    def _invoice_money_triple(self, inv):
+        """Return (amount_total_abs, amount_paid, amount_residual_abs) for API rows."""
+        total = abs(inv.amount_total or 0.0)
+        residual = abs(inv.amount_residual or 0.0)
+        paid = max(0.0, total - residual)
+        return total, paid, residual
+
+    @api.model
+    def _open_invoice_row(self, inv):
+        """One collectable invoice for recovery/shop (additive amount_paid)."""
+        _total_abs, paid, residual = self._invoice_money_triple(inv)
+        return {
+            'invoice_id': inv.id,
+            'name': inv.name,
+            'invoice_date': str(inv.invoice_date) if inv.invoice_date else False,
+            'amount_total': inv.amount_total,
+            'amount_paid': paid,
+            'amount_residual': residual,
+            'payment_state': inv.payment_state,
+            'is_legacy_balance': bool(getattr(inv, 'shahtaj_is_legacy_balance', False)),
+        }
+
+    @api.model
     def _payment_brief_for_recovery(self, payment):
         """Lean payment row for recovery history (no image bytes)."""
         channel = payment.shahtaj_payment_channel or (
@@ -129,12 +166,14 @@ class ShahtajDmRecoveryService(models.AbstractModel):
             ).sorted(lambda p: (p.date or fields.Date.to_date('1970-01-01'), p.id))
             payment_briefs = [self._payment_brief_for_recovery(p) for p in payments]
             paid_dates = [p.date for p in payments if p.date]
+            _total_abs, paid, residual = self._invoice_money_triple(inv)
             rows.append({
                 'invoice_id': inv.id,
                 'name': inv.name,
                 'invoice_date': str(inv.invoice_date) if inv.invoice_date else False,
                 'amount_total': inv.amount_total,
-                'amount_residual': abs(inv.amount_residual),
+                'amount_paid': paid,
+                'amount_residual': residual,
                 'payment_state': inv.payment_state,
                 'is_legacy_balance': bool(getattr(inv, 'shahtaj_is_legacy_balance', False)),
                 'paid_date': str(max(paid_dates)) if paid_dates else (
@@ -154,15 +193,7 @@ class ShahtajDmRecoveryService(models.AbstractModel):
             raise UserError(_('Recovery is only available for Shahtaj shops.'))
 
         invoices = self._open_customer_invoices(shop, company)
-        invoice_rows = [{
-            'invoice_id': inv.id,
-            'name': inv.name,
-            'invoice_date': str(inv.invoice_date) if inv.invoice_date else False,
-            'amount_total': inv.amount_total,
-            'amount_residual': abs(inv.amount_residual),
-            'payment_state': inv.payment_state,
-            'is_legacy_balance': bool(getattr(inv, 'shahtaj_is_legacy_balance', False)),
-        } for inv in invoices]
+        invoice_rows = [self._open_invoice_row(inv) for inv in invoices]
         outstanding = sum(row['amount_residual'] for row in invoice_rows)
 
         paid_invoices = self._paid_customer_invoices(shop, company, limit=10)
@@ -274,7 +305,11 @@ class ShahtajDmRecoveryService(models.AbstractModel):
         limit=50,
         company=None,
     ):
-        """DM wallet collection history for Flutter wallet screen."""
+        """DM wallet collection history for Flutter wallet screen.
+
+        Additive fields (old keys unchanged):
+        collection_status, invoice_amount_total/paid/residual, invoice_details[].
+        """
         company = company or self.env.company
         limit = max(1, min(int(limit or 50), 200))
         extra = []
@@ -287,9 +322,31 @@ class ShahtajDmRecoveryService(models.AbstractModel):
             order='date desc, id desc',
             limit=limit,
         )
+        # One prefetch pass: partners, invoices, computed collection status.
+        payments.mapped('partner_id')
+        payments.mapped('reconciled_invoice_ids.payment_state')
+        payments.mapped('shahtaj_collection_status')
+
         rows = []
         for pay in payments:
-            invoice_names = pay.reconciled_invoice_ids.mapped('name')
+            invoices = pay.reconciled_invoice_ids.filtered(
+                lambda m: m.move_type in ('out_invoice', 'out_refund')
+            )
+            invoice_details = []
+            for inv in invoices:
+                total, paid, residual = self._invoice_money_triple(inv)
+                invoice_details.append({
+                    'invoice_id': inv.id,
+                    'name': inv.name or '',
+                    'amount_total': total,
+                    'amount_paid': paid,
+                    'amount_residual': residual,
+                    'payment_state': inv.payment_state or False,
+                })
+            invoice_names = [d['name'] for d in invoice_details if d['name']]
+            inv_total = sum(d['amount_total'] for d in invoice_details)
+            inv_paid = sum(d['amount_paid'] for d in invoice_details)
+            inv_residual = sum(d['amount_residual'] for d in invoice_details)
             channel = pay.shahtaj_payment_channel or 'cash'
             rows.append({
                 'payment_id': pay.id,
@@ -305,6 +362,11 @@ class ShahtajDmRecoveryService(models.AbstractModel):
                     pay.shahtaj_instrument_reference or ''
                 ) if channel == 'cheque' else '',
                 'has_cheque_image': bool(pay.shahtaj_has_cheque_image),
+                'collection_status': pay.shahtaj_collection_status or 'collected',
+                'invoice_amount_total': inv_total,
+                'invoice_amount_paid': inv_paid,
+                'invoice_amount_residual': inv_residual,
+                'invoice_details': invoice_details,
             })
         return {
             'collections': rows,

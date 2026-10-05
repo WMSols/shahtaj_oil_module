@@ -2,7 +2,8 @@
 
 import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { hasFinancialAccess, notifyPortalBusy } from "../../shahtaj_access";
+import { canMutate, canSee, hasFinancialAccess, notifyPortalBusy } from "../../shahtaj_access";
+import { printFilter, printListPdf } from "../../shahtaj_list_export";
 import { invalidateFinancialStats } from "./financials_cache";
 
 export class CreditControl extends Component {
@@ -15,6 +16,8 @@ export class CreditControl extends Component {
     setup() {
         this.notification = useService("notification");
         this.orm = useService("orm");
+        this.action = useService("action");
+        this._listFetchToken = 0;
         const ITEMS_PER_PAGE = 50;
         this.state = useState({
             activeSubTab: "credit",
@@ -26,6 +29,7 @@ export class CreditControl extends Component {
             },
             itemsPerPage: ITEMS_PER_PAGE,
             isLoadingList: false,
+            isPrintingList: false,
             searchTimeout: null,
             pagination: {
                 credits: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
@@ -47,7 +51,7 @@ export class CreditControl extends Component {
             }
         });
         onWillStart(async () => {
-            if (!hasFinancialAccess()) {
+            if (!hasFinancialAccess() && !canSee("financials", "credit")) {
                 return;
             }
             await this.fetchActiveList();
@@ -71,6 +75,15 @@ export class CreditControl extends Component {
     onFilterChange(listKey) {
         this.state.pagination[listKey].page = 1;
         this.fetchActiveList(); // Dropdowns don't need debouncing, fetch immediately
+    }
+
+    clearFilters(listKey = "credits") {
+        this.state.filters.credits = { search: "", status: "all", hasCreditLimit: false };
+        if (this.state.pagination.credits) {
+            this.state.pagination.credits.page = 1;
+        }
+        this.state.credits = [];
+        this.fetchActiveList();
     }
 
     onHasCreditLimitFilterChange(ev) {
@@ -111,6 +124,7 @@ export class CreditControl extends Component {
             : (this.state.activeSubTab === 'expenses' ? tabMap[this.state.expenseSubTab] : (this.state.activeSubTab === 'po_management' ? tabMap[this.state.poSubTab] : tabMap[this.state.invoiceSubTab]));
         if (!config) return;
 
+        const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
         notifyPortalBusy(true);
         try {
@@ -200,20 +214,30 @@ export class CreditControl extends Component {
             // outstanding_balance is computed/non-stored, so shop balances must be sorted in JS
             // (highest outstanding first) then sliced to keep pagination ranking correct.
             const sortShopBalances = stateKey === 'credits' && this.state.creditSubView === 'balances';
-            const searchReadOptions = sortShopBalances
-                ? { context: queryContext }
-                : { limit: pag.limit, offset: (pag.page - 1) * pag.limit, order: "id desc", context: queryContext };
-            const [total, fetchedRecords] = await Promise.all([
-                sortShopBalances ? Promise.resolve(0) : this.orm.searchCount(model, domain, { context: queryContext }),
-                this.orm.searchRead(model, domain, fields, searchReadOptions)
-            ]);
-            let records = fetchedRecords;
+            let records;
             if (sortShopBalances) {
-                records = [...fetchedRecords].sort((a, b) => (b.outstanding_balance || 0) - (a.outstanding_balance || 0));
-                this.state.pagination[stateKey].total = records.length;
-                const start = (pag.page - 1) * pag.limit;
-                records = records.slice(start, start + pag.limit);
+                const page = await this.orm.call(
+                    "shahtaj.portal.read",
+                    "shahtaj_credit_balance_page",
+                    [{
+                        search: (filters && filters.search) || "",
+                        hasCreditLimit: Boolean(this.state.filters.credits && this.state.filters.credits.hasCreditLimit),
+                        creditSubView: "balances",
+                    }, pag.page, pag.limit],
+                );
+                records = page.records || [];
+                this.state.pagination[stateKey].total = page.total || 0;
             } else {
+                const [total, fetchedRecords] = await Promise.all([
+                    this.orm.searchCount(model, domain, { context: queryContext }),
+                    this.orm.searchRead(model, domain, fields, {
+                        limit: pag.limit,
+                        offset: (pag.page - 1) * pag.limit,
+                        order: "id desc",
+                        context: queryContext,
+                    }),
+                ]);
+                records = fetchedRecords;
                 this.state.pagination[stateKey].total = total;
             }
             // 5. MAP DATA TO UI
@@ -323,10 +347,14 @@ export class CreditControl extends Component {
                 this.state.tableExpenseCategories = records;
             }
         } catch (error) {
-            this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
+            if (fetchToken === this._listFetchToken) {
+                this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
+            }
         } finally {
-            this.state.isLoadingList = false;
-            notifyPortalBusy(false);
+            if (fetchToken === this._listFetchToken) {
+                this.state.isLoadingList = false;
+                notifyPortalBusy(false);
+            }
         }
     }
     setCreditSubView(viewName) {
@@ -336,11 +364,21 @@ export class CreditControl extends Component {
         this.fetchActiveList();
     }
 
+    get canMutate() {
+        return canMutate();
+    }
+
     viewShopBalance(bal) {
+        if (!this.canMutate) {
+            return;
+        }
         this.state.selectedShopBalance = { ...bal };
     }
 
     async saveShopBalanceLimit() {
+        if (!this.canMutate) {
+            return;
+        }
         try {
             const shop = this.state.selectedShopBalance;
             await this.orm.write("res.partner", [shop.id], { credit_limit: parseFloat(shop.rawLimit) });
@@ -391,6 +429,54 @@ export class CreditControl extends Component {
 
     _receiptsListDomain() {
         return [];
+    }
+
+    async printShopBalances() {
+        if (this.state.isPrintingList) return;
+        this.state.isPrintingList = true;
+        try {
+            const filters = this.state.filters.credits;
+            const page = await this.orm.call(
+                "shahtaj.portal.read",
+                "shahtaj_credit_balance_page",
+                [{
+                    search: filters.search || "",
+                    hasCreditLimit: Boolean(filters.hasCreditLimit),
+                    creditSubView: "balances",
+                }, 1, 10000],
+            );
+            const records = page.records || [];
+            if (!records.length) {
+                this.notification.add("No rows match the current filters.", { type: "warning" });
+                return;
+            }
+            await printListPdf(this.orm, this.action, {
+                title: "Shop Balances",
+                filters: [
+                    printFilter("Search", filters.search),
+                    printFilter("Credit Limit > 0", filters.hasCreditLimit ? "Yes" : ""),
+                ],
+                columns: ["Shop Name", "Shop ID", "Shop Owner", "Credit Limit", "Outstanding", "Available Credit"],
+                rows: records.map((shop) => {
+                    const cash = shop.shahtaj_shop_category === "cash";
+                    const limit = shop.credit_limit || 0;
+                    const outstanding = shop.outstanding_balance || 0;
+                    const available = Math.max(0, limit - outstanding).toLocaleString();
+                    return [
+                        shop.name || "",
+                        shop.id,
+                        shop.owner_name || "N/A",
+                        cash ? "N/A" : `Rs. ${limit.toLocaleString()}`,
+                        `Rs. ${outstanding.toLocaleString()}`,
+                        cash ? "N/A" : `Rs. ${available}`,
+                    ];
+                }),
+            });
+        } catch (error) {
+            this.notification.add(error?.data?.message || error?.message || "Print failed.", { type: "danger" });
+        } finally {
+            this.state.isPrintingList = false;
+        }
     }
 
     _mapPurchaseOrder(po) { return po; }

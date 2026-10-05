@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.ShopFilter" owl="1">
+        <div class="position-relative" t-ref="root" style="width: 200px;">
+            <button type="button"
+                    class="form-select form-select-sm shadow-sm text-start text-truncate bg-white"
+                    t-on-click="toggle"
+                    t-att-title="this.label">
+                <t t-esc="this.label"/>
+            </button>
+            <div t-if="this.state.open"
+                 class="position-absolute bg-white border rounded-2 shadow mt-1 w-100"
+                 style="z-index: 1050; max-height: 280px; overflow: auto;">
+                <button type="button" class="dropdown-item small py-2 text-start" style="padding-left: 8px; padding-right: 8px;" t-on-click="chooseAll">All Shops</button>
+                <div t-if="this.state.loadingQuick" class="px-3 py-2 text-muted small">Loading...</div>
+                <t t-else="">
+                    <button t-foreach="this.state.quickShops" t-as="shop" t-key="shop.id"
+                            type="button"
+                            class="dropdown-item small py-2 text-truncate text-start"
+                            style="padding-left: 8px; padding-right: 8px;"
+                            t-on-click="() => this.choose(shop)">
+                        <t t-esc="shop.name"/>
+                    </button>
+                    <div t-if="!this.state.quickShops.length" class="px-3 py-2 text-muted small">No shops found.</div>
+                </t>
+                <button type="button"
+                        class="dropdown-item small py-2 fw-bold text-primary border-top text-start"
+                        style="padding-left: 8px; padding-right: 8px;"
+                        t-on-click="openModal">
+                    Search More...
+                </button>
+            </div>
+        </div>
+
+        <div t-if="this.state.modalOpen" class="modal fade show d-block" tabindex="-1"
+             style="background-color: rgba(0,0,0,0.5); z-index: 1070;"
+             t-on-click.self="closeModal">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg rounded-3">
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title fw-bold text-dark mb-0">Select Shop</h5>
+                        <button type="button" class="btn-close" t-on-click="closeModal" aria-label="Close"/>
+                    </div>
+                    <div class="modal-body">
+                        <div class="input-group input-group-sm mb-3">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i class="fa fa-search text-muted"/>
+                            </span>
+                            <input type="text" class="form-control border-start-0"
+                                   placeholder="Search shops..."
+                                   t-att-value="this.state.modalSearch"
+                                   t-on-input="onModalSearch"/>
+                        </div>
+                        <div class="position-relative border rounded-2" style="min-height: 220px;">
+                            <div t-if="this.state.modalLoading"
+                                 class="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-white"
+                                 style="z-index: 2; opacity: 0.75;">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"/>
+                            </div>
+                            <div t-if="!this.state.modalRows.length and !this.state.modalLoading" class="text-center text-muted py-5 small fw-bold">
+                                No shops found.
+                            </div>
+                            <button t-foreach="this.state.modalRows" t-as="shop" t-key="shop.id"
+                                    type="button"
+                                    class="list-group-item list-group-item-action border-0 border-bottom text-start py-2 px-3"
+                                    t-on-click="() => this.choose(shop)">
+                                <t t-esc="shop.name"/>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light d-flex justify-content-between align-items-center">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.modalRangeStart"/>
+                            to <t t-esc="this.modalRangeEnd"/>
+                            of <t t-esc="this.state.modalTotal"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button type="button" class="btn btn-sm btn-light bg-white border fw-bold"
+                                    t-on-click="() => this.changeModalPage(-1)"
+                                    t-att-disabled="this.state.modalPage === 1">Prev</button>
+                            <button type="button" class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                <t t-esc="this.state.modalPage"/> / <t t-esc="this.modalPageCount"/>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light bg-white border fw-bold"
+                                    t-on-click="() => this.changeModalPage(1)"
+                                    t-att-disabled="this.state.modalPage &gt;= this.modalPageCount">Next</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

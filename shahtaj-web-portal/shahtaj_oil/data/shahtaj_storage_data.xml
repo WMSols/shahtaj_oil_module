@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="icp_shahtaj_retention_delivery" model="ir.config_parameter">
+        <field name="key">shahtaj.storage.retention.delivery_proof_days</field>
+        <field name="value">90</field>
+    </record>
+    <record id="icp_shahtaj_retention_cheque" model="ir.config_parameter">
+        <field name="key">shahtaj.storage.retention.cheque_image_days</field>
+        <field name="value">180</field>
+    </record>
+    <record id="icp_shahtaj_retention_field_report" model="ir.config_parameter">
+        <field name="key">shahtaj.storage.retention.field_report_days</field>
+        <field name="value">90</field>
+    </record>
+    <record id="icp_shahtaj_retention_activity" model="ir.config_parameter">
+        <field name="key">shahtaj.storage.retention.activity_log_days</field>
+        <field name="value">2</field>
+    </record>
+    <record id="icp_shahtaj_auto_purge" model="ir.config_parameter">
+        <field name="key">shahtaj.storage.auto_purge_enabled</field>
+        <field name="value">False</field>
+    </record>
+
+    <record id="ir_cron_shahtaj_auto_purge_media" model="ir.cron">
+        <field name="name">Shahtaj: Auto-purge aged field media (if enabled)</field>
+        <field name="model_id" ref="model_shahtaj_storage_purge_log"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_auto_purge_media()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

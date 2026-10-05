@@ -126,4 +126,12 @@
               sequence="97"
               groups="base.group_system"/>
 
+    <!-- Distributor native UI: keep under Shahtaj Oil app -->
+    <menuitem id="menu_shahtaj_gps_attempts"
+              name="Shop GPS Attempts"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_gps_attempt"
+              sequence="95"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
+
 </odoo>

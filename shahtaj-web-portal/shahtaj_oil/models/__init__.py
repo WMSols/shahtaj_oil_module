@@ -42,5 +42,8 @@ from . import shahtaj_dm_day_session
 from . import shahtaj_dm_recovery
 from . import shahtaj_dm_api
 from . import shahtaj_activity_log
+from . import shahtaj_storage_manager
 from . import shahtaj_field_report
 from . import stock_picking
+from . import shahtaj_list_print
+from . import shahtaj_portal_read

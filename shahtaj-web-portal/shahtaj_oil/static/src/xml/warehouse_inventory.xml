@@ -6,14 +6,14 @@
             <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center rounded-top">
                 <div>
                     <h2 class="h4 fw-bold text-dark mb-0">Warehouse &amp; Inventory</h2>
-                    <small class="text-muted">Manage your product catalog, update stock levels, and monitor warehouse operations.</small>
+                    <small class="text-muted">Manage your product catalog and monitor warehouse stock. Quantities are received through purchase orders.</small>
                 </div>
                                <div>
                 <!-- NEW REFRESH BUTTON -->
                     <button class="btn btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center " t-on-click="refreshData" t-att-disabled="this.state.isLoading" title="Refresh Inventory Data">
                         <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isLoading}"></i> Refresh
                     </button>
-                    <button t-if="this.hasFinancialAccess" class="btn btn-outline-danger ms-3 fw-bold shadow-sm d-inline-flex align-items-center" t-on-click="() => this.setSubTab('archive')" title="View Archived Items">
+                    <button t-if="this.canManageProducts and this.hasFinancialAccess" class="btn btn-outline-danger ms-3 fw-bold shadow-sm d-inline-flex align-items-center" t-on-click="() => this.setSubTab('archive')" title="View Archived Items">
                         <i class="fa fa-archive me-2"></i> View Archive
                     </button>
                 </div>
@@ -21,7 +21,7 @@
             </div>
 
 <!-- INVENTORY TAB -->
-            <t t-if="this.hasFinancialAccess and this.state.activeSubTab === 'inventory'">
+            <t t-if="this.state.activeSubTab === 'inventory'">
 
                 <div class="p-4 bg-white border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                     <div>
@@ -35,14 +35,17 @@
                                 <span class="input-group-text bg-white text-muted border-end-0">
                                     <i class="fa fa-search"></i>
                                 </span>
-                                <input t-att-value="this.state.filters.inventory.search" t-on-input="(ev) => this.onSearchInput(ev, 'inventory')" type="text" class="form-control border-start-0 ps-0" placeholder="Search product name..." t-model="this.state.productSearchQuery" />
+                                <input t-att-value="this.state.filters.inventory.search" t-on-input="(ev) => this.onSearchInput(ev, 'inventory')" type="text" class="form-control border-start-0 ps-0" placeholder="Search product name..." />
                             </div>
-                            <select  class="form-select form-select-sm shadow-sm" style="width: 170px;" t-model="this.state.filters.inventory.sort" t-on-change="() => this.onFilterChange('inventory')" title="Reorder the list based on specific values">
+                            <select class="form-select form-select-sm shadow-sm" style="width: 170px;" t-att-value="this.state.filters.inventory.sort" t-on-change="(ev) => this.onFilterField('inventory', 'sort', ev)" title="Reorder the list based on specific values">
                                 <option value="default">Default Sorting</option>
-                                <option value="price_asc">Price: Low to High</option>
-                                <option value="price_desc">Price: High to Low</option>
+                                <option t-if="this.showPrices" value="price_asc">Price: Low to High</option>
+                                <option t-if="this.showPrices" value="price_desc">Price: High to Low</option>
                             </select>
-                            <button class="btn btn-sm btn-dark fw-bold d-flex align-items-center text-white ms-2 shadow-sm text-nowrap" t-on-click="() => { this.resetForms(); this.state.showProductAddForm = true; }" title="Add a brand new product to your catalog">
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('inventory')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                                <i class="fa fa-times me-1"/> Clear filters
+                            </button>
+                            <button t-if="this.canManageProducts" class="btn btn-sm btn-dark fw-bold d-flex align-items-center text-white ms-2 shadow-sm text-nowrap" t-on-click="() => { this.resetForms(); this.state.showProductAddForm = true; }" title="Add a brand new product to your catalog">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
                                     <path d="M5 12h14"/>
                                     <path d="M12 5v14"/>
@@ -71,10 +74,10 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="small fw-bold">Primary Vendor / Supplier</label>
-                                    <select class="form-select shadow-sm" t-model="this.state.productForm.vendor_id">
+                                    <select class="form-select shadow-sm" t-att-value="this.state.productForm.vendor_id" t-on-change="(ev) => this.onProductVendorChange(ev, 'new')">
                                         <option value="">-- Choose Vendor (Optional) --</option>
                                         <t t-foreach="this.state.allVendors" t-as="vendor" t-key="vendor.id">
-                                            <option t-att-value="vendor.id"><t t-esc="vendor.name"/></option>
+                                            <option t-att-value="this.filterOptionValue(vendor.id)"><t t-esc="vendor.name"/></option>
                                         </t>
                                     </select>
                                 </div>
@@ -167,10 +170,10 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="small fw-bold">Primary Vendor</label>
-                                <select class="form-select" t-model="this.state.currentProduct.vendor_id">
+                                <select class="form-select" t-att-value="this.state.currentProduct.vendor_id" t-on-change="(ev) => this.onProductVendorChange(ev, 'edit')">
                                     <option value="">-- None / Select Vendor --</option>
                                     <t t-foreach="this.state.allVendors" t-as="vendor" t-key="vendor.id">
-                                        <option t-att-value="vendor.id"><t t-esc="vendor.name"/></option>
+                                        <option t-att-value="this.filterOptionValue(vendor.id)"><t t-esc="vendor.name"/></option>
                                     </t>
                                 </select>
                             </div>
@@ -251,15 +254,15 @@
                                 <thead class="bg-light text-uppercase small fw-bold text-muted">
                                     <tr>
                                         <th class="border-top-0 ps-4">Product Details</th>
-                                        <th class="border-top-0 text-end">Price </th>
+                                        <th t-if="this.showPrices" class="border-top-0 text-end" title="Cost price / sale price">Price Cost/Sale</th>
                                         <th class="border-top-0 text-end">On-Hand Qty</th>
-                                        <th class="border-top-0 text-center pe-4">Actions</th>
+                                        <th t-if="this.canManageProducts" class="border-top-0 text-center pe-4">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <t t-if="this.state.tableInventory.length === 0 and !this.state.isLoadingList">
                                         <tr>
-                                            <td colspan="4" class="text-center py-5 text-muted fw-bold">
+                                            <td t-att-colspan="this.productListColspan" class="text-center py-5 text-muted fw-bold">
                                                 <i class="fa fa-cubes fs-1 mb-3 opacity-50"></i>
                                                 <p class="mb-0">No products match your search or catalog is empty.</p>
                                             </td>
@@ -273,9 +276,15 @@
                                                     <small class="text-muted">Unit: <t t-esc="item.shahtaj_sale_uom || item.uom_name"/> <t t-if="item.shahtaj_vendor_name"> · Vendor: <span class="fw-bold text-dark"><t t-esc="item.shahtaj_vendor_name"/></span></t> · Tax: <t t-esc="item.tax_label"/></small>
                                                 </div>
                                             </td>
-                                            <td class="text-end"><div class="fw-bold text-success">Rs. <t t-esc="item.list_price"/></div></td>
+                                            <td t-if="this.showPrices" class="text-end" title="Cost / Sale">
+                                                <div class="fw-bold">
+                                                    <span class="text-muted">Rs. <t t-esc="(item.standard_price || 0).toLocaleString()"/></span>
+                                                    <span class="text-muted mx-1">/</span>
+                                                    <span class="text-success">Rs. <t t-esc="(item.list_price || 0).toLocaleString()"/></span>
+                                                </div>
+                                            </td>
                                             <td class="text-end"><span class="h6 fw-bold text-dark mb-0"><t t-esc="item.qty_available"/></span> <span class="text-muted ms-1 small"><t t-esc="item.uom_name"/></span></td>
-                                            <td class="text-center pe-4">
+                                            <td t-if="this.canManageProducts" class="text-center pe-4">
                                                 <button class="btn btn-sm btn-light border fw-bold text-primary" t-on-click="() => this.viewProductDetails(item)">Edit</button>
                                                 <button class="btn btn-sm btn-outline-danger ms-2 fw-bold" t-on-click="() => this.toggleArchive('product.template', item.id, false)">Archive</button>
                                             </td>
@@ -305,68 +314,26 @@
             <div class="p-4 bg-white border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
                     <h2 class="fw-bold mb-0 text-dark">Stock Management Overview</h2>
-                    <small class="text-muted">Monitor available quantities and manually adjust stock if needed.</small>
+                    <small class="text-muted">Monitor available quantities. Stock is received through purchase orders.</small>
                 </div>
 
-                <t t-if="!this.state.showAdjustmentForm">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
-                            <span class="input-group-text bg-white text-muted border-end-0">
-                                <i class="fa fa-search"></i>
-                            </span>
-                            <input t-att-value="this.state.filters.management.search" t-on-input="(ev) => this.onSearchInput(ev, 'management')" type="text" class="form-control border-start-0 ps-0" placeholder="Search product name..." t-model="this.state.stockSearchQuery" />
-                        </div>
-                        <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.filters.management.status" t-on-change="() => this.onFilterChange('management')" title="Filter to see only available or depleted items">
-                            <option value="all">All Stock Levels</option>
-                            <option value="in_stock">In Stock (&gt; 0)</option>
-                            <option value="out_of_stock">Out of Stock (0)</option>
-                        </select>
-                        <button class="btn btn-sm btn-dark fw-bold shadow-sm ms-2 text-nowrap" t-on-click="() => this.state.showAdjustmentForm = true" title="Manually add new stock to a product">
-                                + Update Stock
-                        </button>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
+                        <span class="input-group-text bg-white text-muted border-end-0">
+                            <i class="fa fa-search"></i>
+                        </span>
+                        <input t-att-value="this.state.filters.management.search" t-on-input="(ev) => this.onSearchInput(ev, 'management')" type="text" class="form-control border-start-0 ps-0" placeholder="Search product name..." />
                     </div>
-                </t>
-                <t t-else="">
-                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.state.showAdjustmentForm = false">
-                             Close Stock Update
+                    <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-att-value="this.state.filters.management.status" t-on-change="(ev) => this.onFilterField('management', 'status', ev)" title="Filter to see only available or depleted items">
+                        <option value="all">All Stock Levels</option>
+                        <option value="in_stock">In Stock (&gt; 0)</option>
+                        <option value="out_of_stock">Out of Stock (0)</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('management')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                        <i class="fa fa-times me-1"/> Clear filters
                     </button>
-                </t>
-            </div>
-
-            <t t-if="this.state.showAdjustmentForm">
-                <div class="p-4 bg-light border-bottom">
-                    <h2 class="fw-bold text-dark mb-3">Add Stock to Product</h2>
-                    <div class="row align-items-end g-3">
-                        <div class="col-md-3">
-                            <label class="small fw-bold">Select Product</label>
-                            <select class="form-select shadow-sm" t-model="this.state.adjustmentForm.product_id">
-                                <option value="">-- Choose an item --</option>
-                                <t t-foreach="this.state.allActiveProducts" t-as="inv" t-key="inv.id">
-                                    <option t-att-value="inv.id">
-                                        <t t-esc="inv.name"/>
-                                    </option>
-                                </t>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted" title="Amount currently sitting in the warehouse">Current On-Hand</label>
-                            <input type="text" class="form-control bg-white shadow-sm" t-att-value="this.selectedProductStock" disabled="1"/>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-success" title="How many new units are you adding?">Quantity to Add</label>
-                            <input type="number" class="form-control border-success shadow-sm" t-model="this.state.adjustmentForm.qty" min="1" placeholder="e.g. 50"/>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted" title="Purchase cost per unit for this batch (Optional - defaults to current average cost)">Unit Cost (Rs.)</label>
-                            <input type="number" class="form-control shadow-sm" t-model="this.state.adjustmentForm.unit_cost" placeholder="Optional"/>
-                        </div>
-                        <div class="col-md-3 d-flex pb-1">
-                            <button class="btn btn-outline-secondary w-50 me-2 fw-bold" t-on-click="() => { this.state.showAdjustmentForm = false; this.state.adjustmentForm = { product_id: '', qty: 0, unit_cost: '' }; }">Cancel</button>
-                            <button class="btn btn-success w-50 fw-bold text-white shadow-sm" t-on-click="saveAdjustment">Confirm</button>
-                        </div>
-                    </div>
                 </div>
-            </t>
+            </div>
 <div class="position-relative">
                 <t t-if="this.state.isLoadingList">
                     <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
@@ -378,16 +345,18 @@
                     <thead class="bg-light text-uppercase small fw-bold text-muted">
                         <tr>
                             <th class="border-top-0 ps-4 py-3">Product Name</th>
+                            <th class="border-top-0 py-3 text-end" title="Total stock received into the warehouse">Received</th>
+                            <th class="border-top-0 py-3 text-end" title="Quantity delivered to shops from confirmed sales orders">Sold</th>
                             <th class="border-top-0 py-3 text-end" title="Total physical units located in the warehouse">On-Hand Qty</th>
                             <th class="border-top-0 py-3 text-end" title="Units bookers can still sell: On-Hand minus open visit carts and undelivered confirmed sales orders">Available to Book</th>
                             <!-- <th class="border-top-0 py-3 text-end" title="Predicted future stock based on incoming/outgoing orders">Forecast</th> -->
-                            <th t-if="this.hasFinancialAccess" class="border-top-0 py-3 text-end pe-4">Unit Price</th>
+                            <th t-if="this.showPrices" class="border-top-0 py-3 text-end pe-4" title="Cost price / sale price">Price Cost/Sale</th>
                         </tr>
                     </thead>
                     <tbody>
                         <t t-if="this.state.tableStock.length === 0 and !this.state.isLoadingList">
                                 <tr>
-                                    <td t-att-colspan="this.hasFinancialAccess ? 5 : 4" class="text-center py-5 text-muted fw-bold">No stock matches your search or filter criteria.</td>
+                                    <td t-att-colspan="this.showPrices ? 6 : 5" class="text-center py-5 text-muted fw-bold">No stock matches your search or filter criteria.</td>
                                 </tr>
                             </t>
                         <t t-foreach="this.state.tableStock" t-as="item" t-key="item.id">
@@ -399,15 +368,23 @@
                                     </t>
                                 </td>
                                 <td class="text-end fw-bold">
+                                    <t t-esc="this.formatStockQty(item.shahtaj_qty_received)"/>
+                                    <span class="text-muted small ms-1"><t t-esc="item.uom_name"/></span>
+                                </td>
+                                <td class="text-end fw-bold">
+                                    <t t-esc="this.formatStockQty(item.shahtaj_qty_sold)"/>
+                                    <span class="text-muted small ms-1"><t t-esc="item.uom_name"/></span>
+                                </td>
+                                <td class="text-end fw-bold">
                                     <span t-attf-class="#{item.qty_available &lt;= 0 ? 'text-danger' : 'text-dark'}">
-                                        <t t-esc="item.qty_available || 0"/>
+                                        <t t-esc="this.formatStockQty(item.qty_available)"/>
                                     </span>
                                     <span class="text-muted small ms-1">
                                         <t t-esc="item.uom_name"/>
                                     </span>
                                 </td>
                                 <td class="text-end text-primary fw-bold">
-                                    <t t-esc="item.shahtaj_qty_bookable || 0"/>
+                                    <t t-esc="this.formatStockQty(item.shahtaj_qty_bookable)"/>
                                     <span class="text-muted small ms-1">
                                         <t t-esc="item.uom_name"/>
                                     </span>
@@ -418,8 +395,10 @@
                                         <t t-esc="item.uom_name"/>
                                     </span>
                                 </td> -->
-                                <td t-if="this.hasFinancialAccess" class="text-end pe-4 text-muted fw-bold">
-                                        Rs. <t t-esc="item.list_price"/>
+                                <td t-if="this.showPrices" class="text-end pe-4 fw-bold" title="Cost / Sale">
+                                    <span class="text-muted">Rs. <t t-esc="(item.standard_price || 0).toLocaleString()"/></span>
+                                    <span class="text-muted mx-1">/</span>
+                                    <span class="text-success">Rs. <t t-esc="(item.list_price || 0).toLocaleString()"/></span>
                                 </td>
                             </tr>
                         </t>
@@ -441,7 +420,7 @@
             </div>
         </t>
 <!-- Sales Taxes Tab -->
-        <t t-if="this.hasFinancialAccess and this.state.activeSubTab === 'taxes'">
+        <t t-if="this.state.activeSubTab === 'taxes'">
             <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center">
                 <div>
                     <h2 class="fw-bold mb-0">Sales Taxes Configuration</h2>
@@ -495,6 +474,9 @@
                                t-att-value="this.state.filters.taxes.search" 
                                t-on-input="(ev) => this.onSearchInput(ev, 'taxes')"/>
                     </div>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.clearFilters('taxes')" t-att-disabled="this.state.isLoadingList" title="Clear all filters on this list">
+                        <i class="fa fa-times me-1"/> Clear filters
+                    </button>
                 </div>
 
                 <div class="position-relative">

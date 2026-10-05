@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
+from odoo.osv import expression
 from odoo.tools import float_compare, float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
@@ -44,9 +45,17 @@ class ShahtajDmDelivery(models.Model):
     )
     partner_id = fields.Many2one(
         related='sale_order_id.partner_id',
-        string='Shop',
+        string='Shop / Customer',
         store=True,
         readonly=True,
+    )
+    is_walk_in = fields.Boolean(
+        string='Walk-in',
+        related='sale_order_id.shahtaj_is_walk_in',
+        store=True,
+        index=True,
+        readonly=True,
+        help='Cash-and-carry van sale (not a shop visit delivery).',
     )
     order_booker_id = fields.Many2one(
         related='sale_order_id.shahtaj_order_booker_id',
@@ -115,22 +124,31 @@ class ShahtajDmDelivery(models.Model):
             'Shop Closed and Could Not Deliver require a note.'
         ),
     )
-    delivery_progress = fields.Selection(
-        [
-            ('pending', 'Pending'),
-            ('partial', 'Partial'),
-            ('done', 'Done'),
-        ],
-        string='Progress (internal)',
-        compute='_compute_delivery_progress',
-        store=True,
-        index=True,
-        help='Internal coarse summary derived from Status. Prefer Status in the UI.',
-    )
     scheduled_date = fields.Date(
         string='Delivery Day',
         index=True,
         help='Day this delivery is planned for (My Deliveries / Today Load).',
+    )
+    is_overdue = fields.Boolean(
+        string='Overdue / Not Done',
+        compute='_compute_schedule_status',
+        search='_search_is_overdue',
+        help=(
+            'Open job with no delivery day or a day before today. '
+            'Distributor should reschedule these; they are not shown on the DM day plan.'
+        ),
+    )
+    schedule_status = fields.Selection(
+        [
+            ('unscheduled', 'Unscheduled'),
+            ('today', 'Today'),
+            ('overdue', 'Overdue'),
+            ('future', 'Future'),
+            ('closed', 'Closed'),
+        ],
+        string='Schedule',
+        compute='_compute_schedule_status',
+        help='Relative to today for open jobs; Closed when delivered or returned.',
     )
     scheduled_time = fields.Float(
         string='Planned Delivery Time',
@@ -173,6 +191,54 @@ class ShahtajDmDelivery(models.Model):
         for rec in self:
             rec.has_delivery_proof = bool(rec.delivery_proof_image)
 
+    @api.depends('scheduled_date', 'state')
+    @api.depends_context('uid', 'tz')
+    def _compute_schedule_status(self):
+        today = fields.Date.context_today(self)
+        open_states = ('not_ready', 'ready', 'picked', 'partial')
+        for rec in self:
+            if rec.state not in open_states:
+                rec.is_overdue = False
+                rec.schedule_status = 'closed'
+                continue
+            day = rec.scheduled_date
+            if not day:
+                rec.is_overdue = True
+                rec.schedule_status = 'unscheduled'
+            elif day < today:
+                rec.is_overdue = True
+                rec.schedule_status = 'overdue'
+            elif day == today:
+                rec.is_overdue = False
+                rec.schedule_status = 'today'
+            else:
+                rec.is_overdue = False
+                rec.schedule_status = 'future'
+
+    def _search_is_overdue(self, operator, value):
+        """Allow search/filter on is_overdue without storing the field."""
+        today = fields.Date.context_today(self)
+        open_domain = [('state', 'in', ('not_ready', 'ready', 'picked', 'partial'))]
+        overdue_domain = [
+            '|',
+            ('scheduled_date', '=', False),
+            ('scheduled_date', '<', today),
+        ]
+        positive = (operator, value) in (
+            ('=', True), ('!=', False), ('=', 1),
+        )
+        negative = (operator, value) in (
+            ('=', False), ('!=', True), ('=', 0),
+        )
+        if positive:
+            return expression.AND([open_domain, overdue_domain])
+        if negative:
+            return expression.OR([
+                [('state', 'not in', ('not_ready', 'ready', 'picked', 'partial'))],
+                [('scheduled_date', '>=', today)],
+            ])
+        raise UserError(_('Unsupported search on Overdue / Not Done.'))
+
     assigned_by_id = fields.Many2one(
         'res.users',
         string='Assigned By',
@@ -202,11 +268,29 @@ class ShahtajDmDelivery(models.Model):
         string='Processing Locked',
         compute='_compute_shahtaj_processing_locked',
     )
+    shahtaj_can_edit_schedule = fields.Boolean(
+        string='Can Edit Schedule',
+        compute='_compute_shahtaj_can_edit_schedule',
+    )
 
     @api.depends('state')
     def _compute_shahtaj_processing_locked(self):
         for rec in self:
             rec.shahtaj_processing_locked = rec._shahtaj_is_processing_locked()
+
+    @api.depends('state')
+    @api.depends_context('uid')
+    def _compute_shahtaj_can_edit_schedule(self):
+        """Office/Warehouse may reschedule Delivery Day even after pick (overdue fix)."""
+        user = self.env.user
+        is_office = user._shahtaj_can_manage_dm_ops()
+        for rec in self:
+            if rec.state in ('delivered', 'returned'):
+                rec.shahtaj_can_edit_schedule = False
+            elif is_office:
+                rec.shahtaj_can_edit_schedule = True
+            else:
+                rec.shahtaj_can_edit_schedule = not rec._shahtaj_is_processing_locked()
 
     check_in_latitude = fields.Float(string='Last Deliver Latitude', digits=(10, 7))
     check_in_longitude = fields.Float(string='Last Deliver Longitude', digits=(10, 7))
@@ -325,10 +409,18 @@ class ShahtajDmDelivery(models.Model):
         'This sale order is already assigned to this delivery man.',
     )
 
-    @api.depends('sale_order_id.name', 'partner_id.name', 'delivery_man_id.name', 'is_split_share')
+    @api.depends(
+        'sale_order_id.name', 'partner_id.name', 'delivery_man_id.name',
+        'is_split_share', 'is_walk_in',
+    )
     def _compute_display_name(self):
         for rec in self:
-            base = f"{rec.sale_order_id.name or '?'} → {rec.partner_id.name or '?'}"
+            customer = rec.partner_id.name or '?'
+            order = rec.sale_order_id.name or '?'
+            if rec.is_walk_in:
+                base = f"Walk-in {order} → {customer}"
+            else:
+                base = f"{order} → {customer}"
             if rec.is_split_share and rec.delivery_man_id:
                 rec.display_name = f"{base} ({rec.delivery_man_id.name})"
             else:
@@ -513,28 +605,6 @@ class ShahtajDmDelivery(models.Model):
                     f'<tbody>{"".join(paid_html_rows)}</tbody></table></div>'
                 )
 
-    @api.depends('state', 'line_ids.qty_picked', 'line_ids.qty_delivered')
-    def _compute_delivery_progress(self):
-        for rec in self:
-            if rec.state in ('delivered',):
-                rec.delivery_progress = 'done'
-            elif rec.state in ('partial',):
-                rec.delivery_progress = 'partial'
-            elif rec.state == 'returned':
-                # Returned leftover: done for the day if nothing left to deliver to shop
-                remaining = sum(
-                    max(l.qty_picked - l.qty_delivered, 0.0) for l in rec.line_ids
-                )
-                any_delivered = any(l.qty_delivered > 0 for l in rec.line_ids)
-                if remaining <= 0 and any_delivered:
-                    rec.delivery_progress = 'done'
-                elif any_delivered:
-                    rec.delivery_progress = 'partial'
-                else:
-                    rec.delivery_progress = 'pending'
-            else:
-                rec.delivery_progress = 'pending'
-
     @api.depends(
         'van_location_id',
         'line_ids.qty_ordered',
@@ -662,26 +732,36 @@ class ShahtajDmDelivery(models.Model):
     def write(self, vals):
         planning_vals = DM_DISTRIBUTOR_PLANNING_FIELDS.intersection(vals)
         user = self.env.user
-        is_distributor = (
+        is_office_planner = (
             not self.env.context.get('shahtaj_system_visit_write')
             and not self.env.context.get('shahtaj_skip_planning_log')
-            and user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            and user._shahtaj_can_manage_dm_ops()
             and not user._is_public()
         )
-        if planning_vals and is_distributor:
-            changing = self.filtered(
-                lambda rec: any(
-                    rec._shahtaj_planning_field_changed(key, vals[key])
-                    for key in planning_vals
-                )
-            )
-            locked = changing.filtered(lambda rec: rec._shahtaj_is_processing_locked())
-            if locked:
+        if planning_vals and is_office_planner:
+            locked = self.filtered(lambda rec: rec._shahtaj_is_processing_locked())
+            # Allow Delivery Day / time / notes on picked open jobs so overdue
+            # work can be rescheduled; reassigning DM while stock is on van stays blocked.
+            if locked and 'delivery_man_id' in planning_vals:
                 raise UserError(_(
-                    'Cannot change delivery planning for %(names)s — '
-                    'stock is already picked or delivery is finished.',
+                    'Cannot change delivery man for %(names)s — '
+                    'stock is already picked or delivery is finished. '
+                    'You can still change Delivery Day to reschedule.',
                     names=', '.join(locked.mapped('display_name')),
                 ))
+            finished = self.filtered(lambda rec: rec.state in ('delivered', 'returned'))
+            if finished and planning_vals:
+                raise UserError(_(
+                    'Cannot change delivery planning for %(names)s — '
+                    'delivery is already finished.',
+                    names=', '.join(finished.mapped('display_name')),
+                ))
+            changing = self.filtered(
+                lambda rec: any(
+                    rec._shahtaj_planning_field_changed(fname, vals[fname])
+                    for fname in planning_vals
+                )
+            )
             if changing:
                 self.env['shahtaj.activity.log'].log_model_field_changes(
                     changing,
@@ -692,9 +772,20 @@ class ShahtajDmDelivery(models.Model):
                 )
         res = super().write(vals)
         if planning_vals.intersection({'delivery_man_id', 'scheduled_date'}):
-            self.filtered(
-                lambda r: not r._shahtaj_is_processing_locked()
-            )._ensure_visit_task()
+            open_jobs = self.filtered(
+                lambda r: r.state not in ('delivered', 'returned')
+            )
+            open_jobs._ensure_visit_task()
+            # Only Dist/office planning edits — not system pick/sync writes.
+            if is_office_planner:
+                seen = set()
+                for job in open_jobs:
+                    dm = job.delivery_man_id
+                    day = job.scheduled_date
+                    if not dm or not day or (dm.id, day) in seen:
+                        continue
+                    seen.add((dm.id, day))
+                    self._shahtaj_sync_route_after_dist_change(dm, day)
         return res
 
     def _sync_lines_from_sale_order(self):
@@ -897,17 +988,18 @@ class ShahtajDmDelivery(models.Model):
                 rec._ensure_visit_task()
 
     def _shahtaj_stop_for_stock_state(self, stock_state):
-        """Target Stop after stock sync/undo. Only clears stale ``done``.
+        """Target Stop after stock sync/undo.
 
         Returns field_state value to write, or False to leave Stop unchanged
-        (Shop Closed / Could Not Deliver stay as set by the DM).
+        (Shop Closed / Could Not Deliver stay as set by the DM while stock is open).
+        Returned-to-WH clears any Heading / Done stop so UI matches finished stock.
         """
         self.ensure_one()
         any_delivered = any((l.qty_delivered or 0.0) > 0 for l in self.line_ids)
         if stock_state == 'delivered':
             return 'done'
         if stock_state == 'returned':
-            return False
+            return 'pending'
         if self.field_state == 'done' and not any_delivered:
             if stock_state in ('picked', 'partial'):
                 return 'in_transit'
@@ -924,6 +1016,9 @@ class ShahtajDmDelivery(models.Model):
         Task = self.env['shahtaj.visit.task'].sudo()
         today = fields.Date.context_today(self)
         for rec in self:
+            if rec.is_walk_in:
+                # Walk-in cash sales are not shop visit stops.
+                continue
             if rec.state == 'not_ready' or not rec.partner_id or not rec.delivery_man_id:
                 continue
             booker = rec.order_booker_id
@@ -1121,7 +1216,29 @@ class ShahtajDmDelivery(models.Model):
                 line_qty_map[sol.id] = remaining
         job._apply_line_assignments(line_qty_map)
         job._sync_with_sale_order()
+        # Dist mid-day assign while DM Left Office → Stock/Stop for plan API.
+        self._shahtaj_sync_route_after_dist_change(delivery_man, day)
         return job
+
+    @api.model
+    def _shahtaj_sync_route_after_dist_change(self, dm, day=None):
+        """If DM already Left Office for day, align Stock/Stop for live Dist changes.
+
+        No new API fields — only updates job Stock/Stop so plan/today returns
+        the same keys with correct values after Dist assign/reschedule.
+        Safe no-op when session is office/ended/missing.
+        """
+        if not dm:
+            return
+        day = day or fields.Date.context_today(self)
+        session = self.env['shahtaj.dm.day.session'].sudo().search([
+            ('delivery_man_id', '=', dm.id),
+            ('session_date', '=', day),
+            ('company_id', '=', self.env.company.id),
+            ('state', '=', 'on_the_way'),
+        ], limit=1)
+        if session:
+            session.action_sync_on_route_stops(include_retry_stops=False)
 
     @api.model
     def action_apply_split_plan(self, sale_order, assignments, assigned_by=None):
@@ -1231,6 +1348,10 @@ class ShahtajDmDelivery(models.Model):
                     existing._apply_line_assignments(lines)
                     existing._sync_with_sale_order()
                     touched |= existing
+                    self._shahtaj_sync_route_after_dist_change(
+                        dm_user,
+                        existing.scheduled_date or block.get('scheduled_date'),
+                    )
                 else:
                     existing.unlink()
                 continue
@@ -1257,6 +1378,14 @@ class ShahtajDmDelivery(models.Model):
         ])
         for job in jobs:
             job._sync_with_sale_order()
+        # Stamp free van onto today's open jobs so Dist Stock matches Load Van.
+        self._shahtaj_attribute_free_van_to_open_jobs(
+            delivery_man, fields.Date.context_today(self),
+        )
+        # Mid-day Dist jobs while Left Office → Heading on refresh/list.
+        self._shahtaj_sync_route_after_dist_change(
+            delivery_man, fields.Date.context_today(self),
+        )
         return jobs
 
     @api.model
@@ -1352,10 +1481,7 @@ class ShahtajDmDelivery(models.Model):
         if not dm.shahtaj_is_delivery_man:
             raise UserError(_('%(user)s is not a delivery man.', user=dm.display_name))
         if user.shahtaj_is_delivery_man and user.id != dm.id:
-            if not (
-                user.has_group('shahtaj_oil.group_shahtaj_distributor')
-                or user.has_group('shahtaj_oil.group_shahtaj_native_distributor_ui')
-            ):
+            if not user._shahtaj_can_manage_dm_ops():
                 raise AccessError(_('You can only move stock on your own van.'))
         if direction not in ('to_van', 'to_wh'):
             raise UserError(_('Invalid transfer direction.'))
@@ -1436,6 +1562,10 @@ class ShahtajDmDelivery(models.Model):
         for move in picking.move_ids:
             move.quantity = move.product_uom_qty
         picking.with_context(skip_backorder=True, skip_sms=True).button_validate()
+        # Free WH→van often leaves need=0 on Load screen without stamping jobs —
+        # attribute free van onto today's open jobs so Dist Stock shows Loaded.
+        if direction == 'to_van':
+            self._shahtaj_attribute_free_van_to_open_jobs(dm)
         return picking
 
     def _retarget_sale_outgoing_to_van(self, van_location):
@@ -1526,29 +1656,40 @@ class ShahtajDmDelivery(models.Model):
 
     @api.model
     def _shahtaj_today_open_jobs_domain(self, dm, day=None):
-        """Open jobs for Today Load: today, unscheduled, or overdue only.
+        """Open jobs for Today Load / pick: scheduled for today only.
 
-        Excludes future-dated jobs so Still Need matches Confirm Pick.
+        Overdue and unscheduled jobs are excluded until the distributor
+        reschedules them onto today (same rule as DM plan/today).
         """
         day = day or fields.Date.context_today(self)
         return [
             ('delivery_man_id', '=', dm.id),
             ('state', 'in', ('ready', 'picked', 'partial')),
-            '|', '|',
             ('scheduled_date', '=', day),
+        ]
+
+    @api.model
+    def _shahtaj_overdue_open_jobs_domain(self, day=None):
+        """Open jobs past their delivery day (or with no day) for distributor."""
+        day = day or fields.Date.context_today(self)
+        return [
+            ('state', 'in', ('not_ready', 'ready', 'picked', 'partial')),
+            '|',
             ('scheduled_date', '=', False),
             ('scheduled_date', '<', day),
         ]
 
     @api.model
-    def _shahtaj_unattributed_van_qty_map(self, dm, product_ids=None):
-        """Physical van qty not already tied to open job lines (picked − delivered).
+    def _shahtaj_unattributed_van_qty_map(self, dm, product_ids=None, day=None):
+        """Physical van qty not reserved by today's scheduled open jobs.
 
-        Leftover from prior days / free van loads can cover today's Still Need
-        without another warehouse pick. Also the only stock allowed for walk-in
-        / free van→WH return while jobs are still open.
+        Free = on van − (picked − delivered) on open jobs scheduled for *today*
+        only. Past-day (or future) open jobs do not reserve stock for walk-in /
+        van→WH return / Today Load van-cover until the distributor reschedules
+        them to today. Leftover from prior days then counts as free surplus.
         """
         dm.ensure_one()
+        day = day or fields.Date.context_today(self)
         van = dm._shahtaj_get_van_location()
         if not van:
             return {}
@@ -1568,9 +1709,12 @@ class ShahtajDmDelivery(models.Model):
             if row.get('product_id')
         }
         attributed = defaultdict(float)
+        # Only today's schedule reserves van stock. Overdue / future open jobs
+        # release into free until rescheduled onto today.
         open_jobs = self.search([
             ('delivery_man_id', '=', dm.id),
             ('state', 'in', ('ready', 'picked', 'partial')),
+            ('scheduled_date', '=', day),
         ])
         for line in open_jobs.mapped('line_ids'):
             if not line.product_id:
@@ -1590,10 +1734,74 @@ class ShahtajDmDelivery(models.Model):
         }
 
     @api.model
-    def _shahtaj_assert_van_surplus(self, dm, qty_by_product, purpose):
-        """Block consuming van stock that is still reserved for open shop jobs.
+    def _shahtaj_attribute_free_van_to_open_jobs(self, dm, day=None):
+        """Stamp today's open jobs Loaded when free van already covers still-needed.
 
-        Allows surplus only: physical − (picked − delivered on open jobs).
+        Load Van / app can show need=0 (van cover) while Dist still has qty_picked=0
+        and Stock=Ready. This applies free van onto job lines (FIFO, no WH move)
+        so Dist dashboard and DM job Stock stay in sync.
+
+        Returns number of jobs that received an attribution write.
+        """
+        if self.env.context.get('shahtaj_skip_van_attribute'):
+            return 0
+        if not dm:
+            return 0
+        dm.ensure_one()
+        day = day or fields.Date.context_today(self)
+        deliveries = self.search(
+            self._shahtaj_today_open_jobs_domain(dm, day),
+            order='id',
+        )
+        if not deliveries:
+            return 0
+
+        still_by_product = defaultdict(float)
+        for delivery in deliveries:
+            for line in delivery.line_ids:
+                if not line.product_id:
+                    continue
+                still = max(line.qty_assigned - line.qty_picked, 0.0)
+                if still > 0:
+                    still_by_product[line.product_id.id] += still
+        if not still_by_product:
+            return 0
+
+        free_van = self._shahtaj_unattributed_van_qty_map(
+            dm, set(still_by_product), day=day,
+        )
+        van_apply = {}
+        for pid, still in still_by_product.items():
+            product = self.env['product.product'].browse(pid)
+            rounding = product.uom_id.rounding or 0.01
+            cover = float_round(
+                min(still, free_van.get(pid, 0.0)),
+                precision_rounding=rounding,
+            )
+            if float_compare(cover, 0.0, precision_rounding=rounding) > 0:
+                van_apply[pid] = cover
+        if not van_apply:
+            return 0
+
+        qty_by_delivery, _remaining = self._shahtaj_fifo_allocate_product_qtys(
+            deliveries, van_apply,
+        )
+        touched = 0
+        for delivery_id, qty_map in qty_by_delivery.items():
+            if not qty_map:
+                continue
+            # Skip re-entry if sync/attribute nests (attribute calls sync).
+            self.browse(delivery_id).with_context(
+                shahtaj_skip_van_attribute=True,
+            )._attribute_van_stock_with_qtys(qty_map, reload_form=False)
+            touched += 1
+        return touched
+
+    @api.model
+    def _shahtaj_assert_van_surplus(self, dm, qty_by_product, purpose):
+        """Block consuming van stock still reserved for *today's* open shop jobs.
+
+        Allows surplus only: physical − (picked − delivered on today's schedule).
         """
         dm.ensure_one()
         need = {
@@ -1612,13 +1820,94 @@ class ShahtajDmDelivery(models.Model):
             if float_compare(qty, available, precision_rounding=rounding) > 0:
                 raise UserError(_(
                     'Cannot %(purpose)s %(qty)s of %(product)s — only %(free)s is free on the van. '
-                    'The rest is reserved for open shop deliveries (picked, not yet delivered). '
-                    'Finish those stops, or return undelivered stock to the warehouse first.',
+                    'The rest is reserved for today\'s open shop deliveries (picked, not yet delivered). '
+                    'Finish those stops, or return undelivered stock to the warehouse first. '
+                    'Stock from past-day open jobs counts as free unless rescheduled to today.',
                     purpose=purpose,
                     qty=qty,
                     product=product.display_name if product.exists() else pid,
                     free=available,
                 ))
+
+    @api.model
+    def _shahtaj_create_walk_in_job(
+        self,
+        sale_order,
+        dm,
+        picking=False,
+        proof_vals=None,
+        notes='',
+        latitude=None,
+        longitude=None,
+    ):
+        """Register a completed Delivery Job for a walk-in van cash sale.
+
+        Walk-ins skip WH pick / shop GPS flow, but distributors still need the
+        stop visible under Delivery Jobs next to shop deliveries.
+        """
+        sale_order = sale_order.sudo()
+        dm = dm.sudo()
+        if not sale_order or not sale_order.exists():
+            return self.browse()
+        if not dm or not dm.shahtaj_is_delivery_man:
+            raise UserError(_('Select a valid delivery man for the walk-in job.'))
+
+        existing = self.sudo().search([
+            ('sale_order_id', '=', sale_order.id),
+            ('delivery_man_id', '=', dm.id),
+        ], limit=1)
+        if existing:
+            return existing
+
+        proof_vals = proof_vals or {}
+        now = fields.Datetime.now()
+        today = fields.Date.context_today(self)
+        van = dm._shahtaj_get_van_location()
+        line_cmds = []
+        for sol in sale_order.order_line.filtered(
+            lambda l: l.product_id and not l.display_type
+        ):
+            qty = sol.product_uom_qty or 0.0
+            if qty <= 0:
+                continue
+            line_cmds.append((0, 0, {
+                'sale_order_line_id': sol.id,
+                'product_id': sol.product_id.id,
+                'product_uom_id': sol.product_uom_id.id,
+                'qty_ordered': qty,
+                'qty_assigned': qty,
+                'qty_to_pick': 0.0,
+                'qty_picked': qty,
+                'qty_to_deliver': 0.0,
+                'qty_delivered': qty,
+            }))
+        if not line_cmds:
+            raise UserError(_('Walk-in order has no deliverable lines.'))
+
+        job = self.sudo().with_context(
+            shahtaj_skip_planning_log=True,
+            tracking_disable=True,
+        ).create({
+            'delivery_man_id': dm.id,
+            'sale_order_id': sale_order.id,
+            'scheduled_date': today,
+            'assignment_mode': 'manual',
+            'assigned_by_id': self.env.user.id,
+            'state': 'delivered',
+            'field_state': 'done',
+            'picked_at': now,
+            'delivered_at': now,
+            'receiver_name': proof_vals.get('receiver_name') or False,
+            'delivery_proof_image': proof_vals.get('delivery_proof_image') or False,
+            'delivery_picking_id': picking.id if picking else False,
+            'van_location_id': van.id if van else False,
+            'notes': (notes or '').strip() or _('Walk-in van cash sale'),
+            'check_in_latitude': latitude if latitude is not None else 0.0,
+            'check_in_longitude': longitude if longitude is not None else 0.0,
+            'gps_verified': True,
+            'line_ids': line_cmds,
+        })
+        return job
 
     @api.model
     def _shahtaj_align_dm_jobs_to_sale_delivery(self, sale_order):
@@ -1907,6 +2196,11 @@ class ShahtajDmDelivery(models.Model):
         """Recompute Stock/Stop/visit task from invoice + line qtys (safe anytime)."""
         self.ensure_one()
         self.sudo()._sync_with_sale_order(ensure_visit_task=True)
+        if self.delivery_man_id:
+            day = self.scheduled_date or fields.Date.context_today(self)
+            self._shahtaj_attribute_free_van_to_open_jobs(self.delivery_man_id, day)
+            # Recompute this job after van attribution (may have become picked).
+            self.sudo()._sync_with_sale_order(ensure_visit_task=True)
         # Also clear completed DM visits if stock is no longer delivered.
         if not any((l.qty_delivered or 0.0) > 0 for l in self.line_ids):
             self._shahtaj_reopen_dm_visit_after_undo()
@@ -2134,6 +2428,8 @@ class ShahtajDmDelivery(models.Model):
         self.write({
             'state': 'returned',
             'return_picking_id': picking.id,
+            # Clear Heading to Shop / other stop flags — job is finished at warehouse.
+            'field_state': 'pending',
         })
         self._ensure_visit_task()
         return self._reload_form(
@@ -2176,10 +2472,12 @@ class ShahtajDmDelivery(models.Model):
         Does not touch allocation / pick qty. Blocked after invoicing.
         """
         if not (
-            self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
+            self.env.user._shahtaj_can_manage_dm_ops()
             or self.env.user.has_group('base.group_system')
         ):
-            raise UserError(_('Only distributors can undo a shop delivery.'))
+            raise UserError(_(
+                'Only distributors, managers, or warehouse incharge can undo a shop delivery.'
+            ))
 
         for job in self:
             job._shahtaj_undo_delivery_to_shop()

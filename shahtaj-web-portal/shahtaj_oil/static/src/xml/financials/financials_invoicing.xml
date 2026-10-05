@@ -15,7 +15,10 @@
                 </t>
             </div>
             <t t-if="this.state.activeSubTab !== 'pnl' and this.state.activeSubTab !== 'money' and this.state.activeSubTab !== 'cash' and this.state.activeSubTab !== 'tax_ledger' and this.state.activeSubTab !== 'expenses' and this.state.activeSubTab !== 'po_management'">
-                <div class="row g-3 px-4 pb-4 bg-light border-bottom">
+                <div class="row g-3 px-4 pb-4 bg-light border-bottom position-relative">
+                    <div t-if="this.state.isLoadingStats" class="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="z-index: 2; background: rgba(248, 250, 252, 0.9);">
+                        <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                    </div>
                     <div class="col-md-2 col-6">
                         <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4">
                             <div class="d-flex align-items-center justify-content-between mb-3">
@@ -108,10 +111,10 @@
                 <MoneyOverview refreshNonce="this.state.refreshNonce"/>
             </t>
             <t t-if="this.state.activeSubTab === 'cash'">
-                <CashActivity initialDirection="this.state.cashDirection" refreshNonce="this.state.refreshNonce"/>
+                <CashActivity initialDirection="this.state.cashDirection" initialDateFrom="this.state.cashDateFrom" initialDateTo="this.state.cashDateTo" refreshNonce="this.state.refreshNonce"/>
             </t>
             <t t-if="this.state.activeSubTab === 'invoices'">
-                <InvoiceManagement requestedInvoiceSubTab="this.state.invoiceSubTab" refreshNonce="this.state.refreshNonce" onStatsRefresh.bind="onStatsRefresh"/>
+                <InvoiceManagement requestedInvoiceSubTab="this.state.invoiceSubTab" requestedInvoiceStatus="this.state.invoiceStatus" refreshNonce="this.state.refreshNonce" onStatsRefresh.bind="onStatsRefresh"/>
             </t>
             <t t-if="this.state.activeSubTab === 'po_management'">
                 <PoManagement requestedPoSubTab="this.state.poSubTab" refreshNonce="this.state.refreshNonce" onStatsRefresh.bind="onStatsRefresh"/>
