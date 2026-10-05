@@ -43,7 +43,7 @@ class ResCompany(models.Model):
         user = self.env.user
         return (
             user.has_group('base.group_system')
-            or user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            or user.has_group('shahtaj_oil.group_shahtaj_distributor')
         )
 
     @api.model
@@ -115,6 +115,23 @@ class ResCompany(models.Model):
         """Called from data/shahtaj_user_access_sync.xml on every module upgrade."""
         from ..setup import run_all_setup_checks
         run_all_setup_checks(self.env)
+
+    @api.model
+    def shahtaj_get_app_info(self):
+        """Installed Shahtaj Oil module version for the portal settings tab."""
+        Module = self.env['ir.module.module']
+        info = Module.get_module_info('shahtaj_oil') or {}
+        module = Module.sudo().search([('name', '=', 'shahtaj_oil')], limit=1)
+        version = (
+            info.get('version')
+            or module.installed_version
+            or module.latest_version
+            or ''
+        )
+        return {
+            'name': info.get('name') or module.shortdesc or 'Shahtaj Oil',
+            'version': version,
+        }
 
     @api.model
     def shahtaj_get_company_profile(self):

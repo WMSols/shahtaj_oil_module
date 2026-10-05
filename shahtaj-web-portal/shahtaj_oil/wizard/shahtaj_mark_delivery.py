@@ -71,6 +71,7 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
 
     def action_confirm_delivery(self):
         self.ensure_one()
+        self.sale_order_id._shahtaj_assert_not_cancelled()
         if not self.line_ids:
             raise UserError(_(
                 'No open delivery for this order. '
@@ -186,7 +187,7 @@ class ShahtajMarkDeliveryWizardLine(models.TransientModel):
     def create(self, vals_list):
         """Fill product/qty context from the move when readonly fields are dropped."""
         Move = self.env['stock.move']
-        if self.env.user._shahtaj_can_manage_dm_ops():
+        if self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor'):
             Move = Move.sudo()
         for vals in vals_list:
             move = Move.browse(vals.get('move_id')) if vals.get('move_id') else Move

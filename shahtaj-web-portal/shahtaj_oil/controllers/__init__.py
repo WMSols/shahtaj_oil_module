@@ -2,5 +2,4 @@
 from . import api
 from . import api_test
 from . import activity_log
-from . import storage_admin
 from . import main

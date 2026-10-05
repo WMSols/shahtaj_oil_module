@@ -12,13 +12,10 @@ class ShahtajApiTargets(http.Controller):
     @http.route('/api/shahtaj/v1/targets/mine', **API_ROUTE)
     def my_targets(self, **kwargs):
         ensure_order_booker()
-        Target = request.env['shahtaj.visit.target']
-        # Current-period only (same shape; ended/upcoming omitted).
-        domain = [
+        targets = request.env['shahtaj.visit.target'].search([
             ('order_booker_id', '=', request.env.user.id),
             ('active', '=', True),
-        ] + Target._domain_current_period()
-        targets = Target.search(domain, order='date_start desc')
+        ], order='date_start desc')
         return api_success({
             'targets': [serializers.target_dict(target) for target in targets],
         })

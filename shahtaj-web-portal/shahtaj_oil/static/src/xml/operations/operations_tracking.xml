@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.OperationsTracking" owl="1">
+        <div class="card border-0 shadow-sm bg-white rounded-3">
+            <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center rounded-top">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-0">Live Operations Tracker</h2>
+                    <small class="text-muted">Monitor field personnel check-ins, track incoming orders, and review booker performance in real-time.</small>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-dark fw-bold text-white shadow-sm d-inline-flex align-items-center" t-on-click="refreshData" t-att-disabled="this.state.isRefreshing" title="Refresh Live Data">
+                        <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isRefreshing}"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <t t-if="this.state.activeSubTab === 'checkins'">
+                <ShopCheckins requestedSubTab="'checkins'" requestedCheckinPurpose="this.props.requestedCheckinPurpose" requestedCheckinRole="this.props.requestedCheckinRole" requestedCheckinDate="this.props.requestedCheckinDate" refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'deliveries'">
+                <DmOperations requestedSubTab="'deliveries'" requestedDeliveriesSubTab="this.state.deliveriesSubTab" refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'orders'">
+                <LiveOrders requestedSubTab="'orders'" refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'performance'">
+                <BookersPerformance requestedSubTab="'performance'" refreshNonce="this.state.refreshNonce"/>
+            </t>
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.FinancialsInvoicing" owl="1">
+        <div class="card border-0 shadow-sm bg-white rounded-3">
+
+            <div class="p-4 bg-light d-flex justify-content-between align-items-center rounded-top">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-0">Financials &amp; Invoicing</h2>
+                    <p class="text-muted">Process field orders into invoices, register received payments, and manage shop credit limits.</p>
+                </div>
+                <t t-if="this.state.activeSubTab !== 'pnl' and this.state.activeSubTab !== 'cash' and this.state.activeSubTab !== 'tax_ledger'">
+                <button class="btn btn-dark fw-bold text-white shadow-sm d-inline-flex align-items-center" t-on-click="refreshData" t-att-disabled="this.state.isRefreshing" title="Refresh Live Data">
+                    <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isRefreshing}"></i> Refresh
+                </button>
+                </t>
+            </div>
+            <t t-if="this.state.activeSubTab !== 'pnl' and this.state.activeSubTab !== 'money' and this.state.activeSubTab !== 'cash' and this.state.activeSubTab !== 'tax_ledger' and this.state.activeSubTab !== 'expenses' and this.state.activeSubTab !== 'po_management'">
+                <div class="row g-3 px-4 pb-4 bg-light border-bottom">
+                    <div class="col-md-2 col-6">
+                        <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <small class="fw-bold text-muted text-uppercase tracking-wider" style="font-size: 0.70rem;">Field Orders</small>
+                                <div class="text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shopping-bag">
+                                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/>
+                                        <path d="M3 6h18"/>
+                                        <path d="M16 10a4 4 0 0 1-8 0"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h2 class="fw-bold text-dark mb-0">
+                                <t t-esc="this.state.stats.totalOrders"/>
+                            </h2>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <small class="fw-bold text-muted text-uppercase tracking-wider" style="font-size: 0.70rem;">To Invoice</small>
+                                <div class=" text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-clock">
+                                        <path d="M16 22h2a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/>
+                                        <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                                        <circle cx="8" cy="16" r="6"/>
+                                        <path d="M9.5 17.5 8 16.25V14"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h2 class="fw-bold text-primary mb-0">
+                                <t t-esc="this.state.stats.toInvoice"/>
+                            </h2>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <small class="fw-bold text-muted text-uppercase tracking-wider" style="font-size: 0.70rem;">Open Invoices</small>
+                                <div class=" text-warning rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-warning">
+                                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                                        <path d="M12 9v4"/>
+                                        <path d="M12 17h.01"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h2 class="fw-bold text-warning mb-0">
+                                <t t-esc="this.state.stats.openInvoices"/>
+                            </h2>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <small class="fw-bold text-muted text-uppercase tracking-wider" style="font-size: 0.70rem;">Credit Notes</small>
+                                <div class="text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-reply">
+                                        <polyline points="9 17 4 12 9 7"/>
+                                        <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h2 class="fw-bold text-danger mb-0">
+                                <t t-esc="this.state.stats.creditNotes"/>
+                            </h2>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-12">
+                        <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <small class="fw-bold text-muted text-uppercase tracking-wider" style="font-size: 0.70rem;">Approved Shops</small>
+                                <div class=" text-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store">
+                                        <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/>
+                                        <path d="M4 12v8a2 2 0 0 0 2 2h2V14h8v8h2a2 2 0 0 0 2-2v-8"/>
+                                        <path d="M2 7h20v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h2 class="fw-bold text-success mb-0">
+                                <t t-esc="this.state.stats.approvedShops"/>
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <t t-if="this.state.activeSubTab === 'money'">
+                <MoneyOverview refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'cash'">
+                <CashActivity initialDirection="this.state.cashDirection" refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'invoices'">
+                <InvoiceManagement requestedInvoiceSubTab="this.state.invoiceSubTab" refreshNonce="this.state.refreshNonce" onStatsRefresh.bind="onStatsRefresh"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'po_management'">
+                <PoManagement requestedPoSubTab="this.state.poSubTab" refreshNonce="this.state.refreshNonce" onStatsRefresh.bind="onStatsRefresh"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'credit'">
+                <CreditControl requestedCreditSubView="this.state.creditSubView" refreshNonce="this.state.refreshNonce" onStatsRefresh.bind="onStatsRefresh"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'tax_ledger'">
+                <TaxLedger refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'expenses'">
+                <Expenses refreshNonce="this.state.refreshNonce" onStatsRefresh.bind="onStatsRefresh"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'pnl'">
+                <Pnl refreshNonce="this.state.refreshNonce"/>
+            </t>
+
+        </div>
+    </t>
+</templates>

@@ -3,7 +3,7 @@
 import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmModal } from "./confirm_modal";
-import { hasFinancialAccess } from "../shahtaj_access";
+import { hasFinancialAccess, notifyPortalBusy } from "../shahtaj_access";
 
 export class WarehouseInventory extends Component {
     static props = {
@@ -14,7 +14,7 @@ export class WarehouseInventory extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         // Universal items per page shared across Inventory, Stock, and Taxes
-        const ITEMS_PER_PAGE = 10;
+        const ITEMS_PER_PAGE = 50;
         this.state = useState({
             activeSubTab: this._normalizeSubTab(this.props.requestedSubTab || 'inventory'),
             previousSubTab: 'inventory',
@@ -151,6 +151,7 @@ export class WarehouseInventory extends Component {
         if (!['inventory', 'management', 'taxes'].includes(tab)) return;
 
         this.state.isLoadingList = true;
+        notifyPortalBusy(true);
         try {
             const pag = this.state.pagination[tab];
             const filters = this.state.filters[tab];
@@ -201,6 +202,7 @@ export class WarehouseInventory extends Component {
             this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
             this.state.isLoadingList = false;
+            notifyPortalBusy(false);
         }
     }
     
@@ -263,7 +265,7 @@ export class WarehouseInventory extends Component {
             name: '',
             vendor_id: '',
             track_inventory: true,
-            invoice_policy: 'delivery',
+            invoice_policy: 'order',
             type: 'consu',
             shahtaj_sale_uom: 'piece',
             shahtaj_kg_per_unit: 1.0,
@@ -433,7 +435,7 @@ export class WarehouseInventory extends Component {
                 type: this.state.productForm.type,
                 list_price: 0.0,
                 standard_price: 0.0,
-                invoice_policy: this.state.productForm.invoice_policy,
+                invoice_policy: 'order',
                 barcode: this.state.productForm.barcode,
                 weight: parseFloat(this.state.productForm.weight || 0),
                 volume: parseFloat(this.state.productForm.volume || 0),
@@ -576,7 +578,7 @@ export class WarehouseInventory extends Component {
                 barcode: this.state.currentProduct.barcode || false,
                 weight: parseFloat(this.state.currentProduct.weight || 0),
                 volume: parseFloat(this.state.currentProduct.volume || 0),
-                invoice_policy: this.state.currentProduct.invoice_policy,
+                invoice_policy: 'order',
                 type: this.state.currentProduct.type,
                 is_storable: !!this.state.currentProduct.is_storable,
                 shahtaj_sale_uom: this.state.currentProduct.shahtaj_sale_uom,

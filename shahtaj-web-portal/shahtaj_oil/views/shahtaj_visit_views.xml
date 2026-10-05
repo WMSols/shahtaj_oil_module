@@ -49,7 +49,7 @@
                             class="btn-warning"
                             confirm="Undo this completed visit? The linked sales order will be cancelled (only if not invoiced/delivered), the visit will be marked undone, and the order booker will be asked to check in again."
                             invisible="state != 'completed' or visit_kind == 'delivery_man'"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,base.group_system"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor,base.group_system"/>
                     <field name="state" widget="statusbar" statusbar_visible="in_progress,completed,cancelled"/>
                 </header>
                 <sheet>

@@ -40,27 +40,24 @@
                 <header>
                     <button name="action_shahtaj_activate_delivery_man" type="object"
                             string="Activate" class="oe_highlight"
-                            invisible="active" readonly="0"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            invisible="active" readonly="0"/>
                     <button name="action_shahtaj_deactivate_delivery_man" type="object"
                             string="Deactivate"
                             invisible="not active" readonly="0"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"
                             confirm="Deactivate this delivery man? They will not be able to log in."/>
                     <button name="action_shahtaj_dm_collect_payment" type="object"
                             string="Collect Payment" class="btn-secondary"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                     <button name="action_shahtaj_dm_walk_in" type="object"
                             string="Walk-in Delivery" class="btn-secondary"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse,shahtaj_oil.group_shahtaj_delivery_man"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_delivery_man"/>
                     <button name="action_shahtaj_dm_settle_wallet" type="object"
                             string="Settle Wallet to Bank" class="btn-primary"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"
+                            groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"
                             confirm="Settle this delivery man's wallet cash to the bank?"/>
                     <button name="action_shahtaj_delete_delivery_man" type="object"
                             string="Delete Permanently" class="btn-danger"
                             readonly="0"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"
                             confirm="Permanently delete this delivery man? This cannot be undone."/>
                 </header>
                 <sheet>
@@ -94,14 +91,9 @@
                             <field name="shahtaj_dm_dispatchable_order_count" widget="statinfo"
                                    string="To Dispatch"/>
                         </button>
-                        <button name="action_shahtaj_dm_view_walk_in_orders" type="object"
-                                class="oe_stat_button" icon="fa-shopping-bag">
-                            <field name="shahtaj_dm_walk_in_order_count" widget="statinfo"
-                                   string="Walk-in Orders"/>
-                        </button>
                         <button name="action_shahtaj_dm_view_wallet_collections" type="object"
                                 class="oe_stat_button" icon="fa-money"
-                                groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui">
+                                groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui">
                             <div class="o_stat_info">
                                 <span class="o_stat_value">
                                     <field name="shahtaj_dm_wallet_balance" nolabel="1" widget="monetary"/>
@@ -209,35 +201,6 @@
                                 Confirmed orders still to deliver. If this delivery man has
                                 assigned order bookers, only their shops are listed.
                                 Use <b>Assign / Split</b> to plan day, time, and quantities.
-                            </div>
-                        </page>
-                        <page string="Walk-in Orders" name="walk_in_orders">
-                            <div class="mb-2">
-                                <button name="action_shahtaj_dm_walk_in" type="object"
-                                        string="New Walk-in Delivery" class="btn btn-primary"
-                                        icon="fa-plus"/>
-                                <button name="action_shahtaj_dm_view_walk_in_orders" type="object"
-                                        string="Open Full List" class="btn btn-secondary"
-                                        icon="fa-external-link"/>
-                            </div>
-                            <field name="shahtaj_dm_walk_in_order_ids" nolabel="1"
-                                   mode="list" readonly="1">
-                                <list create="0" delete="0" edit="0"
-                                      default_order="date_order desc">
-                                    <field name="name" string="Order"/>
-                                    <field name="partner_id" string="Customer"/>
-                                    <field name="shahtaj_is_walk_in" string="Walk-in"/>
-                                    <field name="date_order"/>
-                                    <field name="amount_total" sum="Total"/>
-                                    <field name="invoice_status" optional="show"/>
-                                    <field name="currency_id" column_invisible="1"/>
-                                    <field name="state" widget="badge"/>
-                                </list>
-                            </field>
-                            <div class="alert alert-info mt-2" role="alert">
-                                Van cash-and-carry sales by this delivery man. Same sale
-                                orders appear under Field Sales Orders with the
-                                <b>Walk-in</b> tag (already invoiced and paid into the DM wallet).
                             </div>
                         </page>
                         <page string="Van Stock" name="van_stock">

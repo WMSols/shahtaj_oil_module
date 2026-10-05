@@ -13,11 +13,11 @@
                     <button name="action_shahtaj_open_assign_to_route" type="object"
                             string="Assign to Route"
                             display="always"
-                            groups="shahtaj_oil.group_shahtaj_office_ops"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor"/>
                     <button name="action_shahtaj_unassign_route" type="object"
                             string="Clear all routes"
                             confirm="Remove this shop from all routes? It will get no visit tasks until assigned again from a route."
-                            groups="shahtaj_oil.group_shahtaj_office_ops"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor"/>
                 </header>
                 <field name="id" string="Shop ID" optional="show"/>
                 <field name="name" string="Shop Name"/>
@@ -98,25 +98,21 @@
         <field name="arch" type="xml">
             <form string="Shop">
                 <header>
-                    <button string="Save" special="save" class="oe_highlight" data-hotkey="s"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager"/>
-                    <button string="Discard" special="cancel" data-hotkey="j"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager"/>
+                    <button string="Save" special="save" class="oe_highlight" data-hotkey="s"/>
+                    <button string="Discard" special="cancel" data-hotkey="j"/>
                     <button name="action_approve_shop" type="object" string="Approve Shop"
                             class="oe_highlight"
-                            invisible="shop_approval_state == 'approved'"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager"/>
+                            invisible="shop_approval_state == 'approved'"/>
                     <button name="action_reject_shop" type="object" string="Reject"
-                            invisible="shop_approval_state == 'rejected'"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager"/>
+                            invisible="shop_approval_state == 'rejected'"/>
                     <button name="action_shahtaj_open_assign_to_route" type="object"
                             string="Assign to Route"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor"/>
                     <button name="action_shahtaj_unassign_route" type="object"
                             string="Clear all routes"
                             invisible="not route_ids"
                             confirm="Remove this shop from all routes? It will get no visit tasks until assigned again from a route."
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor"/>
                     <button name="action_view_legacy_balance_move" type="object"
                             string="Legacy Balance Invoice"
                             invisible="not legacy_balance_move_id"
@@ -126,7 +122,7 @@
                             class="btn-outline-warning"
                             invisible="not shahtaj_field_verified"
                             confirm="Are you sure you want to reset verification and clear GPS coordinates for this shop? The Order Booker will be required to re-verify the location and take exterior photo on their next visit."
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager,account.group_account_manager"/>
+                            groups="shahtaj_oil.group_shahtaj_distributor,account.group_account_manager"/>
                     <field name="shahtaj_visit_tag" widget="badge"
                            decoration-warning="shahtaj_visit_tag == 'not_visited'"
                            decoration-success="shahtaj_visit_tag == 'visited'"/>
@@ -154,7 +150,7 @@
                                 name="action_shahtaj_view_sale_orders"
                                 class="oe_stat_button"
                                 icon="fa-shopping-cart"
-                                groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager">
+                                groups="shahtaj_oil.group_shahtaj_distributor">
                             <field name="sale_order_count" widget="statinfo" string="Sales Orders"/>
                         </button>
                         <button type="object"
@@ -220,7 +216,7 @@
                                         class="btn btn-sm btn-link text-warning p-0"
                                         invisible="not shahtaj_field_verified"
                                         confirm="Reset field verification and clear GPS coordinates for this shop?"
-                                        groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager,account.group_account_manager"/>
+                                        groups="shahtaj_oil.group_shahtaj_distributor,account.group_account_manager"/>
                             </div>
                             <field name="shahtaj_field_verified_at" readonly="1"
                                    invisible="not shahtaj_field_verified"/>
@@ -265,19 +261,19 @@
                         </group>
                         <group>
                             <field name="outstanding_balance" string="Posted Outstanding (Rs)"
-                                   groups="shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_order_approver"/>
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                             <field name="shahtaj_pending_order_exposure" string="Pending Orders"
                                    widget="monetary"
-                                   groups="shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_order_approver"/>
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                             <field name="shahtaj_uninvoiced_order_exposure" string="Confirmed (Not Invoiced)"
                                    widget="monetary"
-                                   groups="shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_order_approver"/>
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                             <field name="shahtaj_effective_outstanding" string="Effective Outstanding"
                                    widget="monetary" class="fw-bold"
-                                   groups="shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_order_approver"/>
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                             <field name="shahtaj_credit_remaining_effective" string="Credit Remaining"
                                    widget="monetary"
-                                   groups="shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_order_approver"/>
+                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
                             <field name="credit" string="Total Receivable (Odoo)"
                                    groups="account.group_account_invoice,account.group_account_readonly"/>
                             <field name="property_account_receivable_id"

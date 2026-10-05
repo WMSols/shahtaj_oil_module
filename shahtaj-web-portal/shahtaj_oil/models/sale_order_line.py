@@ -67,7 +67,7 @@ class SaleOrderLine(models.Model):
         user = self.env.user
         if user.has_group('stock.group_stock_user'):
             return False
-        return user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
 
     _SHAHTAJ_DISCOUNT_LINE_FIELDS = frozenset({
         'price_unit', 'product_id', 'product_uom_qty', 'discount',
@@ -83,6 +83,7 @@ class SaleOrderLine(models.Model):
         lines.order_id._shahtaj_recompute_visit_targets()
         if not self.env.context.get('shahtaj_skip_approval_sync'):
             lines.order_id._shahtaj_sync_approval_state_from_lines()
+        lines.order_id._shahtaj_check_bookable_qty()
         return lines
 
     def write(self, vals):
@@ -95,6 +96,7 @@ class SaleOrderLine(models.Model):
         orders = orders_before | self.order_id
         if any(k in vals for k in ('product_id', 'product_uom_qty', 'order_id')):
             orders._shahtaj_recompute_visit_targets()
+            orders._shahtaj_check_bookable_qty()
         if self._SHAHTAJ_DISCOUNT_LINE_FIELDS.intersection(vals):
             orders._shahtaj_sync_approval_state_from_lines()
         return res

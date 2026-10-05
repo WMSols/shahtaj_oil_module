@@ -24,7 +24,7 @@
                         <group string="Wallet">
                             <field name="delivery_man_id"
                                    readonly="context.get('lock_delivery_man')"
-                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
+                                   groups="shahtaj_oil.group_shahtaj_distributor,shahtaj_oil.group_shahtaj_native_distributor_ui"/>
                             <field name="delivery_man_id" readonly="1"
                                    groups="shahtaj_oil.group_shahtaj_delivery_man"/>
                             <field name="wallet_balance" readonly="1"/>
@@ -154,68 +154,24 @@
         </field>
     </record>
 
-    <record id="view_shahtaj_dm_wallet_settlement_form" model="ir.ui.view">
-        <field name="name">shahtaj.dm.wallet.settlement.form</field>
-        <field name="model">shahtaj.dm.wallet.settlement</field>
-        <field name="arch" type="xml">
-            <form string="DM Wallet Settlement" create="false" edit="false" delete="false">
-                <header>
-                    <field name="state" widget="statusbar"
-                           statusbar_visible="posted,cancelled"/>
-                </header>
-                <sheet>
-                    <group>
-                        <group>
-                            <field name="delivery_man_id" readonly="1"/>
-                            <field name="settlement_date" readonly="1"/>
-                            <field name="amount" readonly="1"/>
-                            <field name="currency_id" invisible="1"/>
-                        </group>
-                        <group>
-                            <field name="bank_journal_id" readonly="1"/>
-                            <field name="settled_by_id" readonly="1"/>
-                            <field name="move_id" readonly="1"/>
-                            <field name="company_id" groups="base.group_multi_company" readonly="1"/>
-                        </group>
-                    </group>
-                    <group>
-                        <field name="notes" readonly="1"/>
-                    </group>
-                </sheet>
-            </form>
-        </field>
-    </record>
-
     <record id="view_shahtaj_dm_wallet_collection_list" model="ir.ui.view">
         <field name="name">account.payment.list.shahtaj.dm.wallet</field>
         <field name="model">account.payment</field>
         <field name="priority">90</field>
         <field name="arch" type="xml">
             <list create="false" edit="false" delete="false"
-                  decoration-success="shahtaj_collection_status == 'paid'"
-                  decoration-warning="shahtaj_collection_status in ('partial', 'in_payment')"
-                  decoration-info="shahtaj_collection_status == 'collected'"
-                  decoration-danger="shahtaj_collection_status in ('not_paid', 'canceled')">
+                  decoration-success="state in ('paid', 'in_process')">
                 <field name="date"/>
                 <field name="name"/>
                 <field name="partner_id" string="Shop"/>
-                <field name="amount" string="Collected" sum="Collected"/>
-                <field name="shahtaj_invoice_names" string="Invoices" optional="show"/>
-                <field name="shahtaj_invoice_amount_total" string="Invoice Total" optional="show"
-                       sum="Invoice Total"/>
-                <field name="shahtaj_invoice_amount_residual" string="Remaining" optional="show"
-                       sum="Remaining"/>
+                <field name="amount" sum="Collected"/>
                 <field name="shahtaj_payment_channel" string="Method"/>
                 <field name="shahtaj_instrument_reference" string="Cheque #" optional="show"/>
                 <field name="shahtaj_has_cheque_image" string="Cheque photo" optional="hide"/>
                 <field name="shahtaj_collected_by_dm_id" string="DM"/>
                 <field name="shahtaj_dm_delivery_id" optional="show"/>
-                <field name="shahtaj_payment_notes" optional="hide"/>
-                <field name="shahtaj_collection_status" string="Status" widget="badge"
-                       decoration-success="shahtaj_collection_status == 'paid'"
-                       decoration-warning="shahtaj_collection_status in ('partial', 'in_payment')"
-                       decoration-info="shahtaj_collection_status == 'collected'"
-                       decoration-danger="shahtaj_collection_status in ('not_paid', 'canceled')"/>
+                <field name="shahtaj_payment_notes" optional="show"/>
+                <field name="state" widget="badge"/>
                 <field name="currency_id" column_invisible="1"/>
             </list>
         </field>
@@ -236,17 +192,9 @@
                         <group string="Collection">
                             <field name="date" readonly="1"/>
                             <field name="partner_id" string="Shop" readonly="1"/>
-                            <field name="amount" string="Collected amount" readonly="1"/>
+                            <field name="amount" readonly="1"/>
                             <field name="currency_id" invisible="1"/>
-                            <field name="shahtaj_collection_status" string="Status" widget="badge"
-                                   readonly="1"
-                                   decoration-success="shahtaj_collection_status == 'paid'"
-                                   decoration-warning="shahtaj_collection_status in ('partial', 'in_payment')"
-                                   decoration-info="shahtaj_collection_status == 'collected'"
-                                   decoration-danger="shahtaj_collection_status in ('not_paid', 'canceled')"/>
-                            <field name="shahtaj_invoice_names" string="Invoices" readonly="1"/>
-                            <field name="shahtaj_invoice_amount_total" string="Invoice Total" readonly="1"/>
-                            <field name="shahtaj_invoice_amount_residual" string="Invoice Remaining" readonly="1"/>
+                            <field name="state" widget="badge" readonly="1"/>
                         </group>
                         <group string="DM Wallet">
                             <field name="shahtaj_collected_by_dm_id" string="Collected By" readonly="1"/>
@@ -258,9 +206,6 @@
                                    invisible="shahtaj_payment_channel != 'cheque'"/>
                             <field name="shahtaj_has_cheque_image" invisible="1"/>
                         </group>
-                    </group>
-                    <group string="Invoice details" colspan="2">
-                        <field name="shahtaj_invoice_summary_html" nolabel="1" colspan="2" readonly="1"/>
                     </group>
                     <group string="Cheque photo"
                            invisible="shahtaj_payment_channel != 'cheque' or not shahtaj_has_cheque_image">
@@ -303,10 +248,6 @@
         <field name="name">DM Wallet Settlements</field>
         <field name="res_model">shahtaj.dm.wallet.settlement</field>
         <field name="view_mode">list,form</field>
-        <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
-        <field name="view_ids" eval="[(5, 0, 0),
-            (0, 0, {'view_mode': 'list', 'view_id': ref('view_shahtaj_dm_wallet_settlement_list')}),
-            (0, 0, {'view_mode': 'form', 'view_id': ref('view_shahtaj_dm_wallet_settlement_form')})]"/>
     </record>
 
 </odoo>

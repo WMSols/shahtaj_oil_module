@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.FinancialsExpenses" owl="1">
+            <t t-if="this.state.activeSubTab === 'expenses'">
+                <div class="px-4 pt-3 bg-white border-bottom shadow-sm" style="overflow-x: auto; overflow-y: hidden;">
+                    <ul class="nav nav-tabs border-0 flex-nowrap text-nowrap mb-0">
+                        <li class="nav-item me-4">
+                            <button t-on-click="() => this.setExpenseSubTab('expenses')" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 fs-6 #{this.state.expenseSubTab === 'expenses' ? 'text-primary border-bottom border-primary border-3 rounded-0' : 'text-muted'}" title="View and log daily operating expenses">
+                                <i class="fa fa-credit-card me-1"></i> Operating Expenses
+                            </button>
+                        </li>
+                        <li class="nav-item me-4">
+                            <button t-on-click="() => this.setExpenseSubTab('categories')" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 fs-6 #{this.state.expenseSubTab === 'categories' ? 'text-primary border-bottom border-primary border-3 rounded-0' : 'text-muted'}" title="Manage expense categorizations">
+                                <i class="fa fa-tags me-1"></i> Expense Categories
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- EXPENSES LIST, DETAILS & FORM -->
+                <t t-if="this.state.expenseSubTab === 'expenses'">
+                    
+                    <!-- 1. LIST VIEW -->
+                    <t t-if="!this.state.showExpenseForm and !this.state.selectedExpense">
+                        <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
+                            <div class="input-group input-group-sm w-25 shadow-sm">
+                                <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search description..." 
+                                       t-att-value="this.state.filters.expenses.search" t-on-input="(ev) => this.onSearchInput(ev, 'expenses')"/>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <select class="form-select form-select-sm shadow-sm" t-model="this.state.filters.expenses.status" t-on-change="() => this.onFilterChange('expenses')">
+                                    <option value="all">All Statuses</option>
+                                    <option value="draft">Draft</option>
+                                    <option value="posted">Posted</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                                <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="openExpenseForm">
+                                    <i class="fa fa-plus me-1"></i> New Expense
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="position-relative">
+                            <t t-if="this.state.isLoadingList">
+                                <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;"><div class="spinner-border text-primary" role="status"></div></div>
+                            </t>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                        <tr>
+                                            <th class="ps-4 py-3">Date</th>
+                                            <th>Category / Description</th>
+                                            <th>Paid To</th>
+                                            <th>Journal</th>
+                                            <th class="text-end">Amount</th>
+                                            <th class="text-center pe-4">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="this.state.tableExpenses.length === 0 and !this.state.isLoadingList">
+                                            <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No expenses found.</td></tr>
+                                        </t>
+                                        <t t-foreach="this.state.tableExpenses" t-as="exp" t-key="exp.id">
+                                            <!-- Make row clickable -->
+                                            <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewExpense(exp)">
+                                                <td class="ps-4 fw-bold"><t t-esc="exp.date"/></td>
+                                                <td><span class="badge bg-secondary text-dark me-2"><t t-esc="exp.category"/></span><t t-esc="exp.description"/></td>
+                                                <td class="text-muted"><t t-esc="exp.partner"/></td>
+                                                <td><t t-esc="exp.journal"/></td>
+                                                <td class="text-end fw-bold text-dark">Rs. <t t-esc="exp.amount"/></td>
+                                                <td class="text-center pe-4">
+                                                    <span t-attf-class="badge #{exp.state === 'posted' ? 'bg-success' : exp.state === 'draft' ? 'bg-info text-dark' : 'bg-danger'} text-white px-2 py-1 shadow-sm text-capitalize"><t t-esc="exp.state"/></span>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                            </div>
+                            <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                                <small class="text-muted fw-bold">Showing <t t-esc="this.state.pagination.expenses.total === 0 ? 0 : ((this.state.pagination.expenses.page - 1) * this.state.pagination.expenses.limit) + 1"/> to <t t-esc="Math.min(this.state.pagination.expenses.page * this.state.pagination.expenses.limit, this.state.pagination.expenses.total)"/> of <t t-esc="this.state.pagination.expenses.total"/></small>
+                                <div class="btn-group shadow-sm">
+                                    <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('expenses', -1)" t-att-disabled="this.state.pagination.expenses.page === 1">Prev</button>
+                                    <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.expenses.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.expenses.total / this.state.pagination.expenses.limit))"/></button>
+                                    <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('expenses', 1)" t-att-disabled="this.state.pagination.expenses.page &gt;= Math.ceil(this.state.pagination.expenses.total / this.state.pagination.expenses.limit)">Next</button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- 2. DETAILED VIEW -->
+                    <t t-elif="this.state.selectedExpense">
+                        <div class="p-4 bg-light">
+                            <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm mb-4" t-on-click="() => this.state.selectedExpense = null">
+                                <i class="fa fa-arrow-left me-1"></i> Back to Expenses
+                            </button>
+                            <div t-attf-class="card p-0 shadow-sm border-0 border-start border-4 #{this.state.selectedExpense.state === 'posted' ? 'border-success' : this.state.selectedExpense.state === 'draft' ? 'border-info' : 'border-danger'} overflow-hidden">
+                                <div class="p-4 border-bottom bg-white d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                    <div>
+                                        <h4 class="mb-1 text-dark fw-bold"><t t-esc="this.state.selectedExpense.name"/></h4>
+                                        <span t-attf-class="badge #{this.state.selectedExpense.state === 'posted' ? 'bg-success' : this.state.selectedExpense.state === 'draft' ? 'bg-info text-dark' : 'bg-danger'} text-white px-2 py-1 shadow-sm text-capitalize">
+                                            <t t-esc="this.state.selectedExpense.state"/>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button t-if="this.state.selectedExpense.state === 'draft'" class="btn btn-success fw-bold text-white shadow-sm" t-on-click="() => this.actionPostExpense(this.state.selectedExpense.id)">
+                                            <i class="fa fa-check me-1"></i> Post Expense
+                                        </button>
+                                        <button t-if="this.state.selectedExpense.state !== 'cancelled'" class="btn btn-outline-danger fw-bold shadow-sm bg-white" t-on-click="() => this.actionCancelExpense(this.state.selectedExpense.id)">
+                                            <i class="fa fa-times me-1"></i> Cancel
+                                        </button>
+                                        <button t-if="this.state.selectedExpense.has_move" class="btn btn-dark fw-bold text-white shadow-sm" t-on-click="() => this.viewExpenseJournalEntry(this.state.selectedExpense.id)" t-att-disabled="this.state.isLoadingLines">
+                                            <span t-if="this.state.isLoadingLines" class="spinner-border spinner-border-sm me-2"/>
+                                            <i t-else="" class="fa fa-book me-1"></i> View Journal Entry
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="p-4 bg-white">
+                                    <div class="row gx-4 gy-4">
+                                        <div class="col-md-3">
+                                            <div class="small text-muted fw-bold text-uppercase mb-1">Date</div>
+                                            <div class="fw-bold text-dark fs-6"><t t-esc="this.state.selectedExpense.date"/></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="small text-muted fw-bold text-uppercase mb-1">Category</div>
+                                            <div class="fw-bold text-dark fs-6"><t t-esc="this.state.selectedExpense.category"/></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="small text-muted fw-bold text-uppercase mb-1">Paid From</div>
+                                            <div class="fw-bold text-dark fs-6"><t t-esc="this.state.selectedExpense.journal"/></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="small text-muted fw-bold text-uppercase mb-1">Paid To</div>
+                                            <div class="fw-bold text-dark fs-6"><t t-esc="this.state.selectedExpense.partner"/></div>
+                                        </div>
+                                    <div class="col-md-6">
+                                            <div class="small text-muted fw-bold text-uppercase mb-1">Description</div>
+                                            <div class="text-dark fs-6"><t t-esc="this.state.selectedExpense.description"/></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="small text-muted fw-bold text-uppercase mb-1">Amount</div>
+                                            <div class="text-danger fw-bold fs-4">Rs. <t t-esc="this.state.selectedExpense.amount"/></div>
+                                    </div>
+                                        <div class="col-12 mt-3 pt-3 border-top">
+                                            <div class="small text-muted fw-bold text-uppercase mb-2">Notes</div>
+                                            <div class="bg-light p-3 rounded text-dark" style="min-height: 80px;"><t t-esc="this.state.selectedExpense.notes"/></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- 3. CREATE FORM -->
+                    <t t-else="">
+                        <div class="p-4 bg-light border-bottom">
+                            <h4 class="fw-bold text-dark mb-0">Record Operating Expense</h4>
+                            <small class="text-muted mb-4 d-block">This will deduct money from your selected journal and impact Net Profit.</small>
+                            <div class="row g-3 bg-white p-3 rounded-3 shadow-sm border">
+                                <div class="col-md-3">
+                                    <label class="small fw-bold">Date</label>
+                                    <input type="date" class="form-control" t-model="this.state.expenseForm.date"/>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold text-success">Amount (Rs.) <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control fw-bold text-success" t-model="this.state.expenseForm.amount"/>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Category <span class="text-danger">*</span></label>
+                                    <select class="form-select" t-model="this.state.expenseForm.category_id">
+                                        <option value="">-- Select Category --</option>
+                                        <t t-foreach="this.state.expenseLookups.categories" t-as="cat" t-key="cat.id">
+                                            <option t-att-value="cat.id"><t t-esc="cat.name"/></option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Short Description <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" t-model="this.state.expenseForm.description" placeholder="e.g. Fuel for Route A"/>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Paid From (Cash/Bank) <span class="text-danger">*</span></label>
+                                    <select class="form-select" t-model="this.state.expenseForm.journal_id">
+                                        <option value="">-- Select Journal --</option>
+                                        <t t-foreach="this.state.expenseLookups.journals" t-as="j" t-key="j.id">
+                                            <option t-att-value="j.id"><t t-esc="j.name"/></option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Paid To (Booker / Shop)</label>
+                                    <select class="form-select" t-model="this.state.expenseForm.partner_id">
+                                        <option value="">-- Optional --</option>
+                                        <t t-foreach="this.state.expenseLookups.partners" t-as="p" t-key="p.id">
+                                            <option t-att-value="p.id"><t t-esc="p.name"/></option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Notes</label>
+                                    <input type="text" class="form-control" t-model="this.state.expenseForm.notes" placeholder="Additional details or receipt ref"/>
+                                </div>
+                                <div class="col-12 text-end pt-3 border-top mt-3">
+                                    <button class="btn btn-outline-secondary fw-bold px-4 me-2" t-on-click="() => this.state.showExpenseForm = false">Cancel</button>
+                                    <button class="btn btn-dark fw-bold text-white px-4" t-on-click="saveExpense"><i class="fa fa-save me-1"></i> Save as Draft</button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+
+                <!-- EXPENSE CATEGORIES -->
+                <t t-if="this.state.expenseSubTab === 'categories'">
+                    <t t-if="!this.state.showCategoryForm">
+                        <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
+                            <div class="input-group input-group-sm w-25 shadow-sm">
+                                <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search category..." 
+                                       t-att-value="this.state.filters.expenseCategories.search" t-on-input="(ev) => this.onSearchInput(ev, 'expenseCategories')"/>
+                            </div>
+                            <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm" t-on-click="() => this.openCategoryForm()">
+                                <i class="fa fa-plus me-1"></i> New Category
+                                        </button>
+                                    </div>
+                        <div class="position-relative">
+                            <t t-if="this.state.isLoadingList">
+                                <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;"><div class="spinner-border text-primary" role="status"></div></div>
+                            </t>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                        <tr>
+                                            <th class="ps-4 py-3">Category Name</th>
+                                            <th>Sequence</th>
+                                            <th>Status</th>
+                                            <th class="text-end pe-4">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="this.state.tableExpenseCategories.length === 0 and !this.state.isLoadingList">
+                                            <tr><td colspan="4" class="text-center py-5 text-muted fw-bold">No categories found.</td></tr>
+                                        </t>
+                                        <t t-foreach="this.state.tableExpenseCategories" t-as="cat" t-key="cat.id">
+                                            <tr>
+                                                <td class="ps-4 fw-bold text-dark"><t t-esc="cat.name"/></td>
+                                                <td class="text-muted"><t t-esc="cat.sequence"/></td>
+                                                <td><span t-attf-class="badge #{cat.active ? 'bg-success text-white' : 'bg-secondary text-dark'} shadow-sm"><t t-esc="cat.active ? 'Active' : 'Archived'"/></span></td>
+                                                <td class="text-end pe-4"><button class="btn btn-sm btn-outline-primary fw-bold" t-on-click="() => this.openCategoryForm(cat)">Edit</button></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- Expense Categories Pagination -->
+                            <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                                <small class="text-muted fw-bold">Showing <t t-esc="this.state.pagination.expenseCategories.total === 0 ? 0 : ((this.state.pagination.expenseCategories.page - 1) * this.state.pagination.expenseCategories.limit) + 1"/> to <t t-esc="Math.min(this.state.pagination.expenseCategories.page * this.state.pagination.expenseCategories.limit, this.state.pagination.expenseCategories.total)"/> of <t t-esc="this.state.pagination.expenseCategories.total"/></small>
+                                <div class="btn-group shadow-sm">
+                                    <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('expenseCategories', -1)" t-att-disabled="this.state.pagination.expenseCategories.page === 1">Prev</button>
+                                    <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.expenseCategories.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.expenseCategories.total / this.state.pagination.expenseCategories.limit))"/></button>
+                                    <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('expenseCategories', 1)" t-att-disabled="this.state.pagination.expenseCategories.page &gt;= Math.ceil(this.state.pagination.expenseCategories.total / this.state.pagination.expenseCategories.limit)">Next</button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                    
+                    <t t-else="">
+                        <div class="p-4 bg-light border-bottom">
+                            <h4 class="fw-bold text-dark mb-4"><t t-esc="this.state.categoryForm.id ? 'Edit Category' : 'Create Category'"/></h4>
+                            <div class="row g-3 bg-white p-3 rounded-3 shadow-sm border" style="max-width: 600px;">
+                                <div class="col-md-8">
+                                    <label class="small fw-bold">Category Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" t-model="this.state.categoryForm.name" placeholder="e.g. Fuel, Maintenance"/>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="small fw-bold">Sequence</label>
+                                    <input type="number" class="form-control" t-model="this.state.categoryForm.sequence"/>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" id="catActive" t-model="this.state.categoryForm.active"/>
+                                        <label class="form-check-label small fw-bold" for="catActive">Active</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="small fw-bold">Notes</label>
+                                    <input type="text" class="form-control" t-model="this.state.categoryForm.note"/>
+                                </div>
+                                <div class="col-12 text-end pt-3 mt-2 border-top">
+                                    <button class="btn btn-outline-secondary fw-bold px-4 me-2" t-on-click="() => this.state.showCategoryForm = false">Cancel</button>
+                                    <button class="btn btn-dark fw-bold text-white px-4" t-on-click="saveCategory">Save Category</button>
+                                </div>
+                            </div>
+                        </div>
+                </t>
+            </t>
+            </t>
+            <t t-if="this.state.showExpenseMoveModal">
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background-color: rgba(0, 0, 0, 0.6); z-index: 1060; padding: 1rem;">
+                    <div class="bg-white p-0 rounded-4 shadow-lg overflow-hidden" style="width: 800px; max-height: 90vh; display: flex; flex-direction: column;">
+                        
+                        <!-- Modal Header -->
+                        <div class="d-flex justify-content-between align-items-center p-4 bg-light border-bottom">
+                    <div>
+                                <h5 class="fw-bold text-dark mb-1">
+                                    <i class="fa fa-book text-primary me-2"></i> Journal Entry
+                                </h5>
+                                <small class="text-muted">Detailed view of the double-entry accounting record.</small>
+                    </div>
+                            <div class="d-flex align-items-center gap-2">
+                            <span t-attf-class="badge #{this.state.selectedExpenseMove.state === 'Posted' ? 'bg-success text-white' : 'bg-secondary text-dark'} px-3 py-2 shadow-sm fs-6">
+                                <t t-esc="this.state.selectedExpenseMove.state"/>
+                            </span>
+                            <button type="button" class="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 32px; height: 32px;" t-on-click="closeExpenseMoveModal" title="Close" aria-label="Close">
+                                <i class="fa fa-times"></i>
+                            </button>
+                            </div>
+                        </div>
+
+                        <!-- Modal Body (Scrollable) -->
+                        <div class="p-4 overflow-auto" style="background-color: #f8fafc;">
+                            <div class="card border-0 shadow-sm rounded-3 p-4 mb-4 bg-white">
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <span class="text-muted fw-bold small d-block text-uppercase mb-1">Entry Number</span>
+                                        <span class="fw-bold fs-5 text-primary"><t t-esc="this.state.selectedExpenseMove.name"/></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <span class="text-muted fw-bold small d-block text-uppercase mb-1">Associated Journal</span>
+                                        <span class="fw-bold text-dark"><i class="fa fa-bank text-muted me-1"></i> <t t-esc="this.state.selectedExpenseMove.journal"/></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <span class="text-muted fw-bold small d-block text-uppercase mb-1">Reference / Expense ID</span>
+                                        <span class="fw-bold text-dark"><t t-esc="this.state.selectedExpenseMove.ref"/></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <span class="text-muted fw-bold small d-block text-uppercase mb-1">Accounting Date</span>
+                                        <span class="fw-bold text-dark"><t t-esc="this.state.selectedExpenseMove.date"/></span>
+                                    </div>
+                    </div>
+                </div>
+
+                            <h6 class="fw-bold text-dark mb-3">Journal Items (Debits &amp; Credits)</h6>
+                            <div class="table-responsive border rounded-3 shadow-sm bg-white">
+                                <table class="table table-hover table-borderless table-striped align-middle mb-0">
+                                    <thead class="bg-light text-muted small text-uppercase fw-bold border-bottom">
+                                        <tr>
+                                            <th class="ps-4 py-3">Account</th>
+                                            <th>Label / Description</th>
+                                            <th class="text-end text-success">Debit</th>
+                                            <th class="text-end pe-4 text-danger">Credit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                        <t t-foreach="this.state.selectedExpenseMove.lines" t-as="line" t-key="line.id">
+                                            <tr>
+                                                <td class="ps-4 fw-bold text-dark"><t t-esc="line.account"/></td>
+                                                <td class="text-muted"><t t-esc="line.label"/></td>
+                                                <td class="text-end fw-bold text-dark">
+                                                    <t t-if="line.debit > 0">Rs. <t t-esc="line.debit.toLocaleString(undefined, {minimumFractionDigits: 2})"/></t>
+                                                    <t t-else="">-</t>
+                                    </td>
+                                                <td class="text-end pe-4 fw-bold text-dark">
+                                                    <t t-if="line.credit > 0">Rs. <t t-esc="line.credit.toLocaleString(undefined, {minimumFractionDigits: 2})"/></t>
+                                                    <t t-else="">-</t>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+            <t t-if="this.state.confirmModal.isOpen">
+                <ConfirmModal title="this.state.confirmModal.title" message="this.state.confirmModal.message" onConfirm="this.state.confirmModal.onConfirm" onCancel="() => this.closeConfirm()" />
+            </t>
+    </t>
+</templates>

@@ -1,5 +1,26 @@
 /* Custom-portal distributors: avatar + Log out only. */
 
+body.o_shahtaj_custom_portal .o_main_navbar {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    color: #334155;
+    --o-navbar-background: #ffffff;
+    --NavBar-entry-color: #334155;
+    --NavBar-entry-color--hover: #0f172a;
+    --NavBar-entry-color--active: #0f172a;
+    --NavBar-brand-color: #0f172a;
+}
+
+body.o_shahtaj_custom_portal .o_main_navbar .o_nav_entry,
+body.o_shahtaj_custom_portal .o_main_navbar .o_menu_brand,
+body.o_shahtaj_custom_portal .o_main_navbar .o_nav_entry_icon,
+body.o_shahtaj_custom_portal .o_main_navbar .oi,
+body.o_shahtaj_custom_portal .o_main_navbar .fa,
+body.o_shahtaj_custom_portal .o_main_navbar .o_user_menu,
+body.o_shahtaj_custom_portal .o_main_navbar i {
+    color: #334155 !important;
+}
+
 body.o_shahtaj_custom_portal .o_navbar_apps_menu,
 body.o_shahtaj_custom_portal .o_menu_toggle,
 body.o_shahtaj_custom_portal .o_app_menu_sidebar,

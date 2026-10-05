@@ -322,10 +322,38 @@ class ShahtajDmAssignWizard(models.TransientModel):
             'target': 'new',
         }
 
+    def action_remove_delivery_man(self, job_id=None):
+        """Drop a wizard DM row. Picked/delivered jobs cannot be removed."""
+        self.ensure_one()
+        if isinstance(job_id, (list, tuple)):
+            job_id = job_id[0] if job_id else False
+        job = self.env['shahtaj.dm.assign.wizard.job'].browse(job_id)
+        if not job.exists() or job.wizard_id.id != self.id:
+            raise UserError(_('That delivery man row was not found.'))
+        existing = job.existing_job_id
+        if existing and (
+            existing.state in ('picked', 'partial', 'delivered', 'returned')
+            or any(l.qty_picked > 0 for l in existing.line_ids)
+        ):
+            raise UserError(_(
+                'Cannot remove %(dm)s — stock was already picked or delivered on that job.',
+                dm=existing.delivery_man_id.name or _('this delivery man'),
+            ))
+        job.unlink()
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': self._name,
+            'res_id': self.id,
+            'view_mode': 'form',
+            'target': 'new',
+        }
+
     def action_confirm_assign(self):
         self.ensure_one()
+        self.sale_order_id._shahtaj_assert_not_cancelled()
         if self.sale_order_id.state not in ('sale', 'done'):
             raise UserError(_('Only confirmed sales orders can be assigned.'))
+        self.sale_order_id._shahtaj_require_posted_invoice_for_dm()
         if not self.job_ids:
             raise UserError(_('Add at least one delivery man.'))
 
@@ -474,6 +502,11 @@ class ShahtajDmAssignWizardJob(models.TransientModel):
                 'qty_delivered': 0.0,
             }))
         self.line_ids = lines
+
+    def action_remove(self):
+        self.ensure_one()
+        wizard = self.wizard_id
+        return wizard.action_remove_delivery_man(self.id)
 
 
 class ShahtajDmAssignWizardLine(models.TransientModel):

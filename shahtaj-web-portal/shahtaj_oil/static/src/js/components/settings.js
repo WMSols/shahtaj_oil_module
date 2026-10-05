@@ -2,6 +2,7 @@
 
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { notifyPortalBusy } from "../shahtaj_access";
 
 export class PortalSettings extends Component {
     setup() {
@@ -22,6 +23,8 @@ export class PortalSettings extends Component {
                 min_m: 0,
                 max_m: 100,
             },
+            appName: "Shahtaj Oil",
+            appVersion: "",
         });
 
         onWillStart(async () => {
@@ -41,10 +44,12 @@ export class PortalSettings extends Component {
 
     async loadSettings() {
         this.state.isLoading = true;
+        notifyPortalBusy(true);
         try {
-            const [limits, profile] = await Promise.all([
+            const [limits, profile, appInfo] = await Promise.all([
                 this.orm.call("res.company", "shahtaj_get_shop_distance_limits", []),
                 this.orm.call("res.company", "shahtaj_get_company_profile", []),
+                this.orm.call("res.company", "shahtaj_get_app_info", []),
             ]);
             this.state.gpsForm.min_m = limits.min_m ?? 0;
             this.state.gpsForm.max_m = limits.max_m ?? 100;
@@ -52,6 +57,8 @@ export class PortalSettings extends Component {
             this.state.companyForm.name = profile.name || "";
             this.state.companyForm.phone = profile.phone || "";
             this.state.companyForm.logo_preview = this._logoPreviewSrc(profile.logo);
+            this.state.appName = appInfo.name || "Shahtaj Oil";
+            this.state.appVersion = appInfo.version || "";
         } catch (error) {
             this.notification.add(
                 error.data?.message || error.message || "Failed to load settings",
@@ -59,6 +66,7 @@ export class PortalSettings extends Component {
             );
         } finally {
             this.state.isLoading = false;
+            notifyPortalBusy(false);
         }
     }
 

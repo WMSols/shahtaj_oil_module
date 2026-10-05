@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.OperationsBookersPerformance" owl="1">
+        <div>
+<!-- Bookers Performance Tab -->
+<t t-if="this.state.activeSubTab === 'performance'">
+<div class="px-4 pt-3 bg-white border-bottom shadow-sm">
+<ul class="nav nav-tabs border-0">
+<li class="nav-item me-4">
+<button t-on-click="() => this.setPerfSubTab('schedules')" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 fs-6 #{this.state.perfSubTab === 'schedules' ? 'text-primary border-bottom border-primary border-3 rounded-0' : 'text-muted'}" title="View weekly route assignments">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-days me-1">
+        <path d="M8 2v4"/>
+        <path d="M16 2v4"/>
+        <rect width="18" height="18" x="3" y="4" rx="2"/>
+        <path d="M3 10h18"/>
+        <path d="M8 14h.01"/>
+        <path d="M12 14h.01"/>
+        <path d="M16 14h.01"/>
+        <path d="M8 18h.01"/>
+        <path d="M12 18h.01"/>
+        <path d="M16 18h.01"/>
+    </svg>
+                                Weekly Schedules
+</button>
+</li>
+<li class="nav-item">
+<button t-on-click="() => this.setPerfSubTab('targets')" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 fs-6 #{this.state.perfSubTab === 'targets' ? 'text-primary border-bottom border-primary border-3 rounded-0' : 'text-muted'}" title="View sales and performance targets">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target me-1">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="6"/>
+        <circle cx="12" cy="12" r="2"/>
+    </svg>
+                                Targets
+</button>
+</li>
+</ul>
+</div>
+<!-- Bookers Performance : Schedules sub tab -->
+<t t-if="this.state.perfSubTab === 'schedules'">
+<t t-if="!this.state.selectedSchedule">
+<div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
+    <small class="fw-bold text-muted">Filters: </small>
+    <select class="form-select form-select-sm shadow-sm" style="max-width: 200px;" 
+            t-model="this.state.filters.schedules.booker" 
+            t-on-change="() => this.onFilterChange('schedules')">
+        <option value="all">All Bookers</option>
+        <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
+            <option t-att-value="b.id"><t t-esc="b.name"/></option>
+        </t>
+    </select>
+    <input type="date" class="form-control form-control-sm shadow-sm" style="max-width: 160px;"
+           t-model="this.state.filters.schedules.date"
+           t-on-change="() => this.onFilterChange('schedules')"
+           title="Optional: show this booker's performance on a specific date"/>
+</div>
+<div class="position-relative">
+    <t t-if="this.state.isLoadingList">
+        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    </t>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light text-uppercase small fw-bold text-muted">
+                <tr>
+                    <th class="ps-4">Booker</th>
+                    <th>Day / Date</th>
+                    <th>Route &amp; Zone</th>
+                    <th class="text-center" style="width: 200px;">Route Progress</th>
+                    <th class="text-center pe-4">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <t t-if="this.state.tableSchedules.length === 0 and !this.state.isLoadingList">
+                    <tr><td colspan="5" class="text-center py-5 text-muted">No schedules found.</td></tr>
+                </t>
+                <t t-foreach="this.state.tableSchedules" t-as="sched" t-key="sched.id">
+                    <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewSchedule(sched)">
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark"><t t-esc="sched.bookerName"/></div>
+                            <small class="text-muted">Booker ID: <t t-esc="sched.bookerId"/></small>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-primary"><t t-esc="sched.day"/></div>
+                            <small class="text-muted"><t t-esc="sched.occurrenceDate || 'Recurring'"/></small>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark"><t t-esc="sched.route"/></div>
+                            <small class="text-muted"><t t-esc="sched.zone"/></small>
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center justify-content-center w-100">
+                                <div class="progress flex-grow-1 me-2 shadow-sm" style="height: 8px;">
+                                    <div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{sched.progress}%;"></div>
+                                </div>
+                                <small class="fw-bold text-success"><t t-esc="sched.progress.toFixed(0)"/>%</small>
+                            </div>
+                        </td>
+                        <td class="text-center pe-4">
+                            <span t-attf-class="badge #{sched.active ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm">
+                                <t t-esc="sched.active ? 'Active' : 'Deactivated'"/>
+                            </span>
+                        </td>
+                    </tr>
+                </t>
+            </tbody>
+        </table>
+    </div>
+    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+        <small class="text-muted fw-bold">
+            Showing <t t-esc="this.state.pagination.schedules.total === 0 ? 0 : ((this.state.pagination.schedules.page - 1) * this.state.pagination.schedules.limit) + 1"/>
+            to <t t-esc="Math.min(this.state.pagination.schedules.page * this.state.pagination.schedules.limit, this.state.pagination.schedules.total)"/>
+            of <t t-esc="this.state.pagination.schedules.total"/>
+        </small>
+        <div class="btn-group shadow-sm">
+            <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('schedules', -1)" t-att-disabled="this.state.pagination.schedules.page === 1">Prev</button>
+            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.schedules.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.schedules.total / this.state.pagination.schedules.limit))"/></button>
+            <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('schedules', 1)" t-att-disabled="this.state.pagination.schedules.page &gt;= Math.ceil(this.state.pagination.schedules.total / this.state.pagination.schedules.limit)">Next</button>
+        </div>
+    </div>
+</div>
+</t>
+<t t-else="">
+<div class="p-4 bg-light">
+<button class="btn btn-sm btn-light border fw-bold px-3 shadow-sm mb-4" t-on-click="closeSchedule">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+        <path d="m12 19-7-7 7-7"/>
+        <path d="M19 12H5"/>
+    </svg>
+                                Back to Schedules
+</button>
+<div class="card p-4 shadow-sm border-0 border-start border-4 border-primary">
+    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+        <h4 class="text-dark fw-bold mb-0">Schedule: <t t-esc="this.state.selectedSchedule.name"/>
+        </h4>
+        <span t-attf-class="badge #{this.state.selectedSchedule.active ? 'bg-success text-white' : 'bg-secondary text-dark'} px-3 py-2 shadow-sm fs-6">
+            <t t-esc="this.state.selectedSchedule.active ? 'Active Schedule' : 'Deactivated'"/>
+        </span>
+    </div>
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="p-3 bg-light rounded-3 h-100">
+                <h6 class="fw-bold text-muted text-uppercase mb-3">Assignment Details</h6>
+                <p class="mb-2">
+                    <span class="fw-bold text-dark">Order Booker:</span>
+                    <span class="ms-2">
+                        <t t-esc="this.state.selectedSchedule.bookerName"/>
+                    </span>
+                </p>
+                <p class="mb-2">
+                    <span class="fw-bold text-dark">Day:</span>
+                    <span class="ms-2 text-primary fw-bold">
+                        <t t-esc="this.state.selectedSchedule.day"/>
+                    </span>
+                </p>
+                <p class="mb-2">
+                    <span class="fw-bold text-dark">Occurrence Date:</span>
+                    <span class="ms-2">
+                        <t t-esc="this.state.selectedSchedule.occurrenceDate || 'Recurring'"/>
+                    </span>
+                </p>
+                <p class="mb-2">
+                    <span class="fw-bold text-dark">Route:</span>
+                    <span class="ms-2">
+                        <t t-esc="this.state.selectedSchedule.route"/>
+                    </span>
+                </p>
+                <p class="mb-0">
+                    <span class="fw-bold text-dark">Zone:</span>
+                    <span class="ms-2">
+                        <t t-esc="this.state.selectedSchedule.zone"/>
+                    </span>
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="p-3 bg-light rounded-3 h-100">
+                <h6 class="fw-bold text-muted text-uppercase mb-3">Visit Performance</h6>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-dark fw-bold">Shops on Route:</span>
+                    <span class="badge bg-secondary text-dark">
+                        <t t-esc="this.state.selectedSchedule.shops"/>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-dark fw-bold">Visits Planned:</span>
+                    <span>
+                        <t t-esc="this.state.selectedSchedule.planned"/>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                    <span class="text-dark fw-bold">Visits Completed:</span>
+                    <span class="text-success fw-bold">
+                        <t t-esc="this.state.selectedSchedule.done"/>
+                    </span>
+                </div>
+                                            <!-- NEW SKIPPED ROW -->
+                <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                    <span class="text-dark fw-bold">Visits Skipped:</span>
+                    <span class="text-danger fw-bold">
+                        <t t-esc="this.state.selectedSchedule.skipped"/>
+                    </span>
+                </div>
+                <label class="small fw-bold mb-1">Completion Progress</label>
+                <div class="d-flex align-items-center">
+                    <div class="progress flex-grow-1 me-2 shadow-sm" style="height: 10px;">
+                        <div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{this.state.selectedSchedule.progress}%;"></div>
+                    </div>
+                    <span class="fw-bold text-success">
+                        <t t-esc="this.state.selectedSchedule.progress.toFixed(1)"/>
+%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</t>
+</t>
+<!-- Bookers Performance : Targets sub tab -->
+<t t-if="this.state.perfSubTab === 'targets'">
+<t t-if="!this.state.selectedTarget">
+<div class="p-3 bg-light border-bottom d-flex gap-2">
+    <small class="fw-bold text-muted">Filters: </small>
+    <select class="form-select form-select-sm shadow-sm w-25" 
+            t-model="this.state.filters.targets.booker" 
+            t-on-change="() => this.onFilterChange('targets')">
+        <option value="all">All Bookers</option>
+        <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
+            <option t-att-value="b.id"><t t-esc="b.name"/></option>
+        </t>
+    </select>
+
+    <select class="form-select form-select-sm shadow-sm w-25" 
+            t-model="this.state.filters.targets.type" 
+            t-on-change="() => this.onFilterChange('targets')">
+        <option value="all">All Target Types</option>
+        <t t-foreach="this.state.lookupTargetTypes" t-as="type" t-key="type.value">
+            <option t-att-value="type.value"><t t-esc="type.label"/></option>
+        </t>
+    </select>
+</div>
+<div class="position-relative">
+    <t t-if="this.state.isLoadingList">
+        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    </t>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light text-uppercase small fw-bold text-muted text-nowrap">
+                <tr>
+                    <th class="border-top-0 ps-4">Booker</th>
+                    <th class="border-top-0">Target Metric</th>
+                    <th class="border-top-0">Period</th>
+                    <th class="border-top-0 text-center">Achieved / Goal</th>
+                    <th class="border-top-0 text-center" style="width: 150px;">Progress</th>
+                    <th class="border-top-0 text-end pe-4">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <t t-if="this.state.tableTargets.length === 0 and !this.state.isLoadingList">
+                    <tr><td colspan="6" class="text-center py-5 text-muted">No targets found matching your filters.</td></tr>
+                </t>
+                <t t-foreach="this.state.tableTargets" t-as="tgt" t-key="tgt.id">
+                    <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewTarget(tgt)">
+                        <td class="ps-4 text-nowrap"><div class="fw-bold text-dark"><t t-esc="tgt.bookerName"/></div></td>
+                        <td class="align-middle"><div class="text-primary fw-bold"><t t-esc="tgt.displayType"/></div></td>
+                        <td class="align-middle text-nowrap"><div class="fw-bold small text-dark"><t t-esc="tgt.startDate"/></div><div class="text-muted small">to <t t-esc="tgt.endDate"/></div></td>
+                        <td class="align-middle text-center fw-bold text-dark text-nowrap"><span class="text-success"><t t-esc="tgt.achievedValue"/></span><span class="text-muted mx-1">/</span><t t-esc="tgt.targetValue"/></td>
+                        <td class="align-middle text-center">
+                            <div class="d-flex align-items-center justify-content-center w-100">
+                                <div class="progress flex-grow-1 me-2 shadow-sm" style="height: 6px;"><div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{tgt.progress}%;"></div></div>
+                                <small class="fw-bold text-success"><t t-esc="tgt.progress.toFixed(0)"/>%</small>
+                            </div>
+                        </td>
+                        <td class="align-middle text-end pe-4 text-nowrap"><span t-attf-class="badge #{tgt.active ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm"><t t-esc="tgt.active ? 'Active' : 'Deactivated'"/></span></td>
+                    </tr>
+                </t>
+            </tbody>
+        </table>
+    </div>
+    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+        <small class="text-muted fw-bold">
+            Showing <t t-esc="this.state.pagination.targets.total === 0 ? 0 : ((this.state.pagination.targets.page - 1) * this.state.pagination.targets.limit) + 1"/>
+            to <t t-esc="Math.min(this.state.pagination.targets.page * this.state.pagination.targets.limit, this.state.pagination.targets.total)"/>
+            of <t t-esc="this.state.pagination.targets.total"/>
+        </small>
+        <div class="btn-group shadow-sm">
+            <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('targets', -1)" t-att-disabled="this.state.pagination.targets.page === 1">Prev</button>
+            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.targets.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.targets.total / this.state.pagination.targets.limit))"/></button>
+            <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('targets', 1)" t-att-disabled="this.state.pagination.targets.page &gt;= Math.ceil(this.state.pagination.targets.total / this.state.pagination.targets.limit)">Next</button>
+        </div>
+    </div>
+</div>
+</t>
+<t t-else="">
+<div class="p-4 bg-light">
+<button class="btn btn-sm btn-light border fw-bold px-3 shadow-sm mb-4" t-on-click="closeTarget">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+        <path d="m12 19-7-7 7-7"/>
+        <path d="M19 12H5"/>
+    </svg>
+                                Back to Targets
+</button>
+<div class="card p-4 shadow-sm border-0 border-start border-4 border-success">
+    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+        <h4 class="text-dark fw-bold mb-0">Target: <t t-esc="this.state.selectedTarget.name"/>
+        </h4>
+        <span t-attf-class="badge #{this.state.selectedTarget.active ? 'text-success' : 'text-secondary'}  px-3 py-2 shadow-sm fs-6">
+            <t t-esc="this.state.selectedTarget.active ? 'Active Target' : 'Deactivated'"/>
+        </span>
+    </div>
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="p-3 bg-light rounded-3 h-100">
+                <h6 class="fw-bold text-muted text-uppercase mb-3">Target Definition</h6>
+                <p class="mb-2">
+                    <span class="fw-bold text-dark">Order Booker:</span>
+                    <span class="ms-2">
+                        <t t-esc="this.state.selectedTarget.bookerName"/>
+                    </span>
+                </p>
+                <p class="mb-2">
+                    <span class="fw-bold text-dark">Metric Type:</span>
+                    <span class="ms-2 badge bg-primary text-white">
+                        <t t-esc="this.state.selectedTarget.displayType"/>
+                    </span>
+                </p>
+                <p class="mb-2">
+                    <span class="fw-bold text-dark">Start Date:</span>
+                    <span class="ms-2">
+                        <t t-esc="this.state.selectedTarget.startDate"/>
+                    </span>
+                </p>
+                <p class="mb-2">
+                    <span class="fw-bold text-dark">End Date:</span>
+                    <span class="ms-2">
+                        <t t-esc="this.state.selectedTarget.endDate"/>
+                    </span>
+                </p>
+
+                <t t-if="this.state.selectedTarget.product">
+                    <p class="mb-2 border-top pt-2 mt-2">
+                        <span class="fw-bold text-dark">Specific Product:</span>
+                        <span class="ms-2 fw-bold text-info">
+                            <t t-esc="this.state.selectedTarget.product"/>
+                        </span>
+                    </p>
+                </t>
+                <t t-if="this.state.selectedTarget.currency">
+                    <p class="mb-2">
+                        <span class="fw-bold text-dark">Currency:</span>
+                        <span class="ms-2">
+                            <t t-esc="this.state.selectedTarget.currency"/>
+                        </span>
+                    </p>
+                </t>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="p-3 bg-light rounded-3 h-100">
+                <h6 class="fw-bold text-muted text-uppercase mb-3">Achievement Status</h6>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-dark fw-bold">Goal Value:</span>
+                    <span class="fw-bold fs-5">
+                        <t t-esc="this.state.selectedTarget.targetValue"/>
+                        <small class="text-muted ms-1" t-if="this.state.selectedTarget.type === 'collective_weight'">
+                            <t t-esc="this.state.selectedTarget.weightUom"/>
+                        </small>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-dark fw-bold">Achieved So Far:</span>
+                    <span class="text-success fw-bold fs-5">
+                        <t t-esc="this.state.selectedTarget.achievedValue"/>
+                        <small class="text-muted ms-1" t-if="this.state.selectedTarget.type === 'collective_weight'">
+                            <t t-esc="this.state.selectedTarget.weightUom"/>
+                        </small>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between mb-3 border-bottom pb-3">
+                    <span class="text-dark fw-bold">Remaining:</span>
+                    <span class="text-warning fw-bold fs-5">
+                        <t t-esc="this.state.selectedTarget.remainingValue"/>
+                        <small class="text-muted ms-1" t-if="this.state.selectedTarget.type === 'collective_weight'">
+                            <t t-esc="this.state.selectedTarget.weightUom"/>
+                        </small>
+                    </span>
+                </div>
+
+                <label class="small fw-bold mb-1">Overall Progress</label>
+                <div class="d-flex align-items-center">
+                    <div class="progress flex-grow-1 me-2 shadow-sm" style="height: 12px;">
+                        <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" role="progressbar" t-attf-style="width: #{this.state.selectedTarget.progress}%;"></div>
+                    </div>
+                    <span class="fw-bold text-success fs-5">
+                        <t t-esc="this.state.selectedTarget.progress.toFixed(1)"/>
+%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</t>
+</t>
+
+</t>
+        </div>
+    </t>
+</templates>

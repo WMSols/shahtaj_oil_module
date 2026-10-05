@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.FieldReports" owl="1">
+        <div class="h-100 d-flex flex-column bg-white">
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <ul class="nav nav-pills gap-2 mb-0">
+                    <li class="nav-item">
+                        <button t-on-click="() => this.setPill('reports')" t-attf-class="nav-link fw-bold rounded-pill px-4 #{this.state.pill === 'reports' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light border border-dark'}">
+                            <i class="fa fa-flag me-2"></i> Reports
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button t-on-click="() => this.setPill('tags')" t-attf-class="nav-link fw-bold rounded-pill px-4 #{this.state.pill === 'tags' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light border border-dark'}">
+                            <i class="fa fa-tags me-2"></i> Report Tags
+                        </button>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center gap-2" t-if="this.state.pill === 'reports'">
+                    <div class="input-group input-group-sm shadow-sm" style="width: 240px;" t-if="this.state.mode === 'list'">
+                        <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search reports..." t-att-value="this.state.filters.search" t-on-input="onSearch"/>
+                    </div>
+                    <select t-if="this.state.mode === 'list'" class="form-select form-select-sm w-auto shadow-sm" t-on-change="(ev) => this.onFilter('state', ev)">
+                        <option value="all">All statuses</option>
+                        <option value="new">New</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="done">Done</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <select t-if="this.state.mode === 'list'" class="form-select form-select-sm w-auto shadow-sm" t-on-change="(ev) => this.onFilter('role', ev)">
+                        <option value="all">All roles</option>
+                        <option value="order_booker">Order Booker</option>
+                        <option value="delivery_man">Delivery Man</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline-dark fw-bold shadow-sm d-inline-flex align-items-center" t-on-click="refreshReports" t-att-disabled="this.state.isLoading or this.state.isSaving" title="Refresh reports">
+                        <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isLoading}"></i> Refresh
+                    </button>
+                    <button t-if="this.state.mode === 'list'" class="btn btn-sm btn-dark fw-bold px-3 shadow-sm" t-on-click="openCreate">
+                        <i class="fa fa-plus me-1"></i> New
+                    </button>
+                </div>
+                <button t-if="this.state.pill === 'tags' and this.state.mode === 'list'" class="btn btn-sm btn-dark fw-bold px-3 shadow-sm" t-on-click="startTag">
+                    <i class="fa fa-plus me-1"></i> New Tag
+                </button>
+            </div>
+
+            <div class="flex-grow-1 overflow-auto">
+                <t t-if="this.state.pill === 'reports' and this.state.mode === 'list'">
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoading">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;"><div class="spinner-border text-primary" role="status"></div></div>
+                        </t>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 py-3">Reference</th>
+                                        <th>Subject</th>
+                                        <th>Tags</th>
+                                        <th>Reported By</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th class="pe-4">Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-if="!this.state.reports.length and !this.state.isLoading">
+                                        <td colspan="7" class="text-center py-5 text-muted fw-bold">No field reports yet.</td>
+                                    </tr>
+                                    <tr t-foreach="this.state.reports" t-as="report" t-key="report.id" style="cursor:pointer;" t-on-click="() => this.openReport(report.id)">
+                                        <td class="ps-4 fw-bold text-dark"><t t-esc="report.name"/></td>
+                                        <td><t t-esc="report.subject"/></td>
+                                        <td>
+                                            <span t-foreach="this.tagsFor(report)" t-as="tag" t-key="tag.id" class="badge rounded-pill me-1" t-att-style="this.tagStyle(tag)">
+                                                <t t-esc="tag.name"/>
+                                            </span>
+                                        </td>
+                                        <td><t t-esc="report.user_id ? report.user_id[1] : ''"/></td>
+                                        <td><t t-esc="this.roleLabel(report.reporter_role)"/></td>
+                                        <td><span t-attf-class="badge #{this.stateClass(report.state)} px-3 py-1" t-esc="this.stateLabel(report.state)"/></td>
+                                        <td class="pe-4 text-muted"><t t-esc="this.formatWhen(report.create_date)"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top" t-if="this.state.total > this.state.pageSize">
+                            <button class="btn btn-sm btn-light border" t-on-click="() => this.changePage(-1)">Previous</button>
+                            <span class="small text-muted fw-bold" t-esc="this.pageLabel"/>
+                            <button class="btn btn-sm btn-light border" t-on-click="() => this.changePage(1)">Next</button>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="this.state.pill === 'reports' and this.state.mode === 'create'">
+                    <div class="p-4 bg-light">
+                        <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm mb-4" t-on-click="backToList"><i class="fa fa-arrow-left me-1"></i> Back to Reports</button>
+                        <div class="card border-0 shadow-sm p-4">
+                            <h4 class="fw-bold mb-4">New Field Report</h4>
+                            <div class="row g-4">
+                                <div class="col-lg-6">
+                                    <label class="form-label small fw-bold text-uppercase text-muted">Subject</label>
+                                    <input class="form-control" t-model="this.state.form.subject" placeholder="What happened?"/>
+                                    <label class="form-label small fw-bold text-uppercase text-muted mt-3">Tags</label>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" t-foreach="this.state.tags" t-as="tag" t-key="tag.id"
+                                                t-on-click="() => this.toggleTag(tag.id)"
+                                                t-attf-class="btn btn-sm rounded-pill #{this.state.form.tagIds.includes(tag.id) ? '' : 'border'}"
+                                                t-att-style="this.state.form.tagIds.includes(tag.id) ? this.tagStyle(tag) : ''">
+                                            <t t-esc="tag.name"/>
+                                        </button>
+                                    </div>
+                                    <label class="form-label small fw-bold text-uppercase text-muted mt-3">Details</label>
+                                    <textarea class="form-control" rows="5" t-model="this.state.form.description" placeholder="Describe the issue"/>
+                                </div>
+                                <div class="col-lg-6">
+                                    <label class="form-label small fw-bold text-uppercase text-muted">Screenshot / Capture</label>
+                                    <input type="file" class="form-control" accept="image/*" t-on-change="onScreenshot"/>
+                                    <img t-if="this.state.form.screenshot" t-att-src="this.screenshotSrc(this.state.form.screenshot)" class="mt-3 rounded border" style="max-height: 180px; max-width: 100%; object-fit: contain;" alt="Screenshot preview"/>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <button class="btn btn-dark fw-bold px-4" t-on-click="saveReport" t-att-disabled="this.state.isSaving">
+                                    <t t-if="this.state.isSaving">Saving...</t>
+                                    <t t-else="">Create Report</t>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="this.state.pill === 'reports' and this.state.mode === 'detail' and this.state.selected">
+                    <div class="d-flex flex-column flex-xl-row h-100">
+                        <div class="flex-grow-1 p-4 border-end" style="min-width: 0;">
+                            <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm mb-3" t-on-click="backToList"><i class="fa fa-arrow-left me-1"></i> Back</button>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                                <button t-if="this.state.selected.state === 'new'" class="btn btn-outline-warning  fw-bold" t-on-click="() => this.runAction('action_mark_in_progress')" t-att-disabled="this.state.isSaving">In Progress</button>
+                                <button t-if="this.state.selected.state !== 'done' and this.state.selected.state !== 'cancelled'" class="btn btn-primary" t-on-click="() => this.runAction('action_mark_done')" t-att-disabled="this.state.isSaving">Mark Done</button>
+                                <button t-if="this.state.selected.state === 'done' or this.state.selected.state === 'cancelled'" class="btn btn-secondary" t-on-click="() => this.runAction('action_reopen')" t-att-disabled="this.state.isSaving">Reopen</button>
+                                <button t-if="this.state.selected.state !== 'done' and this.state.selected.state !== 'cancelled'" class="btn btn-outline-danger fw-bold" t-on-click="() => this.runAction('action_mark_cancelled')" t-att-disabled="this.state.isSaving">Cancel</button>
+                                <div class="ms-auto d-flex align-items-center gap-1">
+                                    <t t-foreach="this.statusSteps" t-as="step" t-key="step.key">
+                                        <span t-if="step_index" class="text-muted">›</span>
+                                        <span t-attf-class="badge rounded-pill px-3 py-2 #{this.stepClass(step)}" t-esc="step.label"/>
+                                    </t>
+                                    <span t-if="this.state.selected.state === 'cancelled'" class="badge bg-secondary rounded-pill px-3 py-2">Cancelled</span>
+                                </div>
+                            </div>
+                            <div class="text-muted small">Reference</div>
+                            <h2 class="fw-bold mb-4" t-esc="this.state.selected.name"/>
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <div class="text-uppercase small fw-bold text-muted border-bottom pb-2 mb-3">Report</div>
+                                    <div class="row mb-2"><div class="col-4 text-muted">Subject</div><div class="col-8 fw-bold" t-esc="this.state.selected.subject"/></div>
+                                    <div class="row mb-2">
+                                        <div class="col-4 text-muted">Tags</div>
+                                        <div class="col-8">
+                                            <span t-foreach="this.tagsFor(this.state.selected)" t-as="tag" t-key="tag.id" class="badge rounded-pill me-1" t-att-style="this.tagStyle(tag)">
+                                                <t t-esc="tag.name"/>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2"><div class="col-4 text-muted">Details</div><div class="col-8" t-esc="this.state.selected.description"/></div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="text-uppercase small fw-bold text-muted border-bottom pb-2 mb-3">Reporter</div>
+                                    <div class="row mb-2"><div class="col-4 text-muted">Reported By</div><div class="col-8" t-esc="this.state.selected.user_id ? this.state.selected.user_id[1] : ''"/></div>
+                                    <div class="row mb-2"><div class="col-4 text-muted">Reporter Role</div><div class="col-8" t-esc="this.roleLabel(this.state.selected.reporter_role)"/></div>
+                                    <div class="row mb-2"><div class="col-4 text-muted">Created on</div><div class="col-8" t-esc="this.formatWhen(this.state.selected.create_date)"/></div>
+                                    <div class="row mb-2"><div class="col-4 text-muted">Device Info</div><div class="col-8" t-esc="this.state.selected.device_info || ''"/></div>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <div class="text-uppercase small fw-bold text-muted border-bottom pb-2 mb-3">Closing Remark</div>
+                                <textarea t-if="!this.isClosed(this.state.selected)"
+                                          class="form-control"
+                                          rows="3"
+                                          placeholder="What was done / why cancelled (required before Mark Done or Cancel)"
+                                          t-model="this.state.closingRemark"
+                                          t-att-disabled="this.state.isSaving"/>
+                                <div t-else="" class="text-dark" style="white-space: pre-wrap;" t-esc="this.state.selected.closing_remark || ''"/>
+                            </div>
+                            <div class="mt-4" t-if="this.state.selected.screenshot">
+                                <div class="text-uppercase small fw-bold text-muted border-bottom pb-2 mb-3">Screenshot / Capture</div>
+                                <img t-att-src="this.screenshotSrc(this.state.selected.screenshot)" class="rounded border" style="max-width: 420px; max-height: 240px; object-fit: contain;" alt="Report screenshot"/>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column bg-light" style="width: 100%; max-width: 420px; min-height: 420px;">
+                            <div class="px-3 py-3 border-bottom bg-white fw-bold">Messages</div>
+                            <div class="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-3" t-ref="thread" style="min-height: 280px;">
+                                <t t-foreach="this.state.thread" t-as="item" t-key="item.id">
+                                    <div t-if="item.kind === 'message'" class="d-flex gap-2">
+                                        <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center flex-shrink-0 fw-bold" style="width: 36px; height: 36px;" t-esc="this.authorInitial(item.author)"/>
+                                        <div class="bg-white border rounded-4 rounded-top-0 px-3 py-2 shadow-sm" style="max-width: 85%;">
+                                            <div class="d-flex justify-content-between gap-3 small">
+                                                <span class="fw-bold" t-esc="item.author"/>
+                                                <span class="text-muted" t-esc="this.formatWhen(item.date)"/>
+                                            </div>
+                                            <div class="mt-1" t-esc="item.body"/>
+                                        </div>
+                                    </div>
+                                    <div t-else="" class="text-center">
+                                        <div class="d-inline-flex flex-column align-items-center gap-1">
+                                            <span class="small text-muted" t-esc="this.formatWhen(item.date)"/>
+                                            <t t-if="item.kind === 'tracking'">
+                                                <span t-foreach="item.tracking" t-as="change" t-key="change_index" class="badge rounded-pill bg-white text-dark border px-3 py-2">
+                                                    <t t-esc="change.old || '—'"/> <span class="text-primary">→</span> <span class="fw-bold text-primary" t-esc="change.next || '—'"/>
+                                                    <span class="text-muted ms-1">(<t t-esc="change.field"/>)</span>
+                                                </span>
+                                            </t>
+                                            <span t-else="" class="badge rounded-pill bg-white text-dark border px-3 py-2" t-esc="item.body"/>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                            <div class="p-3 border-top bg-white">
+                                <div class="small text-muted mb-2">To: Followers only</div>
+                                <div class="d-flex gap-2">
+                                    <textarea class="form-control" rows="2" placeholder="Send a message to followers..." t-model="this.state.draft" t-on-keydown="onDraftKeydown"/>
+                                    <button class="btn btn-primary align-self-end" t-on-click="sendMessage" t-att-disabled="this.state.isSending or !this.state.draft.trim()">
+                                        <t t-if="this.state.isSending">Sending</t>
+                                        <t t-else="">Send</t>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="this.state.pill === 'tags' and this.state.mode === 'list'">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                <tr>
+                                    <th class="ps-4 py-3">Tag</th>
+                                    <th>Kind</th>
+                                    <th>Color</th>
+                                    <th class="text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-if="!this.state.tags.length">
+                                    <td colspan="4" class="text-center py-5 text-muted fw-bold">No report tags yet.</td>
+                                </tr>
+                                <tr t-foreach="this.state.tags" t-as="tag" t-key="tag.id">
+                                    <td class="ps-4"><span class="badge rounded-pill" t-att-style="this.tagStyle(tag)" t-esc="tag.name"/></td>
+                                    <td t-esc="tag.kind === 'app_error' ? 'App Error' : 'Field Activity'"/>
+                                    <td>
+                                        <span class="d-inline-block rounded-circle border" t-attf-style="width: 22px; height: 22px; background: #{this.tagColor(tag)};"/>
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <button class="btn btn-sm btn-outline-dark me-2" t-on-click="() => this.editTag(tag)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.deleteTag(tag)" t-att-disabled="this.state.isSaving">Delete</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+
+                <t t-if="this.state.pill === 'tags' and this.state.mode === 'tag-form'">
+                    <div class="p-4 bg-light">
+                        <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm mb-4" t-on-click="() => this.state.mode = 'list'"><i class="fa fa-arrow-left me-1"></i> Back to Tags</button>
+                        <div class="card border-0 shadow-sm p-4" style="max-width: 520px;">
+                            <h4 class="fw-bold mb-4"><t t-esc="this.state.editingTagId ? 'Edit Tag' : 'New Tag'"/></h4>
+                            <label class="form-label small fw-bold text-uppercase text-muted">Name</label>
+                            <input class="form-control mb-3" t-model="this.state.tagForm.name" placeholder="Tag name"/>
+                            <label class="form-label small fw-bold text-uppercase text-muted">Kind</label>
+                            <div class="d-flex gap-2 mb-3">
+                                <button type="button" t-on-click="() => this.state.tagForm.kind = 'field_activity'" t-attf-class="btn btn-sm rounded-pill px-3 #{this.state.tagForm.kind === 'field_activity' ? 'btn-dark' : 'btn-outline-dark'}">Field Activity</button>
+                                <button type="button" t-on-click="() => this.state.tagForm.kind = 'app_error'" t-attf-class="btn btn-sm rounded-pill px-3 #{this.state.tagForm.kind === 'app_error' ? 'btn-dark' : 'btn-outline-dark'}">App Error</button>
+                            </div>
+                            <label class="form-label small fw-bold text-uppercase text-muted">Color</label>
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <button type="button" t-foreach="this.colorOptions" t-as="color" t-key="color.index"
+                                        t-on-click="() => this.state.tagForm.color = color.index"
+                                        class="rounded-circle border-0 p-0"
+                                        t-attf-style="width: 28px; height: 28px; background: #{color.hex}; outline: #{this.state.tagForm.color === color.index ? '2px solid #0f172a' : '1px solid #cbd5e1'}; outline-offset: 2px;"/>
+                            </div>
+                            <span class="badge rounded-pill px-3 py-2" t-att-style="this.tagStyle({color: this.state.tagForm.color})">
+                                <t t-esc="this.state.tagForm.name || 'Preview'"/>
+                            </span>
+                            <div class="mt-4">
+                                <button class="btn btn-dark fw-bold px-4" t-on-click="saveTag" t-att-disabled="this.state.isSaving">Save Tag</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -339,7 +339,7 @@ class ShahtajVisitTask(models.Model):
         user = self.env.user
         return (
             user.has_group('shahtaj_oil.group_shahtaj_order_booker')
-            and not user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            and not user.has_group('shahtaj_oil.group_shahtaj_distributor')
             and not user.has_group('base.group_system')
         )
 
@@ -368,7 +368,7 @@ class ShahtajVisitTask(models.Model):
         user = self.env.user
         is_distributor = (
             not self.env.context.get('shahtaj_system_visit_write')
-            and user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            and user.has_group('shahtaj_oil.group_shahtaj_distributor')
             and not user._is_public()
         )
         if planning_vals and is_distributor:

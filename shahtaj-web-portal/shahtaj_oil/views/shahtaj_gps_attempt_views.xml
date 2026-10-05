@@ -57,6 +57,7 @@
                     <group string="Links">
                         <field name="visit_task_id"/>
                         <field name="visit_id"/>
+                        <field name="sale_order_id"/>
                         <field name="dm_delivery_id"/>
                     </group>
                 </sheet>
@@ -117,20 +118,12 @@
         </field>
     </record>
 
-    <!-- Admin: under Settings → Administration (same area as Activity Logs) -->
+    <!-- Admin only here (parent exists in base). App menu lives in menus.xml. -->
     <menuitem id="menu_shahtaj_gps_attempts_admin"
               name="Shahtaj Shop GPS Attempts"
               parent="base.menu_administration"
               action="action_shahtaj_gps_attempt"
               sequence="97"
               groups="base.group_system"/>
-
-    <!-- Distributor native UI: keep under Shahtaj Oil app -->
-    <menuitem id="menu_shahtaj_gps_attempts"
-              name="Shop GPS Attempts"
-              parent="menu_shahtaj_root"
-              action="action_shahtaj_gps_attempt"
-              sequence="95"
-              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
 
 </odoo>

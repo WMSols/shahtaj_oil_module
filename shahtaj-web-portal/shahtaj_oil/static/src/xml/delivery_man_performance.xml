@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.DeliveryManPerformance" owl="1">
+        <div class="card border-0 shadow-sm bg-white p-3 p-md-4 rounded-3">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 border-bottom pb-3 gap-3">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-0">Delivery Men Performance</h2>
+                    <small class="text-muted">Visit progress for the current week. Date range is optional and replaces week totals when set.</small>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <input type="date" class="form-control form-control-sm" style="max-width: 160px;" t-model="this.state.dateFrom" t-on-change="refreshActive"/>
+                    <span class="text-muted small">to</span>
+                    <input type="date" class="form-control form-control-sm" style="max-width: 160px;" t-model="this.state.dateTo" t-on-change="refreshActive"/>
+                    <button class="btn btn-outline-secondary fw-bold" t-on-click="refreshActive" t-att-disabled="this.state.isLoading">
+                        <i class="fa fa-refresh me-1" t-att-class="{'fa-spin': this.state.isLoading}"/> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <t t-if="!this.state.selectedDm">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <div class="input-group input-group-sm shadow-sm" style="max-width: 260px;">
+                        <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search name or code..."
+                               t-att-value="this.state.filters.search"
+                               t-on-input="onSearchInput"/>
+                    </div>
+                    <select class="form-select form-select-sm" style="max-width: 200px;" t-on-change="onDmFilterChange">
+                        <option value="all" t-att-selected="this.state.filters.dm === 'all'">All delivery men</option>
+                        <t t-foreach="this.state.deliveryMen" t-as="dm" t-key="dm.id">
+                            <option t-att-value="dm.id" t-att-selected="this.isDmSelected(dm.id)"><t t-esc="dm.name"/></option>
+                        </t>
+                    </select>
+                </div>
+                <div class="position-relative">
+                    <t t-if="this.state.isLoading">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                <tr>
+                                    <th class="ps-3 border-top-0">Delivery man</th>
+                                    <th class="border-top-0" style="width: 180px;">Week %</th>
+                                    <th class="text-center border-top-0">Today Total</th>
+                                    <th class="text-center border-top-0">Today Delivered</th>
+                                    <th class="text-center border-top-0">Week Total</th>
+                                    <th class="text-center border-top-0">Week Done</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="!this.state.rows.length and !this.state.isLoading">
+                                    <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No delivery men match these filters.</td></tr>
+                                </t>
+                                <t t-foreach="this.state.rows" t-as="row" t-key="row.id">
+                                    <tr class="cursor-pointer" style="cursor: pointer;" t-on-click="() => this.openDm(row)">
+                                        <td class="ps-3">
+                                            <div class="fw-bold"><t t-esc="row.name"/></div>
+                                            <small class="text-muted">
+                                                <t t-if="row.code"><t t-esc="row.code"/> · </t>
+                                                <t t-esc="this.statusLabel(row.status)"/>
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 8px;">
+                                                <div class="progress-bar bg-primary" role="progressbar"
+                                                     t-att-style="'width: ' + Math.min(100, Math.max(0, row.weekPct)) + '%;'"/>
+                                            </div>
+                                            <small class="text-muted"><t t-esc="Math.round(row.weekPct)"/>%</small>
+                                        </td>
+                                        <td class="text-center"><t t-esc="row.todayTotal"/></td>
+                                        <td class="text-center"><t t-esc="row.todayDelivered"/></td>
+                                        <td class="text-center"><t t-esc="row.weekTotal"/></td>
+                                        <td class="text-center"><t t-esc="row.weekDone"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.total === 0 ? 0 : ((this.state.pagination.page - 1) * this.state.pagination.limit) + 1"/>
+                            to <t t-esc="Math.min(this.state.pagination.page * this.state.pagination.limit, this.state.pagination.total)"/>
+                            of <t t-esc="this.state.pagination.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage(-1)" t-att-disabled="this.state.pagination.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.total / this.state.pagination.limit))"/></button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage(1)" t-att-disabled="this.state.pagination.page &gt;= Math.ceil(this.state.pagination.total / this.state.pagination.limit)">Next</button>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <t t-if="this.state.selectedDm">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2" t-on-click="closeDm">← Back</button>
+                        <span class="fw-bold"><t t-esc="this.state.selectedDm.name"/></span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <span class="badge bg-light text-dark">Today <t t-esc="this.state.selectedDm.todayDelivered"/> / <t t-esc="this.state.selectedDm.todayTotal"/></span>
+                        <span class="badge bg-primary text-white">Week <t t-esc="this.state.selectedDm.weekDone"/> / <t t-esc="this.state.selectedDm.weekTotal"/></span>
+                    </div>
+                </div>
+                <ul class="nav nav-tabs border-0 mb-3">
+                    <li class="nav-item">
+                        <button t-on-click="() => this.state.taskTab = 'today'" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 #{this.state.taskTab === 'today' ? 'text-primary border-bottom border-primary border-3 rounded-0' : 'text-muted'}">Today</button>
+                    </li>
+                    <li class="nav-item">
+                        <button t-on-click="() => this.state.taskTab = 'week'" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 #{this.state.taskTab === 'week' ? 'text-primary border-bottom border-primary border-3 rounded-0' : 'text-muted'}"><t t-esc="this.hasDateFilter ? 'Filtered range' : 'This week'"/></button>
+                    </li>
+                </ul>
+                <t t-set="taskRows" t-value="this.state.taskTab === 'today' ? this.state.todayTasks : this.state.weekTasks"/>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="bg-light text-uppercase small fw-bold text-muted">
+                            <tr>
+                                <th class="ps-3 border-top-0">Date</th>
+                                <th class="border-top-0">Shop</th>
+                                <th class="border-top-0">Route</th>
+                                <th class="border-top-0">State</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-if="!taskRows.length">
+                                <tr><td colspan="4" class="text-center py-4 text-muted">No visit tasks.</td></tr>
+                            </t>
+                            <t t-foreach="taskRows" t-as="task" t-key="task.id">
+                                <tr>
+                                    <td class="ps-3"><t t-esc="task.date"/></td>
+                                    <td class="fw-bold"><t t-esc="task.shop"/></td>
+                                    <td><t t-esc="task.route"/></td>
+                                    <td><span t-attf-class="badge #{this.taskStateClass(task.state)}"><t t-esc="this.taskStateLabel(task.state)"/></span></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

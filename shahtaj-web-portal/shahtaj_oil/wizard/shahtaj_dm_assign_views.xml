@@ -36,6 +36,9 @@
                         <field name="job_field_state" string="Stop" optional="show"
                                widget="badge"/>
                         <field name="existing_job_id" optional="hide"/>
+                        <button name="action_remove" type="object"
+                                string="Remove" icon="fa-trash"
+                                confirm="Remove this delivery man from the assignment?"/>
                     </list>
                     <form string="Delivery Man Share">
                         <group>

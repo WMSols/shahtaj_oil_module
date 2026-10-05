@@ -7,6 +7,10 @@
                     <h2 class="h4 fw-bold text-dark mb-0">Journals</h2>
                     <small class="text-muted">Open a journal to view its details and journal entries.</small>
                 </t>
+                <t t-elif="this.state.activeSubTab === 'audit'">
+                    <h2 class="h4 fw-bold text-dark mb-0">Audit Trail</h2>
+                    <small class="text-muted">Changes logged on journal entries, accounts, taxes, partners, and the company.</small>
+                </t>
                 <t t-else="">
                     <h2 class="h4 fw-bold text-dark mb-0">Chart of Accounts</h2>
                     <small class="text-muted">Browse ledger accounts by code, type, and prefix.</small>
@@ -14,7 +18,7 @@
             </div>
 
             <!-- ================= JOURNALS ================= -->
-            <t t-if="this.state.activeSubTab === 'journals'">
+            <t t-if="this.state.activeSubTab === 'journals' or this.state.auditView === 'entry'">
                 <t t-if="this.state.journalPanel === 'form'">
                     <div class="p-4 bg-light border-bottom">
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -478,7 +482,9 @@
                     <t t-if="this.state.selectedEntry">
                         <div class="p-4 bg-light">
                             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-                                <button class="btn btn-sm btn-light border shadow-sm fw-bold" t-on-click="closeJournalEntry">Back to Entries</button>
+                                <button class="btn btn-sm btn-light border shadow-sm fw-bold" t-on-click="closeJournalEntry">
+                                    <t t-esc="this.state.auditView === 'entry' ? 'Back to Audit Trail' : 'Back to Entries'"/>
+                                </button>
                                 <span t-attf-class="badge fs-6 px-3 py-2 shadow-sm #{this.entryStateBadgeClass(this.state.selectedEntry.state)}">
                                     <t t-esc="this.state.selectedEntry.stateLabel"/>
                                 </span>
@@ -717,7 +723,7 @@
             </t>
 
             <!-- ================= CHART OF ACCOUNTS ================= -->
-            <t t-if="this.state.activeSubTab === 'accounts'">
+            <t t-if="this.state.activeSubTab === 'accounts' or this.state.auditView === 'account'">
                 <t t-if="this.state.showAccountForm">
                     <div class="p-4 bg-light border-bottom">
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -725,7 +731,9 @@
                                 <h4 class="fw-bold mb-0"><t t-esc="this.state.accountForm.id ? 'Edit Account' : 'Create Account'"/></h4>
                                 <small class="text-muted">Use the same code numbering as Odoo (e.g. 101000, 200000).</small>
                             </div>
-                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="closeAccountForm" t-att-disabled="this.state.isSaving">Back to Accounts</button>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="closeAccountForm" t-att-disabled="this.state.isSaving">
+                                <t t-esc="this.state.auditView === 'account' ? 'Back to Audit Trail' : 'Back to Accounts'"/>
+                            </button>
                         </div>
                         <div class="row g-3 mb-3">
                             <div class="col-md-2">
@@ -912,6 +920,108 @@
                         </div>
                     </div>
                 </t>
+            </t>
+
+            <!-- ================= AUDIT TRAIL ================= -->
+            <t t-if="this.state.activeSubTab === 'audit' and this.state.auditView === 'list'">
+                <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom flex-wrap gap-2">
+                    <div class="input-group input-group-sm shadow-sm" style="width: 280px;">
+                        <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search user, record, or change..." t-att-value="this.state.filters.audit.search" t-on-input="(ev) => this.onSearchInput(ev, 'audit')"/>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.filters.audit.model" t-on-change="() => this.onFilterChange('audit')">
+                            <option value="all">All Records</option>
+                            <option value="account.move">Journal Entry</option>
+                            <option value="account.account">Account</option>
+                            <option value="account.tax">Tax</option>
+                            <option value="res.partner">Partner</option>
+                            <option value="res.company">Company</option>
+                        </select>
+                        <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-model="this.state.filters.audit.dateFrom" t-on-change="() => this.onFilterChange('audit')"/>
+                        <input type="date" class="form-control form-control-sm shadow-sm" style="width: 150px;" t-model="this.state.filters.audit.dateTo" t-on-change="() => this.onFilterChange('audit')"/>
+                    </div>
+                </div>
+                <div class="position-relative overflow-hidden">
+                    <t t-if="this.state.isLoadingList">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>
+                    <div class="table-responsive" style="max-width: 100%;">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                <tr>
+                                    <th class="ps-4">Date</th>
+                                    <th>User</th>
+                                    <th>Type</th>
+                                    <th>Record</th>
+                                    <th>Change</th>
+                                    <th class="text-end pe-3 text-nowrap">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="this.state.tableAudit.length === 0 and !this.state.isLoadingList">
+                                    <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No audit events found.</td></tr>
+                                </t>
+                                <t t-foreach="this.state.tableAudit" t-as="row" t-key="row.id">
+                                    <tr t-on-click="() => this.toggleAuditRow(row)" style="cursor: pointer;">
+                                        <td class="ps-4 text-nowrap"><t t-esc="row.date"/></td>
+                                        <td><t t-esc="row.author || '—'"/></td>
+                                        <td><span class="badge bg-light border text-dark"><t t-esc="row.model_label"/></span></td>
+                                        <td class="fw-bold text-dark"><t t-esc="row.record_name"/></td>
+                                        <td class="text-muted"><t t-esc="row.summary"/></td>
+                                        <td class="text-end pe-3 text-nowrap">
+                                            <button t-if="row.can_open" class="btn btn-sm btn-outline-dark fw-bold" t-on-click.stop="() => this.openAuditRecord(row)">Open</button>
+                                        </td>
+                                    </tr>
+                                    <tr t-if="this.state.expandedAuditId === row.id">
+                                        <td colspan="6" class="bg-light ps-4 pe-3 py-3">
+                                            <t t-if="row.changes.length">
+                                                <table class="table table-sm mb-0 bg-white border">
+                                                    <thead class="small text-uppercase text-muted">
+                                                        <tr>
+                                                            <th class="ps-3">Field</th>
+                                                            <th>Old</th>
+                                                            <th>New</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <t t-foreach="row.changes" t-as="change" t-key="change_index">
+                                                            <tr>
+                                                                <td class="ps-3 fw-bold"><t t-esc="change.field"/></td>
+                                                                <td><t t-esc="change.old"/></td>
+                                                                <td><t t-esc="change.new"/></td>
+                                                            </tr>
+                                                        </t>
+                                                    </tbody>
+                                                </table>
+                                            </t>
+                                            <t t-else="">
+                                                <span class="text-muted">No field changes on this event.</span>
+                                            </t>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.audit.total === 0 ? 0 : ((this.state.pagination.audit.page - 1) * this.state.pagination.audit.limit) + 1"/>
+                            to
+                            <t t-esc="Math.min(this.state.pagination.audit.page * this.state.pagination.audit.limit, this.state.pagination.audit.total)"/>
+                            of <t t-esc="this.state.pagination.audit.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('audit', -1)" t-att-disabled="this.state.pagination.audit.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                <t t-esc="this.state.pagination.audit.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.audit.total / this.state.pagination.audit.limit))"/>
+                            </button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('audit', 1)" t-att-disabled="this.state.pagination.audit.page &gt;= Math.ceil(this.state.pagination.audit.total / this.state.pagination.audit.limit)">Next</button>
+                        </div>
+                    </div>
+                </div>
             </t>
 
             <t t-if="this.state.confirmModal.isOpen">

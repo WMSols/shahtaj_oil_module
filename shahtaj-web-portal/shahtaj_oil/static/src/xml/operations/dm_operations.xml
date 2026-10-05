@@ -1,0 +1,1230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.OperationsDmOperations" owl="1">
+        <div>
+<!-- DM JOB DETAIL -->
+            <!-- ========================================== -->
+            <t t-if="this.state.selectedDmJob">
+                    <div class="p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="closeDmJob">
+                                ← Back to Jobs
+                            </button>
+                            <div class="d-flex gap-2" t-if="this.showDmJobActions()">
+                                <button t-if="this.state.selectedDmJob.orderId" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openAssignModal(this.state.selectedDmJob.orderId, true)">View DM Assignment</button>
+                                <button t-if="this.canPickJob(this.state.selectedDmJob)" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openPickModal(this.state.selectedDmJob.id)">Pick Stock</button>
+                                <button t-if="this.canResetField(this.state.selectedDmJob)" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.resetDmJobField(this.state.selectedDmJob.id)">Reset Pending</button>
+                                <button t-if="this.canReturnWarehouse(this.state.selectedDmJob)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(this.state.selectedDmJob.id)">Return to WH</button>
+                            </div>
+                        </div>
+                        <h4 class="fw-bold"><t t-esc="this.state.selectedDmJob.name"/></h4>
+                        <div class="d-flex gap-2 mb-3 flex-wrap">
+                            <span t-attf-class="badge #{this.stockStateBadgeClass(this.state.selectedDmJob.state)}"><t t-esc="this.stockStateLabel(this.state.selectedDmJob.state)"/></span>
+                            <span t-attf-class="badge #{this.fieldStateBadgeClass(this.state.selectedDmJob.fieldState)}"><t t-esc="this.fieldStateLabel(this.state.selectedDmJob.fieldState)"/></span>
+                        </div>
+
+                        <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
+                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('delivery')">
+                                <h6 class="mb-0 fw-bold text-dark text-uppercase small">Delivery Details</h6>
+                                <i t-attf-class="fa #{this.state.dmJobSections.delivery ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
+                            </button>
+                            <t t-if="this.state.dmJobSections.delivery">
+                                <div class="border-top p-3 row g-3">
+                                    <div class="col-md-6"><span class="text-muted small d-block">Delivery man</span><span class="fw-bold"><t t-esc="this.state.selectedDmJob.dm"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Scheduled</span><span class="fw-bold"><t t-esc="this.state.selectedDmJob.date"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Picked at</span><span><t t-esc="this.state.selectedDmJob.pickedAt || '—'"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Delivered at</span><span><t t-esc="this.state.selectedDmJob.deliveredAt || '—'"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Assignment</span><span><t t-esc="this.assignmentModeLabel(this.state.selectedDmJob.assignmentMode)"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Assigned qty</span><span><t t-esc="this.state.selectedDmJob.qtyAssignedTotal"/></span></div>
+                                    <t t-if="this.hasFinancialAccess">
+                                        <div class="col-md-6"><span class="text-muted small d-block">Amount</span><span class="fw-bold">Rs. <t t-esc="this.formatMoney(this.state.selectedDmJob.amount)"/></span></div>
+                                        <div class="col-md-6"><span class="text-muted small d-block">Invoice</span><span><t t-esc="this.state.selectedDmJob.invoiceStatus || '—'"/></span></div>
+                                    </t>
+                                    <div class="col-12" t-if="this.state.selectedDmJob.notes"><span class="text-muted small d-block">Notes</span><span><t t-esc="this.state.selectedDmJob.notes"/></span></div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
+                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('order')">
+                                <h6 class="mb-0 fw-bold text-dark text-uppercase small">Order Details</h6>
+                                <i t-attf-class="fa #{this.state.dmJobSections.order ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
+                            </button>
+                            <t t-if="this.state.dmJobSections.order">
+                                <div class="border-top p-3 row g-3">
+                                    <div class="col-md-6"><span class="text-muted small d-block">Sales order</span><span class="fw-bold"><t t-esc="this.state.selectedDmJob.order"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Shop</span><span class="fw-bold"><t t-esc="this.state.selectedDmJob.shop"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Order booker</span><span><t t-esc="this.state.selectedDmJob.booker"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Order date</span><span><t t-esc="this.state.selectedDmJob.orderDate || '—'"/></span></div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
+                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('shop')">
+                                <h6 class="mb-0 fw-bold text-dark text-uppercase small">Shop Balance</h6>
+                                <i t-attf-class="fa #{this.state.dmJobSections.shop ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
+                            </button>
+                            <t t-if="this.state.dmJobSections.shop">
+                                <div class="border-top p-3 row g-3">
+                                    <div class="col-md-6"><span class="text-muted small d-block">Category</span><span class="fw-bold text-capitalize"><t t-esc="this.state.selectedDmJob.shopCategory || '—'"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Outstanding</span><span t-attf-class="fw-bold #{this.state.selectedDmJob.shopDue &gt; 0 ? 'text-danger' : ''}">Rs. <t t-esc="this.formatMoney(this.state.selectedDmJob.shopDue)"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Unpaid invoices</span><span><t t-esc="this.state.selectedDmJob.shopUnpaidCount"/> / <t t-esc="this.state.selectedDmJob.shopInvoiceCount"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Unpaid amount</span><span>Rs. <t t-esc="this.formatMoney(this.state.selectedDmJob.shopUnpaidAmount)"/></span></div>
+                                    <div class="col-md-6" t-if="this.state.selectedDmJob.shopCategory === 'credit'"><span class="text-muted small d-block">Credit limit</span><span>Rs. <t t-esc="this.formatMoney(this.state.selectedDmJob.shopCreditLimit)"/></span></div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden" t-if="this.state.selectedDmJob.gpsVerified">
+                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('gps')">
+                                <h6 class="mb-0 fw-bold text-dark text-uppercase small">Last GPS</h6>
+                                <i t-attf-class="fa #{this.state.dmJobSections.gps ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
+                            </button>
+                            <t t-if="this.state.dmJobSections.gps">
+                                <div class="border-top p-3 row g-3">
+                                    <div class="col-md-6"><span class="text-muted small d-block">Delivered at</span><span><t t-esc="this.state.selectedDmJob.deliveredAt || '—'"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Distance</span><span><t t-esc="Math.round(this.state.selectedDmJob.gpsDistance || 0)"/> m</span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Receiver</span><span><t t-esc="this.state.selectedDmJob.receiverName || '—'"/></span></div>
+                                    <div class="col-md-6"><span class="text-muted small d-block">Coordinates</span><span><t t-esc="this.state.selectedDmJob.gpsLat"/>, <t t-esc="this.state.selectedDmJob.gpsLng"/></span></div>
+                                    <div class="col-12" t-if="this.state.selectedDmJob.hasProof and this.state.selectedDmJob.proofImage">
+                                        <span class="text-muted small d-block mb-2">Delivery proof</span>
+                                        <button type="button" class="btn p-0 border-0 bg-transparent"
+                                                t-on-click="() => this.openImagePreview(this.proofImageSrc(this.state.selectedDmJob.proofImage), 'Delivery proof')"
+                                                title="Click to enlarge">
+                                            <img t-att-src="this.proofImageSrc(this.state.selectedDmJob.proofImage)"
+                                                 alt="Delivery proof"
+                                                 class="rounded border shadow-sm"
+                                                 style="width: 280px; height: 280px; object-fit: cover; cursor: zoom-in;"/>
+                                        </button>
+                                        <div class="text-muted small mt-1">Click to enlarge</div>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
+                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0" t-on-click="() => this.toggleDmJobSection('products')">
+                                <h6 class="mb-0 fw-bold text-dark text-uppercase small">Products</h6>
+                                <i t-attf-class="fa #{this.state.dmJobSections.products ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
+                            </button>
+                            <t t-if="this.state.dmJobSections.products">
+                                <div class="table-responsive border-top">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="bg-light small text-muted text-uppercase">
+                                            <tr><th class="ps-3">Product</th><th class="text-end">Ordered</th><th class="text-end">Assigned</th><th class="text-end">Picked</th><th class="text-end">Delivered</th><th class="text-end pe-3">On van</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="this.state.selectedDmJob.lines" t-as="line" t-key="line.id">
+                                                <tr>
+                                                    <td class="ps-3"><t t-esc="line.product"/></td>
+                                                    <td class="text-end"><t t-esc="line.qtyOrdered"/></td>
+                                                    <td class="text-end"><t t-esc="line.qtyAssigned"/></td>
+                                                    <td class="text-end"><t t-esc="line.qtyPicked"/></td>
+                                                    <td class="text-end"><t t-esc="line.qtyDelivered"/></td>
+                                                    <td class="text-end pe-3"><t t-esc="line.qtyOnVan"/></td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+            </t>
+
+            <!-- ========================================== -->
+            <!-- DM OPERATIONS                              -->
+            <!-- ========================================== -->
+            <t t-if="this.state.activeSubTab === 'deliveries'">
+
+                <t t-if="!this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery">
+                    <div class="px-3 pt-3 border-bottom bg-white">
+                        <ul class="nav nav-pills gap-2 mb-3 flex-wrap">
+                            <li class="nav-item">
+                                <button t-on-click="() => this.setDeliveriesSubTab('dispatch')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'dispatch' ? 'active bg-dark text-white' : 'text-muted bg-light'}">To Dispatch</button>
+                            </li>
+                            <li class="nav-item">
+                                <button t-on-click="() => this.setDeliveriesSubTab('jobs')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'jobs' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Delivery Jobs</button>
+                            </li>
+                            <li class="nav-item">
+                                <button t-on-click="() => this.setDeliveriesSubTab('sessions')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'sessions' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Day Sessions</button>
+                            </li>
+                            <li class="nav-item" t-if="this.hasFinancialAccess">
+                                <button t-on-click="() => this.setDeliveriesSubTab('recovery')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'recovery' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Recovery</button>
+                            </li>
+                            <li class="nav-item" t-if="this.hasFinancialAccess">
+                                <button t-on-click="() => this.setDeliveriesSubTab('settlements')" t-attf-class="nav-link rounded-pill fw-bold px-3 py-2 border-0 #{this.state.deliveriesSubTab === 'settlements' ? 'active bg-dark text-white' : 'text-muted bg-light'}">Wallet Settlements</button>
+                            </li>
+                        </ul>
+                    </div>
+                </t>
+
+                <t t-if="!this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'dispatch'">
+                    <div class="p-3 bg-light border-bottom">
+                        <div class="input-group input-group-sm w-50 shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search shop, booker, or order..."
+                                   t-att-value="this.state.filters.dispatch.search"
+                                   t-on-input="(ev) => this.onSearchInput(ev, 'dispatch')"/>
+                        </div>
+                    </div>
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 border-top-0">Order</th>
+                                        <th class="border-top-0">Shop &amp; Booker</th>
+                                        <th class="border-top-0">Left</th>
+                                        <th class="border-top-0">Invoice</th>
+                                        <th class="border-top-0">DM Jobs</th>
+                                        <th class="text-end pe-4 border-top-0">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="this.state.tableDispatch.length === 0 and !this.state.isLoadingList">
+                                        <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No orders waiting to dispatch.</td></tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableDispatch" t-as="row" t-key="row.odoo_id">
+                                        <tr>
+                                            <td class="ps-4 fw-bold"><t t-esc="row.id"/></td>
+                                            <td>
+                                                <div class="fw-bold"><t t-esc="row.shop"/></div>
+                                                <small class="text-muted"><t t-esc="row.booker"/></small>
+                                            </td>
+                                            <td><t t-esc="row.qtyToDeliver"/></td>
+                                            <td>
+                                                <span t-if="row.hasPostedInvoice" class="badge bg-success text-white">Posted</span>
+                                                <span t-else="" class="badge bg-warning text-dark">Invoice first</span>
+                                            </td>
+                                            <td><t t-esc="row.dmJobCount"/></td>
+                                            <td class="text-end pe-4">
+                                                <button t-if="this.canCreateInvoice(row)" class="btn btn-sm btn-success text-white fw-bold me-1" t-on-click="() => this.createInvoiceFromDispatch(row)" t-att-disabled="this.state.isCreatingInvoice">Invoice</button>
+                                                <button t-if="this.canAssignDeliveryMan(row)" class="btn btn-sm btn-dark text-white fw-bold me-1" t-on-click="() => this.openAssignModal(row.odoo_id)">Assign / Split</button>
+                                                <button t-if="!row.dmJobCount and row.hasPostedInvoice and row.status !== 'Cancelled'" class="btn btn-sm btn-outline-primary fw-bold me-1" t-on-click="() => this.openDeliveryCustom(row.odoo_id)">Mark Delivery</button>
+                                                <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewDelivery(row)">View</button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.dispatch.total === 0 ? 0 : ((this.state.pagination.dispatch.page - 1) * this.state.pagination.dispatch.limit) + 1"/>
+                                to <t t-esc="Math.min(this.state.pagination.dispatch.page * this.state.pagination.dispatch.limit, this.state.pagination.dispatch.total)"/>
+                                of <t t-esc="this.state.pagination.dispatch.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('dispatch', -1)" t-att-disabled="this.state.pagination.dispatch.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.dispatch.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.dispatch.total / this.state.pagination.dispatch.limit))"/></button>
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('dispatch', 1)" t-att-disabled="this.state.pagination.dispatch.page &gt;= Math.ceil(this.state.pagination.dispatch.total / this.state.pagination.dispatch.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                                <t t-if="!this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'jobs'">
+                    <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="max-width: 240px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search jobs, order, shop, DM..."
+                                   t-att-value="this.state.filters.dm_jobs.search"
+                                   t-on-input="(ev) => this.onSearchInput(ev, 'dm_jobs')"/>
+                        </div>
+                        <select class="form-select form-select-sm" style="max-width: 180px;" t-model="this.state.filters.dm_jobs.dm" t-on-change="() => this.onFilterChange('dm_jobs')">
+                            <option value="all">All delivery men</option>
+                            <t t-foreach="this.state.lookupDeliveryMen" t-as="dm" t-key="dm.id">
+                                <option t-att-value="dm.id"><t t-esc="dm.name"/></option>
+                            </t>
+                        </select>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.dm_jobs.dateFrom" t-on-change="() => this.onFilterChange('dm_jobs')" title="From date"/>
+                        <span class="text-muted small align-self-center">to</span>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.dm_jobs.dateTo" t-on-change="() => this.onFilterChange('dm_jobs')" title="To date"/>
+                        <select class="form-select form-select-sm" style="max-width: 140px;" t-model="this.state.filters.dm_jobs.state" t-on-change="() => this.onFilterChange('dm_jobs')">
+                            <option value="all">All stock</option>
+                            <option value="ready">Ready</option>
+                            <option value="picked">Picked</option>
+                            <option value="partial">Partial</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="returned">Returned</option>
+                            <option value="not_ready">Not ready</option>
+                        </select>
+                        <select class="form-select form-select-sm" style="max-width: 150px;" t-model="this.state.filters.dm_jobs.field_state" t-on-change="() => this.onFilterChange('dm_jobs')">
+                            <option value="all">All field</option>
+                            <option value="pending">Pending</option>
+                            <option value="in_transit">In transit</option>
+                            <option value="done">Done</option>
+                            <option value="not_attended">Shop closed</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                        <select class="form-select form-select-sm" style="max-width: 140px;" t-model="this.state.filters.dm_jobs.assignment_mode" t-on-change="() => this.onFilterChange('dm_jobs')">
+                            <option value="all">All assign</option>
+                            <option value="manual">Manual</option>
+                            <option value="auto">Auto</option>
+                        </select>
+                    </div>
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 border-top-0">Job</th>
+                                        <th class="border-top-0">Date</th>
+                                        <th class="border-top-0">Order / Shop</th>
+                                        <th class="border-top-0">DM / Booker</th>
+                                        <th class="text-end border-top-0" t-if="this.hasFinancialAccess">Amount</th>
+                                        <th class="text-end border-top-0">Shop Due</th>
+                                        <th class="border-top-0">Stock</th>
+                                        <th class="border-top-0">Field</th>
+                                        <th class="text-end pe-4 border-top-0">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="this.state.tableDmJobs.length === 0 and !this.state.isLoadingList">
+                                        <tr><td t-att-colspan="this.hasFinancialAccess ? 9 : 8" class="text-center py-5 text-muted fw-bold">No delivery jobs for these filters.</td></tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableDmJobs" t-as="job" t-key="job.id">
+                                        <tr>
+                                            <td class="ps-4 fw-bold"><t t-esc="job.name"/></td>
+                                            <td><t t-esc="job.date"/></td>
+                                            <td>
+                                                <div class="fw-bold"><t t-esc="job.order"/></div>
+                                                <small class="text-muted"><t t-esc="job.shop"/></small>
+                                            </td>
+                                            <td>
+                                                <div class="fw-bold"><t t-esc="job.dm"/></div>
+                                                <small class="text-muted"><t t-esc="job.booker"/></small>
+                                            </td>
+                                            <td class="text-end" t-if="this.hasFinancialAccess">Rs. <t t-esc="this.formatMoney(job.amount)"/></td>
+                                            <td class="text-end" t-attf-class="#{job.shopDue &gt; 0 ? 'text-danger fw-bold' : ''}">Rs. <t t-esc="this.formatMoney(job.shopDue)"/></td>
+                                            <td><span t-attf-class="badge #{this.stockStateBadgeClass(job.state)}"><t t-esc="this.stockStateLabel(job.state)"/></span></td>
+                                            <td><span t-attf-class="badge #{this.fieldStateBadgeClass(job.fieldState)}"><t t-esc="this.fieldStateLabel(job.fieldState)"/></span></td>
+                                            <td class="text-end pe-4">
+                                                <button class="btn btn-sm btn-outline-dark fw-bold me-1" t-on-click="() => this.viewDmJob(job)">View</button>
+                                                <button t-if="this.canResetField(job)" class="btn btn-sm btn-outline-secondary fw-bold me-1" t-on-click="() => this.resetDmJobField(job.id)">Reset</button>
+                                                <button t-if="this.canReturnWarehouse(job)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(job.id)">Return WH</button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.dm_jobs.total === 0 ? 0 : ((this.state.pagination.dm_jobs.page - 1) * this.state.pagination.dm_jobs.limit) + 1"/>
+                                to <t t-esc="Math.min(this.state.pagination.dm_jobs.page * this.state.pagination.dm_jobs.limit, this.state.pagination.dm_jobs.total)"/>
+                                of <t t-esc="this.state.pagination.dm_jobs.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('dm_jobs', -1)" t-att-disabled="this.state.pagination.dm_jobs.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.dm_jobs.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.dm_jobs.total / this.state.pagination.dm_jobs.limit))"/></button>
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('dm_jobs', 1)" t-att-disabled="this.state.pagination.dm_jobs.page &gt;= Math.ceil(this.state.pagination.dm_jobs.total / this.state.pagination.dm_jobs.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+<t t-if="!this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'sessions'">
+                    <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2">
+                        <select class="form-select form-select-sm" style="max-width: 200px;" t-model="this.state.filters.sessions.dm" t-on-change="() => this.onFilterChange('sessions')">
+                            <option value="all">All delivery men</option>
+                            <t t-foreach="this.state.lookupDeliveryMen" t-as="dm" t-key="dm.id">
+                                <option t-att-value="dm.id"><t t-esc="dm.name"/></option>
+                            </t>
+                        </select>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.sessions.dateFrom" t-on-change="() => this.onFilterChange('sessions')"/>
+                        <span class="text-muted small align-self-center">to</span>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.sessions.dateTo" t-on-change="() => this.onFilterChange('sessions')"/>
+                    </div>
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 border-top-0">Delivery man</th>
+                                        <th class="border-top-0">Date</th>
+                                        <th class="border-top-0">Status</th>
+                                        <th class="border-top-0">Departed</th>
+                                        <th class="border-top-0">Ended</th>
+                                        <th class="text-end pe-4 border-top-0">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="!this.state.tableSessions.length and !this.state.isLoadingList">
+                                        <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No day sessions for these filters.</td></tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableSessions" t-as="sess" t-key="sess.id">
+                                        <tr>
+                                            <td class="ps-4 fw-bold"><t t-esc="sess.dm"/></td>
+                                            <td><t t-esc="sess.date"/></td>
+                                            <td><t t-esc="this.sessionLabel(sess.state)"/></td>
+                                            <td><t t-esc="sess.departed"/></td>
+                                            <td><t t-esc="sess.ended"/></td>
+                                            <td class="text-end pe-4">
+                                                <button t-if="sess.state !== 'office'" class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.resetSession(sess.id)">Reset to office</button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.sessions.total === 0 ? 0 : ((this.state.pagination.sessions.page - 1) * this.state.pagination.sessions.limit) + 1"/>
+                                to <t t-esc="Math.min(this.state.pagination.sessions.page * this.state.pagination.sessions.limit, this.state.pagination.sessions.total)"/>
+                                of <t t-esc="this.state.pagination.sessions.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('sessions', -1)" t-att-disabled="this.state.pagination.sessions.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.sessions.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.sessions.total / this.state.pagination.sessions.limit))"/></button>
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('sessions', 1)" t-att-disabled="this.state.pagination.sessions.page &gt;= Math.ceil(this.state.pagination.sessions.total / this.state.pagination.sessions.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="this.hasFinancialAccess and !this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'recovery'">
+                    <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="max-width: 240px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search collections..."
+                                   t-att-value="this.state.filters.collections.search"
+                                   t-on-input="(ev) => this.onSearchInput(ev, 'collections')"/>
+                        </div>
+                        <select class="form-select form-select-sm" style="max-width: 200px;" t-model="this.state.filters.collections.dm" t-on-change="() => this.onFilterChange('collections')">
+                            <option value="all">All delivery men</option>
+                            <t t-foreach="this.state.lookupDeliveryMen" t-as="dm" t-key="'col-' + dm.id">
+                                <option t-att-value="dm.id"><t t-esc="dm.name"/></option>
+                            </t>
+                        </select>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.collections.dateFrom" t-on-change="() => this.onFilterChange('collections')"/>
+                        <span class="text-muted small align-self-center">to</span>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.collections.dateTo" t-on-change="() => this.onFilterChange('collections')"/>
+                    </div>
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 border-top-0">Payment</th>
+                                        <th class="border-top-0">Date</th>
+                                        <th class="border-top-0">Shop</th>
+                                        <th class="border-top-0">Delivery man</th>
+                                        <th class="text-end border-top-0">Amount</th>
+                                        <th class="text-end pe-4 border-top-0">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="!this.state.tableCollections.length and !this.state.isLoadingList">
+                                        <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No wallet collections for these filters.</td></tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableCollections" t-as="pay" t-key="pay.id">
+                                        <tr>
+                                            <td class="ps-4 fw-bold"><t t-esc="pay.name"/></td>
+                                            <td><t t-esc="pay.date"/></td>
+                                            <td><t t-esc="pay.shop"/></td>
+                                            <td><t t-esc="pay.dm"/></td>
+                                            <td class="text-end">Rs. <t t-esc="this.formatMoney(pay.amount)"/></td>
+                                            <td class="text-end pe-4">
+                                                <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewRecovery(pay)">View</button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.collections.total === 0 ? 0 : ((this.state.pagination.collections.page - 1) * this.state.pagination.collections.limit) + 1"/>
+                                to <t t-esc="Math.min(this.state.pagination.collections.page * this.state.pagination.collections.limit, this.state.pagination.collections.total)"/>
+                                of <t t-esc="this.state.pagination.collections.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('collections', -1)" t-att-disabled="this.state.pagination.collections.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.collections.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.collections.total / this.state.pagination.collections.limit))"/></button>
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('collections', 1)" t-att-disabled="this.state.pagination.collections.page &gt;= Math.ceil(this.state.pagination.collections.total / this.state.pagination.collections.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="this.hasFinancialAccess and !this.state.selectedDelivery and !this.state.selectedDmJob and !this.state.selectedSettlement and !this.state.selectedRecovery and this.state.deliveriesSubTab === 'settlements'">
+                    <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
+                        <div class="input-group input-group-sm shadow-sm" style="max-width: 240px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search settlements..."
+                                   t-att-value="this.state.filters.settlements.search"
+                                   t-on-input="(ev) => this.onSearchInput(ev, 'settlements')"/>
+                        </div>
+                        <select class="form-select form-select-sm" style="max-width: 200px;" t-model="this.state.filters.settlements.dm" t-on-change="() => this.onFilterChange('settlements')">
+                            <option value="all">All delivery men</option>
+                            <t t-foreach="this.state.lookupDeliveryMen" t-as="dm" t-key="'set-' + dm.id">
+                                <option t-att-value="dm.id"><t t-esc="dm.name"/></option>
+                            </t>
+                        </select>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.settlements.dateFrom" t-on-change="() => this.onFilterChange('settlements')"/>
+                        <span class="text-muted small align-self-center">to</span>
+                        <input type="date" class="form-control form-control-sm" style="max-width: 150px;" t-model="this.state.filters.settlements.dateTo" t-on-change="() => this.onFilterChange('settlements')"/>
+                        <button class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openSettleModal()">Settle Wallet</button>
+                    </div>
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 border-top-0">Date</th>
+                                        <th class="border-top-0">Delivery man</th>
+                                        <th class="text-end border-top-0">Amount</th>
+                                        <th class="border-top-0">Journal</th>
+                                        <th class="border-top-0">Settled by</th>
+                                        <th class="border-top-0">State</th>
+                                        <th class="text-end pe-4 border-top-0">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="!this.state.tableSettlements.length and !this.state.isLoadingList">
+                                        <tr><td colspan="7" class="text-center py-5 text-muted fw-bold">No wallet settlements for these filters.</td></tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableSettlements" t-as="setl" t-key="setl.id">
+                                        <tr>
+                                            <td class="ps-4"><t t-esc="setl.date"/></td>
+                                            <td class="fw-bold"><t t-esc="setl.dm"/></td>
+                                            <td class="text-end">Rs. <t t-esc="this.formatMoney(setl.amount)"/></td>
+                                            <td><t t-esc="setl.journal"/></td>
+                                            <td><t t-esc="setl.settledBy"/></td>
+                                            <td><span class="badge bg-light text-dark text-capitalize"><t t-esc="setl.state"/></span></td>
+                                            <td class="text-end pe-4">
+                                                <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewSettlement(setl)">View</button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.settlements.total === 0 ? 0 : ((this.state.pagination.settlements.page - 1) * this.state.pagination.settlements.limit) + 1"/>
+                                to <t t-esc="Math.min(this.state.pagination.settlements.page * this.state.pagination.settlements.limit, this.state.pagination.settlements.total)"/>
+                                of <t t-esc="this.state.pagination.settlements.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('settlements', -1)" t-att-disabled="this.state.pagination.settlements.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.settlements.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.settlements.total / this.state.pagination.settlements.limit))"/></button>
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('settlements', 1)" t-att-disabled="this.state.pagination.settlements.page &gt;= Math.ceil(this.state.pagination.settlements.total / this.state.pagination.settlements.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="this.state.selectedRecovery">
+                    <div class="p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <button class="btn btn-sm btn-light border fw-bold" t-on-click="closeRecovery">← Back to Recovery</button>
+                            <button class="btn btn-sm btn-dark text-white fw-bold"
+                                    t-on-click="openRecoverySettle"
+                                    t-att-disabled="!this.state.selectedRecovery.dmId">
+                                Settle Wallet
+                            </button>
+                        </div>
+                        <div class="card border-0 shadow-sm rounded-4 p-4">
+                            <h4 class="fw-bold mb-4"><t t-esc="this.state.selectedRecovery.name"/></h4>
+                            <div class="row g-3">
+                                <div class="col-md-6"><span class="text-muted small d-block">Shop</span><span class="fw-bold"><t t-esc="this.state.selectedRecovery.shop"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Delivery man</span><span class="fw-bold"><t t-esc="this.state.selectedRecovery.dm"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Date</span><span class="fw-bold"><t t-esc="this.state.selectedRecovery.date"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Amount</span><span class="fw-bold text-success">Rs. <t t-esc="this.formatMoney(this.state.selectedRecovery.amount)"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Payment method</span><span><t t-esc="this.state.selectedRecovery.channelLabel"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">State</span><span class="text-capitalize"><t t-esc="this.state.selectedRecovery.state"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Journal</span><span><t t-esc="this.state.selectedRecovery.journal || '—'"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Journal entry</span><span><t t-esc="this.state.selectedRecovery.move || '—'"/></span></div>
+                                <div class="col-md-6" t-if="this.state.selectedRecovery.job">
+                                    <span class="text-muted small d-block">Delivery job</span>
+                                    <span><t t-esc="this.state.selectedRecovery.job"/></span>
+                                </div>
+                                <div class="col-md-6" t-if="this.state.selectedRecovery.reference">
+                                    <span class="text-muted small d-block">Cheque / reference</span>
+                                    <span><t t-esc="this.state.selectedRecovery.reference"/></span>
+                                </div>
+                                <div class="col-md-6" t-if="this.state.selectedRecovery.bankName">
+                                    <span class="text-muted small d-block">Customer bank</span>
+                                    <span><t t-esc="this.state.selectedRecovery.bankName"/></span>
+                                </div>
+                                <div class="col-md-6" t-if="this.state.selectedRecovery.accountNumber">
+                                    <span class="text-muted small d-block">Customer account</span>
+                                    <span><t t-esc="this.state.selectedRecovery.accountNumber"/></span>
+                                </div>
+                                <div class="col-12" t-if="this.state.selectedRecovery.invoiceLabel">
+                                    <span class="text-muted small d-block">Invoices</span>
+                                    <span><t t-esc="this.state.selectedRecovery.invoiceLabel"/></span>
+                                </div>
+                                <div class="col-12">
+                                    <span class="text-muted small d-block">Notes</span>
+                                    <span><t t-esc="this.state.selectedRecovery.notes || '—'"/></span>
+                                </div>
+                                <div class="col-12" t-if="this.state.selectedRecovery.chequeImage">
+                                    <span class="text-muted small d-block mb-2">Cheque photo</span>
+                                    <img class="img-fluid rounded border" style="max-height: 240px;" t-att-src="this.proofImageSrc(this.state.selectedRecovery.chequeImage)" alt="Cheque photo"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="this.state.selectedSettlement">
+                    <div class="p-4">
+                        <button class="btn btn-sm btn-light border fw-bold mb-3" t-on-click="closeSettlement">← Back to Settlements</button>
+                        <div class="card border-0 shadow-sm rounded-4 p-4">
+                            <h4 class="fw-bold mb-4"><t t-esc="this.state.selectedSettlement.name"/></h4>
+                            <div class="row g-3">
+                                <div class="col-md-6"><span class="text-muted small d-block">Delivery man</span><span class="fw-bold"><t t-esc="this.state.selectedSettlement.dm"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Date</span><span class="fw-bold"><t t-esc="this.state.selectedSettlement.date"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Amount</span><span class="fw-bold text-success">Rs. <t t-esc="this.formatMoney(this.state.selectedSettlement.amount)"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Deposit journal</span><span><t t-esc="this.state.selectedSettlement.journal"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Journal entry</span><span><t t-esc="this.state.selectedSettlement.move"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">Settled by</span><span><t t-esc="this.state.selectedSettlement.settledBy"/></span></div>
+                                <div class="col-md-6"><span class="text-muted small d-block">State</span><span class="text-capitalize"><t t-esc="this.state.selectedSettlement.state"/></span></div>
+                                <div class="col-12"><span class="text-muted small d-block">Notes</span><span><t t-esc="this.state.selectedSettlement.notes || '—'"/></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+
+            <t t-if="this.state.selectedDelivery">
+                <div class="p-4" style="background-color: #f8fafc;">
+                        <!-- Header with Back Button & Actions -->
+                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+                        <button class="btn btn-sm btn-light border shadow-sm fw-bold text-dark d-flex align-items-center" t-on-click="closeDelivery" t-att-disabled="this.state.isEditingDelivery">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+                                <path d="m12 19-7-7 7-7"/>
+                                <path d="M19 12H5"/>
+                            </svg>
+                                Back to DM Operations
+                        </button>
+
+                        <div class="d-flex align-items-center gap-2">
+                            <t t-if="!this.state.isEditingDelivery">
+                                <button t-if="this.state.deliveriesSubTab === 'dispatch' and this.canAssignDeliveryMan(this.state.selectedDelivery)" class="btn btn-sm btn-dark text-white shadow-sm fw-bold px-3" t-on-click="() => this.openAssignModal(this.state.selectedDelivery.odoo_id)">Assign / Split</button>
+
+                                    <!-- Create Invoice Button -->
+                                <t t-if="this.canCreateInvoice(this.state.selectedDelivery)">
+                                    <button class="btn btn-sm btn-success text-white shadow-sm fw-bold px-3" t-on-click="createInvoiceFromDelivery" t-att-disabled="this.state.isCreatingInvoice" title="Invoice ordered quantities, then post. Required before assigning a delivery man.">
+                                        <t t-if="this.state.isCreatingInvoice">
+                                            <span class="spinner-border spinner-border-sm me-1"/>
+ Working...
+                                        </t>
+                                        <t t-else="">Create Invoice</t>
+                                    </button>
+                                </t>
+
+                                    <!-- NEW: Auto-Hiding Mark Delivery Button -->
+                                <t t-set="hasPendingDelivery" t-value="this.state.selectedDelivery.full_lines and this.state.selectedDelivery.full_lines.some(l => l.qty > l.delivered)"/>
+                                <t t-if="hasPendingDelivery and this.state.selectedDelivery.status !== 'Cancelled' and this.state.selectedDelivery.orderState !== 'cancel'">
+                                    <button class="btn btn-sm btn-primary shadow-sm fw-bold px-3 text-white d-flex align-items-center" t-on-click="() => this.openDeliveryCustom(this.state.selectedDelivery.odoo_id)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-package-check me-1">
+                                            <path d="m16 16 2 2 4-4"/>
+                                            <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/>
+                                            <path d="m7.5 4.27 9 5.15"/>
+                                            <polyline points="3.29 7 12 12 12 22"/>
+                                        </svg>
+                                            Mark Delivery
+                                    </button>
+                                </t>
+
+                                    <!-- Edit Details Button -->
+                                <button t-if="this.hasFinancialAccess" class="btn btn-sm btn-dark shadow-sm fw-bold px-3 d-flex align-items-center" t-on-click="toggleEditDelivery">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil me-1">
+                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                        <path d="m15 5 4 4"/>
+                                    </svg>
+                                        Edit Details
+                                </button>
+                            </t>
+                            <t t-else="">
+                                <button class="btn btn-sm btn-outline-secondary shadow-sm fw-bold px-3" t-on-click="toggleEditDelivery">
+                                        Discard
+                                </button>
+                                <button class="btn btn-sm btn-success shadow-sm fw-bold px-4 text-white d-flex align-items-center" t-on-click="saveDeliveryChanges">
+                                    <i class="fa fa-save me-2"></i> Save Changes
+                                </button>
+                            </t>
+                        </div>
+                    </div>
+
+
+                        <!-- Main Order Information Card -->
+                    <div t-attf-class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden #{this.state.isEditingDelivery ? 'border border-success' : ''}">
+                        <div class="p-4 bg-white">
+                            <div class="d-flex justify-content-between">
+                                <h3 class="fw-bold mb-4 text-dark">
+                                    <t t-esc="this.state.selectedDelivery.id"/>
+                                </h3>
+                                <span t-if="this.state.isEditingDelivery" class="badge bg-success text-white px-3 py-2 fs-6 mb-auto shadow-sm">EDITING MODE</span>
+                            </div>
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <div class="d-flex mb-3 align-items-center">
+                                        <span class="text-muted small fw-bold text-uppercase w-25">Customer</span>
+                                        <span class="text-primary fw-bold fs-6">
+                                            <t t-esc="this.state.selectedDelivery.shop"/>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex mb-3 align-items-center">
+                                        <span class="text-muted small fw-bold text-uppercase w-25">Order Booker</span>
+                                        <span class="fw-bold text-dark">
+                                            <t t-esc="this.state.selectedDelivery.booker"/>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex mb-3 align-items-center">
+                                        <span class="text-muted small fw-bold text-uppercase w-25">Delivery Status</span>
+                                        <span t-attf-class="badge #{this.state.selectedDelivery.is_fully_delivered ? 'bg-success text-white' : 'bg-warning text-dark'} px-2 py-1">
+                                            <t t-esc="this.state.selectedDelivery.is_fully_delivered ? 'Delivered' : 'To Deliver'"/>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex mb-3 align-items-center">
+                                        <span class="text-muted small fw-bold text-uppercase w-25">Order Date</span>
+                                        <span class="text-dark">
+                                            <t t-esc="this.state.selectedDelivery.date"/>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border-top">
+                            <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0"
+                                    t-on-click="toggleShopSnapshot" title="Show or hide shop credit and sales history">
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    <h6 class="mb-0 fw-bold text-dark text-uppercase small">Shop Snapshot</h6>
+                                    <t t-if="this.state.selectedDelivery.shopCategory">
+                                        <span t-attf-class="badge text-white #{this.state.selectedDelivery.shopCategory === 'cash' ? 'bg-success' : 'bg-info'}">
+                                            <t t-esc="this.state.selectedDelivery.shopCategory === 'cash' ? 'Cash' : 'Credit'"/>
+                                        </span>
+                                    </t>
+                                </div>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted"
+                                     t-att-style="this.state.shopSnapshotOpen ? 'transform: rotate(180deg); transition: transform 0.15s ease;' : 'transition: transform 0.15s ease;'">
+                                    <path d="m6 9 6 6 6-6"/>
+                                </svg>
+                            </button>
+                            <t t-if="this.state.shopSnapshotOpen">
+                                <div class="border-top p-4">
+                                    <div class="row g-4">
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted text-uppercase small fw-bold mb-3">Credit &amp; Balance</h6>
+                                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                <span class="text-muted small">Shop Category</span>
+                                                <span t-attf-class="badge text-white #{this.state.selectedDelivery.shopCategory === 'cash' ? 'bg-success' : 'bg-info'}">
+                                                    <t t-esc="this.state.selectedDelivery.shopCategory === 'cash' ? 'Cash' : 'Credit'"/>
+                                                </span>
+                                            </div>
+                                            <t t-if="this.state.selectedDelivery.shopCategory === 'credit'">
+                                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                    <span class="text-muted small">Shop Credit Limit</span>
+                                                    <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedDelivery.creditLimit)"/></span>
+                                                </div>
+                                            </t>
+                                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                <span class="text-muted small">Posted Outstanding</span>
+                                                <span t-attf-class="fw-bold #{this.state.selectedDelivery.outstanding &gt; 0 ? 'text-danger' : ''}">
+                                                    <t t-esc="this._formatRs(this.state.selectedDelivery.outstanding)"/>
+                                                </span>
+                                            </div>
+                                            <t t-if="this.state.selectedDelivery.shopCategory === 'credit'">
+                                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                    <span class="text-muted small">Shop Pending Orders</span>
+                                                    <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedDelivery.pendingExposure)"/></span>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                    <span class="text-muted small">Shop Confirmed (Not Invoiced)</span>
+                                                    <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedDelivery.uninvoicedExposure)"/></span>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                    <span class="text-muted small">Shop Effective Outstanding</span>
+                                                    <span t-attf-class="fw-bold #{this.state.selectedDelivery.creditWouldExceed ? 'text-danger' : ''}">
+                                                        <t t-esc="this._formatRs(this.state.selectedDelivery.effectiveOutstanding)"/>
+                                                    </span>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                    <span class="text-muted small">Shop Credit Remaining</span>
+                                                    <span t-attf-class="fw-bold #{this.state.selectedDelivery.creditWouldExceed ? 'text-warning' : ''}">
+                                                        <t t-esc="this._formatRs(this.state.selectedDelivery.creditRemaining)"/>
+                                                    </span>
+                                                </div>
+                                                <t t-if="this.state.selectedDelivery.creditWouldExceed">
+                                                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                        <span class="text-muted small">Over Credit Limit By</span>
+                                                        <span class="fw-bold text-danger"><t t-esc="this._formatRs(this.state.selectedDelivery.creditShortfall)"/></span>
+                                                    </div>
+                                                </t>
+                                            </t>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted text-uppercase small fw-bold mb-3">Sales &amp; Discount History</h6>
+                                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                <span class="text-muted small">Shop Lifetime Sales</span>
+                                                <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedDelivery.lifetimeSales)"/></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                <span class="text-muted small">Shop Confirmed Orders</span>
+                                                <span class="fw-bold"><t t-esc="this.state.selectedDelivery.confirmedOrderCount || 0"/></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                <span class="text-muted small">Past Discounts Total</span>
+                                                <span t-attf-class="fw-bold #{this.state.selectedDelivery.pastDiscountTotal &gt; 0 ? 'text-danger' : ''}">
+                                                    <t t-esc="this._formatRs(this.state.selectedDelivery.pastDiscountTotal)"/>
+                                                </span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                <span class="text-muted small">Past Discounted Orders</span>
+                                                <span class="fw-bold"><t t-esc="this.state.selectedDelivery.pastDiscountCount || 0"/></span>
+                                            </div>
+                                            <t t-if="this.state.selectedDelivery.lastDiscountDate">
+                                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                                    <span class="text-muted small">Last Discount Date</span>
+                                                    <span class="fw-bold"><t t-esc="this.state.selectedDelivery.lastDiscountDate"/></span>
+                                                </div>
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="text-muted small">Last Discount Amount</span>
+                                                    <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedDelivery.lastDiscountAmount)"/></span>
+                                                </div>
+                                            </t>
+                                            <div class="d-flex justify-content-between" t-if="!this.state.selectedDelivery.lastDiscountDate">
+                                                <span class="text-muted small">Payment Terms</span>
+                                                <span class="fw-bold text-muted"><t t-esc="this.state.selectedDelivery.paymentTerms || 'Immediate'"/></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+
+                            <!-- Custom Inline Editable Order Lines -->
+                        <div class="table-responsive border-top">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-muted small fw-bold text-uppercase">
+                                    <tr>
+                                        <th class="ps-4 py-3">Product</th>
+                                        <th class="text-center" style="width: 120px;">Quantity</th>
+                                        <th class="text-center" style="width: 100px;">Delivered</th>
+                                        <th t-if="this.hasFinancialAccess" class="text-center" style="width: 100px;">Invoiced</th>
+                                        <th t-if="this.hasFinancialAccess" class="text-end" style="width: 140px;">Unit Price</th>
+                                        <th t-if="this.hasFinancialAccess" class="text-center">Taxes</th>
+                                        <th t-if="this.hasFinancialAccess" class="text-end pe-4" style="width: 150px;">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="this.state.selectedDelivery.full_lines || []" t-as="line" t-key="line.id">
+                                        <tr t-attf-class="#{this.state.isEditingDelivery ? 'bg-light' : ''}">
+                                                <!-- Product Dropdown -->
+                                            <td class="ps-4 fw-bold text-dark align-middle">
+                                                <t t-if="this.state.isEditingDelivery">
+                                                    <select class="form-select form-select-sm shadow-sm" t-model="line.productId">
+                                                        <option value="">Select Product...</option>
+                                                        <t t-foreach="this.state.allProducts" t-as="p" t-key="p.id">
+                                                            <option t-att-value="p.id">
+                                                                <t t-esc="p.name"/>
+                                                            </option>
+                                                        </t>
+                                                    </select>
+                                                </t>
+                                                <t t-else="">
+                                                    <t t-esc="line.product"/>
+                                                </t>
+                                            </td>
+
+                                            <td class="text-center align-middle">
+                                                <t t-if="this.state.isEditingDelivery">
+                                                    <input type="number" class="form-control form-control-sm text-center shadow-sm" t-model="line.qty"/>
+                                                </t>
+                                                <t t-else="">
+                                                    <t t-esc="line.qty"/>
+                                                </t>
+                                            </td>
+
+                                            <td class="text-center align-middle text-primary fw-bold">
+                                                <t t-esc="line.delivered"/>
+                                            </td>
+
+                                            <td t-if="this.hasFinancialAccess" class="text-center align-middle text-success fw-bold">
+                                                <t t-esc="line.invoiced"/>
+                                            </td>
+
+                                            <td t-if="this.hasFinancialAccess" class="text-end align-middle">
+                                                <t t-if="this.state.isEditingDelivery">
+                                                    <input type="number" step="any" class="form-control form-control-sm text-end shadow-sm" t-model="line.price"/>
+                                                </t>
+                                                <t t-else="">Rs. <t t-esc="line.price"/>
+                                                </t>
+                                            </td>
+
+                                            <td t-if="this.hasFinancialAccess" class="text-center align-middle">
+                                                <t t-if="this.state.isEditingDelivery">
+                                                    <select class="form-select form-select-sm shadow-sm" t-model="line.tax_id">
+                                                        <option value="">None</option>
+                                                        <t t-foreach="this.state.saleTaxes" t-as="tax" t-key="tax.id">
+                                                            <option t-att-value="tax.id">
+                                                                <t t-esc="tax.name"/>
+                                                            </option>
+                                                        </t>
+                                                    </select>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="badge bg-light border text-dark">
+                                                        <t t-esc="line.taxes"/>
+                                                    </span>
+                                                </t>
+                                            </td>
+
+                                            <td t-if="this.hasFinancialAccess" class="text-end pe-4 align-middle fw-bold text-dark">
+                                                <t t-if="this.state.isEditingDelivery and this.canRemoveSaleOrderProduct(this.state.selectedDelivery, line)">
+                                                    <button class="btn btn-sm btn-outline-danger shadow-sm" t-on-click="() => this.removeDeliveryLine(line.id)" title="Remove Product">
+                                                        <i class="fa fa-trash"></i>
+                                                    </button>
+                                                </t>
+                                                <t t-else="">
+                                                    Rs. <t t-esc="line.subtotal"/>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                    </t>
+
+                                        <!-- ADD PRODUCT ROW -->
+                                    <t t-if="this.state.isEditingDelivery">
+                                        <tr>
+                                            <td colspan="7" class="ps-4 py-3 border-bottom-0">
+                                                <button class="btn btn-sm btn-outline-primary fw-bold shadow-sm" t-on-click="addDeliveryLine">
+                                                    <i class="fa fa-plus me-1"></i> Add Product
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+
+                            <!-- Summary Totals with Null-Checks -->
+                        <div t-if="this.hasFinancialAccess" class="bg-light p-4 border-top d-flex justify-content-end">
+                            <div style="min-width: 300px;">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted fw-bold">Untaxed Amount:</span>
+                                    <span class="fw-bold text-dark">
+                                        <t t-if="this.state.selectedDelivery.amount_untaxed !== undefined">
+                                            <t t-esc="this.state.selectedDelivery.amount_untaxed.toLocaleString(undefined, {minimumFractionDigits: 2})"/>
+                                        </t>
+                                        <t t-else="">0.00</t> Rs.
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 border-bottom pb-3">
+                                    <span class="text-muted fw-bold">Taxes:</span>
+                                    <span class="fw-bold text-dark">
+                                        <t t-if="this.state.selectedDelivery.amount_tax !== undefined">
+                                            <t t-esc="this.state.selectedDelivery.amount_tax.toLocaleString(undefined, {minimumFractionDigits: 2})"/>
+                                        </t>
+                                        <t t-else="">0.00</t> Rs.
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between pt-2 fs-5">
+                                    <span class="fw-bold text-dark">Total:</span>
+                                    <span class="fw-bold text-success">
+                                        <t t-if="this.state.selectedDelivery.amount_total !== undefined">
+                                            <t t-esc="this.state.selectedDelivery.amount_total.toLocaleString(undefined, {minimumFractionDigits: 2})"/>
+                                        </t>
+                                        <t t-else="">0.00</t> Rs.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <t t-if="this.state.assignModal.open">
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background: rgba(15, 23, 42, 0.6); z-index: 1055;">
+                    <div class="card border-0 shadow-lg rounded-4" style="width: 100%; max-width: 820px; max-height: 90vh; overflow: auto;">
+                        <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="fw-bold mb-0"><t t-esc="this.state.assignModal.readOnly ? 'DM Assignment' : 'Assign / Split'"/></h5>
+                                <small class="text-muted"><t t-esc="this.state.assignModal.orderName"/> · <t t-esc="this.state.assignModal.shop"/></small>
+                            </div>
+                            <button type="button" class="btn btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 40px; height: 40px; font-size: 22px;" t-on-click="closeAssignModal" title="Close" aria-label="Close">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="p-4">
+                            <div class="mb-3">
+                                <p t-attf-class="mb-1 small #{this.assignAllocationSummary.messageClass}">
+                                    <t t-if="this.assignAllocationSummary.messageStrong">
+                                        <b><t t-esc="this.assignAllocationSummary.message"/></b>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-esc="this.assignAllocationSummary.message"/>
+                                    </t>
+                                </p>
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th class="text-end">Ordered</th>
+                                            <th class="text-end">Assigned</th>
+                                            <th class="text-end">Left</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="!this.assignAllocationSummary.rows.length">
+                                            <tr><td colspan="4" class="text-muted">No products</td></tr>
+                                        </t>
+                                        <t t-foreach="this.assignAllocationSummary.rows" t-as="arow" t-key="arow.id">
+                                            <tr t-attf-class="#{arow.status === 'over' ? 'text-danger' : arow.status === 'left' ? 'text-warning' : 'text-success'}">
+                                                <td><t t-esc="arow.product"/></td>
+                                                <td class="text-end"><t t-esc="arow.qtyOrderedLabel"/></td>
+                                                <td class="text-end"><t t-esc="arow.qtyAssignedLabel"/></td>
+                                                <td class="text-end"><t t-esc="arow.leftLabel"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <t t-foreach="this.state.assignModal.jobs" t-as="job" t-key="job.id">
+                                <div class="border rounded-3 p-3 mb-3">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-6">
+                                            <label class="small fw-bold">Delivery man</label>
+                                            <select class="form-select form-select-sm" t-att-disabled="this.state.assignModal.readOnly" t-on-change="(ev) => this.setAssignDeliveryMan(job, ev.target.value)">
+                                                <option value="" t-att-selected="this.isSelectedId(job.deliveryManId, '')">Select</option>
+                                                <t t-foreach="this.assignDmOptions(job)" t-as="dm" t-key="dm.id">
+                                                    <option t-att-value="this.optionId(dm.id)" t-att-selected="this.isSelectedId(job.deliveryManId, dm.id)"><t t-esc="dm.name"/></option>
+                                                </t>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small fw-bold">Delivery day</label>
+                                            <input type="date" class="form-control form-control-sm" t-model="job.scheduledDate" t-att-disabled="this.state.assignModal.readOnly"/>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button class="btn btn-sm btn-outline-danger fw-bold w-100" t-on-click="() => this.removeAssignDeliveryMan(job.id)" t-att-disabled="this.state.assignModal.readOnly || this.state.assignModal.saving || !job.canRemove" title="Remove this delivery man">Remove</button>
+                                        </div>
+                                    </div>
+                                    <table class="table table-sm mb-0">
+                                        <thead><tr><th>Product</th><th class="text-end">Ordered</th><th class="text-end">Assign</th></tr></thead>
+                                        <tbody>
+                                            <t t-foreach="job.lines" t-as="line" t-key="line.id">
+                                                <tr>
+                                                    <td><t t-esc="line.product"/></td>
+                                                    <td class="text-end"><t t-esc="line.qtyOrdered"/></td>
+                                                    <td class="text-end" style="max-width: 110px;">
+                                                        <input type="number" class="form-control form-control-sm text-end" t-model.number="line.qtyAssigned" min="0" t-att-disabled="this.state.assignModal.readOnly"/>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </t>
+                            <div class="d-flex justify-content-between" t-if="!this.state.assignModal.readOnly">
+                                <button class="btn btn-primary text-white fw-bold shadow-sm" t-on-click="addAssignDeliveryMan" t-att-disabled="this.state.assignModal.saving">Add delivery man</button>
+                                <button class="btn btn-dark text-white fw-bold" t-on-click="confirmAssign" t-att-disabled="this.state.assignModal.saving">Confirm assign</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <t t-if="this.state.pickModal.open">
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background: rgba(15, 23, 42, 0.6); z-index: 1056;">
+                    <div class="card border-0 shadow-lg rounded-4" style="width: 100%; max-width: 640px;">
+                        <div class="p-4 border-bottom d-flex justify-content-between">
+                            <h5 class="fw-bold mb-0">Pick stock to van</h5>
+                            <button type="button" class="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 32px; height: 32px;" t-on-click="closePickModal" title="Close" aria-label="Close">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="p-4">
+                            <table class="table table-sm">
+                                <thead><tr><th>Product</th><th class="text-end">Needed</th><th class="text-end">Pick</th></tr></thead>
+                                <tbody>
+                                    <t t-foreach="this.state.pickModal.lines" t-as="pline" t-key="pline.id">
+                                        <tr>
+                                            <td><t t-esc="pline.product"/></td>
+                                            <td class="text-end"><t t-esc="pline.qtyRequired"/></td>
+                                            <td class="text-end" style="max-width: 110px;">
+                                                <input type="number" class="form-control form-control-sm text-end" t-model.number="pline.qtyToPick" min="0"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                            <div class="text-end">
+                                <button class="btn btn-dark text-white fw-bold" t-on-click="confirmPick" t-att-disabled="this.state.pickModal.saving">Confirm pick</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+
+            <t t-if="this.state.settleModal.open">
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background: rgba(15, 23, 42, 0.6); z-index: 1057;">
+                    <div class="card border-0 shadow-lg rounded-4" style="width: 100%; max-width: 480px;">
+                        <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
+                            <h5 class="fw-bold mb-0">Settle Wallet</h5>
+                            <button type="button" class="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 32px; height: 32px;" t-on-click="closeSettle" title="Close" aria-label="Close">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="p-4">
+                            <label class="small fw-bold">Delivery man</label>
+                            <select class="form-select mb-3" t-model="this.state.settleModal.dmId" t-on-change="onSettleDmChange">
+                                <option value="">Select delivery man</option>
+                                <t t-foreach="this.state.lookupDeliveryMen" t-as="dm" t-key="'settle-' + dm.id">
+                                    <option t-att-value="dm.id"><t t-esc="dm.name"/></option>
+                                </t>
+                            </select>
+                            <label class="small fw-bold">Wallet Balance</label>
+                            <input type="text" class="form-control mb-3" readonly="readonly" t-att-value="'Rs. ' + this.formatMoney(this.state.settleModal.walletBalance)"/>
+                            <label class="small fw-bold">Settle Amount</label>
+                            <input type="number" class="form-control mb-3" t-model.number="this.state.settleModal.amount" min="0"/>
+                            <label class="small fw-bold">Deposit to</label>
+                            <select class="form-select mb-3" t-model="this.state.settleModal.bankJournalId">
+                                <option value="">Select journal</option>
+                                <t t-foreach="this.state.settleModal.journals" t-as="jnl" t-key="jnl.id">
+                                    <option t-att-value="jnl.id"><t t-esc="jnl.name"/></option>
+                                </t>
+                            </select>
+                            <label class="small fw-bold">Notes</label>
+                            <textarea class="form-control" rows="2" t-model="this.state.settleModal.notes"/>
+                        </div>
+                        <div class="p-4 pt-0 d-flex justify-content-end gap-2">
+                            <button class="btn btn-outline-secondary fw-bold" t-on-click="closeSettle">Cancel</button>
+                            <button class="btn btn-dark text-white fw-bold" t-on-click="confirmSettle" t-att-disabled="this.state.settleModal.saving">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+
+        </t>
+
+            <!-- ========================================== -->
+        <!-- CUSTOM DELIVERY MODAL OVERLAY              -->
+        <!-- ========================================== -->
+<t t-if="this.state.showDeliveryModal">
+<div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background: rgba(15, 23, 42, 0.6); z-index: 1055; backdrop-filter: blur(4px);">
+<div class="card border-0 shadow-lg rounded-4 overflow-hidden" style="width: 100%; max-width: 750px; animation: fadeIn 0.2s ease-out;">
+
+<div class="bg-primary text-white p-4 d-flex justify-content-between align-items-center">
+<h5 class="mb-0 fw-bold text-white d-flex align-items-center">
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-truck me-2">
+    <path d="M10 17h4V5H2v12h3"/>
+    <path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5"/>
+    <path d="M14 17h1"/>
+    <circle cx="7.5" cy="17.5" r="2.5"/>
+    <circle cx="17.5" cy="17.5" r="2.5"/>
+</svg>
+                                Process Delivery
+</h5>
+<button class="btn btn-sm btn-light bg-opacity-25 border-0 text-black rounded-circle d-flex align-items-center justify-content-center p-2" style="width: 32px; height: 32px;" t-on-click="closeDeliveryModal">
+<i class="fa fa-times"></i>
+</button>
+</div>
+
+<div class="p-4 bg-light">
+<div class="alert alert-info border-0 shadow-sm rounded-3 small d-flex align-items-center mb-4">
+<i class="fa fa-info-circle fs-4 me-3"></i>
+<div>
+    <strong class="d-block mb-1">Set the exact quantities being delivered right now.</strong>
+                                    Any remaining balance will automatically be moved to a backorder by the system.
+</div>
+</div>
+
+<div class="table-responsive rounded-3 border bg-white mb-4 shadow-sm">
+<table class="table table-hover align-middle mb-0">
+    <thead class="bg-light text-muted small fw-bold text-uppercase">
+        <tr>
+            <th class="ps-4 py-3">Product</th>
+            <th class="text-center">Ordered</th>
+            <th class="text-center">Already Done</th>
+            <th class="text-end pe-4" style="width: 160px;">Deliver Now</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr t-foreach="this.state.deliveryLines" t-as="line" t-key="line.id">
+            <td class="ps-4 fw-bold text-dark">
+                <t t-esc="line.product"/>
+            </td>
+            <td class="text-center">
+                <t t-esc="line.ordered"/>
+            </td>
+            <td class="text-center text-primary fw-bold">
+                <t t-esc="line.delivered"/>
+            </td>
+            <td class="text-end pe-4">
+                <input type="number" step="any" class="form-control text-end fw-bold border-primary shadow-sm" t-model="line.toDeliver" min="0"/>
+            </td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
+<div class="d-flex justify-content-between align-items-center">
+<div class="d-flex gap-2">
+    <button class="btn btn-light fw-bold px-4 border shadow-sm" t-on-click="closeDeliveryModal">Cancel</button>
+    <button class="btn btn-success fw-bold px-4 shadow-sm text-white d-flex align-items-center" t-on-click="confirmDeliveryCustom">
+        <i class="fa fa-save me-2"></i> Confirm Delivery
+    </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</t>
+
+        <t t-if="this.state.imagePreview.open">
+            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center p-3"
+                 style="background: rgba(15, 23, 42, 0.75); z-index: 1060;"
+                 t-on-click="closeImagePreview">
+                <div class="bg-white rounded-4 shadow-lg p-3" style="max-width: min(720px, 92vw);" t-on-click.stop="() => {}">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold mb-0"><t t-esc="this.state.imagePreview.title"/></h6>
+                        <button type="button" class="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 32px; height: 32px;" t-on-click="closeImagePreview" title="Close" aria-label="Close">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    <img t-att-src="this.state.imagePreview.src"
+                         t-att-alt="this.state.imagePreview.title"
+                         class="rounded border d-block"
+                         style="max-width: 100%; max-height: 78vh; object-fit: contain;"/>
+                </div>
+            </div>
+        </t>
+        </div>
+    </t>
+</templates>

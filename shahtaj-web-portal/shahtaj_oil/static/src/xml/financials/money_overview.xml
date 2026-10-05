@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.FinancialsMoneyOverview" owl="1">
+            <t t-if="this.state.activeSubTab === 'money'">
+                <div class="p-4">
+                    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-4">
+                        <div>
+                            <h3 class="fw-bold text-dark mb-1">Money Overview</h3>
+                            <p class="text-muted mb-0">See cash collected, paid out, and what shops still owe — without opening the full ledger.</p>
+                        </div>
+                        <div class="d-flex align-items-end gap-2 flex-wrap">
+                            <div>
+                                <label class="small fw-bold text-muted mb-1">From</label>
+                                <input type="date" class="form-control form-control-sm" t-model="this.state.money.date_from"/>
+                            </div>
+                            <div>
+                                <label class="small fw-bold text-muted mb-1">To</label>
+                                <input type="date" class="form-control form-control-sm" t-model="this.state.money.date_to"/>
+                            </div>
+                            <button class="btn btn-dark fw-bold text-white" t-on-click="loadMoneyOverview" t-att-disabled="this.state.money.isLoading">
+                                <t t-if="this.state.money.isLoading">
+                                    <span class="spinner-border spinner-border-sm me-1"/> Loading...
+                                </t>
+                                <t t-else="">Apply</t>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3 col-6">
+                            <button class="card border-0 shadow-sm p-3 h-100 rounded-4 text-start w-100 bg-white" t-on-click="() => this.openCashActivity('inbound')" title="Open collected cash activity">
+                                <small class="fw-bold text-muted text-uppercase">Collected</small>
+                                <h3 class="fw-bold text-success mb-1">+ Rs. <t t-esc="this.state.money.collected.toLocaleString()"/></h3>
+                                <small class="text-muted"><t t-esc="this.state.money.paymentCountIn"/> payment(s) in</small>
+                            </button>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <button class="card border-0 shadow-sm p-3 h-100 rounded-4 text-start w-100 bg-white" t-on-click="() => this.openCashActivity('outbound')" title="Open paid-out cash activity">
+                                <small class="fw-bold text-muted text-uppercase">Paid Out</small>
+                                <h3 class="fw-bold text-danger mb-1">- Rs. <t t-esc="this.state.money.paidOut.toLocaleString()"/></h3>
+                                <small class="text-muted"><t t-esc="this.state.money.paymentCountOut"/> payment(s) out</small>
+                            </button>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <button class="card border-0 shadow-sm p-3 h-100 rounded-4 text-start w-100 bg-white" t-on-click="() => this.openCashActivity('all')" title="Open all cash activity">
+                                <small class="fw-bold text-muted text-uppercase">Net Cash</small>
+                                <h3 t-attf-class="fw-bold mb-1 #{this.state.money.netCash &lt; 0 ? 'text-danger' : 'text-dark'}">
+                                    Rs. <t t-esc="this.state.money.netCash.toLocaleString()"/>
+                                </h3>
+                                <small class="text-muted">Collected − paid out</small>
+                            </button>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <button class="card border-0 shadow-sm p-3 h-100 rounded-4 text-start w-100 bg-white" t-on-click="openShopBalancesFromMoney" title="Open shop balances">
+                                <small class="fw-bold text-muted text-uppercase">Receivable</small>
+                                <h3 class="fw-bold text-warning mb-1">Rs. <t t-esc="this.state.money.stillOwed.toLocaleString()"/></h3>
+                                <small class="text-muted">Shop outstanding balance</small>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="border rounded-3 p-3 h-100 bg-light">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-bold mb-0">Open Invoices</h6>
+                                    <span class="badge bg-warning text-dark">Unpaid residual</span>
+                                </div>
+                                <h4 class="fw-bold text-dark mb-2">Rs. <t t-esc="this.state.money.openInvoiceAmount.toLocaleString()"/></h4>
+                                <p class="small text-muted mb-3">Amount still open on posted shop invoices.</p>
+                               <button class="btn btn-sm btn-outline-dark fw-bold bg-white" t-on-click="() => this.requestTabSwitch('financials', 'customer_invoices')">
+                                    View Invoices
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border rounded-3 p-3 h-100 bg-light">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-bold mb-0">Quick Links</h6>
+                                </div>
+                               <div class="d-flex flex-wrap gap-2">
+                                    <button class="btn btn-sm btn-dark fw-bold text-white" t-on-click="() => this.openCashActivity('all')">Cash Activity</button>
+                                    <button class="btn btn-sm btn-outline-secondary fw-bold bg-white" t-on-click="openCreditNotesFromMoney">Credit Notes</button>
+                                    <button class="btn btn-sm btn-outline-secondary fw-bold bg-white" t-on-click="() => this.requestTabSwitch('financials', 'credit')">Credit Risk</button>
+                                    <!-- Hidden for now; uncomment to restore
+                                    <button class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.requestTabSwitch('financials', 'pnl')">Profit &amp; Loss</button>
+                                    -->
+                                </div>
+                                <p class="small text-muted mt-3 mb-0">
+                                    Flow: Sold (invoices) → Collected (cash in) → Still with shops → Paid back (cash out).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+    </t>
+</templates>

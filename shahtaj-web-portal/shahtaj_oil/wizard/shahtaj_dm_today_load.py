@@ -62,10 +62,10 @@ class ShahtajDmTodayLoad(models.TransientModel):
     )
 
     def _shahtaj_resolve_delivery_man(self):
-        """Current user for DM; context override when office/warehouse opens for a DM."""
+        """Current user for DM; context override when distributor opens for a DM."""
         user = self.env.user
         ctx_dm = self.env.context.get('shahtaj_delivery_man_id')
-        if ctx_dm and user._shahtaj_can_manage_dm_ops():
+        if ctx_dm and user.has_group('shahtaj_oil.group_shahtaj_distributor'):
             return self.env['res.users'].browse(ctx_dm)
         if user.shahtaj_is_delivery_man:
             return user
@@ -193,13 +193,6 @@ class ShahtajDmTodayLoad(models.TransientModel):
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
 
-        # Stamp free van onto jobs so Shop Progress / Stock match Load need=0.
-        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
-        deliveries = Delivery.search(
-            self._shahtaj_today_load_delivery_domain(dm, day),
-            order='scheduled_date, partner_id, id',
-        )
-
         self.shop_line_ids.unlink()
         self.pick_line_ids.unlink()
 
@@ -303,11 +296,11 @@ class ShahtajDmTodayLoad(models.TransientModel):
                 'qty_on_van': van_by_product.get(pid, 0.0),
             }))
 
-        shops_done = len(deliveries.filtered(lambda d: d.state == 'delivered'))
-        shops_partial = len(deliveries.filtered(lambda d: d.state == 'partial'))
+        shops_done = len(deliveries.filtered(lambda d: d.delivery_progress == 'done'))
+        shops_partial = len(deliveries.filtered(lambda d: d.delivery_progress == 'partial'))
         summary = (
             f'<p class="mb-0">'
-            f'<b>{len(shop_vals)}</b> shops (today) · '
+            f'<b>{len(shop_vals)}</b> shops (today / overdue) · '
             f'<b>{shops_partial}</b> partial · '
             f'<b>{shops_done}</b> done'
             f'</p>'
@@ -360,11 +353,6 @@ class ShahtajDmTodayLoad(models.TransientModel):
         )
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
-        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
-        deliveries = Delivery.search(
-            self._shahtaj_today_load_delivery_domain(dm, day),
-            order='id',
-        )
 
         live_still = defaultdict(float)
         for delivery in deliveries:
@@ -399,21 +387,6 @@ class ShahtajDmTodayLoad(models.TransientModel):
                 wh_move[pid] = wh
 
         if not van_apply and not wh_move:
-            if not any(q > 0 for q in live_still.values()):
-                self.action_refresh()
-                return {
-                    'type': 'ir.actions.client',
-                    'tag': 'display_notification',
-                    'params': {
-                        'title': _('Already loaded'),
-                        'message': _(
-                            'Today’s jobs are already stamped Loaded from free van stock. '
-                            'Shop Progress / Dist Stock are in sync.'
-                        ),
-                        'type': 'success',
-                        'sticky': False,
-                    },
-                }
             raise UserError(_(
                 'Nothing to load: today’s jobs are covered, or Pick Now is zero '
                 'with no free van stock to apply. Refresh and check Shop Progress.'
@@ -536,6 +509,11 @@ class ShahtajDmTodayLoadShop(models.TransientModel):
     field_state = fields.Selection(
         related='delivery_id.field_state',
         string='Stop',
+        readonly=True,
+    )
+    delivery_progress = fields.Selection(
+        related='delivery_id.delivery_progress',
+        string='Progress',
         readonly=True,
     )
     qty_ordered = fields.Float(string='Ordered', digits='Product Unit of Measure', readonly=True)

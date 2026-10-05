@@ -4,9 +4,9 @@ import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { session } from "@web/session";
 import { ConfirmModal } from "./confirm_modal";
-import { hasFinancialAccess } from "../shahtaj_access";
+import { hasFinancialAccess, notifyPortalBusy } from "../shahtaj_access";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 50;
 
 const JOURNAL_LIST_FIELDS = ["id", "name", "type", "code", "active", "default_account_id", "currency_id"];
 const JOURNAL_FORM_FIELDS = [
@@ -86,6 +86,9 @@ export class Accounting extends Component {
             tableJournals: [],
             tableAccounts: [],
             tableEntries: [],
+            tableAudit: [],
+            auditView: "list",
+            expandedAuditId: null,
             selectedEntry: null,
             selectedEntryLines: [],
             entryCount: 0,
@@ -93,11 +96,13 @@ export class Accounting extends Component {
                 journals: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
                 accounts: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
                 entries: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
+                audit: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
             },
             filters: {
                 journals: { search: "", type: "all" },
                 accounts: { search: "", typeGroup: "all", prefix: "", status: "active" },
                 entries: { search: "" },
+                audit: { search: "", model: "all", dateFrom: "", dateTo: "" },
             },
             lookups: {
                 accounts: [],
@@ -252,7 +257,10 @@ export class Accounting extends Component {
     }
 
     _normalizeSubTab(tabName) {
-        return tabName === "accounts" ? "accounts" : "journals";
+        if (tabName === "accounts" || tabName === "audit") {
+            return tabName;
+        }
+        return "journals";
     }
 
     _emptyJournalForm() {
@@ -447,11 +455,11 @@ export class Accounting extends Component {
     entryStateBadgeClass(state) {
         if (state === "posted") return "bg-success text-white";
         if (state === "cancel") return "bg-danger text-white";
-        return "bg-secondary text-white";
+        return "bg-secondary text-dark";
     }
 
     get journalActiveBadgeClass() {
-        return this.state.journalForm.active === false ? "bg-secondary text-white" : "bg-success text-white";
+        return this.state.journalForm.active === false ? "bg-secondary text-dark" : "bg-success text-white";
     }
 
     moveTypeLabel(type) {
@@ -506,6 +514,8 @@ export class Accounting extends Component {
         this.state.activeSubTab = next;
         this.state.showJournalForm = false;
         this.state.showAccountForm = false;
+        this.state.auditView = "list";
+        this.state.expandedAuditId = null;
         this._resetJournalPanel();
         this.state.pagination[next].page = 1;
         this.fetchActiveList();
@@ -618,6 +628,7 @@ export class Accounting extends Component {
         }
         const tab = this.state.activeSubTab;
         this.state.isLoadingList = true;
+        notifyPortalBusy(true);
         try {
             if (tab === "journals") {
                 if (this.state.journalPanel === "entries") {
@@ -625,6 +636,8 @@ export class Accounting extends Component {
                 } else {
                     await this._fetchJournals();
                 }
+            } else if (tab === "audit") {
+                await this._fetchAuditTrail();
             } else {
                 await this._fetchAccounts();
             }
@@ -632,6 +645,7 @@ export class Accounting extends Component {
             this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
             this.state.isLoadingList = false;
+            notifyPortalBusy(false);
         }
     }
 
@@ -709,6 +723,68 @@ export class Accounting extends Component {
             taxLabel: this._idsLabel(rec.tax_ids, this.state.lookups.taxes),
             currencyLabel: this._many2oneName(rec.currency_id),
         }));
+    }
+
+    async _fetchAuditTrail() {
+        const pag = this.state.pagination.audit;
+        const filters = this.state.filters.audit;
+        const result = await this.orm.call("shahtaj.accounting.hub", "shahtaj_audit_trail", [], {
+            filters: {
+                search: filters.search || "",
+                model: filters.model || "all",
+                date_from: filters.dateFrom || "",
+                date_to: filters.dateTo || "",
+            },
+            limit: pag.limit,
+            offset: (pag.page - 1) * pag.limit,
+        });
+        pag.total = result.total || 0;
+        this.state.tableAudit = result.rows || [];
+        if (this.state.expandedAuditId && !this.state.tableAudit.some((row) => row.id === this.state.expandedAuditId)) {
+            this.state.expandedAuditId = null;
+        }
+    }
+
+    toggleAuditRow(row) {
+        this.state.expandedAuditId = this.state.expandedAuditId === row.id ? null : row.id;
+    }
+
+    async openAuditRecord(row) {
+        if (!row?.can_open || !row.res_id) {
+            return;
+        }
+        if (row.model === "account.move") {
+            this.state.auditView = "entry";
+            this.state.journalPanel = "entries";
+            await this.viewJournalEntry({
+                id: row.res_id,
+                name: row.record_name,
+                date: "—",
+                ref: "—",
+                partner: "—",
+                amount: "—",
+                state: "",
+                stateLabel: "",
+                typeLabel: "",
+            });
+            return;
+        }
+        if (row.model === "account.account") {
+            this.state.auditView = "account";
+            await this._loadAccountForm(row.res_id);
+            if (!this.state.showAccountForm) {
+                this.state.auditView = "list";
+            }
+        }
+    }
+
+    closeAuditDetail() {
+        this.state.auditView = "list";
+        this.state.journalPanel = "list";
+        this.state.selectedEntry = null;
+        this.state.selectedEntryLines = [];
+        this.state.showAccountForm = false;
+        this.state.accountForm = this._emptyAccountForm();
     }
 
     openJournalForm(journal = null) {
@@ -985,6 +1061,10 @@ export class Accounting extends Component {
     }
 
     closeJournalEntry() {
+        if (this.state.auditView === "entry") {
+            this.closeAuditDetail();
+            return;
+        }
         this.state.selectedEntry = null;
         this.state.selectedEntryLines = [];
     }
@@ -1175,6 +1255,10 @@ export class Accounting extends Component {
     }
 
     closeAccountForm() {
+        if (this.state.auditView === "account") {
+            this.closeAuditDetail();
+            return;
+        }
         this.state.showAccountForm = false;
         this.state.accountForm = this._emptyAccountForm();
     }

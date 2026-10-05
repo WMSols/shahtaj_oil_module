@@ -8,7 +8,12 @@
                     <h2 class="h4 fw-bold text-dark mb-0">General Settings</h2>
                     <small class="text-muted">Company profile, branding, and order booker GPS range.</small>
                 </div>
-                <span class="badge bg-dark px-3 py-2 fs-6 text-white">Admin</span>
+                <div class="text-end">
+                    <span class="badge bg-dark px-3 py-2 fs-6 text-white">Admin</span>
+                    <div t-if="this.state.appVersion" class="small text-muted mt-2">
+                        <span class="fw-semibold text-dark ms-1" t-esc="this.state.appVersion"/>
+                    </div>
+                </div>
             </div>
 
             <t t-if="this.state.isLoading">
@@ -125,6 +130,8 @@
                             </div>
                         </div>
                     </div>
+
+                    
                 </div>
             </t>
         </div>

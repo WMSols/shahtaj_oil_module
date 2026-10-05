@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.TerritoryArchive" owl="1">
+        <div>
+        <t t-if="this.state.activeSubTab === 'archive'">
+            <div class="p-4 bg-white border-bottom">
+                               <button class="btn btn-sm btn-light border shadow-sm fw-bold text-dark px-3 mb-4 d-flex align-items-center" t-on-click="() => this.setSubTab(this.state.previousSubTab || 'areas')" title="Return to Previous Tab">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-2">
+                        <path d="m12 19-7-7 7-7"/>
+                        <path d="M19 12H5"/>
+                    </svg>
+                    Back
+                </button>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="fw-bold text-danger mb-0">Archived Items</h2>
+                        <small class="text-muted">Restore or permanently manage soft-deleted zones, routes, and shops.</small>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="p-4 bg-light">
+                <h5 class="fw-bold mb-3">Archived Zones</h5>
+                <ul class="list-group mb-4 shadow-sm">
+                    <t t-if="this.archivedZones.length === 0">
+                        <li class="list-group-item text-muted">No archived zones.</li>
+                    </t>
+                    <t t-foreach="this.archivedZones" t-as="area" t-key="area.id">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><strong><t t-esc="area.name"/></strong> (ID: <t t-esc="area.id"/>)</span>
+                            <button class="btn btn-sm btn-success fw-bold" t-on-click="() => this.toggleArchive('shahtaj.zone', area.id, true)">Restore</button>
+                        </li>
+                    </t>
+                </ul>
+
+                <h5 class="fw-bold mb-3">Archived Routes</h5>
+                <ul class="list-group mb-4 shadow-sm">
+                    <t t-if="this.archivedRoutes.length === 0">
+                        <li class="list-group-item text-muted">No archived routes.</li>
+                    </t>
+                    <t t-foreach="this.archivedRoutes" t-as="route" t-key="route.id">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><strong><t t-esc="route.name"/></strong> (Zone: <t t-esc="route.zone_id ? route.zone_id[1] : 'Unassigned'"/>)</span>
+                            <button class="btn btn-sm btn-success fw-bold" t-on-click="() => this.toggleArchive('shahtaj.route', route.id, true)">Restore</button>
+                        </li>
+                    </t>
+                </ul>
+
+                <h5 class="fw-bold mb-3">Archived Shops</h5>
+                <ul class="list-group shadow-sm">
+                    <t t-if="this.archivedShops.length === 0">
+                        <li class="list-group-item text-muted">No archived shops.</li>
+                    </t>
+                    <t t-foreach="this.archivedShops" t-as="shop" t-key="shop.id">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><strong><t t-esc="shop.name"/></strong> - <t t-esc="shop.owner_name"/> (<t t-esc="this.formatShopRoutes(shop)"/>)</span>
+                            <button class="btn btn-sm btn-success fw-bold" t-on-click="() => this.toggleArchive('res.partner', shop.id, true)">Restore</button>
+                        </li>
+                    </t>
+                </ul>
+            </div>
+        </t>
+        <!-- Custom Confirm Modal -->
+        <t t-if="this.state.confirmModal.isOpen">
+            <ConfirmModal 
+                title="this.state.confirmModal.title" 
+                message="this.state.confirmModal.message" 
+                onConfirm="this.state.confirmModal.onConfirm" 
+                onCancel="() => this.closeConfirm()" 
+            />
+        </t>
+        </div>
+    </t>
+</templates>

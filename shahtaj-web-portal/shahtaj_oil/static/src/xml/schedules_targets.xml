@@ -434,7 +434,7 @@
                                         </td>
                                         <td class="align-middle text-center"><t t-esc="sched.shops"/></td>
                                         <td class="align-middle">
-                                            <span t-attf-class="badge #{sched.isActive ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm">
+                                            <span t-attf-class="badge #{sched.isActive ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm">
                                                 <t t-esc="sched.status"/>
                                             </span>
                                         </td>
@@ -540,7 +540,7 @@
                                             </t>
                                         </td>
                                         <td class="align-middle">
-                                            <span t-attf-class="badge #{tgt.isActive ? 'bg-success text-white' : 'bg-secondary text-white'} px-2 py-1 shadow-sm"><t t-esc="tgt.status"/></span>
+                                            <span t-attf-class="badge #{tgt.isActive ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm"><t t-esc="tgt.status"/></span>
                                         </td>
                                         <td class="align-middle text-end pe-4">
                                             <button class="btn btn-sm btn-outline-primary me-2" t-on-click="() => this.editTarget(tgt)" title="Edit target (includes Active toggle)">Edit</button>
@@ -700,7 +700,7 @@
                                 <button class="btn btn-light border fw-bold px-4" t-on-click="closeEditShopsModal"
                                         t-att-disabled="this.state.isAddingEditShops">
                                     <t t-if="this.state.editShopsTab === 'add'">Cancel</t>
-                                    <t t-else="">Close</t>
+                                    <t t-else=""><i class="fa fa-times" title="Close" aria-label="Close"></i></t>
                                 </button>
                                 <t t-if="this.state.editShopsTab === 'add'">
                                     <button class="btn btn-success fw-bold text-white px-4 shadow-sm"

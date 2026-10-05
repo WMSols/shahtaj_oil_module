@@ -159,7 +159,7 @@
                                                 </span>
                                             </td>
                                             <td class="text-center">
-                                                <span t-attf-class="badge #{t.state === 'posted' or t.state === 'paid' or t.state === 'in_process' ? 'bg-success text-white' : (t.state === 'draft' ? 'bg-warning text-dark' : 'bg-secondary')}">
+                                                <span t-attf-class="badge #{t.state === 'posted' or t.state === 'paid' or t.state === 'in_process' ? 'bg-success text-white' : (t.state === 'draft' ? 'bg-warning text-dark' : 'bg-secondary text-dark')}">
                                                    <t t-esc="t.state === 'posted' ? 'PAID' : t.state.toUpperCase()"/>
                                                 </span>
                                             </td>
@@ -200,10 +200,15 @@
                         <h4 class="fw-bold mb-1">
                             <t t-esc="this.state.selectedTransaction.name"/>
                         </h4>
-                        <span class="text-muted">Shop/Customer: <strong class="text-dark">
+                        <div class="text-muted">Shop/Customer: <strong class="text-dark">
                             <t t-esc="this.state.selectedTransaction.partner_name"/>
                         </strong>
-                    </span>
+                        </div>
+                        <div class="text-muted" t-if="this.state.selectedTransaction.dm_name">
+                            Delivery Man: <strong class="text-dark">
+                                <t t-esc="this.state.selectedTransaction.dm_name"/>
+                            </strong>
+                        </div>
                 </div>
                 <span t-attf-class="badge fs-6 #{this.state.selectedTransaction.state === 'posted' || this.state.selectedTransaction.state === 'paid' ? 'bg-success text-white' : 'bg-warning text-dark'}">
                     <t t-esc="this.state.selectedTransaction.state === 'posted' ? 'PAID' : this.state.selectedTransaction.state.toUpperCase()"/>
@@ -250,6 +255,10 @@
                     </t>
                     <t t-else="">
                         <h6 class="fw-bold text-primary mb-3">Payment Details</h6>
+                        <p class="mb-2" t-if="this.state.selectedTransaction.dm_name">
+                            <strong>Delivery Man:</strong>
+                            <t t-esc="this.state.selectedTransaction.dm_name"/>
+                        </p>
                         <p class="mb-2">
                             <strong>Method:</strong>
                             <span class="text-capitalize">

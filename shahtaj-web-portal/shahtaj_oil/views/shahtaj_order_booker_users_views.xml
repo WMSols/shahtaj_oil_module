@@ -115,10 +115,6 @@
                                 <list>
                                     <field name="date_start"/>
                                     <field name="date_end"/>
-                                    <field name="period_status" string="Period" widget="badge"
-                                           decoration-info="period_status == 'upcoming'"
-                                           decoration-success="period_status == 'current'"
-                                           decoration-muted="period_status == 'ended'"/>
                                     <field name="target_type"/>
                                     <field name="target_value"/>
                                     <field name="achieved_value"/>

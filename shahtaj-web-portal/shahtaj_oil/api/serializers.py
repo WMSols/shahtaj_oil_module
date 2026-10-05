@@ -9,14 +9,6 @@ ORDER_APPROVAL_LABELS = {
     'rejected': 'Rejected',
 }
 
-ORDER_STATE_LABELS = {
-    'draft': 'Draft',
-    'sent': 'Quotation Sent',
-    'sale': 'Sales Order',
-    'done': 'Locked',
-    'cancel': 'Cancelled',
-}
-
 
 def _approval_reason_payload(
     requires_discount=False,
@@ -239,75 +231,6 @@ def visit_lines_dicts(lines):
     ]
 
 
-def sale_order_line_as_visit_line_dict(sol, bookable_qty=None):
-    """Serialize a sale.order.line in the same shape as visit cart lines.
-
-    Used after place-order so Dist/OB qty edits and cancels show on OB pull.
-    """
-    product = sol.product_id
-    if bookable_qty is None and product:
-        # Placed order: bookable qty is informational only (no cart hold).
-        bookable_qty = product._get_shahtaj_bookable_qty(exclude_visit_line_ids=[])
-    catalog_price = (
-        sol.shahtaj_catalog_price
-        if hasattr(sol, 'shahtaj_catalog_price') and sol.shahtaj_catalog_price
-        else (product.lst_price if product else 0.0)
-    )
-    price_unit = sol.price_unit or 0.0
-    qty = sol.product_uom_qty or 0.0
-    unit_discount = (
-        max(0.0, catalog_price - price_unit)
-        if (price_unit < catalog_price - 0.001) else 0.0
-    )
-    total_discount = unit_discount * qty
-    discount_pct = (
-        round(((catalog_price - price_unit) / catalog_price * 100.0), 2)
-        if (unit_discount > 0 and catalog_price > 0) else 0.0
-    )
-    # Prefer SO price_subtotal when taxes/discounts apply; fall back to qty*unit.
-    subtotal = sol.price_subtotal if hasattr(sol, 'price_subtotal') else (qty * price_unit)
-    reason = ''
-    if hasattr(sol, 'shahtaj_discount_reason') and sol.shahtaj_discount_reason:
-        reason = sol.shahtaj_discount_reason
-    return {
-        'id': sol.id,
-        'sale_order_line_id': sol.id,
-        'product': product_brief(product, bookable_qty=bookable_qty),
-        'quantity': qty,
-        'catalog_price': catalog_price,
-        'price_unit': price_unit,
-        'has_discount': unit_discount > 0,
-        'unit_discount': unit_discount,
-        'total_discount': total_discount,
-        'discount_percent': discount_pct,
-        'discount_reason': reason,
-        'subtotal': subtotal,
-    }
-
-
-def sale_order_lines_as_visit_lines(sale_order):
-    """Live SO product lines for OB visit API (skip sections / notes)."""
-    if not sale_order:
-        return []
-    lines = sale_order.order_line.filtered(
-        lambda l: l.product_id and not l.display_type
-    )
-    if not lines:
-        return []
-    products = lines.mapped('product_id')
-    bookable_map = lines.env['product.product']._get_shahtaj_bookable_qty_map(
-        products,
-        exclude_visit_line_ids=[],
-    )
-    return [
-        sale_order_line_as_visit_line_dict(
-            sol,
-            bookable_qty=bookable_map.get(sol.product_id.id) if sol.product_id else None,
-        )
-        for sol in lines
-    ]
-
-
 def product_brief(product, bookable_qty=None, visit_line_ids=None):
     if not product:
         return None
@@ -362,21 +285,14 @@ def product_briefs(products, visit_line_ids=None):
 
 
 def visit_order_summary_dict(visit):
-    """Compact order + discount/credit verification payload for visit screens.
-
-    After place-order, values are read live from sale.order so Dist cancel /
-    qty edits appear on the next OB API pull.
-    """
+    """Compact order + discount/credit verification payload for visit screens."""
     so = visit.sale_order_id
     if so:
         approval_state = so.shahtaj_approval_state or 'none'
-        state = so.state or 'draft'
         payload = {
             'id': so.id,
             'name': so.name,
-            'state': state,
-            'state_label': ORDER_STATE_LABELS.get(state, state),
-            'is_cancelled': state == 'cancel',
+            'state': so.state,
             'approval_state': approval_state,
             'approval_state_label': ORDER_APPROVAL_LABELS.get(approval_state, approval_state),
             'has_discount': bool(so.shahtaj_has_discount),
@@ -407,8 +323,6 @@ def visit_order_summary_dict(visit):
         'id': False,
         'name': False,
         'state': 'draft',
-        'state_label': ORDER_STATE_LABELS.get('draft', 'Draft'),
-        'is_cancelled': False,
         'approval_state': approval_state,
         'approval_state_label': ORDER_APPROVAL_LABELS.get(approval_state, approval_state),
         'has_discount': has_discount,
@@ -455,13 +369,7 @@ def visit_dict(visit, include_lines=True, shop_payload=None):
         'total_discount_amount': order['discount_amount'] if order else 0.0,
     }
     if include_lines:
-        # After place-order: live SO lines (Dist qty/cancel). Before: visit cart.
-        if visit.sale_order_id:
-            data['lines'] = sale_order_lines_as_visit_lines(visit.sale_order_id)
-            data['lines_source'] = 'sale_order'
-        else:
-            data['lines'] = visit_lines_dicts(visit.line_ids)
-            data['lines_source'] = 'visit_cart'
+        data['lines'] = visit_lines_dicts(visit.line_ids)
     return data
 
 

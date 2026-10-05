@@ -11,16 +11,11 @@
                 <field name="name"/>
                 <field name="shahtaj_vendor_id" string="Vendor" optional="show"/>
                 <field name="shahtaj_sale_uom" string="Unit"/>
-                <field name="standard_price" string="Cost"
-                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
-                <field name="list_price" string="Sales Price"
-                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
-                <field name="shahtaj_unit_margin" string="Profit/Unit" optional="show"
-                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
-                <field name="shahtaj_margin_percent" string="Margin %" optional="show"
-                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
-                <field name="taxes_id" widget="many2many_tags" string="Taxes" optional="show"
-                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <field name="standard_price" string="Cost"/>
+                <field name="list_price" string="Sales Price"/>
+                <field name="shahtaj_unit_margin" string="Profit/Unit" optional="show"/>
+                <field name="shahtaj_margin_percent" string="Margin %" optional="show"/>
+                <field name="taxes_id" widget="many2many_tags" string="Taxes" optional="show"/>
                 <field name="qty_available" string="On Hand"/>
                 <field name="shahtaj_qty_bookable" string="Available to Book"/>
                 <field name="is_storable" string="Tracked" widget="boolean"/>
@@ -43,8 +38,7 @@
                         <h1><field name="name" placeholder="e.g. Cheese Burger"/></h1>
                     </div>
                     <group>
-                        <group string="Pricing &amp; Supplier"
-                               groups="shahtaj_oil.group_shahtaj_distributor_financial">
+                        <group string="Pricing &amp; Supplier">
                             <field name="shahtaj_vendor_id" string="Primary Vendor"
                                    domain="[('supplier_rank', '>', 0), ('is_shahtaj_shop', '=', False)]"
                                    context="{'default_supplier_rank': 1, 'res_partner_search_mode': 'supplier'}"/>
@@ -52,12 +46,6 @@
                             <field name="list_price" string="Sales Price"/>
                             <field name="shahtaj_unit_margin" string="Profit per Unit" readonly="1"/>
                             <field name="shahtaj_margin_percent" string="Margin %" readonly="1"/>
-                            <field name="currency_id" invisible="1"/>
-                        </group>
-                        <group string="Supplier"
-                               groups="shahtaj_oil.group_shahtaj_warehouse,shahtaj_oil.group_shahtaj_warehouse_acl">
-                            <field name="shahtaj_vendor_id" string="Primary Vendor" readonly="1"
-                                   domain="[('supplier_rank', '>', 0), ('is_shahtaj_shop', '=', False)]"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
                         <group string="Sales">
@@ -69,8 +57,7 @@
                                    string="Customer Taxes"
                                    force_save="1"
                                    domain="[('type_tax_use', '=', 'sale'), ('active', '=', True)]"
-                                   context="{'default_type_tax_use': 'sale'}"
-                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                                   context="{'default_type_tax_use': 'sale'}"/>
                         </group>
                     </group>
                     <group>
@@ -88,8 +75,7 @@
                         <group string="Sales Summary" invisible="not id">
                             <field name="shahtaj_qty_received" readonly="1"/>
                             <field name="shahtaj_qty_sold" readonly="1"/>
-                            <field name="shahtaj_payable_to_manufacturer" readonly="1"
-                                   groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                            <field name="shahtaj_payable_to_manufacturer" readonly="1"/>
                         </group>
                     </group>
                     <group string="Optional">
@@ -118,13 +104,10 @@
                 <field name="shahtaj_qty_sold" string="Sold"/>
                 <field name="qty_available" string="On Hand"/>
                 <field name="shahtaj_qty_bookable" string="Available to Book"/>
-                <field name="standard_price" string="Cost" optional="hide"
-                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
-                <field name="shahtaj_payable_to_manufacturer" string="Purchased Value" optional="show"
-                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <field name="standard_price" string="Cost" optional="hide"/>
+                <field name="shahtaj_payable_to_manufacturer" string="Purchased Value" optional="show"/>
                 <field name="virtual_available" string="Forecast" optional="hide"/>
-                <field name="list_price" string="Price" optional="show"
-                       groups="shahtaj_oil.group_shahtaj_distributor_financial"/>
+                <field name="list_price" string="Price" optional="show"/>
                 <field name="currency_id" column_invisible="1"/>
             </list>
         </field>

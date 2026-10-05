@@ -7,6 +7,7 @@
         <field name="arch" type="xml">
             <form string="Check in at Shop">
                 <field name="needs_shop_setup" invisible="1"/>
+                <field name="shop_category" invisible="1"/>
                 <field name="show_legacy_balance" invisible="1"/>
                 <field name="cnic_required" invisible="1"/>
                 <field name="shop_category" invisible="1"/>

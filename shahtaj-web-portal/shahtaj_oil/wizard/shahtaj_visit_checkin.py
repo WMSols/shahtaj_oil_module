@@ -53,6 +53,10 @@ class ShahtajVisitCheckinWizard(models.TransientModel):
         required=True,
         digits=(10, 7),
     )
+    shop_category = fields.Selection(
+        related='shop_id.shahtaj_shop_category',
+        readonly=True,
+    )
     owner_cnic_number = fields.Char(string='Owner ID Card Number')
     shop_category = fields.Selection(
         related='visit_task_id.shop_id.shahtaj_shop_category',

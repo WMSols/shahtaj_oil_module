@@ -417,7 +417,7 @@ class ShahtajVisit(models.Model):
         user = self.env.user
         return (
             user.has_group('shahtaj_oil.group_shahtaj_order_booker')
-            and not user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            and not user.has_group('shahtaj_oil.group_shahtaj_distributor')
             and not user.has_group('base.group_system')
         )
 
@@ -620,6 +620,19 @@ class ShahtajVisit(models.Model):
                 **log_common,
             )
             raise UserError(msg)
+
+        # Place Order reuses the successful check-in row. A second OK log would
+        # show up as a duplicate shop check-in (Check-in + Place Order).
+        if (
+            log_purpose == 'place_order'
+            and visit
+            and Attempt.search_count([
+                ('visit_id', '=', visit.id),
+                ('purpose', '=', 'check_in'),
+                ('result', '=', 'ok'),
+            ])
+        ):
+            return distance
 
         Attempt.log_attempt(
             result='ok',
@@ -883,6 +896,14 @@ class ShahtajVisit(models.Model):
         self.with_context(shahtaj_system_visit_write=True).write({
             'sale_order_id': order.id,
         })
+        gps_rows = self.env['shahtaj.gps.attempt'].sudo().search([
+            ('visit_id', '=', self.id),
+            ('sale_order_id', '=', False),
+        ])
+        if gps_rows:
+            gps_rows.write({'sale_order_id': order.id})
+        # Check-in created the GPS row. Placing the order updates that row's purpose.
+        self.env['shahtaj.gps.attempt'].promote_checkin_to_place_order(self, order)
         self._finish_visit('order')
         reasons_label = order.shahtaj_approval_reasons_display or _('none')
         log_msg = _(
@@ -941,7 +962,7 @@ class ShahtajVisit(models.Model):
         resets the visit task to pending, and notifies the order booker.
         """
         if not (
-            self.env.user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            self.env.user.has_group('shahtaj_oil.group_shahtaj_distributor')
             or self.env.user.has_group('base.group_system')
         ):
             raise UserError(_('Only distributors can undo a completed shop visit.'))

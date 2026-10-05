@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Link confirmed sales orders back to the shop visit and daily task."""
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tools import float_compare
 
 
@@ -35,14 +35,6 @@ class SaleOrder(models.Model):
         related='partner_id',
         store=True,
         readonly=True,
-    )
-    shahtaj_is_walk_in = fields.Boolean(
-        string='Walk-in',
-        related='partner_id.shahtaj_is_walk_in',
-        store=True,
-        index=True,
-        readonly=True,
-        help='Cash-and-carry van sale to a non-shop walk-in customer.',
     )
     shahtaj_delivery_man_id = fields.Many2one(
         'res.users',
@@ -527,13 +519,9 @@ class SaleOrder(models.Model):
 
     def _shahtaj_user_is_distributor(self):
         user = self.env.user
-        return user.has_group('shahtaj_oil.group_shahtaj_office_ops') or user.has_group(
+        return user.has_group('shahtaj_oil.group_shahtaj_distributor') or user.has_group(
             'shahtaj_oil.group_shahtaj_distributor_financial'
         )
-
-    def _shahtaj_user_can_approve_orders(self):
-        """Distributor and Manager (via order_approver technical group)."""
-        return self.env.user.has_group('shahtaj_oil.group_shahtaj_order_approver')
 
     def _shahtaj_action_open_credit_override_wizard(self, action_type):
         self.ensure_one()
@@ -613,6 +601,84 @@ class SaleOrder(models.Model):
             )
         return True
 
+    def _shahtaj_assert_not_cancelled(self):
+        """Cancelled orders cannot be invoiced or delivered."""
+        for order in self:
+            if order.state == 'cancel':
+                raise UserError(_(
+                    'Cancelled order "%(order)s" cannot be invoiced or delivered.',
+                    order=order.display_name,
+                ))
+
+    def action_shahtaj_cancel_order(self):
+        """Distributor cancels a live order that is not invoiced or delivered."""
+        for order in self:
+            if order.state == 'cancel':
+                raise UserError(_(
+                    'Order "%(order)s" is already cancelled.',
+                    order=order.display_name,
+                ))
+            if order.state not in ('draft', 'sent', 'sale'):
+                raise UserError(_(
+                    'Cannot cancel "%(order)s" in its current state.',
+                    order=order.display_name,
+                ))
+            posted = order._shahtaj_posted_customer_invoices()
+            if posted:
+                raise UserError(_(
+                    'Cannot cancel "%(order)s": it already has posted invoice(s) %(invoices)s.',
+                    order=order.display_name,
+                    invoices=', '.join(posted.mapped('display_name')),
+                ))
+            delivered = order.order_line.filtered(
+                lambda l: not l.display_type and l.qty_delivered > 0
+            )
+            if delivered:
+                raise UserError(_(
+                    'Cannot cancel "%(order)s": stock has already been delivered.',
+                    order=order.display_name,
+                ))
+            jobs = order.shahtaj_dm_delivery_ids
+            busy_jobs = jobs.filtered(
+                lambda j: j.state in ('picked', 'partial', 'delivered', 'returned')
+            )
+            if busy_jobs:
+                raise UserError(_(
+                    'Cannot cancel "%(order)s": delivery is already in progress or completed.',
+                    order=order.display_name,
+                ))
+            pending_jobs = jobs - busy_jobs
+            tasks = pending_jobs.mapped('visit_task_id').filtered(
+                lambda t: t.state not in ('completed', 'cancelled')
+            )
+            if tasks:
+                tasks.with_context(shahtaj_system_visit_write=True).write({
+                    'state': 'cancelled',
+                })
+            if pending_jobs:
+                try:
+                    with self.env.cr.savepoint():
+                        pending_jobs.sudo().unlink()
+                except Exception:
+                    pass
+            drafts = order.invoice_ids.filtered(
+                lambda m: m.state == 'draft' and m.move_type == 'out_invoice'
+            )
+            if drafts:
+                drafts.sudo().button_cancel()
+            order.with_context(disable_cancel_warning=True).action_cancel()
+            self.env['shahtaj.activity.log'].log_business(
+                operation='order.cancelled',
+                name='Cancel order',
+                related_record=order,
+                message=_(
+                    'Distributor %(user)s cancelled order %(order)s.',
+                    user=self.env.user.name,
+                    order=order.name,
+                ),
+            )
+        return True
+
     def action_shahtaj_open_reject_wizard(self):
         """Open wizard to enter rejection reason before cancelling."""
         self.ensure_one()
@@ -681,6 +747,75 @@ class SaleOrder(models.Model):
     def _compute_shahtaj_dm_delivery_count(self):
         for order in self:
             order.shahtaj_dm_delivery_count = len(order.shahtaj_dm_delivery_ids)
+
+    def _shahtaj_posted_customer_invoices(self):
+        self.ensure_one()
+        return self.invoice_ids.filtered(
+            lambda move: move.state == 'posted' and move.move_type == 'out_invoice'
+        )
+
+    def _shahtaj_require_posted_invoice_for_dm(self):
+        """Jobs stay Waiting Invoice until a customer invoice is posted."""
+        self.ensure_one()
+        if not self._shahtaj_posted_customer_invoices():
+            raise UserError(_(
+                'Invoice and post %(order)s before assigning a delivery man. '
+                'Stock cannot be picked until a customer invoice is posted.',
+                order=self.display_name,
+            ))
+
+    def _shahtaj_prepare_lines_for_order_invoice(self):
+        """Force ordered-qty policy and refresh stored qty_to_invoice on this SO."""
+        self.ensure_one()
+        templates = self.order_line.product_id.product_tmpl_id
+        if templates:
+            templates.sudo().write({'invoice_policy': 'order'})
+        lines = self.order_line.filtered(lambda line: not line.display_type and line.product_id)
+        if not lines:
+            return lines
+        if hasattr(lines, '_compute_qty_to_invoice'):
+            lines._compute_qty_to_invoice()
+            lines.flush_recordset(['qty_to_invoice'])
+        else:
+            for line in lines:
+                if line.state in ('sale', 'done'):
+                    line.qty_to_invoice = line.product_uom_qty - line.qty_invoiced
+        return lines
+
+    def action_shahtaj_create_and_post_invoice(self):
+        """Invoice ordered quantities and post — required before DM assign."""
+        self.ensure_one()
+        self._shahtaj_assert_not_cancelled()
+        user = self.env.user
+        if not (
+            user.has_group('shahtaj_oil.group_shahtaj_distributor_financial')
+            or user.has_group('account.group_account_invoice')
+            or user.has_group('base.group_system')
+        ):
+            raise AccessError(_('You need financial access to create invoices.'))
+        if self.state not in ('sale', 'done'):
+            raise UserError(_('Confirm the sales order before invoicing.'))
+
+        posted = self._shahtaj_posted_customer_invoices()
+        if posted:
+            return posted.ids
+
+        drafts = self.invoice_ids.filtered(
+            lambda move: move.state == 'draft' and move.move_type == 'out_invoice'
+        )
+        if drafts:
+            drafts.action_post()
+            return drafts.ids
+
+        self._shahtaj_prepare_lines_for_order_invoice()
+        invoices = self._create_invoices(final=False)
+        if not invoices:
+            raise UserError(_(
+                'No invoiceable quantity on %(order)s after switching to ordered quantities.',
+                order=self.display_name,
+            ))
+        invoices.action_post()
+        return invoices.ids
 
     @api.depends(
         'shahtaj_dm_delivery_ids.delivery_man_id',
@@ -759,6 +894,7 @@ class SaleOrder(models.Model):
     def action_shahtaj_assign_dm(self):
         """Open distributor wizard to assign or split this SO across DMs."""
         self.ensure_one()
+        self._shahtaj_assert_not_cancelled()
         if self.state not in ('sale', 'done'):
             raise UserError(_(
                 'Confirm the sales order before assigning a delivery man.'
@@ -795,6 +931,7 @@ class SaleOrder(models.Model):
     def action_shahtaj_mark_delivery(self):
         """Open wizard so distributor can validate full/partial delivery."""
         self.ensure_one()
+        self._shahtaj_assert_not_cancelled()
         if self.state not in ('sale', 'done'):
             return False
         return {
@@ -842,6 +979,32 @@ class SaleOrder(models.Model):
             if write_vals:
                 order.write(write_vals)
 
+    def _shahtaj_check_bookable_qty(self):
+        """Reject draft/sent orders that book more than warehouse bookable stock.
+
+        Bookable = on-hand minus open visit carts and undelivered confirmed SOs.
+        Visit-created orders exclude that visit's cart so place-order is not double-counted.
+        """
+        for order in self.filtered(lambda o: o.state in ('draft', 'sent')):
+            exclude_visit_line_ids = (
+                order.shahtaj_visit_id.line_ids.ids if order.shahtaj_visit_id else []
+            )
+            totals = {}
+            for line in order.order_line.filtered(lambda l: l.product_id and not l.display_type):
+                product = line.product_id
+                qty = line.product_uom_qty
+                line_uom = line.product_uom_id
+                if line_uom and product.uom_id and line_uom != product.uom_id:
+                    qty = line_uom._compute_quantity(
+                        qty, product.uom_id, rounding_method='HALF-UP',
+                    )
+                totals[product] = totals.get(product, 0.0) + qty
+            for product, total_qty in totals.items():
+                product._check_shahtaj_bookable_qty(
+                    total_qty,
+                    exclude_visit_line_ids=exclude_visit_line_ids,
+                )
+
     def action_confirm(self):
         pending_verification = self.filtered(
             lambda o: o.shahtaj_approval_state == 'to_approve'
@@ -870,19 +1033,44 @@ class SaleOrder(models.Model):
                     effective=snap['effective_outstanding'],
                     limit=snap['credit_limit'],
                 ))
+        self._shahtaj_check_bookable_qty()
         return super().action_confirm()
 
     @api.model_create_multi
     def create(self, vals_list):
         orders = super().create(vals_list)
+        orders._shahtaj_check_bookable_qty()
         orders._shahtaj_recompute_visit_targets()
+        try:
+            orders._shahtaj_ensure_gps_attempt()
+        except Exception:  # noqa: BLE001 — GPS log must never block order create
+            pass
         return orders
+
+    def _shahtaj_ensure_gps_attempt(self):
+        """Shop orders created without a visit (portal) still appear in Check-ins."""
+        Attempt = self.env['shahtaj.gps.attempt']
+        for order in self:
+            if order.shahtaj_visit_id:
+                continue
+            if not order.partner_id.is_shahtaj_shop:
+                continue
+            if Attempt.sudo().search_count([('sale_order_id', '=', order.id)]):
+                continue
+            Attempt.log_attempt(
+                purpose='check_in',
+                result='ok',
+                shop=order.partner_id,
+                user=order.user_id or order.create_uid,
+                sale_order=order,
+                message='Order placed without a field check-in (distributor portal).',
+            )
 
     def write(self, vals):
         tracked_order_fields = {'date_order'}
         user = self.env.user
         is_distributor = (
-            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
+            user.has_group('shahtaj_oil.group_shahtaj_distributor')
             and not user._is_public()
         )
         if tracked_order_fields.intersection(vals) and is_distributor:
@@ -908,17 +1096,13 @@ class SaleOrder(models.Model):
         return res
 
     def _shahtaj_distributor_needs_stock_sudo(self):
-        """Office/KPO users may lack stock.picking ACL used by delivery fields."""
+        """Custom-portal distributors lack stock.picking ACL used by delivery fields."""
         if self.env.su:
             return False
         user = self.env.user
         if user.has_group('stock.group_stock_user'):
             return False
-        return (
-            user.has_group('shahtaj_oil.group_shahtaj_office_ops')
-            or user.has_group('shahtaj_oil.group_shahtaj_kpo')
-            or user.has_group('shahtaj_oil.group_shahtaj_warehouse')
-        )
+        return user.has_group('shahtaj_oil.group_shahtaj_distributor')
 
     def _compute_delivery_status(self):
         if self._shahtaj_distributor_needs_stock_sudo():

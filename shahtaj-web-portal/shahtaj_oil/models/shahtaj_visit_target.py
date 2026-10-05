@@ -107,54 +107,6 @@ class ShahtajVisitTarget(models.Model):
         help='0–100. For Combined targets this is the average of individual line percentages.',
     )
     active = fields.Boolean(default=True)
-    period_status = fields.Selection(
-        [
-            ('upcoming', 'Upcoming'),
-            ('current', 'Current'),
-            ('ended', 'Ended'),
-        ],
-        string='Period',
-        compute='_compute_period_status',
-        search='_search_period_status',
-        help='Relative to today: Upcoming / Current / Ended. Archive with Active.',
-    )
-
-    @api.depends('date_start', 'date_end')
-    @api.depends_context('uid', 'tz')
-    def _compute_period_status(self):
-        today = fields.Date.context_today(self)
-        for target in self:
-            if not target.date_start or not target.date_end:
-                target.period_status = False
-            elif today < target.date_start:
-                target.period_status = 'upcoming'
-            elif today > target.date_end:
-                target.period_status = 'ended'
-            else:
-                target.period_status = 'current'
-
-    def _search_period_status(self, operator, value):
-        """Map period status to date domains (no stored column)."""
-        today = fields.Date.context_today(self)
-        if operator != '=' or value not in ('upcoming', 'current', 'ended'):
-            raise ValidationError(_('Unsupported search on Period status.'))
-        if value == 'upcoming':
-            return [('date_start', '>', today)]
-        if value == 'ended':
-            return [('date_end', '<', today)]
-        return [
-            ('date_start', '<=', today),
-            ('date_end', '>=', today),
-        ]
-
-    @api.model
-    def _domain_current_period(self, day=None):
-        """Targets whose period includes day (default today)."""
-        day = day or fields.Date.context_today(self)
-        return [
-            ('date_start', '<=', day),
-            ('date_end', '>=', day),
-        ]
 
     @api.depends(
         'order_booker_id', 'target_type', 'date_start', 'date_end',

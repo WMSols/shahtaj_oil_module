@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
                 <app data-string="Shahtaj Oil" string="Shahtaj Oil" name="shahtaj_oil"
-                     groups="shahtaj_oil.group_shahtaj_office_ops,base.group_system">
+                     groups="shahtaj_oil.group_shahtaj_distributor,base.group_system">
                     <block title="Order Booker GPS" name="shahtaj_gps_distance">
                         <setting string="Shop proximity range"
                                  help="Used for visit check-in and place-order. Changes apply on the next GPS check.">

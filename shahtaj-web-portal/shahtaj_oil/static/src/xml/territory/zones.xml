@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.TerritoryZones" owl="1">
+        <div>
+<!-- Zones Tab -->
+            <t t-if="this.state.activeSubTab === 'areas'">
+                <div class="p-4 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <h2 class="fw-bold mb-0">Geographical Zones</h2>
+                        <small class="text-muted">Zones represent the highest level of your territory.</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="fa fa-search"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search zone name..." 
+                                   t-model="this.state.areaSearchQuery" t-on-input="() => this.onSearchInput('areas')" />
+                        </div>
+                        <button class="btn btn-sm btn-dark d-flex align-items-center text-white ms-2 shadow-sm" t-on-click="() => this.state.showAreaForm = true" title="Create a new overarching zone">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
+                                <path d="M5 12h14"/>
+                                <path d="M12 5v14"/>
+                            </svg>
+                        New Zone
+                        </button>
+                    </div>
+                </div>
+
+                <t t-if="this.state.showAreaForm">
+                    <div class="p-4 bg-light border-bottom">
+                        <div class="row align-items-end">
+                            <div class="col-md-6">
+                                <label class="small fw-bold">Zone Name</label>
+                                <input type="text" class="form-control" t-model="this.state.areaForm.name" placeholder="e.g. West Zone"/>
+                            </div>
+                            <div class="col-md-3 pb-2">
+                                <div class="form-check form-switch" title="Toggle off to disable all routes inside this zone">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="areaActiveSwitch" t-model="this.state.areaForm.is_active"/>
+                                    <label class="form-check-label small fw-bold cursor-pointer" for="areaActiveSwitch">Active Status</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 d-flex">
+                                <button class="btn btn-outline-secondary me-2 w-50 fw-bold" t-on-click="cancelForms">Cancel</button>
+                                <button class="btn btn-success text-white w-50 fw-bold" t-on-click="saveArea">
+                                    <t t-esc="this.state.editingAreaId ? 'Update' : 'Save'"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+                <div class="position-relative">
+                    <t t-if="this.state.isLoadingList">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="bg-light text-uppercase small fw-bold text-muted">
+                            <tr>
+                                <th class="border-top-0 ps-4">Zone ID</th>
+                                <th class="border-top-0">Zone Name</th>
+                                <th class="border-top-0 text-center" title="Number of routes operating in this zone">Active Routes</th>
+                                <th class="border-top-0">Status</th>
+                                <th class="border-top-0 text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 1. Show 'No zones found' ONLY if the array is completely empty -->
+                            <t t-if="this.state.tableAreas.length === 0 and !this.state.isLoadingList">
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted fw-bold">No zones match your search or filter criteria.</td>
+                                </tr>
+                            </t>
+                            
+                            <!-- 2. Loop through the backend-paginated array -->
+                            <t t-foreach="this.state.tableAreas" t-as="area" t-key="area.id">
+                                <tr>
+                                    <td class="ps-4 fw-bold align-middle">
+                                        <t t-esc="area.id"/>
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="text-dark fw-bold">
+                                            <t t-esc="area.name"/>
+                                        </div>
+                                    </td>
+                                    <td class="align-middle text-center">
+                                        <span class="badge bg-light text-dark border px-2 py-1">
+                                            <t t-esc="area.route_count"/>
+                                        </span>
+                                    </td>
+                                    <td class="align-middle">
+                                        <span t-attf-class="small fw-bold #{area.active ? 'text-success' : 'text-warning'}">
+                                            <t t-esc="area.active ? 'Active' : 'Inactive'"/>
+                                        </span>
+                                    </td>
+                                    <td class="align-middle text-end pe-4">
+                                        <button class="btn btn-sm btn-outline-primary" t-on-click="() => this.editArea(area)" title="Edit Zone Details">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger ms-2" t-on-click="() => this.toggleArchive('shahtaj.zone', area.id, false)" title="Move to Archive">Archive</button>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                  </div>
+                  <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.areas.total === 0 ? 0 : ((this.state.pagination.areas.page - 1) * this.state.pagination.areas.limit) + 1"/>
+                            to <t t-esc="Math.min(this.state.pagination.areas.page * this.state.pagination.areas.limit, this.state.pagination.areas.total)"/>
+                            of <t t-esc="this.state.pagination.areas.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('areas', -1)" t-att-disabled="this.state.pagination.areas.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.areas.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.areas.total / this.state.pagination.areas.limit))"/></button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('areas', 1)" t-att-disabled="this.state.pagination.areas.page &gt;= Math.ceil(this.state.pagination.areas.total / this.state.pagination.areas.limit)">Next</button>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        <!-- Custom Confirm Modal -->
+        <t t-if="this.state.confirmModal.isOpen">
+            <ConfirmModal 
+                title="this.state.confirmModal.title" 
+                message="this.state.confirmModal.message" 
+                onConfirm="this.state.confirmModal.onConfirm" 
+                onCancel="() => this.closeConfirm()" 
+            />
+        </t>
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,827 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.TerritoryShops" owl="1">
+        <div t-on-click="closeShopActionMenu">
+<!-- Shops Tab -->
+            <t t-if="this.state.activeSubTab === 'shops'">
+                <t t-if="this.state.selectedShopDetails">
+                    <div class="p-4 bg-light border-bottom d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2 flex-wrap">
+                                <t t-esc="this.state.selectedShopDetails.name"/>
+                                <span t-attf-class="badge #{this.state.selectedShopDetails.shop_approval_state === 'approved' ? 'bg-success text-white' : (this.state.selectedShopDetails.shop_approval_state === 'rejected' ? 'bg-danger text-white' : 'bg-warning text-dark')}">
+                                    <t t-esc="(this.state.selectedShopDetails.shop_approval_state || '').toUpperCase()"/>
+                                </span>
+                                <span t-attf-class="badge #{this.state.selectedShopDetails.shahtaj_field_verified ? 'bg-success text-white' : 'bg-warning text-dark'}"
+                                      t-att-title="this.state.selectedShopDetails.shahtaj_field_verified ? 'On-site GPS and exterior photo verified' : 'Waiting for order booker on-site verification'">
+                                    <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified ? 'On-site Verified' : 'Not Verified'"/>
+                                </span>
+                            </h4>
+                            <small class="text-muted">
+                            Shop ID: <strong>
+                                <t t-esc="this.state.selectedShopDetails.id"/>
+                            </strong>
+                            · Owner: <t t-esc="this.state.selectedShopDetails.owner_name"/>
+ |                        <t t-esc="this.state.selectedShopDetails.phone"/>
+                    </small>
+                    <small class="text-muted d-block" t-if="this.state.selectedShopDetails.owner_cnic_number">
+                            ID Card No: <strong>
+                        <t t-esc="this.state.selectedShopDetails.owner_cnic_number"/>
+                    </strong>
+                </small>
+                    <small class="text-muted d-block" t-if="this.state.selectedShopDetails.shop_license_number">
+                            License No: <strong>
+                        <t t-esc="this.state.selectedShopDetails.shop_license_number"/>
+                    </strong>
+                </small>
+                <small class="text-muted d-block">
+                            Registered by:
+                    <strong>
+                        <t t-if="this.state.selectedShopDetails.registered_by_id">
+                            <t t-esc="this.state.selectedShopDetails.registered_by_id[1]"/>
+                                    (Booker ID: <t t-esc="this.state.selectedShopDetails.registered_by_id[0]"/>
+)
+                        </t>
+                        <t t-else="">Distributor / not recorded</t>
+                    </strong>
+                </small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-primary fw-bold d-flex align-items-center"
+                        t-on-click="editShopFromDetails"
+                        title="Edit this shop">
+                    <i class="fa fa-pencil me-1"></i> Edit
+                </button>
+                <button class="btn btn-sm btn-outline-secondary fw-bold d-flex align-items-center" t-on-click="closeShopDetails" title="Close details and return to list">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+                        <path d="m12 19-7-7 7-7"/>
+                        <path d="M19 12H5"/>
+                    </svg>
+                    Back to Directory
+                </button>
+            </div>
+        </div>
+
+        <div class="p-4">
+            <div class="row mb-4 g-4">
+                <div class="col-md-5">
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary">Location Details</h6>
+                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
+                            <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <strong class="mb-0 text-dark">Assigned Routes</strong>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="input-group input-group-sm shadow-sm" style="width: 180px;">
+                                        <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                                        <input type="text" class="form-control border-start-0 ps-0"
+                                               placeholder="Search routes..."
+                                               t-model="this.state.shopRouteSearchQuery"
+                                               t-on-input="onShopRouteSearchInput"/>
+                                    </div>
+                                    <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm d-flex align-items-center"
+                                            t-on-click="openAddRouteModal"
+                                            title="Assign this shop to routes">
+                                        <i class="fa fa-plus me-1"></i> Add Route
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="px-3 py-2 bg-light border-bottom small text-muted">
+                                Routes this shop belongs to. Remove only unlinks from that route; Add Route can assign more.
+                            </div>
+                            <div class="table-responsive" style="height: 260px; overflow-y: auto;">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-uppercase small fw-bold text-muted sticky-top">
+                                        <tr>
+                                            <th class="ps-3">Route</th>
+                                            <th>Zone</th>
+                                            <th class="text-end pe-3">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="!this.paginatedShopRouteLines.length">
+                                            <tr>
+                                                <td colspan="3" class="text-center py-4 text-muted fw-bold">
+                                                    <t t-if="this.state.shopRouteSearchQuery and !this.filteredShopRouteLines.length">
+                                                        No routes match your search.
+                                                    </t>
+                                                    <t t-else="">
+                                                        No routes assigned. Click <strong>Add Route</strong> to assign.
+                                                    </t>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="this.paginatedShopRouteLines" t-as="line" t-key="line.route_id">
+                                            <tr>
+                                                <td class="ps-3 fw-bold text-dark"><t t-esc="line.route_name"/></td>
+                                                <td class="text-muted"><t t-esc="line.zone_name"/></td>
+                                                <td class="text-end pe-3">
+                                                    <button class="btn btn-sm btn-outline-danger fw-bold"
+                                                            t-on-click="() => this.removeRouteFromShop(line)"
+                                                            title="Remove shop from this route only">
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2">
+                                <small class="text-muted fw-bold">
+                                    Showing
+                                    <t t-esc="this.state.pagination.shopRoutes.total === 0 ? 0 : ((this.state.pagination.shopRoutes.page - 1) * this.state.pagination.shopRoutes.limit) + 1"/>
+                                    to
+                                    <t t-esc="Math.min(this.state.pagination.shopRoutes.page * this.state.pagination.shopRoutes.limit, this.state.pagination.shopRoutes.total)"/>
+                                    of
+                                    <t t-esc="this.state.pagination.shopRoutes.total"/>
+                                </small>
+                                <div class="btn-group shadow-sm">
+                                    <button class="btn btn-sm btn-white border fw-bold"
+                                            t-on-click="() => this.changeShopRoutePage(-1)"
+                                            t-att-disabled="this.state.pagination.shopRoutes.page === 1">Prev</button>
+                                    <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                        <t t-esc="this.state.pagination.shopRoutes.page"/>
+                                        /
+                                        <t t-esc="Math.max(1, Math.ceil(this.state.pagination.shopRoutes.total / this.state.pagination.shopRoutes.limit))"/>
+                                    </button>
+                                    <button class="btn btn-sm btn-white border fw-bold"
+                                            t-on-click="() => this.changeShopRoutePage(1)"
+                                            t-att-disabled="this.state.pagination.shopRoutes.page &gt;= Math.ceil(this.state.pagination.shopRoutes.total / this.state.pagination.shopRoutes.limit)">Next</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
+                            <div class="px-3 py-2 bg-light border-bottom">
+                                <strong class="text-dark small text-uppercase">Coordinates</strong>
+                            </div>
+                            <div class="p-3">
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="text-muted small mb-1">Latitude</div>
+                                        <div class="fw-bold text-dark">
+                                            <t t-esc="this.state.selectedShopDetails.partner_latitude || '—'"/>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small mb-1">Longitude</div>
+                                        <div class="fw-bold text-dark">
+                                            <t t-esc="this.state.selectedShopDetails.partner_longitude || '—'"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
+                            <div class="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                                <strong class="text-dark small text-uppercase mb-0">On-site Verification</strong>
+                                <span t-attf-class="badge #{this.state.selectedShopDetails.shahtaj_field_verified ? 'bg-success text-white' : 'bg-warning text-dark'}">
+                                    <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified ? 'Verified' : 'Not Verified'"/>
+                                </span>
+                            </div>
+                            <div class="p-3">
+                                <t t-if="this.state.selectedShopDetails.shahtaj_field_verified">
+                                    <div class="small text-muted mb-1">Verified at</div>
+                                    <div class="fw-bold text-dark mb-2">
+                                        <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified_at || '—'"/>
+                                    </div>
+                                    <div class="small text-muted mb-1">Verified by</div>
+                                    <div class="fw-bold text-dark mb-3">
+                                        <t t-if="this.state.selectedShopDetails.shahtaj_field_verified_by_id">
+                                            <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified_by_id[1]"/>
+                                        </t>
+                                        <t t-else="">—</t>
+                                    </div>
+                                    <p class="small text-muted mb-3 mb-md-3">
+                                        Use this if GPS was captured incorrectly or the shop moved.
+                                        Resetting clears coordinates so the booker re-verifies on the next visit.
+                                    </p>
+                                    <button class="btn btn-sm btn-outline-warning fw-bold d-flex align-items-center"
+                                            t-on-click="confirmResetSelectedShopVerification"
+                                            t-att-disabled="this.state.isResettingShopVerification"
+                                            title="Clear GPS and mark shop as not verified">
+                                        <span t-if="this.state.isResettingShopVerification" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        <i t-else="" class="fa fa-map-marker me-1"></i>
+                                        Reset Verification &amp; GPS
+                                    </button>
+                                </t>
+                                <t t-else="">
+                                    <p class="small text-muted mb-0">
+                                        Not verified on site yet. The order booker will capture GPS and an exterior photo on the first visit.
+                                    </p>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h6 class="fw-bold text-success">Financial Details</h6>
+                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+                            <div class="p-3 border-bottom">
+                                <div class="text-muted small mb-2">Category</div>
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    <select class="form-select form-select-sm" style="max-width: 140px;" t-model="this.state.shopCategoryEdit" title="Switching to Cash disables credit limits">
+                                        <option value="cash">Cash</option>
+                                        <option value="credit">Credit</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-primary fw-bold" t-on-click="saveShopCategory" title="Save changes to shop category">
+                                        Save Category
+                                    </button>
+                                </div>
+                            </div>
+                            <t t-if="this.hasFinancialAccess">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2"
+                                         t-if="this.state.selectedShopDetails.shahtaj_shop_category === 'credit'">
+                                        <span class="text-muted">Credit Limit</span>
+                                        <strong class="text-dark">Rs. <t t-esc="this.state.selectedShopDetails.credit_limit"/></strong>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                        <span class="text-muted">Legacy Balance</span>
+                                        <strong class="text-dark">Rs. <t t-esc="this.state.selectedShopDetails.legacy_balance"/></strong>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                        <span class="text-muted">Outstanding Balance</span>
+                                        <strong class="text-dark">Rs. <t t-esc="this.state.selectedShopDetails.outstanding_balance"/></strong>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-7">
+                    <h6 class="fw-bold text-info d-flex align-items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map me-2">
+                            <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/>
+                            <path d="M15 5.764v15"/>
+                            <path d="M9 3.236v15"/>
+                        </svg>
+                                Live Map View
+                    </h6>
+                    <div t-ref="mapContainer" class="w-100 rounded-3 shadow-sm border border-2" style="height: 300px; z-index: 1; position: relative; background-color: #f8f9fa;">
+                        <t t-if="!this.state.selectedShopDetails.partner_latitude or !this.state.selectedShopDetails.partner_longitude">
+                            <div class="d-flex flex-column h-100 justify-content-center align-items-center text-muted px-4 text-center gap-1">
+                                <strong>No valid GPS coordinates for this shop.</strong>
+                                <small t-if="this.state.selectedShopDetails.shahtaj_field_verified">
+                                    Edit latitude/longitude, or reset verification so the booker can re-capture on site.
+                                </small>
+                                <small t-else="">
+                                    The order booker will set GPS during on-site verification.
+                                </small>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="fw-bold text-dark mb-3">Verification Images</h6>
+            <div class="row">
+                <t t-foreach="this.shopDetailImages" t-as="image" t-key="image.key">
+                    <div class="col-md-3 text-center mb-3">
+                        <small class="fw-bold d-block mb-2" t-esc="image.title"/>
+                        <t t-if="image.meta">
+                            <button type="button" class="btn p-0 border-0 bg-transparent"
+                                    t-on-click="() => this.openShopImagePreview(image)"
+                                    title="Click to enlarge">
+                                <img t-att-src="image.meta.src"
+                                     t-att-alt="image.title"
+                                     class="img-fluid rounded border shadow-sm"
+                                     style="cursor: zoom-in;"/>
+                            </button>
+                            <div class="text-muted small mt-1">
+                                <t t-esc="image.meta.ext"/> · <t t-esc="image.meta.sizeLabel"/>
+                            </div>
+                            <div class="text-muted small">Click to enlarge</div>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary fw-bold mt-2"
+                                    t-on-click="() => this.downloadShopImage(image)"
+                                    title="Download this image">
+                                <i class="fa fa-download me-1"></i> Download
+                            </button>
+                        </t>
+                        <t t-else="">
+                            <div class="p-4 bg-light border rounded text-muted small">No Image Uploaded</div>
+                        </t>
+                    </div>
+                </t>
+            </div>
+
+            <div class="border-top pt-3 mt-2 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <t t-if="this.state.selectedShopDetails.shop_approval_state === 'pending'">
+                        <small class="text-muted fw-bold">Verify photos, location, and details, then approve or reject this application.</small>
+                    </t>
+                    <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'approved'">
+                        <small class="text-success fw-bold">This shop is approved and available for schedules and visits.</small>
+                        <small t-if="this.state.selectedShopDetails.shahtaj_field_verified" class="text-muted d-block mt-1">
+                            On-site GPS is locked. Reset verification only if the pin is wrong or the shop relocated.
+                        </small>
+                    </t>
+                    <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'rejected'">
+                        <small class="text-danger fw-bold">This shop was rejected. You can approve it if the application should proceed.</small>
+                    </t>
+                </div>
+               <div class="d-flex gap-2 flex-wrap justify-content-md-end">
+                    <t t-if="this.state.selectedShopDetails.shahtaj_field_verified">
+                        <button class="btn btn-outline-warning fw-bold d-flex align-items-center"
+                                t-on-click="confirmResetSelectedShopVerification"
+                                t-att-disabled="this.state.isResettingShopVerification"
+                                title="Clear GPS and require on-site re-verification">
+                            <span t-if="this.state.isResettingShopVerification" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Unverify GPS
+                        </button>
+                    </t>
+                    <t t-if="this.state.selectedShopDetails.shop_approval_state === 'pending'">
+                        <button class="btn btn-outline-danger fw-bold d-flex align-items-center" t-on-click="rejectSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Reject this shop application">
+                            <span t-if="this.state.isRejectingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Reject
+                        </button>
+                        <button class="btn btn-success fw-bold text-white d-flex align-items-center" t-on-click="approveSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Approve and activate this shop">
+                            <span t-if="this.state.isApprovingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Approve Shop
+                        </button>
+                    </t>
+                    <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'rejected'">
+                        <button class="btn btn-success fw-bold text-white d-flex align-items-center" t-on-click="approveSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Approve this previously rejected shop">
+                            <span t-if="this.state.isApprovingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Approve Shop
+                        </button>
+                    </t>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-elif="!this.state.showShopForm">
+        <div class="p-4 bg-white border-bottom d-flex flex-column  justify-content-between  gap-3">
+            <div>
+                <h2 class="fw-bold mb-0">Registered Shops</h2>
+                <small class="text-muted">Register, Review, approve, and manage the retail shops.</small>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="input-group input-group-sm shadow-sm" style="min-width: 250px; flex-grow: 1;">
+                    <span class="input-group-text bg-white text-muted border-end-0"><i class="fa fa-search"></i></span>
+                    <input type="text" class="form-control border ps-0" placeholder="Search by shop or owner..." 
+                           t-model="this.state.shopSearchQuery" t-on-input="() => this.onSearchInput('shops')" />
+                </div>
+                <small class="fw-bold text-muted">Filters</small>
+                <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.shopFilterCategory" t-on-change="() => this.onFilterChange('shops')">
+                    <option value="all">All Types</option>
+                    <option value="cash">Cash Only</option>
+                    <option value="credit">Credit Only</option>
+                </select>
+                <select class="form-select form-select-sm shadow-sm" style="width: 140px;" t-model="this.state.shopFilterStatus" t-on-change="() => this.onFilterChange('shops')">
+                    <option value="all">All Statuses</option>
+                    <option value="approved">Approved</option>
+                    <option value="pending">Pending Review</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <select class="form-select form-select-sm shadow-sm" style="width: 155px;" t-model="this.state.shopFilterVerified" t-on-change="() => this.onFilterChange('shops')">
+                    <option value="all">All Verification</option>
+                    <option value="verified">On-site Verified</option>
+                    <option value="unverified">Not Verified</option>
+                </select>
+                <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.shopFilterBooker" t-on-change="() => this.onFilterChange('shops')">
+                    <option value="all">All Order Bookers</option>
+                    <t t-foreach="this.state.bookers" t-as="booker" t-key="booker.id">
+                        <option t-att-value="booker.id"><t t-esc="booker.name"/></option>
+                    </t>
+                </select>
+                <select class="form-select form-select-sm shadow-sm" style="width: 160px;" t-model="this.state.shopFilterRoute" t-on-change="() => this.onFilterChange('shops')">
+                    <option value="all">All Routes</option>
+                    <option value="unassigned">Unassigned Only</option>
+                    <t t-foreach="this.state.routes" t-as="route" t-key="route.id">
+                        <option t-att-value="route.id"><t t-esc="route.name"/></option>
+                    </t>
+                </select>
+                <button class="btn btn-sm btn-dark d-flex align-items-center text-white ms-2 shadow-sm" t-on-click="() => this.state.showShopForm = true" title="Manually register a new shop to the database">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus me-1">
+                        <path d="M5 12h14"/>
+                        <path d="M12 5v14"/>
+                    </svg>
+                            Register New Shop
+                </button>
+            </div>
+        </div>
+
+        <div class="position-relative">
+                    <t t-if="this.state.isLoadingList">
+                        <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </t>       <!-- Added min-height to prevent dropdown clipping on single-row tables -->
+        <div class="table-responsive" style="min-height: 250px;">
+            <table class="table table-hover mb-0">
+               <thead class="bg-light text-uppercase small fw-bold text-muted">
+                    <tr>
+                        <th class="border-top-0 ps-4">Shop Details</th>
+                        <th class="border-top-0">Contact</th>
+                        <th class="border-top-0 text-center">On-site Verified</th>
+                        <th class="border-top-0 text-center">Category</th>
+                        <th class="border-top-0 text-center">Status</th>
+                        <th class="border-top-0 text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-if="this.state.tableShops.length === 0">
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted fw-bold">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store mb-2 opacity-50">
+                                    <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/>
+                                    <path d="M4 12v8a2 2 0 0 0 2 2h2V14h8v8h2a2 2 0 0 0 2-2v-8"/>
+                                    <path d="M2 7h20v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z"/>
+                                </svg>
+                                <p class="mb-0">No shops registered. Register a new shop to start building your network.</p>
+                            </td>
+                        </tr>
+                    </t>
+                    <t t-elif="this.state.tableShops.length === 0">
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted fw-bold">No shops match your search or filter criteria.</td>
+                        </tr>
+                    </t>
+                    <t t-foreach="this.state.tableShops" t-as="shop" t-key="shop.id">
+                        <tr>
+                            <td class="ps-4 align-middle">
+                                <div class="text-dark fw-bold">
+                                    <t t-esc="shop.name"/>
+                                </div>
+                                <small class="text-muted">Shop ID: <t t-esc="shop.id"/>
+                                </small>
+                            </td>
+                            <td class="align-middle">
+                                <div class="text-dark">
+                                    <t t-esc="shop.owner_name || 'N/A'"/>
+                                </div>
+                                <small class="text-muted">
+                                    <t t-esc="shop.phone || 'N/A'"/>
+                                </small>
+                                <small class="d-block text-muted" t-if="shop.registered_by_id">
+                                            Registered by: <t t-esc="shop.registered_by_id[1]"/>
+ (#                                <t t-esc="shop.registered_by_id[0]"/>
+)
+                            </small>
+                        </td>
+                        <td class="align-middle text-center">
+                            <span t-attf-class="badge #{shop.shahtaj_visit_tag === 'visited' ? 'bg-success text-white' : 'bg-warning text-dark'} shadow-sm">
+                                <t t-esc="shop.shahtaj_visit_tag === 'visited' ? 'Verified' : 'Not Verified'"/>
+                            </span>
+                        </td>
+                        <td class="align-middle text-center">
+                            <span t-attf-class="badge text-white #{shop.shahtaj_shop_category === 'cash' ? 'bg-info' : 'bg-primary'}">
+                                <t t-esc="shop.shahtaj_shop_category === 'cash' ? 'Cash' : 'Credit'"/>
+                            </span>
+                        </td>
+                        <td class="align-middle text-center">
+                            <span t-attf-class="badge text-white #{shop.shop_approval_state === 'approved' ? 'bg-success' : (shop.shop_approval_state === 'rejected' ? 'bg-danger' : 'bg-warning text-dark')}" t-att-title="shop.shop_approval_state === 'pending' ? 'Needs your review' : ''">
+                                <t t-esc="shop.shop_approval_state.toUpperCase()"/>
+                            </span>
+                        </td>
+                        <td class="align-middle text-end pe-4">
+                            <div class="d-inline-flex align-items-center justify-content-end gap-2">
+                                <button
+                                    t-attf-class="btn btn-sm fw-bold #{shop.shop_approval_state === 'approved' ? 'btn-outline-primary' : 'btn-primary text-white'}"
+                                    t-on-click="() => this.viewShopDetails(shop.id)"
+                                    t-att-title="shop.shop_approval_state === 'pending' ? 'Open details and verify before approving' : (shop.shop_approval_state === 'rejected' ? 'Open details to review and approve again' : 'View full details and live map')"
+                                >
+                                    <t t-if="shop.shop_approval_state === 'approved'">View Details</t>
+                                    <t t-else="">Review</t>
+                                </button>
+                                <div class="dropdown position-relative">
+                                    <button
+                                        class="btn btn-sm btn-outline-secondary"
+                                        type="button"
+                                        t-on-click="(ev) => this.toggleShopActionMenu(shop.id, ev)"
+                                        title="More actions"
+                                        aria-label="More actions"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <circle cx="5" cy="12" r="2"/>
+                                            <circle cx="12" cy="12" r="2"/>
+                                            <circle cx="19" cy="12" r="2"/>
+                                        </svg>
+                                    </button>
+                                    <ul
+                                        t-if="this.state.shopActionMenuId === shop.id"
+                                        class="dropdown-menu dropdown-menu-end show shadow border mt-1 py-1"
+                                        style="display: block; position: absolute; right: 0; left: auto; z-index: 1050; min-width: 10rem;"
+                                    >
+                                        <li>
+                                            <button type="button" class="dropdown-item small py-2" t-on-click="() => this.onShopMenuEdit(shop)">
+                                                Edit
+                                            </button>
+                                        </li>
+                                        <li t-if="shop.shahtaj_visit_tag === 'visited'">
+                                            <button type="button" class="dropdown-item small py-2 text-warning"
+                                                    t-on-click="() => this.onShopMenuResetVerification(shop)">
+                                                Reset Verification &amp; GPS
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider my-1"/></li>
+                                        <li>
+                                            <button type="button" class="dropdown-item small py-2 text-danger" t-on-click="() => this.onShopMenuArchive(shop)">
+                                                Archive
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </t>
+            </tbody>
+        </table>
+    </div>
+    <!-- PAGINATION FOOTER -->
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <small class="text-muted fw-bold">
+                            Showing <t t-esc="this.state.pagination.shops.total === 0 ? 0 : ((this.state.pagination.shops.page - 1) * this.state.pagination.shops.limit) + 1"/>
+                            to <t t-esc="Math.min(this.state.pagination.shops.page * this.state.pagination.shops.limit, this.state.pagination.shops.total)"/>
+                            of <t t-esc="this.state.pagination.shops.total"/>
+                        </small>
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('shops', -1)" t-att-disabled="this.state.pagination.shops.page === 1">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.shops.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.shops.total / this.state.pagination.shops.limit))"/></button>
+                            <button class="btn btn-sm btn-white border fw-bold" t-on-click="() => this.changePage('shops', 1)" t-att-disabled="this.state.pagination.shops.page &gt;= Math.ceil(this.state.pagination.shops.total / this.state.pagination.shops.limit)">Next</button>
+                        </div>
+                    </div>
+                    </div>
+
+</t>
+
+<t t-else="">
+    <div class="p-4 bg-light">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold text-dark mb-0">
+                <t t-esc="this.state.editingShopId ? 'Edit Shop Registration' : 'New Shop Registration'"/>
+            </h4>
+            <button class="btn btn-sm btn-outline-secondary fw-bold d-flex align-items-center" t-on-click="cancelForms" title="Discard changes and return">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+                    <path d="m12 19-7-7 7-7"/>
+                    <path d="M19 12H5"/>
+                </svg>
+                            Back to Directory
+            </button>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4 rounded-3">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                <h6 class="fw-bold text-primary mb-0">1. Basic Information</h6>
+                <small class="text-muted d-block mt-1">
+                    Only <b>Shop Name</b> is required. Owner details and photos are optional.
+                    Assign zones/routes later from the route checklist.
+                </small>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="small fw-bold">Shop Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" t-model="this.state.shopForm.name" placeholder="e.g. Al-Hafeez Supermart"/>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">Owner Name <span class="text-muted fw-normal">(Optional)</span></label>
+                        <input type="text" class="form-control" t-model="this.state.shopForm.owner_name" placeholder="e.g. Rizwan Ahmed"/>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">Contact Phone <span class="text-muted fw-normal">(Optional)</span></label>
+                        <input type="text" class="form-control" t-model="this.state.shopForm.owner_phone" placeholder="e.g. 0300-1234567"/>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">Owner ID Card No. <span class="text-muted">(Optional)</span>
+                        </label>
+                        <input type="text" class="form-control" t-model="this.state.shopForm.owner_cnic_number" placeholder="e.g. 35202-1234567-1"/>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">License Number <span class="text-muted">(Optional)</span>
+                        </label>
+                        <input type="text" class="form-control" t-model="this.state.shopForm.shop_license_number" placeholder="e.g. TRADE-12345"/>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4 rounded-3">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                <h6 class="fw-bold text-warning text-dark mb-0">2. Financial Ledger Setup</h6>
+                <small class="text-muted d-block mt-1">Determine if the shop pays immediately (Cash) or requires a credit limit for deferred payments.</small>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="small fw-bold">Shop Category</label>
+                        <select class="form-select form-control" t-model="this.state.shopForm.shopCategory">
+                            <option value="cash">Cash (Immediate Payment)</option>
+                            <option value="credit">Credit (Requires Limit)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3" t-if="this.hasFinancialAccess and this.state.shopForm.shopCategory === 'credit'">
+                        <label class="small fw-bold">Approved Credit Limit (Rs.)</label>
+                        <input type="number" class="form-control" t-model="this.state.shopForm.creditLimit" placeholder="e.g. 150000"/>
+                    </div>
+                    <div class="col-md-4 mb-3" t-if="this.hasFinancialAccess">
+                        <label class="small fw-bold">Legacy Balance Brought Forward</label>
+                        <input type="number" class="form-control" t-model="this.state.shopForm.legacyBalance" placeholder="0.00" title="Any existing unpaid amount prior to this registration"/>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4 rounded-3">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                <h6 class="fw-bold text-info mb-0">3. KYC &amp; Visual Verification</h6>
+                <small class="text-muted d-block mt-1" t-if="this.state.editingShopId">Note: Leave file inputs blank to keep existing photos unchanged.</small>
+                <small class="text-muted d-block mt-1" t-else="">Upload clear, well-lit photos. These will be reviewed during the approval process.</small>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">Owner CNIC (Front)</label>
+                        <input type="file" class="form-control form-control-sm" accept="image/*" t-on-change="(ev) => this.onFileChange(ev, 'owner_cnic_front')"/>
+                        <t t-if="this.state.shopForm.preview_owner_cnic_front">
+                            <img t-att-src="this.state.shopForm.preview_owner_cnic_front" class="img-thumbnail mt-2 shadow-sm" style="max-height: 120px;"/>
+                        </t>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">Owner CNIC (Back)</label>
+                        <input type="file" class="form-control form-control-sm" accept="image/*" t-on-change="(ev) => this.onFileChange(ev, 'owner_cnic_back')"/>
+                        <t t-if="this.state.shopForm.preview_owner_cnic_back">
+                            <img t-att-src="this.state.shopForm.preview_owner_cnic_back" class="img-thumbnail mt-2 shadow-sm" style="max-height: 120px;"/>
+                        </t>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">Owner Portrait Photo</label>
+                        <input type="file" class="form-control form-control-sm" accept="image/*" t-on-change="(ev) => this.onFileChange(ev, 'owner_photo')"/>
+                        <t t-if="this.state.shopForm.preview_owner_photo">
+                            <img t-att-src="this.state.shopForm.preview_owner_photo" class="img-thumbnail mt-2 shadow-sm" style="max-height: 120px;"/>
+                        </t>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="small fw-bold">Shop Exterior Photo / PFA License Number</label>
+                        <div class="form-control form-control-sm bg-light text-muted" style="min-height: 38px;">
+                            View only — captured by order booker on first visit (with GPS).
+                        </div>
+                        <t t-if="this.state.shopForm.preview_shop_exterior_photo">
+                            <img t-att-src="this.state.shopForm.preview_shop_exterior_photo" class="img-thumbnail mt-2 shadow-sm" style="max-height: 120px;"/>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end pb-4 mt-3">
+            <button class="btn btn-outline-secondary px-4 me-2 fw-bold" t-on-click="cancelForms" t-att-disabled="this.state.isLoading">Discard Changes</button>
+            <button class="btn btn-dark px-5 text-white fw-bold d-flex align-items-center" t-on-click="saveShop" t-att-disabled="this.state.isLoading">
+                <t t-if="this.state.isLoading">
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Processing...
+                </t>
+                <t t-else="">
+                    <t t-esc="this.state.editingShopId ? 'Update Shop Information' : 'Register Shop &amp; Submit for Review'"/>
+                </t>
+            </button>
+        </div>
+    </div>
+</t>
+</t>
+
+        <!-- Add routes to shop (multi-select) -->
+        <t t-if="this.state.showAddRouteModal">
+            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                 style="background-color: rgba(0, 0, 0, 0.55); z-index: 1060; padding: 1rem;"
+                 t-on-click="closeAddRouteModal">
+                <div class="bg-white rounded-3 shadow-lg border-0 w-100 d-flex flex-column"
+                     style="max-width: 720px; max-height: 85vh;"
+                     t-on-click.stop="">
+                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light rounded-top-3">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Add Routes to Shop</h5>
+                            <small class="text-muted">
+                                Select routes not yet assigned to
+                                <strong><t t-esc="this.state.selectedShopDetails and this.state.selectedShopDetails.name"/></strong>
+                            </small>
+                        </div>
+                        <button type="button" class="btn-close" t-on-click="closeAddRouteModal" aria-label="Close"></button>
+                    </div>
+                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="max-width: 280px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0"
+                                   placeholder="Search route or zone..."
+                                   t-model="this.state.addRouteSearchQuery"
+                                   t-on-input="onAddRouteSearchInput"/>
+                        </div>
+                        <small class="text-muted fw-bold">
+                            <t t-esc="this.addRouteSelectedCount"/> selected
+                        </small>
+                    </div>
+                    <div class="position-relative flex-grow-1 overflow-auto" style="min-height: 280px;">
+                        <t t-if="this.state.isLoadingAddRoutes">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold text-muted sticky-top">
+                                <tr>
+                                    <th class="ps-4 text-center" style="width: 56px;">
+                                        <input class="form-check-input cursor-pointer shadow-sm" type="checkbox"
+                                               title="Select all on this page"
+                                               t-att-checked="this.isAllAddRoutePageSelected"
+                                               t-on-change="toggleSelectAllAddRoutePage"/>
+                                    </th>
+                                    <th>Route</th>
+                                    <th class="pe-4">Zone</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="this.state.tableAddRouteCandidates.length === 0 and !this.state.isLoadingAddRoutes">
+                                    <tr>
+                                        <td colspan="3" class="text-center py-5 text-muted fw-bold">
+                                            No routes available to add. All active routes may already be assigned.
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="this.state.tableAddRouteCandidates" t-as="aroute" t-key="aroute.id">
+                                    <tr class="cursor-pointer" t-on-click="() => this.toggleAddRouteSelection(aroute.id)">
+                                        <td class="ps-4 text-center" t-on-click.stop="">
+                                            <input class="form-check-input fs-5 cursor-pointer shadow-sm" type="checkbox"
+                                                   t-att-checked="!!this.state.addRouteSelectedIds[aroute.id]"
+                                                   t-on-change="() => this.toggleAddRouteSelection(aroute.id)"/>
+                                        </td>
+                                        <td class="fw-bold text-dark"><t t-esc="aroute.name"/></td>
+                                        <td class="text-muted pe-4"><t t-esc="aroute.zone_id ? aroute.zone_id[1] : '—'"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light flex-wrap gap-2 rounded-bottom-3">
+                        <div class="btn-group shadow-sm">
+                            <button class="btn btn-sm btn-white border fw-bold"
+                                    t-on-click="() => this.changeAddRoutePage(-1)"
+                                    t-att-disabled="this.state.pagination.addRoutes.page === 1 or this.state.isLoadingAddRoutes">Prev</button>
+                            <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                                <t t-esc="this.state.pagination.addRoutes.page"/>
+                                /
+                                <t t-esc="Math.max(1, Math.ceil(this.state.pagination.addRoutes.total / this.state.pagination.addRoutes.limit))"/>
+                            </button>
+                            <button class="btn btn-sm btn-white border fw-bold"
+                                    t-on-click="() => this.changeAddRoutePage(1)"
+                                    t-att-disabled="this.state.pagination.addRoutes.page &gt;= Math.ceil(this.state.pagination.addRoutes.total / this.state.pagination.addRoutes.limit) or this.state.isLoadingAddRoutes">Next</button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-light border fw-bold px-4" t-on-click="closeAddRouteModal"
+                                    t-att-disabled="this.state.isAddingRoutes">Cancel</button>
+                            <button class="btn btn-success fw-bold text-white px-4 shadow-sm"
+                                    t-on-click="confirmAddSelectedRoutes"
+                                    t-att-disabled="this.state.isAddingRoutes or !this.addRouteSelectedCount">
+                                <t t-if="this.state.isAddingRoutes">Adding…</t>
+                                <t t-else="">Add Selected (<t t-esc="this.addRouteSelectedCount"/>)</t>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+        <t t-if="this.activeShopImagePreview">
+            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center p-3"
+                 style="background: rgba(15, 23, 42, 0.75); z-index: 1080;"
+                 t-on-click="closeShopImagePreview">
+                <div class="bg-white rounded-4 shadow-lg p-3" style="max-width: min(720px, 92vw);" t-on-click.stop="">
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                        <div>
+                            <h6 class="fw-bold mb-0" t-esc="this.activeShopImagePreview.title"/>
+                            <small class="text-muted">
+                                <t t-esc="this.activeShopImagePreview.meta.ext"/> · <t t-esc="this.activeShopImagePreview.meta.sizeLabel"/>
+                            </small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold"
+                                    t-on-click="() => this.downloadShopImage(this.activeShopImagePreview)">
+                                <i class="fa fa-download me-1"></i> Download
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 32px; height: 32px;" t-on-click="closeShopImagePreview" title="Close" aria-label="Close">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <img t-att-src="this.activeShopImagePreview.meta.src"
+                         t-att-alt="this.activeShopImagePreview.title"
+                         class="rounded border d-block"
+                         style="max-width: 100%; max-height: 78vh; object-fit: contain;"/>
+                </div>
+            </div>
+        </t>
+        <!-- Custom Confirm Modal -->
+        <t t-if="this.state.confirmModal.isOpen">
+            <ConfirmModal 
+                title="this.state.confirmModal.title" 
+                message="this.state.confirmModal.message" 
+                onConfirm="this.state.confirmModal.onConfirm" 
+                onCancel="() => this.closeConfirm()" 
+            />
+        </t>
+        </div>
+    </t>
+</templates>

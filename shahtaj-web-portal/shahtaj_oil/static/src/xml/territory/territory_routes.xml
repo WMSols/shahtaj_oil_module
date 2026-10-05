@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.TerritoryRoutes" owl="1">
+        <div class="card border-0 shadow-sm bg-white rounded-3">
+            <div class="p-4 border-bottom bg-light d-flex justify-content-between align-items-center rounded-top">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-0">Territory &amp; Route Management</h2>
+                    <small class="text-muted">Create areas, define routes, map shops, and manage the geographical hierarchy for your order bookers.</small>
+                </div>
+                <div>
+                    <button class="btn btn-dark fw-bold text-white shadow-sm d-inline-flex align-items-center ms-3" t-on-click="refreshData" t-att-disabled="this.state.isRefreshing" title="Refresh Territory Data">
+                        <i class="fa fa-refresh me-2" t-att-class="{'fa-spin': this.state.isRefreshing}"></i> Refresh
+                    </button>
+                    <button class="btn btn-outline-danger ms-3 fw-bold shadow-sm d-inline-flex align-items-center" t-on-click="openArchive" title="View Archived Items">
+                        <i class="fa fa-archive me-2"></i> View Archive
+                    </button>
+                </div>
+            </div>
+            <t t-if="this.state.activeSubTab === 'areas'">
+                <TerritoryZones requestedSubTab="'areas'" refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'routes'">
+                <TerritoryRouteList requestedSubTab="'routes'" refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'shops'">
+                <TerritoryShops requestedSubTab="'shops'" refreshNonce="this.state.refreshNonce"/>
+            </t>
+            <t t-if="this.state.activeSubTab === 'archive'">
+                <TerritoryArchive requestedSubTab="'archive'" previousSubTab="this.state.previousSubTab" onBack.bind="closeArchive" refreshNonce="this.state.refreshNonce"/>
+            </t>
+        </div>
+    </t>
+</templates>

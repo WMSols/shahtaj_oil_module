@@ -1,0 +1,765 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.OperationsLiveOrders" owl="1">
+        <div>
+<!-- Orders Tab -->
+ <t t-if="this.state.activeSubTab === 'orders'">
+  <div t-if="!this.state.showSaleOrderForm" class="px-4 pt-3 bg-white border-bottom shadow-sm">
+    <ul class="nav nav-tabs border-0">
+        <li class="nav-item me-4">
+            <button t-on-click="() => this.setOrdersSubTab('live')" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 fs-6 #{this.state.ordersSubTab === 'live' ? 'text-primary border-bottom border-primary border-3 rounded-0' : 'text-muted'}">
+                Live Orders
+            </button>
+        </li>
+        <li class="nav-item">
+            <button t-on-click="() => this.setOrdersSubTab('verification')" t-attf-class="nav-link bg-transparent border-0 fw-bold pb-2 fs-6 d-inline-flex align-items-center #{this.state.ordersSubTab === 'verification' ? 'text-warning border-bottom border-warning border-3 rounded-0' : 'text-muted'}">
+                Needs Verification
+                <span t-if="this.state.verificationCount &gt; 0" class="ms-2 fw-bold text-white" style="background-color: #ea580c; border-radius: 999px; min-width: 1.4rem; height: 1.4rem; padding: 0 0.4rem; font-size: 0.75rem; line-height: 1.4rem; display: inline-block; text-align: center;"><t t-esc="this.state.verificationCount"/></span>
+            </button>
+        </li>
+    </ul>
+  </div>
+  <t t-if="this.state.ordersSubTab === 'live'">
+  <t t-if="this.state.showSaleOrderForm">
+    <div class="p-4 bg-light border-bottom">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h4 class="fw-bold mb-0">Create Sales Order</h4>
+                <small class="text-muted">Place an order for a shop directly from the portal.</small>
+            </div>
+            <button type="button" class="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 32px; height: 32px;" t-on-click="closeSaleOrderForm" title="Close" aria-label="Close">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-5">
+                <label class="small fw-bold">Shop <span class="text-danger">*</span></label>
+                <select class="form-select" t-model="this.state.saleOrderForm.partner_id">
+                    <option value="">-- Select Shop --</option>
+                    <t t-foreach="this.state.lookupShops" t-as="shop" t-key="shop.id">
+                        <option t-att-value="shop.id"><t t-esc="shop.name"/></option>
+                    </t>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="small fw-bold">Order Date</label>
+                <input type="date" class="form-control" t-model="this.state.saleOrderForm.date_order"/>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button class="btn btn-success fw-bold text-white" t-on-click="saveSaleOrder" t-att-disabled="this.state.isSavingSaleOrder">
+                    <t t-if="this.state.isSavingSaleOrder">
+                        <span class="spinner-border spinner-border-sm me-2"/> Saving...
+                    </t>
+                    <t t-else="">Save Sales Order</t>
+                </button>
+            </div>
+        </div>
+        <div class="table-responsive bg-white rounded-3 border shadow-sm">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                    <tr>
+                        <th class="ps-3">Product</th>
+                        <th class="text-center" title="Warehouse on-hand quantity">On Hand</th>
+                        <th class="text-center">Qty</th>
+                        <th t-if="this.hasFinancialAccess" class="text-end">Unit Price</th>
+                        <th t-if="this.hasFinancialAccess">Tax</th>
+                        <th class="text-end pe-3">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-foreach="this.state.saleOrderForm.lines" t-as="line" t-key="line.id">
+                        <tr>
+                            <td class="ps-3">
+                                <select class="form-select form-select-sm" t-model="line.product_id" t-on-change="() => this.onSaleOrderProductChange(line)">
+                                    <option value="">-- Select Product --</option>
+                                    <t t-foreach="this.state.saleProducts" t-as="product" t-key="product.id">
+                                        <option t-att-value="product.id"><t t-esc="product.name"/></option>
+                                    </t>
+                                </select>
+                            </td>
+                            <td class="text-center">
+                                <t t-if="line.product_id">
+                                    <span t-attf-class="fw-bold #{(line.qty_available || 0) &lt;= 0 ? 'text-danger' : 'text-dark'}">
+                                        <t t-esc="this._formatQty(line.qty_available)"/>
+                                    </span>
+                                    <small class="text-muted ms-1" t-if="line.uom_name"><t t-esc="line.uom_name"/></small>
+                                </t>
+                                <t t-else="">
+                                    <span class="text-muted">—</span>
+                                </t>
+                            </td>
+                            <td class="text-center">
+                                <input type="number" min="1" step="any" class="form-control form-control-sm text-center" t-model="line.qty"/>
+                            </td>
+                            <td t-if="this.hasFinancialAccess" class="text-end">
+                                <input type="number" min="0" step="any" class="form-control form-control-sm text-end" t-model="line.price"/>
+                            </td>
+                            <td t-if="this.hasFinancialAccess">
+                                <select class="form-select form-select-sm" t-model="line.tax_id">
+                                    <option value="">No Tax</option>
+                                    <t t-foreach="this.state.saleTaxes" t-as="tax" t-key="tax.id">
+                                        <option t-att-value="tax.id"><t t-esc="tax.name"/></option>
+                                    </t>
+                                </select>
+                            </td>
+                            <td class="text-end pe-3">
+                                <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.removeSaleOrderLine(line.id)">Remove</button>
+                            </td>
+                        </tr>
+                    </t>
+                    <tr>
+                        <td t-att-colspan="this.hasFinancialAccess ? 6 : 4" class="ps-3 py-3">
+                            <button class="btn btn-sm btn-outline-primary fw-bold" t-on-click="addSaleOrderLine">
+                                <i class="fa fa-plus me-1"></i> Add Product Line
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+  </t>
+  <t t-elif="!this.state.selectedOrder">
+                       <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
+                        <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Search by Shop, Booker, or Order Ref..." 
+                               t-att-value="this.state.filters.orders.search" 
+                               t-on-input="(ev) => this.onSearchInput(ev, 'orders')"/>
+                        <small class="fw-bold text-muted" title="Filters for required data">Filters: </small>
+                        <select class="form-select form-select-sm" style="max-width: 200px;"
+                                t-model="this.state.filters.orders.booker"
+                                t-on-change="() => this.onFilterChange('orders')">
+                            <option value="all">All Order Bookers</option>
+                            <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
+                                <option t-att-value="b.id"><t t-esc="b.name"/></option>
+                            </t>
+                        </select>
+                        <select class="form-select form-select-sm" style="max-width: 240px;" 
+                                t-model="this.state.filters.orders.status" 
+                                t-on-change="() => this.onFilterChange('orders')">
+                            <option value="">All Order Statuses</option>
+                            <option value="Draft">Draft</option>
+                            <option value="To Invoice">To Invoice</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                        <button class="btn btn-sm btn-dark fw-bold text-white shadow-sm ms-auto" t-on-click="openSaleOrderForm">
+                            <i class="fa fa-plus me-1"></i> New Sales Order
+                        </button>
+                    </div>
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </t>
+                        <div class="p-0 table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="border-top-0 ps-4">Order Ref</th>
+                                        <th class="border-top-0">Shop Details</th>
+                                        <th class="border-top-0">Date</th>
+                                        <th class="border-top-0"><t t-if="this.hasFinancialAccess">Order Value</t><t t-else="">Units</t></th>
+                                        <th class="border-top-0">Status</th>
+                                        <th class="border-top-0 text-end pe-4">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="this.state.tableOrders.length === 0 and !this.state.isLoadingList">
+                                        <tr>
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shopping-cart opacity-50 mb-3"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                                                <p class="mb-1 fw-bold fs-5 text-dark">No live orders found.</p>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-foreach="this.state.tableOrders" t-as="ord" t-key="ord.id">
+                                        <tr>
+                                            <td class="ps-4 fw-bold align-middle text-dark"><t t-esc="ord.id"/></td>
+                                            <td class="align-middle">
+                                                <div class="text-dark fw-bold"><t t-esc="ord.shop"/></div>
+                                                <small class="text-muted">Shop ID: <t t-esc="ord.shopId"/> · Booker ID: <t t-esc="ord.bookerId"/> · <t t-esc="ord.booker"/></small>
+                                            </td>
+                                            <td class="align-middle text-nowrap text-muted fw-bold"><t t-esc="ord.date"/></td>
+                                            <td class="align-middle">
+                                                <div class="fw-bold fs-6">
+                                                    <t t-if="this.hasFinancialAccess"><t t-esc="ord.total"/></t>
+                                                    <t t-else=""><t t-esc="ord.items"/> units</t>
+                                                </div>
+                                            </td>
+                                            <td class="align-middle">
+                                                <span t-attf-class="badge #{ord.status === 'To Invoice' ? 'bg-warning text-dark' : ord.status === 'Invoiced' ? 'bg-info text-white' : ord.status === 'Delivered' ? 'bg-success text-white' : ord.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-secondary text-dark'} p-2 fs-6 shadow-sm"><t t-esc="ord.status"/></span>
+                                            </td>
+                                            <td class="align-middle text-end pe-4">
+                                                <button class="btn btn-sm btn-outline-dark fw-bold me-1" t-on-click="() => this.viewOrder(ord)">View Details →</button>
+                                                <button t-if="this.canCancelOrder(ord)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click.stop="() => this.requestCancelOrder(ord)" t-att-disabled="this.state.isCancellingOrder">Cancel</button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                            <small class="text-muted fw-bold">
+                                Showing <t t-esc="this.state.pagination.orders.total === 0 ? 0 : ((this.state.pagination.orders.page - 1) * this.state.pagination.orders.limit) + 1"/>
+                                to <t t-esc="Math.min(this.state.pagination.orders.page * this.state.pagination.orders.limit, this.state.pagination.orders.total)"/>
+                                of <t t-esc="this.state.pagination.orders.total"/>
+                            </small>
+                            <div class="btn-group shadow-sm">
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('orders', -1)" t-att-disabled="this.state.pagination.orders.page === 1">Prev</button>
+                                <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.orders.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.orders.total / this.state.pagination.orders.limit))"/></button>
+                                <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('orders', 1)" t-att-disabled="this.state.pagination.orders.page &gt;= Math.ceil(this.state.pagination.orders.total / this.state.pagination.orders.limit)">Next</button>
+                            </div>
+                        </div>
+                    </div>
+<!-- Close position-relative wrapper -->
+</t>
+
+<t t-else="">
+<div class="p-4" style="background-color: #f8fafc;">
+<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex align-items-center">
+    <button class="btn btn-sm btn-light border shadow-sm fw-bold text-dark d-flex align-items-center" t-on-click="closeOrder" title="Return to the live orders feed">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+            <path d="m12 19-7-7 7-7"/>
+            <path d="M19 12H5"/>
+        </svg>
+                                    Back to List
+    </button>
+</div>
+<div class="d-flex align-items-center">
+    <t t-if="this.state.selectedOrder.status === 'Draft'">
+        <button class="btn btn-sm btn-primary text-white shadow-sm fw-bold px-3 d-flex align-items-center me-2" t-on-click="confirmSelectedOrder" t-att-disabled="this.state.isConfirmingOrder" title="Confirm this draft sales order">
+            <t t-if="this.state.isConfirmingOrder">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Confirming...
+            </t>
+            <t t-else="">Confirm Order</t>
+        </button>
+    </t>
+    <t t-if="this.canCreateInvoice(this.state.selectedOrder)">
+        <button class="btn btn-sm btn-success text-white shadow-sm fw-bold px-3 d-flex align-items-center" t-on-click="createInvoice" t-att-disabled="this.state.isCreatingInvoice" title="Invoice ordered quantities and post. Required before assigning a delivery man.">
+            <t t-if="this.state.isCreatingInvoice">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Generating...
+            </t>
+            <t t-else="">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt me-1">
+                    <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/>
+                    <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>
+                    <path d="M12 17.5v-11"/>
+                </svg>
+                                            Create Invoice
+            </t>
+        </button>
+    </t>
+    <t t-if="this.canCancelOrder(this.state.selectedOrder)">
+        <button class="btn btn-sm btn-outline-danger fw-bold px-3 d-flex align-items-center ms-2" t-on-click="() => this.requestCancelOrder(this.state.selectedOrder)" t-att-disabled="this.state.isCancellingOrder" title="Cancel this order. Cancelled orders cannot be invoiced or delivered.">
+            <t t-if="this.state.isCancellingOrder">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Cancelling...
+            </t>
+            <t t-else="">Cancel Order</t>
+        </button>
+    </t>
+
+    <span t-attf-class="badge #{this.state.selectedOrder.status === 'Confirmed' ? 'bg-primary text-white' : this.state.selectedOrder.status === 'Delivered' ? 'bg-success text-white' : this.state.selectedOrder.status === 'Invoiced' ? 'bg-info text-white' : this.state.selectedOrder.status === 'To Invoice' ? 'bg-warning text-dark' : this.state.selectedOrder.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-secondary text-dark'} p-2 fs-6 text-uppercase shadow-sm ms-2" style="letter-spacing: 1px;">
+                                    Status: <t t-esc="this.state.selectedOrder.status"/>
+    </span>
+</div>
+</div>
+
+<div class="row mb-4">
+<div class="col-md-6 mb-3 mb-md-0">
+    <div class="card border-0 shadow-sm p-4 h-100 rounded-3">
+        <h6 class="text-muted text-uppercase small fw-bold mb-3">Customer Details</h6>
+        <h5 class="fw-bold text-dark mb-1">
+            <t t-esc="this.state.selectedOrder.shop"/>
+        </h5>
+        <p class="text-muted mb-1 small">
+            <strong>Shop ID:</strong>
+            <t t-esc="this.state.selectedOrder.shopId"/>
+        </p>
+        <p class="text-muted mb-1 small d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin me-1">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                <circle cx="12" cy="10" r="3"/>
+            </svg>
+            <t t-esc="this.state.selectedOrder.address"/>
+        </p>
+        <p class="text-muted mb-1 small d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-phone me-1">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            <t t-esc="this.state.selectedOrder.phone"/>
+        </p>
+        <p class="text-muted mb-0 small d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail me-1">
+                <rect width="20" height="16" x="2" y="4" rx="2"/>
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+            <t t-esc="this.state.selectedOrder.email"/>
+        </p>
+    </div>
+</div>
+
+<div class="col-md-6">
+    <div class="card border-0 shadow-sm p-4 h-100 rounded-3">
+        <h6 class="text-muted text-uppercase small fw-bold mb-3">Order Information</h6>
+        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+            <span class="text-muted small">Order Reference:</span>
+            <span class="fw-bold text-dark">
+                <t t-esc="this.state.selectedOrder.id"/>
+            </span>
+        </div>
+        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+            <span class="text-muted small">Order Date:</span>
+            <span class="fw-bold text-dark">
+                <t t-esc="this.state.selectedOrder.date"/>
+            </span>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span class="text-muted small">Field Booker:</span>
+            <span class="fw-bold text-dark">
+                <t t-esc="this.state.selectedOrder.booker"/>
+                <small class="text-muted ms-1">(ID: <t t-esc="this.state.selectedOrder.bookerId"/>
+)</small>
+            </span>
+        </div>
+    </div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3 mb-4 overflow-hidden">
+    <button type="button" class="btn w-100 text-start d-flex align-items-center justify-content-between p-3 bg-white border-0"
+            t-on-click="toggleShopSnapshot" title="Show or hide shop credit and sales history">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <h6 class="mb-0 fw-bold text-dark text-uppercase small">Shop Snapshot</h6>
+            <t t-if="this.state.selectedOrder.shopCategory">
+                <span t-attf-class="badge text-white #{this.state.selectedOrder.shopCategory === 'cash' ? 'bg-success' : 'bg-info'}">
+                    <t t-esc="this.state.selectedOrder.shopCategory === 'cash' ? 'Cash' : 'Credit'"/>
+                </span>
+            </t>
+            <t t-if="this.state.selectedOrder.verificationLabel">
+                <span t-attf-class="badge #{this.state.selectedOrder.approvalState === 'approved' ? 'bg-success text-white' : this.state.selectedOrder.approvalState === 'rejected' ? 'bg-danger text-white' : this.state.selectedOrder.approvalState === 'to_approve' ? 'bg-warning text-dark' : 'bg-light text-dark border'}">
+                    <t t-esc="this.state.selectedOrder.verificationLabel"/>
+                </span>
+            </t>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted"
+             t-att-style="this.state.shopSnapshotOpen ? 'transform: rotate(180deg); transition: transform 0.15s ease;' : 'transition: transform 0.15s ease;'">
+            <path d="m6 9 6 6 6-6"/>
+        </svg>
+    </button>
+    <t t-if="this.state.shopSnapshotOpen">
+        <div class="border-top p-4">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Credit &amp; Balance</h6>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted small">Shop Category</span>
+                        <span t-attf-class="badge text-white #{this.state.selectedOrder.shopCategory === 'cash' ? 'bg-success' : 'bg-info'}">
+                            <t t-esc="this.state.selectedOrder.shopCategory === 'cash' ? 'Cash' : 'Credit'"/>
+                        </span>
+                    </div>
+                    <t t-if="this.state.selectedOrder.shopCategory === 'credit'">
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="text-muted small">Shop Credit Limit</span>
+                            <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedOrder.creditLimit)"/></span>
+                        </div>
+                    </t>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted small">Posted Outstanding</span>
+                        <span t-attf-class="fw-bold #{this.state.selectedOrder.outstanding &gt; 0 ? 'text-danger' : ''}">
+                            <t t-esc="this._formatRs(this.state.selectedOrder.outstanding)"/>
+                        </span>
+                    </div>
+                    <t t-if="this.state.selectedOrder.shopCategory === 'credit'">
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="text-muted small">Shop Pending Orders</span>
+                            <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedOrder.pendingExposure)"/></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="text-muted small">Shop Confirmed (Not Invoiced)</span>
+                            <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedOrder.uninvoicedExposure)"/></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="text-muted small">Shop Effective Outstanding</span>
+                            <span t-attf-class="fw-bold #{this.state.selectedOrder.creditWouldExceed ? 'text-danger' : ''}">
+                                <t t-esc="this._formatRs(this.state.selectedOrder.effectiveOutstanding)"/>
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="text-muted small">Shop Credit Remaining</span>
+                            <span t-attf-class="fw-bold #{this.state.selectedOrder.creditWouldExceed ? 'text-warning' : ''}">
+                                <t t-esc="this._formatRs(this.state.selectedOrder.creditRemaining)"/>
+                            </span>
+                        </div>
+                        <t t-if="this.state.selectedOrder.creditWouldExceed">
+                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                <span class="text-muted small">Over Credit Limit By</span>
+                                <span class="fw-bold text-danger"><t t-esc="this._formatRs(this.state.selectedOrder.creditShortfall)"/></span>
+                            </div>
+                        </t>
+                    </t>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted small">Verification Status</span>
+                        <span t-attf-class="badge #{this.state.selectedOrder.approvalState === 'approved' ? 'bg-success text-white' : this.state.selectedOrder.approvalState === 'rejected' ? 'bg-danger text-white' : this.state.selectedOrder.approvalState === 'to_approve' ? 'bg-warning text-dark' : 'bg-light text-dark border'}">
+                            <t t-esc="this.state.selectedOrder.verificationLabel"/>
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Sales &amp; Discount History</h6>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted small">Shop Lifetime Sales</span>
+                        <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedOrder.lifetimeSales)"/></span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted small">Shop Confirmed Orders</span>
+                        <span class="fw-bold"><t t-esc="this.state.selectedOrder.confirmedOrderCount || 0"/></span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted small">Past Discounts Total</span>
+                        <span t-attf-class="fw-bold #{this.state.selectedOrder.pastDiscountTotal &gt; 0 ? 'text-danger' : ''}">
+                            <t t-esc="this._formatRs(this.state.selectedOrder.pastDiscountTotal)"/>
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted small">Past Discounted Orders</span>
+                        <span class="fw-bold"><t t-esc="this.state.selectedOrder.pastDiscountCount || 0"/></span>
+                    </div>
+                    <t t-if="this.state.selectedOrder.lastDiscountDate">
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="text-muted small">Last Discount Date</span>
+                            <span class="fw-bold"><t t-esc="this.state.selectedOrder.lastDiscountDate"/></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="text-muted small">Last Discount Amount</span>
+                            <span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedOrder.lastDiscountAmount)"/></span>
+                        </div>
+                    </t>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted small">Payment Terms</span>
+                        <span class="fw-bold text-muted"><t t-esc="this.state.selectedOrder.paymentTerms || 'Immediate'"/></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</div>
+
+<div class="card border-0 shadow-sm overflow-hidden rounded-3">
+<div class="bg-dark text-white p-3">
+    <h6 class="mb-0 fw-bold text-white">Order Line Items</h6>
+</div>
+<div class="table-responsive">
+    <table class="table table-borderless table-striped mb-0">
+        <thead class="border-bottom small text-muted text-uppercase fw-bold">
+            <tr>
+                <th class="ps-4">Product Description</th>
+                <th class="text-center">Quantity</th>
+                <th t-if="this.hasFinancialAccess" class="text-end">Unit Price</th>
+                <th t-if="this.hasFinancialAccess" class="text-center">Taxes</th>
+                <th t-if="this.hasFinancialAccess" class="text-end pe-4">Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            <t t-if="this.state.selectedOrder.lines.length === 0">
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">No order lines found. Data may still be syncing.</td>
+                </tr>
+            </t>
+            <t t-foreach="this.state.selectedOrder.lines" t-as="line" t-key="line.product">
+                <tr>
+                    <td class="ps-4 fw-bold text-dark">
+                        <t t-esc="line.product"/>
+                    </td>
+                    <td class="text-center">
+                        <t t-esc="line.qty"/>
+                        <small class="text-muted">
+                            <t t-esc="line.unit"/>
+                        </small>
+                    </td>
+                    <td t-if="this.hasFinancialAccess" class="text-end">Rs. <t t-esc="line.price"/>
+                    </td>
+                    <td t-if="this.hasFinancialAccess" class="text-center">
+                        <span class="badge bg-light border text-dark">
+                            <t t-esc="line.taxes"/>
+                        </span>
+                    </td>
+                    <td t-if="this.hasFinancialAccess" class="text-end pe-4 fw-bold">Rs. <t t-esc="line.subtotal"/>
+                    </td>
+                </tr>
+            </t>
+        </tbody>
+    </table>
+</div>
+
+<div class="bg-light p-4 border-top">
+    <div class="row justify-content-end">
+        <div class="col-md-5">
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">Total Products Requested:</span>
+                <span class="fw-bold">
+                    <t t-esc="this.state.selectedOrder.items"/>
+                </span>
+            </div>
+            <div t-if="this.hasFinancialAccess" class="d-flex justify-content-between mb-2 pt-2">
+                <span class="text-muted">Total Taxes:</span>
+                <span class="fw-bold">
+                    <t t-esc="this.state.selectedOrder.tax"/>
+                </span>
+            </div>
+            <div t-if="this.hasFinancialAccess" class="d-flex justify-content-between border-top pt-3 mt-2">
+                <span class="text-dark fw-bold text-uppercase">Grand Total:</span>
+                <h4 class="fw-bold text-success mb-0">
+                    <t t-esc="this.state.selectedOrder.total"/>
+                </h4>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+</div>
+</t>
+</t>
+  <t t-if="this.state.ordersSubTab === 'verification'">
+    <t t-if="!this.state.selectedOrder">
+        <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-2 align-items-center">
+            <input type="text" class="form-control form-control-sm" style="max-width: 280px;" placeholder="Search by Shop, Booker, or Order Ref..."
+                   t-att-value="this.state.filters.verification.search"
+                   t-on-input="(ev) => this.onSearchInput(ev, 'verification')"/>
+            <small class="fw-bold text-muted">Filters: </small>
+            <select class="form-select form-select-sm" style="max-width: 200px;"
+                    t-model="this.state.filters.verification.booker"
+                    t-on-change="() => this.onFilterChange('verification')">
+                <option value="all">All Order Bookers</option>
+                <t t-foreach="this.state.lookupBookers" t-as="b" t-key="b.id">
+                    <option t-att-value="b.id"><t t-esc="b.name"/></option>
+                </t>
+            </select>
+            <select class="form-select form-select-sm" style="max-width: 220px;"
+                    t-model="this.state.filters.verification.reason"
+                    t-on-change="() => this.onFilterChange('verification')">
+                <option value="all">All Reasons</option>
+                <option value="discount">Discount</option>
+                <option value="credit">Credit Limit</option>
+                <option value="both">Discount + Credit</option>
+            </select>
+        </div>
+        <div class="position-relative">
+            <t t-if="this.state.isLoadingList">
+                <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            </t>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="bg-light text-uppercase small fw-bold text-muted">
+                        <tr>
+                            <th class="ps-4 border-top-0">Order Ref</th>
+                            <th class="border-top-0">Shop &amp; Booker</th>
+                            <th class="border-top-0">Verification Reasons</th>
+                            <th t-if="this.hasFinancialAccess" class="border-top-0">Discount / Net</th>
+                            <th class="border-top-0 text-end pe-4">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-if="this.state.tableVerification.length === 0 and !this.state.isLoadingList">
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <p class="mb-1 fw-bold fs-5 text-dark">No orders pending verification.</p>
+                                    <small>Discounted prices or credit-limit exceedances appear here for approval.</small>
+                                </td>
+                            </tr>
+                        </t>
+                        <t t-foreach="this.state.tableVerification" t-as="ord" t-key="ord.odoo_id">
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark"><t t-esc="ord.id"/></td>
+                                <td>
+                                    <div class="fw-bold text-dark"><t t-esc="ord.shop"/></div>
+                                    <small class="text-muted"><t t-esc="ord.booker"/></small>
+                                </td>
+                                <td>
+                                    <span t-if="ord.needsDiscount" class="badge bg-warning text-dark me-1">Discount</span>
+                                    <span t-if="ord.needsCredit" class="badge bg-danger text-white">Credit Limit</span>
+                                </td>
+                                <td t-if="this.hasFinancialAccess">
+                                    <div class="text-danger fw-bold" t-if="ord.rawDiscountAmount &gt; 0"><t t-esc="ord.discountAmount"/></div>
+                                    <div class="fw-bold text-dark"><t t-esc="ord.total"/></div>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewOrder(ord)">Review ➔</button>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                <small class="text-muted fw-bold">
+                    Showing <t t-esc="this.state.pagination.verification.total === 0 ? 0 : ((this.state.pagination.verification.page - 1) * this.state.pagination.verification.limit) + 1"/>
+                    to <t t-esc="Math.min(this.state.pagination.verification.page * this.state.pagination.verification.limit, this.state.pagination.verification.total)"/>
+                    of <t t-esc="this.state.pagination.verification.total"/>
+                </small>
+                <div class="btn-group shadow-sm">
+                    <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('verification', -1)" t-att-disabled="this.state.pagination.verification.page === 1">Prev</button>
+                    <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.verification.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.verification.total / this.state.pagination.verification.limit))"/></button>
+                    <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('verification', 1)" t-att-disabled="this.state.pagination.verification.page &gt;= Math.ceil(this.state.pagination.verification.total / this.state.pagination.verification.limit)">Next</button>
+                </div>
+            </div>
+        </div>
+    </t>
+    <t t-else="">
+        <div class="p-4" style="background-color: #f8fafc;">
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                <button class="btn btn-sm btn-light border shadow-sm fw-bold text-dark d-flex align-items-center" t-on-click="closeOrder">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left me-1">
+                        <path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>
+                    </svg>
+                    Back to Verification Queue
+                </button>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="openRejectModal" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">Reject</button>
+                    <button class="btn btn-sm btn-success text-white fw-bold" t-on-click="approveSelectedOrder" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">
+                        <t t-if="this.state.isApprovingOrder"><span class="spinner-border spinner-border-sm me-1"/> Approving...</t>
+                        <t t-else="">Approve Order</t>
+                    </button>
+                </div>
+            </div>
+            <div class="alert alert-warning border-0 shadow-sm rounded-3">
+                <div class="fw-bold mb-1">Verification required</div>
+                <div class="small mb-2">
+                    <span t-if="this.state.selectedOrder.needsDiscount" class="badge bg-warning text-dark me-1">Discount below sale price</span>
+                    <span t-if="this.state.selectedOrder.needsCredit" class="badge bg-danger text-white">Credit limit exceeded</span>
+                </div>
+                <t t-if="this.state.selectedOrder.discountReasons">
+                    <div class="small">Discount reason: <t t-esc="this.state.selectedOrder.discountReasons"/></div>
+                </t>
+            </div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm p-4 h-100 rounded-3">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3">Order</h6>
+                        <h5 class="fw-bold mb-1"><t t-esc="this.state.selectedOrder.shop"/></h5>
+                        <p class="text-muted small mb-1">Booker: <t t-esc="this.state.selectedOrder.booker"/></p>
+                        <p class="text-muted small mb-0">Ref: <t t-esc="this.state.selectedOrder.id"/> · <t t-esc="this.state.selectedOrder.date"/></p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm p-4 h-100 rounded-3">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3">Amounts &amp; Credit</h6>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Catalog total</span><span class="fw-bold"><t t-esc="this.state.selectedOrder.catalogTotal"/></span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Discount requested</span><span class="fw-bold text-danger"><t t-esc="this.state.selectedOrder.discountAmount"/></span></div>
+                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom"><span class="text-muted small">Net order</span><span class="fw-bold text-success"><t t-esc="this.state.selectedOrder.total"/></span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Credit limit</span><span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedOrder.creditLimit)"/></span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Outstanding</span><span class="fw-bold"><t t-esc="this._formatRs(this.state.selectedOrder.outstanding)"/></span></div>
+                        <div class="d-flex justify-content-between"><span class="text-muted small">Over limit by</span><span t-attf-class="fw-bold #{this.state.selectedOrder.creditShortfall &gt; 0 ? 'text-danger' : 'text-success'}"><t t-esc="this._formatRs(this.state.selectedOrder.creditShortfall)"/></span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm overflow-hidden rounded-3">
+                <div class="bg-dark text-white p-3"><h6 class="mb-0 fw-bold text-white">Order Line Items</h6></div>
+                <div class="table-responsive">
+                    <table class="table table-borderless table-striped mb-0">
+                        <thead class="border-bottom small text-muted text-uppercase fw-bold">
+                            <tr>
+                                <th class="ps-4">Product</th>
+                                <th class="text-center">Qty</th>
+                                <th t-if="this.hasFinancialAccess" class="text-end">Catalog</th>
+                                <th t-if="this.hasFinancialAccess" class="text-end">Unit Price</th>
+                                <th t-if="this.hasFinancialAccess" class="text-end pe-4">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-if="this.state.selectedOrder.lines.length === 0">
+                                <tr><td colspan="5" class="text-center text-muted py-4">No order lines found.</td></tr>
+                            </t>
+                            <t t-foreach="this.state.selectedOrder.lines" t-as="line" t-key="line.product">
+                                <tr>
+                                    <td class="ps-4 fw-bold text-dark">
+                                        <t t-esc="line.product"/>
+                                        <span t-if="line.hasDiscount" class="badge bg-warning text-dark ms-2">Discounted</span>
+                                        <div t-if="line.discountReason" class="small text-muted fw-normal"><t t-esc="line.discountReason"/></div>
+                                    </td>
+                                    <td class="text-center"><t t-esc="line.qty"/> <small class="text-muted"><t t-esc="line.unit"/></small></td>
+                                    <td t-if="this.hasFinancialAccess" class="text-end">Rs. <t t-esc="line.catalogPrice"/></td>
+                                    <td t-if="this.hasFinancialAccess" t-attf-class="text-end #{line.hasDiscount ? 'text-danger fw-bold' : ''}">Rs. <t t-esc="line.price"/></td>
+                                    <td t-if="this.hasFinancialAccess" class="text-end pe-4 fw-bold">Rs. <t t-esc="line.subtotal"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </t>
+  </t>
+</t>
+<t t-if="this.state.showRejectModal">
+<div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background: rgba(15, 23, 42, 0.6); z-index: 1060; backdrop-filter: blur(4px);">
+    <div class="card border-0 shadow-lg rounded-4" style="width: 100%; max-width: 520px;">
+        <div class="bg-danger text-white p-3 d-flex justify-content-between align-items-center rounded-top-4">
+            <h5 class="mb-0 fw-bold text-white">Reject Order</h5>
+            <button class="btn btn-sm btn-light" t-on-click="closeRejectModal"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="p-4">
+            <p class="text-muted small">The order booker will see this reason. The order will be cancelled.</p>
+            <label class="small fw-bold">Rejection reason <span class="text-danger">*</span></label>
+            <textarea class="form-control mb-3" rows="4" t-model="this.state.rejectReason" placeholder="Explain why this order or discount is rejected..."></textarea>
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-light border fw-bold" t-on-click="closeRejectModal">Cancel</button>
+                <button class="btn btn-danger fw-bold text-white" t-on-click="rejectSelectedOrder" t-att-disabled="this.state.isRejectingOrder">
+                    <t t-if="this.state.isRejectingOrder">Rejecting...</t>
+                    <t t-else="">Confirm Rejection</t>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+</t>
+
+<t t-if="this.state.showCreditOverride">
+<div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background: rgba(15, 23, 42, 0.6); z-index: 1060; backdrop-filter: blur(4px);">
+    <div class="card border-0 shadow-lg rounded-4" style="width: 100%; max-width: 560px;">
+        <div class="bg-danger text-white p-3 rounded-top-4">
+            <h5 class="mb-0 fw-bold text-white">Credit Limit Exceeded</h5>
+        </div>
+        <div class="p-4">
+            <p class="small text-muted">This order would push <strong><t t-esc="this.state.creditOverride.shop"/></strong> above its credit limit. Increase the limit or proceed with an override note.</p>
+            <div class="bg-light rounded-3 p-3 mb-3 small">
+                <div class="d-flex justify-content-between mb-1"><span>Order amount</span><span class="fw-bold"><t t-esc="this._formatRs(this.state.creditOverride.orderAmount)"/></span></div>
+                <div class="d-flex justify-content-between mb-1"><span>Credit limit</span><span class="fw-bold"><t t-esc="this._formatRs(this.state.creditOverride.creditLimit)"/></span></div>
+                <div class="d-flex justify-content-between mb-1"><span>Outstanding</span><span class="fw-bold"><t t-esc="this._formatRs(this.state.creditOverride.outstanding)"/></span></div>
+                <div class="d-flex justify-content-between"><span>Over limit by</span><span class="fw-bold text-danger"><t t-esc="this._formatRs(this.state.creditOverride.shortfall)"/></span></div>
+            </div>
+            <label class="small fw-bold">New credit limit (optional)</label>
+            <input type="number" min="0" step="any" class="form-control mb-3" t-model="this.state.creditOverride.newLimit" placeholder="Leave blank to keep the current limit"/>
+            <label class="small fw-bold">Override note (optional)</label>
+            <textarea class="form-control mb-3" rows="3" t-model="this.state.creditOverride.note" placeholder="Reason for approving above the credit limit"></textarea>
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-light border fw-bold" t-on-click="closeCreditOverride">Cancel</button>
+                <button class="btn btn-danger fw-bold text-white" t-on-click="proceedCreditOverride" t-att-disabled="this.state.isProcessingOverride">
+                    <t t-if="this.state.isProcessingOverride">Processing...</t>
+                    <t t-else="">Proceed Anyway</t>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+</t>
+
+        <t t-if="this.state.confirmModal.isOpen">
+            <ConfirmModal
+                title="this.state.confirmModal.title"
+                message="this.state.confirmModal.message"
+                onConfirm="this.state.confirmModal.onConfirm"
+                onCancel="() => this.closeConfirm()"
+            />
+        </t>
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.FinancialsCashActivity" owl="1">
+            <t t-if="this.state.activeSubTab === 'cash'">
+                <div class="p-3 border-bottom bg-light">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                        <div>
+                            <h3 class="fw-bold text-dark mb-0">Cash Activity</h3>
+                            <small class="text-muted">Money in and out across bank &amp; cash journals.</small>
+                        </div>
+                       <button class="btn btn-sm btn-outline-secondary fw-bold bg-white" t-on-click="() => this.requestTabSwitch('financials', 'money')">
+                            Back to Money Overview
+                        </button>
+                    </div>
+                </div>
+                <div class="p-3">
+                    <BankTransactions t-props="{ embedded: true, initialDirection: this.state.cashDirection }"/>
+                </div>
+            </t>
+    </t>
+</templates>

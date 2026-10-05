@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.FinancialsPnl" owl="1">
+            <t t-if="this.state.activeSubTab === 'pnl'">
+                <!-- P&L Header & Date Filters -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center p-3 bg-light border-bottom gap-3">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-0">Trading Profit &amp; Loss</h5>
+                        <small class="text-muted">Analyzes invoiced sales vs product cost over your selected period.</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 bg-white p-2 rounded-3 shadow-sm border">
+                        <span class="text-muted fw-bold small text-uppercase ms-1">Period:</span>
+                        <input type="date" class="form-control form-control-sm border-0 bg-light" style="width: 140px;" t-model="this.state.pnl.date_from" t-att-max="this.todayStr"/>
+                        <span class="text-muted small">to</span>
+                        <input type="date" class="form-control form-control-sm border-0 bg-light" style="width: 140px;" t-model="this.state.pnl.date_to" t-att-max="this.todayStr"/>
+                        <button class="btn btn-sm btn-dark fw-bold px-3 ms-2" t-on-click="() => this.fetchPnlData()" t-att-disabled="this.state.pnl.isLoading">
+                            <span t-if="this.state.pnl.isLoading" class="spinner-border spinner-border-sm me-1"/>
+                            <i t-else="" class="fa fa-refresh me-1"></i> Refresh
+                        </button>
+                        <div class="vr mx-1"></div>
+                        <button class="btn btn-sm btn-outline-danger fw-bold px-3 text-nowrap bg-white" t-on-click="() => this.printManufacturerSummary()">
+                            <i class="fa fa-file-pdf-o me-1"></i> Mfr. Summary
+                        </button>
+                    </div>
+                </div>
+
+                <!-- P&L Stats Cards -->
+                <div class="p-4 bg-light">
+                    <!-- Modern P&L Stats Grid (Fixed Layout) -->
+                    <div class="row g-4 mb-4">
+
+                        <!-- Net Sales -->
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm h-100 rounded-4 overflow-hidden position-relative">
+                                <div class="position-absolute top-0 start-0 w-100" style="height: 4px; background: linear-gradient(90deg, #3b82f6, #60a5fa);"></div>
+                                <div class="card-body p-4">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <span class="fw-bold text-muted text-uppercase tracking-wider small d-block mb-1">Net Sales Revenue</span>
+                                            <h3 class="fw-bold text-dark mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_net_sales ? this.state.pnl.stats.amount_net_sales.toLocaleString() : '0'"/></h3>
+                                        </div>
+                                        <div class="text-black rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px;">
+                                            <i class="fa fa-line-chart fs-5"></i>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-3">
+                                        <small class="text-muted"><i class="fa fa-arrow-up text-success me-1"></i> Inv: <t t-esc="this.state.pnl.stats.amount_invoiced ? this.state.pnl.stats.amount_invoiced.toLocaleString() : '0'"/></small>
+                                        <small class="text-muted"><i class="fa fa-arrow-down text-danger me-1"></i> Cred: <t t-esc="this.state.pnl.stats.amount_credit_notes ? this.state.pnl.stats.amount_credit_notes.toLocaleString() : '0'"/></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- COGS -->
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm h-100 rounded-4 overflow-hidden position-relative">
+                                <div class="position-absolute top-0 start-0 w-100" style="height: 4px; background: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+                                <div class="card-body p-4">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <span class="fw-bold text-muted text-uppercase tracking-wider small d-block mb-1">Cost of Goods (COGS)</span>
+                                            <h3 class="fw-bold text-dark mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_cogs ? this.state.pnl.stats.amount_cogs.toLocaleString() : '0'"/></h3>
+                                        </div>
+                                        <div class="text-black rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px; ">
+                                            <i class="fa fa-archive fs-5"></i>
+                                        </div>
+                                    </div>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class="text-muted"><i class="fa fa-info-circle me-1"></i> Cost value of products sold net of returns.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gross Profit -->
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm h-100 rounded-4 overflow-hidden position-relative">
+                                <div class="position-absolute top-0 start-0 w-100" t-attf-style="height: 4px; background: linear-gradient(90deg, #{this.state.pnl.stats.amount_gross_profit &lt; 0 ? '#ef4444, #f87171' : '#10b981, #34d399'});"></div>
+                                <div class="card-body p-4">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <span class="fw-bold text-muted text-uppercase tracking-wider small d-block mb-1">Gross Profit</span>
+                                            <h3 t-attf-class="fw-bold mb-0 #{this.state.pnl.stats.amount_gross_profit &lt; 0 ? 'text-danger' : 'text-success'}">
+                                                Rs. <t t-esc="this.state.pnl.stats.amount_gross_profit ? this.state.pnl.stats.amount_gross_profit.toLocaleString() : '0'"/>
+                                            </h3>
+                                        </div>
+                                        <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm text-black" style="width: 45px; height: 45px; ">
+                                            <i class="fa fa-money fs-5"></i>
+                                        </div>
+                                    </div>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class="text-muted"><i class="fa fa-calculator me-1"></i> Net Sales minus Cost of Goods.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Operating Expenses -->
+                        <div class="col-md-6">
+                            <div class="card bg-white border-0 shadow-sm h-100 rounded-4 overflow-hidden position-relative">
+                                <div class="position-absolute top-0 start-0 w-100" style="height: 4px; background: linear-gradient(90deg, #6b7280, #9ca3af);"></div>
+                                <div class="card-body p-4">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <span class="fw-bold text-muted text-uppercase tracking-wider small d-block mb-1">Operating Expenses</span>
+                                            <h3 class="fw-bold text-dark mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_operating_expense ? this.state.pnl.stats.amount_operating_expense.toLocaleString() : '0'"/></h3>
+                                        </div>
+                                        <div class="text-black rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px;">
+                                            <i class="fa fa-credit-card fs-5"></i>
+                                        </div>
+                                    </div>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class="text-muted"><t t-esc="this.state.pnl.stats.expense_count || 0"/> posted expenses in this period.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Net Profit -->
+                        <div class="col-md-6">
+                            <div class="card  border-0 shadow-sm h-100 rounded-4 overflow-hidden position-relative text-white">
+                                <div class="position-absolute top-0 start-0 w-100" t-attf-style="height: 4px; background: linear-gradient(90deg, #{this.state.pnl.stats.amount_net_profit &lt; 0 ? '#ef4444, #f87171' : '#10b981, #34d399'});"></div>
+                                <div class="card-body p-4">
+                                    <div class="d-flex justify-content-between  align-items-start mb-3">
+                                        <div>
+                                            <span class="fw-bold text-muted text-uppercase tracking-wider small d-block mb-1">Net Profit (Bottom Line)</span>
+                                            <h2 t-attf-class="fw-bold mb-0 #{this.state.pnl.stats.amount_net_profit &lt; 0 ? 'text-danger' : 'text-success'}">
+                                                Rs. <t t-esc="this.state.pnl.stats.amount_net_profit ? this.state.pnl.stats.amount_net_profit.toLocaleString() : '0'"/>
+                                            </h2>
+                                        </div>
+                                        <div class="bg-white rounded-circle d-flex align-items-center justify-content-center shadow-sm text-dark" style="width: 45px; height: 45px;">
+                                            <i class="fa fa-line-chart fs-5"></i>
+                                        </div>
+                                    </div>
+                                    <div class="pt-2 border-top  border-secondary mt-3">
+                                        <small class="text-muted opacity-75">Gross Profit minus Operating Expenses.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stock Purchased -->
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4 d-flex flex-row align-items-center">
+                                <div class="text-black rounded-3 p-3 me-3">
+                                    <i class="fa fa-industry fs-4"></i>
+                                </div>
+                                <div>
+                                    <small class="fw-bold text-muted text-uppercase tracking-wider d-block mb-1">Stock Purchased (period)</small>
+                                    <h4 class="fw-bold text-dark mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_manufacturer_payable ? this.state.pnl.stats.amount_manufacturer_payable.toLocaleString() : '0'"/></h4>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class="text-muted mb-1">Total Stock Purchased in selected date range</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payments Collected -->
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4 d-flex flex-row align-items-center">
+                                <div class="text-black rounded-3 p-3 me-3">
+                                    <i class="fa fa-check-circle fs-4"></i>
+                                </div>
+                                <div>
+                                    <small class="fw-bold text-muted text-uppercase tracking-wider d-block mb-1">Payments Collected</small>
+                                    <h4 class="fw-bold text-info mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_payments_received ? this.state.pnl.stats.amount_payments_received.toLocaleString() : '0'"/></h4>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class="text-muted mb-1">Total Payments Collected in selected date range</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Shop AR -->
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm p-3 h-100 rounded-4 d-flex flex-row align-items-center">
+                                <div class="text-black rounded-3 p-3 me-3">
+                                    <i class="fa fa-users fs-4"></i>
+                                </div>
+                                <div>
+                                    <small class="fw-bold text-muted text-uppercase tracking-wider d-block mb-1">Total Shop AR</small>
+                                    <h4 class="fw-bold text-danger mb-0">Rs. <t t-esc="this.state.pnl.stats.amount_shop_outstanding ? this.state.pnl.stats.amount_shop_outstanding.toLocaleString() : '0'"/></h4>
+                                    <div class="pt-2 border-top mt-3">
+                                        <small class="text-muted mb-1">Total Outstanding Amount from Shops</small>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Table -->
+                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mt-4">
+
+                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h6 class="fw-bold text-dark mb-0">Profitability by Product Breakdown</h6>
+                            <div class="d-flex align-items-center gap-2">
+                                <select class="form-select form-select-sm shadow-sm" style="min-width: 250px;" t-model="this.state.pnl.selectedProductLineId">
+                                    <option value="">-- View All Products --</option>
+                                    <t t-foreach="this.state.pnl.lines" t-as="l" t-key="l.id">
+                                        <option t-att-value="l.id">
+                                            <t t-esc="l.product"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                        </div>
+
+                        <t t-if="this.state.pnl.selectedProductLineId and this.displayPnlLines.length > 0">
+                            <t t-set="selLine" t-value="this.displayPnlLines[0]" />
+                            <div class="bg-light p-4 border-bottom shadow-inner">
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="bg-primary text-white rounded p-2 me-3 shadow-sm d-flex align-items-center justify-content-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-box">
+                                            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                                            <path d="m3.3 7 8.7 5 8.7-5"/>
+                                            <path d="M12 22V12"/>
+                                        </svg>
+                                    </div>
+                                    <h5 class="fw-bold text-primary mb-0">
+                                        <t t-esc="selLine.product"/> Analysis</h5>
+                                </div>
+                                <div class="row g-3 text-center align-items-center">
+                                    <div class="col-md-2 col-6 border-end">
+                                        <small class="text-muted fw-bold text-uppercase d-block mb-1">Invoiced</small>
+                                        <span class="fs-5 fw-bold text-dark">
+                                            <t t-esc="selLine.qty_invoiced"/> Units</span>
+                                    </div>
+                                    <div class="col-md-2 col-6 border-end">
+                                        <small class="text-muted fw-bold text-uppercase d-block mb-1">Refunded</small>
+                                        <span class="fs-5 fw-bold text-danger">
+                                            <t t-esc="selLine.qty_credited"/> Units</span>
+                                    </div>
+                                    <div class="col-md-3 col-6 border-end">
+                                        <small class="text-muted fw-bold text-uppercase d-block mb-1">Net Sales</small>
+                                        <span class="fs-5 fw-bold text-dark">Rs. <t t-esc="selLine.net_sales"/></span>
+                                    </div>
+                                    <div class="col-md-2 col-6 border-end">
+                                        <small class="text-muted fw-bold text-uppercase d-block mb-1">COGS</small>
+                                        <span class="fs-5 fw-bold text-warning">Rs. <t t-esc="selLine.cogs"/></span>
+                                    </div>
+                                    <div class="col-md-3 col-12">
+                                        <small class="text-muted fw-bold text-uppercase d-block mb-1">Net Profit</small>
+                                        <span t-attf-class="fs-3 fw-bold #{selLine.rawProfit &lt; 0 ? 'text-danger' : 'text-success'}">Rs. <t t-esc="selLine.profit"/></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-4 py-3">Product</th>
+                                        <th class="text-center">Qty Invoiced</th>
+                                        <th class="text-center">Qty Credited</th>
+                                        <th class="text-end">Net Sales</th>
+                                        <th class="text-end">COGS</th>
+                                        <th class="text-end pe-4">Profit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="this.state.pnl.isLoading">
+                                        <tr>
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                <span class="spinner-border text-secondary mb-3 d-block mx-auto"></span> Crunching Numbers...</td>
+                                        </tr>
+                                    </t>
+                                    <t t-elif="!this.displayPnlLines || this.displayPnlLines.length === 0">
+                                        <tr>
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                <i class="fa fa-bar-chart fs-1 mb-3 opacity-50"></i>
+                                                <p class="mb-1 fw-bold fs-5 text-dark">No trading activity found.</p>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-foreach="this.paginatedPnlLines" t-as="l" t-key="l.id">
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-dark">
+                                                <t t-esc="l.product"/>
+                                            </td>
+                                            <td class="text-center text-primary fw-bold">
+                                                <t t-esc="l.qty_invoiced"/>
+                                            </td>
+                                            <td class="text-center text-danger">
+                                                <t t-esc="l.qty_credited"/>
+                                            </td>
+                                            <td class="text-end fw-bold text-dark">Rs. <t t-esc="l.net_sales"/></td>
+                                            <td class="text-end fw-bold text-warning">Rs. <t t-esc="l.cogs"/></td>
+                                            <td t-attf-class="text-end pe-4 fw-bold #{l.rawProfit &lt; 0 ? 'text-danger' : 'text-success'}">Rs. <t t-esc="l.profit"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                            <div class="p-2 border-top d-flex justify-content-between align-items-center bg-light">
+                                <small class="text-muted fw-bold">Pg <t t-esc="this.state.pnl.page"/> of <t t-esc="Math.max(1, Math.ceil(this.displayPnlLines.length / this.state.pnl.limit))"/></small>
+                                <div class="btn-group shadow-sm">
+                                    <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changeTransientPage('pnl', -1)">Prev</button>
+                                    <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changeTransientPage('pnl', 1)">Next</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </t>
+    </t>
+</templates>

@@ -84,6 +84,12 @@ class ShahtajGpsAttempt(models.Model):
         ondelete='set null',
         index=True,
     )
+    sale_order_id = fields.Many2one(
+        'sale.order',
+        string='Sales Order',
+        ondelete='set null',
+        index=True,
+    )
     dm_delivery_id = fields.Many2one(
         'shahtaj.dm.delivery',
         string='Delivery Job',
@@ -137,6 +143,7 @@ class ShahtajGpsAttempt(models.Model):
         user=None,
         visit_task=None,
         visit=None,
+        sale_order=None,
         dm_delivery=None,
         role=None,
     ):
@@ -150,7 +157,7 @@ class ShahtajGpsAttempt(models.Model):
             'distance_m': float(distance_m or 0.0),
             'min_distance_m': float(min_distance_m or 0.0),
             'max_distance_m': float(max_distance_m or 0.0),
-            'message': (message or '')[:512],
+            'message': str(message or '')[:512],
             'company_id': self.env.company.id,
         }
         if shop:
@@ -165,6 +172,8 @@ class ShahtajGpsAttempt(models.Model):
             vals['visit_task_id'] = visit_task.id
         if visit:
             vals['visit_id'] = visit.id
+        if sale_order:
+            vals['sale_order_id'] = sale_order.id
         if dm_delivery:
             vals['dm_delivery_id'] = dm_delivery.id
         return vals
@@ -185,6 +194,7 @@ class ShahtajGpsAttempt(models.Model):
         user=None,
         visit_task=None,
         visit=None,
+        sale_order=None,
         dm_delivery=None,
         role=None,
     ):
@@ -208,6 +218,7 @@ class ShahtajGpsAttempt(models.Model):
                 user=user,
                 visit_task=visit_task,
                 visit=visit,
+                sale_order=sale_order,
                 dm_delivery=dm_delivery,
                 role=role,
             )
@@ -225,3 +236,221 @@ class ShahtajGpsAttempt(models.Model):
                 'Failed to persist shahtaj.gps.attempt (%s / %s)', purpose, result,
             )
             return self.browse()
+
+    def _stamp_create_date(self, when):
+        """Set create_date so historical backfill sorts with the original visit."""
+        if not self or not when:
+            return
+        self.env.cr.execute(
+            "UPDATE shahtaj_gps_attempt SET create_date = %s WHERE id IN %s",
+            (when, tuple(self.ids)),
+        )
+        self.invalidate_recordset(['create_date'])
+
+    @api.model
+    def promote_checkin_to_place_order(self, visit, sale_order=None):
+        """One successful GPS row per booker visit.
+
+        Check-in creates the row with purpose ``check_in``. Placing the order
+        updates that same row to ``place_order`` and drops any extra OK
+        place-order row for the visit. Blocked attempts are left as-is.
+        """
+        visit = visit.sudo() if visit else visit
+        if not visit or visit.visit_kind == 'delivery_man':
+            return self.browse()
+        order = sale_order or visit.sale_order_id
+        checkins = self.sudo().search([
+            ('visit_id', '=', visit.id),
+            ('purpose', '=', 'check_in'),
+            ('result', '=', 'ok'),
+        ], order='id desc')
+        place_rows = self.sudo().search([
+            ('visit_id', '=', visit.id),
+            ('purpose', '=', 'place_order'),
+            ('result', '=', 'ok'),
+        ], order='id desc')
+        if not checkins and not place_rows:
+            return self.browse()
+        target = checkins[:1] or place_rows[:1]
+        latest_place = place_rows[:1]
+        vals = {'purpose': 'place_order'}
+        if order:
+            vals['sale_order_id'] = order.id
+        if visit.place_order_latitude or visit.place_order_longitude:
+            vals.update({
+                'attempt_latitude': visit.place_order_latitude or 0.0,
+                'attempt_longitude': visit.place_order_longitude or 0.0,
+                'distance_m': visit.place_order_distance_m or 0.0,
+            })
+        elif latest_place and latest_place != target:
+            vals.update({
+                'attempt_latitude': latest_place.attempt_latitude,
+                'attempt_longitude': latest_place.attempt_longitude,
+                'distance_m': latest_place.distance_m,
+                'message': latest_place.message,
+            })
+        target.write(vals)
+        (checkins - target).unlink()
+        (place_rows - target).unlink()
+        return target
+
+    @api.model
+    def collapse_placed_order_checkins(self):
+        """Merge existing Check-in + Place Order pairs into one Place Order row."""
+        visits = self.sudo().search([
+            ('result', '=', 'ok'),
+            ('purpose', 'in', ('check_in', 'place_order')),
+            ('visit_id', '!=', False),
+            ('visit_id.visit_kind', '!=', 'delivery_man'),
+        ]).mapped('visit_id')
+        for visit in visits:
+            has_place = self.sudo().search_count([
+                ('visit_id', '=', visit.id),
+                ('purpose', '=', 'place_order'),
+                ('result', '=', 'ok'),
+            ])
+            if visit.sale_order_id or has_place:
+                self.promote_checkin_to_place_order(visit, visit.sale_order_id)
+        return True
+
+    @api.model
+    def backfill_from_existing_visits(self):
+        """Create GPS log rows for visits that predate shahtaj.gps.attempt.
+
+        Shop Check-ins only reads this model, so older successful check-ins
+        would otherwise disappear after the GPS update.
+        A booker visit that placed an order gets one Place Order row.
+        Idempotent: an existing row for that visit is reused, not duplicated.
+        """
+        Visit = self.env['shahtaj.visit'].sudo()
+        limits = {}
+        try:
+            from .shahtaj_gps import get_shop_distance_limits
+            limits = get_shop_distance_limits(self.env) or {}
+        except Exception:  # noqa: BLE001
+            limits = {}
+        min_m = float(limits.get('min_m') or 0.0)
+        max_m = float(limits.get('max_m') or 0.0)
+
+        logged_checkin = set(
+            self.sudo().search([('purpose', '=', 'check_in'), ('visit_id', '!=', False)]).mapped('visit_id').ids
+        )
+        logged_place = set(
+            self.sudo().search([('purpose', '=', 'place_order'), ('visit_id', '!=', False)]).mapped('visit_id').ids
+        )
+        visits = Visit.search([], order='id asc')
+        created = self.browse()
+        for visit in visits:
+            try:
+                created |= self._backfill_one_visit(
+                    visit, logged_checkin, logged_place, min_m, max_m,
+                )
+            except Exception:  # noqa: BLE001 — one bad visit must not drop the rest
+                _logger.exception('GPS backfill skipped visit %s', visit.id)
+
+        created |= self._backfill_visitless_shop_orders(min_m, max_m)
+        return created
+
+    def _backfill_one_visit(self, visit, logged_checkin, logged_place, min_m, max_m):
+        created = self.browse()
+        shop = visit.shop_id.sudo()
+        user = visit.order_booker_id
+        role = 'order_booker'
+        if visit.visit_kind == 'delivery_man' and visit.delivery_man_id:
+            user = visit.delivery_man_id
+            role = 'delivery_man'
+        if not user:
+            return created
+        company_id = (
+            shop.company_id.id
+            or user.company_id.id
+            or self.env.company.id
+        )
+        base_vals = {
+            'user_id': user.id,
+            'role': role,
+            'shop_id': shop.id if shop else False,
+            'shop_latitude': shop.partner_latitude or 0.0 if shop else 0.0,
+            'shop_longitude': shop.partner_longitude or 0.0 if shop else 0.0,
+            'min_distance_m': min_m,
+            'max_distance_m': max_m,
+            'visit_task_id': visit.visit_task_id.id if visit.visit_task_id else False,
+            'visit_id': visit.id,
+            'sale_order_id': visit.sale_order_id.id if visit.sale_order_id else False,
+            'dm_delivery_id': visit.dm_delivery_id.id if visit.dm_delivery_id else False,
+            'company_id': company_id,
+        }
+        booker_order = visit.visit_kind != 'delivery_man' and bool(
+            visit.sale_order_id
+            or visit.place_order_latitude
+            or visit.place_order_longitude
+            or visit.id in logged_place
+        )
+        if booker_order and (visit.id in logged_checkin or visit.id in logged_place):
+            self.promote_checkin_to_place_order(visit, visit.sale_order_id)
+            return created
+        if booker_order:
+            rec = self.sudo().create({
+                **base_vals,
+                'purpose': 'place_order',
+                'result': 'ok',
+                'attempt_latitude': visit.place_order_latitude or visit.check_in_latitude or 0.0,
+                'attempt_longitude': visit.place_order_longitude or visit.check_in_longitude or 0.0,
+                'distance_m': visit.place_order_distance_m or visit.check_in_distance_m or 0.0,
+                'message': 'Historical place-order (logged before GPS attempt tracking).',
+            })
+            rec._stamp_create_date(visit.ended_at or visit.started_at)
+            created |= rec
+            return created
+        if visit.id not in logged_checkin:
+            rec = self.sudo().create({
+                **base_vals,
+                'purpose': 'check_in',
+                'result': 'ok',
+                'attempt_latitude': visit.check_in_latitude or 0.0,
+                'attempt_longitude': visit.check_in_longitude or 0.0,
+                'distance_m': visit.check_in_distance_m or 0.0,
+                'message': 'Historical check-in (logged before GPS attempt tracking).',
+            })
+            rec._stamp_create_date(visit.started_at)
+            created |= rec
+        return created
+
+    def _backfill_visitless_shop_orders(self, min_m, max_m):
+        """Portal / native shop orders have no visit, so they never got a check-in row."""
+        created = self.browse()
+        already = set(
+            self.sudo().search([('sale_order_id', '!=', False)]).mapped('sale_order_id').ids
+        )
+        orders = self.env['sale.order'].sudo().search([
+            ('partner_id.is_shahtaj_shop', '=', True),
+            ('shahtaj_visit_id', '=', False),
+        ], order='id asc')
+        for order in orders:
+            if order.id in already:
+                continue
+            shop = order.partner_id.sudo()
+            user = order.user_id or order.create_uid
+            if not user:
+                continue
+            rec = self.sudo().create({
+                'user_id': user.id,
+                'role': self._shahtaj_resolve_role(user),
+                'purpose': 'check_in',
+                'result': 'ok',
+                'shop_id': shop.id,
+                'shop_latitude': shop.partner_latitude or 0.0,
+                'shop_longitude': shop.partner_longitude or 0.0,
+                'attempt_latitude': 0.0,
+                'attempt_longitude': 0.0,
+                'distance_m': 0.0,
+                'min_distance_m': min_m,
+                'max_distance_m': max_m,
+                'sale_order_id': order.id,
+                'company_id': order.company_id.id or self.env.company.id,
+                'message': 'Order placed without a field check-in (distributor portal / backfill).',
+            })
+            rec._stamp_create_date(order.date_order or order.create_date)
+            already.add(order.id)
+            created |= rec
+        return created

@@ -18,28 +18,7 @@
                 ('customer_rank', '>', 0),
                 ('supplier_rank', '>', 0),
             ]</field>
-            <field name="groups" eval="[(4, ref('group_shahtaj_office_ops'))]"/>
-            <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="False"/>
-            <field name="perm_unlink" eval="False"/>
-        </record>
-
-        <!-- Manager (order approver): same shop/customer read scope for approval + shop edit -->
-        <record id="rule_shahtaj_manager_partner_read" model="ir.rule">
-            <field name="name">Manager: read shops and customers</field>
-            <field name="model_id" ref="base.model_res_partner"/>
-            <field name="domain_force">[
-                '|', '|', '|', '|', '|', '|',
-                ('is_shahtaj_shop', '=', True),
-                ('parent_id.is_shahtaj_shop', '=', True),
-                ('commercial_partner_id.is_shahtaj_shop', '=', True),
-                ('partner_share', '=', False),
-                ('id', '=', user.partner_id.id),
-                ('id', '=', user.company_id.partner_id.id),
-                ('customer_rank', '>', 0),
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_shahtaj_manager'))]"/>
+            <field name="groups" eval="[(4, ref('group_shahtaj_distributor'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
@@ -53,7 +32,7 @@
             <field name="name">Distributor: read vendor contacts</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="domain_force">[('supplier_rank', '>', 0)]</field>
-            <field name="groups" eval="[(6, 0, [ref('group_shahtaj_office_ops')])]"/>
+            <field name="groups" eval="[(6, 0, [ref('group_shahtaj_distributor')])]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>

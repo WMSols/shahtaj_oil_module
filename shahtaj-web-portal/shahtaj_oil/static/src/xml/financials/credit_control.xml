@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="shahtaj_oil.FinancialsCreditControl" owl="1">
+            <t t-if="this.state.activeSubTab === 'credit'">
+                <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <ul class="nav nav-pills gap-2 mb-0">
+                        <li class="nav-item">
+                            <button t-on-click="() => this.setCreditSubView('risk')" t-attf-class="nav-link fw-bold rounded-pill px-4 #{this.state.creditSubView === 'risk' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light border border-dark'}">
+                                <i class="fa fa-shield me-2"></i> Credit Utilization &amp; Risk
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button t-on-click="() => this.setCreditSubView('balances')" t-attf-class="nav-link fw-bold rounded-pill px-4 #{this.state.creditSubView === 'balances' ? 'active bg-dark text-white shadow-sm' : 'text-muted bg-light border border-dark'}">
+                                <i class="fa fa-balance-scale me-2"></i> Shop Balances &amp; Limits
+                            </button>
+                        </li>
+                    </ul>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search shops..." t-att-value="this.state.filters.credits.search" t-on-input="(ev) => this.onSearchInput(ev, 'credits')"/>
+                        </div>
+                        <select t-if="this.state.creditSubView === 'risk'" class="form-select form-select-sm w-auto shadow-sm" t-model="this.state.filters.credits.status" t-on-change="() => this.onFilterChange('credits')">
+                            <option value="all">All Risk Statuses</option>
+                            <option value="Healthy">Healthy</option>
+                            <option value="Critical">Critical</option>
+                            <option value="Exceeded">Exceeded</option>
+                        </select>
+                        <div t-if="this.state.creditSubView === 'balances'" class="form-check form-switch mb-0 d-flex align-items-center">
+                            <input class="form-check-input mt-0" type="checkbox" role="switch" id="filterCreditLimitGtZero"
+                                   t-att-checked="this.state.filters.credits.hasCreditLimit"
+                                   t-on-change="onHasCreditLimitFilterChange"/>
+                            <label class="form-check-label small fw-bold text-nowrap ms-2" for="filterCreditLimitGtZero">Credit Limit &gt; 0</label>
+                        </div>
+                            </div>
+                        </div>
+
+                <!-- Sub-view A: Risk Monitor -->
+                <t t-if="this.state.creditSubView === 'risk'">
+                    <div class="position-relative">
+                        <t t-if="this.state.isLoadingList">
+                            <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;"><div class="spinner-border text-primary" role="status"></div></div>
+                        </t>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                    <tr><th class="border-top-0 ps-4 py-3">Shop Details</th><th class="border-top-0 w-25">Credit Utilization</th><th class="border-top-0 text-end">Available Credit</th><th class="border-top-0 text-center pe-4">Risk Status</th></tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="this.state.credits.length === 0 and !this.state.isLoadingList">
+                                        <tr><td colspan="4" class="text-center py-5 text-muted fw-bold"><i class="fa fa-shield fs-1 mb-3 opacity-50"></i><p class="mb-1 fs-5 text-dark">No credit shops found.</p></td></tr>
+                                    </t>
+                                    <t t-foreach="this.state.credits" t-as="credit" t-key="credit.id">
+                                        <tr>
+                                            <td class="ps-4">
+                                                <div class="text-dark fw-bold"><t t-esc="credit.shop"/></div>
+                                                <small class="text-muted">Shop ID: <t t-esc="credit.shopId"/></small>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <small class="fw-bold text-dark">Rs. <t t-esc="credit.utilized"/></small>
+                                                    <small class="text-muted">Limit: Rs. <t t-esc="credit.limit"/></small>
+                                                </div>
+                                                <div class="progress" style="height: 8px;">
+                                                    <div t-attf-class="progress-bar #{credit.status === 'Healthy' ? 'bg-success' : credit.status === 'Critical' ? 'bg-warning' : credit.status === 'Cash' ? 'bg-info' : 'bg-danger'}" role="progressbar" t-attf-style="width: #{credit.rawLimit > 0 ? (credit.rawUtilized / credit.rawLimit) * 100 : 0}%; max-width: 100%;"/>
+                                                </div>
+                                            </td>
+                                            <td class="text-end fw-bold">Rs. <t t-esc="credit.available"/></td>
+                                            <td class="text-center pe-4"><span t-attf-class="badge #{credit.status === 'Healthy' ? 'bg-success text-white' : credit.status === 'Critical' ? 'bg-warning text-dark' : credit.status === 'Exceeded' ? 'bg-danger text-white' : 'bg-info text-white'} px-3 py-1 shadow-sm"><t t-esc="credit.status"/></span></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- Sub-view B: Shop Balances & Limits -->
+                <t t-elif="this.state.creditSubView === 'balances'">
+                    <t t-if="!this.state.selectedShopBalance">
+                        <div class="position-relative">
+                            <t t-if="this.state.isLoadingList">
+                                <div class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10; opacity: 0.7;"><div class="spinner-border text-primary" role="status"></div></div>
+                            </t>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-uppercase small fw-bold text-muted">
+                                        <tr><th class="ps-4 py-3">Shop Name</th><th>Shop Owner</th><th class="text-end">Credit Limit</th><th class="text-end">Outstanding (Receivable)</th><th class="text-end pe-4">Action</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="this.state.credits.length === 0 and !this.state.isLoadingList">
+                                            <tr><td colspan="5" class="text-center py-5 text-muted fw-bold"><i class="fa fa-balance-scale fs-1 mb-3 opacity-50"></i><p class="mb-1 fs-5 text-dark">No shops found.</p></td></tr>
+                                        </t>
+                                        <t t-foreach="this.sortedShopBalances" t-as="bal" t-key="bal.id">
+                                            <tr style="cursor:pointer;" t-on-click="() => this.viewShopBalance(bal)">
+                                                <td class="ps-4 fw-bold text-dark"><t t-esc="bal.shop"/><small class="d-block text-muted fw-normal">ID: <t t-esc="bal.shopId"/></small></td>
+                                                <td><t t-esc="bal.owner"/></td>
+                                                <td class="text-end fw-bold">Rs. <t t-esc="bal.limit"/></td>
+                                                <td class="text-end text-danger fw-bold">Rs. <t t-esc="bal.outstanding"/></td>
+                                                <td class="text-end pe-4">
+                                                    <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click.stop="() => this.viewShopBalance(bal)">
+                                                        <i class="fa fa-pencil me-1"></i> Edit Limit
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <!-- Edit Shop Credit Limit Form -->
+                        <div class="p-4 bg-light">
+                            <button class="btn btn-sm btn-light bg-white border fw-bold px-3 shadow-sm mb-4" t-on-click="() => this.state.selectedShopBalance = null"><i class="fa fa-arrow-left me-1"></i> Back to Balances</button>
+                            <div class="card p-4 shadow-sm border-0 border-start border-4 border-warning">
+                                <h4 class="mb-1 text-dark fw-bold"><t t-esc="this.state.selectedShopBalance.shop"/></h4>
+                                <p class="text-muted small mb-4">Shop ID: <t t-esc="this.state.selectedShopBalance.shopId"/></p>
+                                <div class="row align-items-center border-bottom pb-4 mb-4">
+                                    <div class="col-md-6 border-end">
+                                        <label class="small fw-bold text-muted">Shop Owner</label>
+                                        <h5 class="text-dark fw-bold mb-0"><t t-esc="this.state.selectedShopBalance.owner"/></h5>
+                                </div>
+                                    <div class="col-md-6 ps-4">
+                                        <label class="small fw-bold text-muted">Current Outstanding</label>
+                                        <h3 class="text-danger fw-bold mb-0">Rs. <t t-esc="this.state.selectedShopBalance.outstanding"/></h3>
+                                    </div>
+                                    </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="small fw-bold text-dark mb-2">Approved Credit Limit (Rs.)</label>
+                                        <div class="input-group input-group-lg shadow-sm">
+                                            <span class="input-group-text bg-white border-end-0 fw-bold text-muted">Rs.</span>
+                                            <input type="number" class="form-control border-start-0 fw-bold" t-model="this.state.selectedShopBalance.rawLimit"/>
+                                    </div>
+                                    </div>
+                                    <div class="col-md-12 mt-4 text-end">
+                                        <button class="btn btn-dark fw-bold text-white px-5 shadow-sm" t-on-click="saveShopBalanceLimit"><i class="fa fa-save me-1"></i> Save Credit Limit</button>
+                                        </div>
+                                        </div>
+                            </div>
+                                        </div>
+                                    </t>
+                </t>
+
+                <!-- Universal Pagination Footer for Credit Control -->
+                <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light" t-if="!this.state.selectedShopBalance">
+                    <small class="text-muted fw-bold">Showing <t t-esc="this.state.pagination.credits.total === 0 ? 0 : ((this.state.pagination.credits.page - 1) * this.state.pagination.credits.limit) + 1"/> to <t t-esc="Math.min(this.state.pagination.credits.page * this.state.pagination.credits.limit, this.state.pagination.credits.total)"/> of <t t-esc="this.state.pagination.credits.total"/></small>
+                    <div class="btn-group shadow-sm">
+                        <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('credits', -1)" t-att-disabled="this.state.pagination.credits.page === 1">Prev</button>
+                        <button class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark"><t t-esc="this.state.pagination.credits.page"/> / <t t-esc="Math.max(1, Math.ceil(this.state.pagination.credits.total / this.state.pagination.credits.limit))"/></button>
+                        <button class="btn btn-sm btn-light bg-white border fw-bold" t-on-click="() => this.changePage('credits', 1)" t-att-disabled="this.state.pagination.credits.page &gt;= Math.ceil(this.state.pagination.credits.total / this.state.pagination.credits.limit)">Next</button>
+                    </div>
+                                        </div>
+                                    </t>
+    </t>
+</templates>

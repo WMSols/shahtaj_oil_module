@@ -21,15 +21,15 @@
                             invisible="state not in ('draft', 'sent')"/>
                     <button name="button_approve" type="object" string="Approve Order"
                             class="oe_highlight"
-                            groups="purchase.group_purchase_manager,shahtaj_oil.group_shahtaj_kpo"
+                            groups="purchase.group_purchase_manager"
                             invisible="state != 'to approve'"/>
                     <button name="action_view_picking" type="object" string="Receive Products"
                             class="oe_highlight"
-                            groups="stock.group_stock_user,shahtaj_oil.group_shahtaj_kpo"
+                            groups="stock.group_stock_user"
                             invisible="is_shipped or state != 'purchase' or incoming_picking_count == 0"/>
                     <button name="action_create_invoice" type="object" string="Create Bill"
                             class="oe_highlight"
-                            groups="account.group_account_invoice,shahtaj_oil.group_shahtaj_kpo"
+                            groups="account.group_account_invoice"
                             invisible="state != 'purchase' or invoice_status != 'to invoice'"/>
                     <button name="print_quotation" type="object" string="Print"
                             invisible="state == 'purchase'"/>
@@ -336,27 +336,6 @@
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_shahtaj_vendor_form"/>
         <field name="act_window_id" ref="action_shahtaj_vendors"/>
-    </record>
-
-    <!-- KPO: Confirm/Post vendor bills + Pay (Register Payment) without Dist Accounting group. -->
-    <record id="view_account_move_form_shahtaj_kpo_pay" model="ir.ui.view">
-        <field name="name">account.move.form.shahtaj.kpo.pay</field>
-        <field name="model">account.move</field>
-        <field name="inherit_id" ref="account.view_move_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//button[@name='action_post'][contains(@invisible, &quot;move_type != 'entry'&quot;)]" position="attributes">
-                <attribute name="groups">account.group_account_invoice,shahtaj_oil.group_shahtaj_kpo</attribute>
-            </xpath>
-            <xpath expr="//button[@name='action_post'][contains(@invisible, &quot;move_type == 'entry'&quot;)]" position="attributes">
-                <attribute name="groups">account.group_account_invoice,shahtaj_oil.group_shahtaj_kpo</attribute>
-            </xpath>
-            <xpath expr="//button[@id='account_invoice_payment_btn']" position="attributes">
-                <attribute name="groups">account.group_account_invoice,shahtaj_oil.group_shahtaj_kpo</attribute>
-            </xpath>
-            <xpath expr="//button[@id='account_invoice_payment_secondary_btn']" position="attributes">
-                <attribute name="groups">account.group_account_invoice,shahtaj_oil.group_shahtaj_kpo</attribute>
-            </xpath>
-        </field>
     </record>
 
 </odoo>

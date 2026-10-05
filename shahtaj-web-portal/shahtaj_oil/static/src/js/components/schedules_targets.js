@@ -12,7 +12,7 @@ export class SchedulesTargets extends Component {
 
     setup() {
         this.orm = useService("orm");
-        const ITEMS_PER_PAGE = 10;
+        const ITEMS_PER_PAGE = 50;
         this.notification = useService("notification");
         this.state = useState({
             activeMainTab: this.props.requestedSubTab || 'schedules',
