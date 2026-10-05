@@ -127,6 +127,20 @@
         <field name="target">self</field>
     </record>
 
+    <!-- Same place as Activity Logs: Settings → Shahtaj Storage -->
+    <record id="action_shahtaj_storage_dashboard" model="ir.actions.act_url">
+        <field name="name">Shahtaj Storage</field>
+        <field name="url">/shahtaj/storage</field>
+        <field name="target">self</field>
+    </record>
+
+    <menuitem id="menu_shahtaj_storage_dashboard"
+              name="Shahtaj Storage"
+              parent="base.menu_administration"
+              action="action_shahtaj_storage_dashboard"
+              sequence="94"
+              groups="base.group_system"/>
+
     <!-- Admin-only: under Settings, not the Shahtaj Oil app menu -->
     <menuitem id="menu_shahtaj_activity_logs"
               name="Shahtaj Activity Logs"
