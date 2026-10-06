@@ -121,7 +121,7 @@ class ShahtajDmDelivery(models.Model):
             'This shop stop only (not the DM day status).\n'
             'Not Started → Heading to Shop → Shop Closed / Could Not Deliver / Stop Done.\n'
             'Day-level “Left Office” is on My Day Session, not this field.\n'
-            'Shop Closed and Could Not Deliver require a note.'
+            'Shop Closed requires a note and a photo; Could Not Deliver requires a note.'
         ),
     )
     scheduled_date = fields.Date(
@@ -185,11 +185,30 @@ class ShahtajDmDelivery(models.Model):
         index=True,
         help='Stored flag so plan/list APIs avoid loading the proof image binary.',
     )
+    shop_closed_image = fields.Image(
+        string='Shop Closed Photo',
+        max_width=1920,
+        max_height=1920,
+        copy=False,
+        help='Photo proving the shop was closed / not attended (required for Shop Closed).',
+    )
+    has_shop_closed_photo = fields.Boolean(
+        string='Has Shop Closed Photo',
+        compute='_compute_has_shop_closed_photo',
+        store=True,
+        index=True,
+        help='Stored flag so list APIs avoid loading the shop-closed image binary.',
+    )
 
     @api.depends('delivery_proof_image')
     def _compute_has_delivery_proof(self):
         for rec in self:
             rec.has_delivery_proof = bool(rec.delivery_proof_image)
+
+    @api.depends('shop_closed_image')
+    def _compute_has_shop_closed_photo(self):
+        for rec in self:
+            rec.has_shop_closed_photo = bool(rec.shop_closed_image)
 
     @api.depends('scheduled_date', 'state')
     @api.depends_context('uid', 'tz')
@@ -261,7 +280,8 @@ class ShahtajDmDelivery(models.Model):
         string='Notes',
         help=(
             'Shared notes (same idea as order booker visit notes). '
-            'Required when marking Shop Closed or Could Not Deliver.'
+            'Required when marking Shop Closed or Could Not Deliver. '
+            'Shop Closed also requires a photo.'
         ),
     )
     shahtaj_processing_locked = fields.Boolean(
@@ -2140,6 +2160,14 @@ class ShahtajDmDelivery(models.Model):
                 purpose=purpose,
             ))
 
+    def _require_shop_closed_photo(self):
+        self.ensure_one()
+        if not self.shop_closed_image:
+            raise UserError(_(
+                'Upload a Shop Closed photo first (shop front / closed shutter), '
+                'then try again.'
+            ))
+
     def _assert_can_update_field_state(self):
         self.ensure_one()
         if self.state not in ('picked', 'partial'):
@@ -2157,10 +2185,11 @@ class ShahtajDmDelivery(models.Model):
         return True
 
     def action_field_not_attended(self):
-        """DM: shop closed / no one available — note required."""
+        """DM: shop closed / no one available — note + photo required."""
         self.ensure_one()
         self._assert_can_update_field_state()
         self._require_field_notes(_('the shop was closed / not attended'))
+        self._require_shop_closed_photo()
         self.write({'field_state': 'not_attended'})
         return True
 
@@ -2260,6 +2289,23 @@ class ShahtajDmDelivery(models.Model):
             'receiver_name': name,
             'delivery_proof_image': image,
         }
+
+    @api.model
+    def _shahtaj_prepare_shop_closed_photo(self, shop_closed_image=None):
+        """Validate shop-closed proof image. Returns vals to write on the job."""
+        if not shop_closed_image:
+            raise UserError(_(
+                'Shop Closed photo is required (shop front / closed shutter).'
+            ))
+        from odoo.addons.shahtaj_oil.api.image_utils import normalize_image_b64
+        image = normalize_image_b64(shop_closed_image) if isinstance(
+            shop_closed_image, str
+        ) else shop_closed_image
+        if not image:
+            raise UserError(_(
+                'Shop Closed photo is required (shop front / closed shutter).'
+            ))
+        return {'shop_closed_image': image}
 
     def _deliver_to_shop_with_qtys(
         self,

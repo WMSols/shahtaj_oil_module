@@ -496,6 +496,7 @@ class ShahtajDmApiService(models.AbstractModel):
             'delivered_at': job.delivered_at.isoformat(sep=' ') if job.delivered_at else False,
             'receiver_name': job.receiver_name or '',
             'has_delivery_proof': bool(job.has_delivery_proof),
+            'has_shop_closed_photo': bool(job.has_shop_closed_photo),
         }
 
     @api.model
@@ -530,10 +531,17 @@ class ShahtajDmApiService(models.AbstractModel):
         return {'job': self.job_brief(job)}
 
     @api.model
-    def mark_shop_closed(self, job_id, notes, dm=None):
+    def mark_shop_closed(self, job_id, notes, shop_closed_image=None, dm=None):
+        """Mark stop Shop Closed. Requires notes + shop_closed_image (no GPS)."""
         job = self._job_for_dm(job_id, dm)
+        vals = {}
         if notes is not None:
-            job.write({'notes': notes})
+            vals['notes'] = notes
+        photo_vals = self.env['shahtaj.dm.delivery']._shahtaj_prepare_shop_closed_photo(
+            shop_closed_image=shop_closed_image,
+        )
+        vals.update(photo_vals)
+        job.write(vals)
         job.action_field_not_attended()
         return {'job': self.job_brief(job)}
 

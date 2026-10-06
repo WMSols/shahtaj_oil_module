@@ -144,13 +144,31 @@ class ShahtajDmApiOps(http.Controller):
 
     @http.route('/api/shahtaj/v1/dm/job/shop-closed', **DM_API_ROUTE)
     @dm_api_activity('dm.job.shop_closed', 'DM shop closed')
-    def job_shop_closed(self, job_id=None, notes=None, **kwargs):
+    def job_shop_closed(
+        self,
+        job_id=None,
+        notes=None,
+        shop_closed_image=None,
+        **kwargs,
+    ):
+        """Mark shop closed / not attended.
+
+        Requires notes + shop_closed_image (base64 or data-URL). No GPS.
+        """
         ensure_delivery_man()
         if not job_id:
             raise UserError(_('job_id is required.'))
         if not (notes or '').strip():
             raise UserError(_('Notes are required when the shop is closed.'))
-        return api_success(dm_service().mark_shop_closed(job_id, notes))
+        if not shop_closed_image:
+            raise UserError(_(
+                'Shop Closed photo is required (shop front / closed shutter).'
+            ))
+        return api_success(dm_service().mark_shop_closed(
+            job_id,
+            notes,
+            shop_closed_image=shop_closed_image,
+        ))
 
     @http.route('/api/shahtaj/v1/dm/job/failed', **DM_API_ROUTE)
     @dm_api_activity('dm.job.failed', 'DM could not deliver')

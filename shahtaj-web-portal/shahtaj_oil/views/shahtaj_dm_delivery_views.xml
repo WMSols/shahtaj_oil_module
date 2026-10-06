@@ -174,7 +174,7 @@
                             string="Shop Closed" class="btn-warning"
                             invisible="is_walk_in or state not in ('picked', 'partial') or field_state == 'done'"
                             groups="shahtaj_oil.group_shahtaj_delivery_man"
-                            confirm="Mark shop closed / not attended? Add a note first if empty."/>
+                            confirm="Mark shop closed / not attended? Add a note and Shop Closed photo first if empty."/>
                     <button name="action_field_failed" type="object"
                             string="Could Not Deliver" class="btn-danger"
                             invisible="is_walk_in or state not in ('picked', 'partial') or field_state == 'done'"
@@ -252,7 +252,7 @@
                             <li><b>Heading to Shop</b> on this form = this stop only (not “left the warehouse”)</li>
                             <li><b>Deliver to Shop (GPS)</b> — at the shop: Use My GPS → set qty → confirm</li>
                             <li><b>Undo Delivery to Shop</b> (distributor) — before invoicing: stock back to van, clear Delivered</li>
-                            <li>Shop Closed and Could Not Deliver need a <b>note</b> below</li>
+                            <li>Shop Closed needs a <b>note</b> and a <b>photo</b> below; Could Not Deliver needs a note</li>
                         </ul>
                     </div>
                     <group>
@@ -346,6 +346,18 @@
                     <group string="Notes">
                         <field name="notes" nolabel="1"
                                placeholder="Required for Shop Closed / Could Not Deliver (e.g. shop closed, customer refused)…"/>
+                    </group>
+                    <group string="Shop Closed photo"
+                           invisible="field_state not in ('pending', 'in_transit', 'not_attended', 'failed') and not has_shop_closed_photo">
+                        <field name="has_shop_closed_photo" invisible="1"/>
+                        <field name="shop_closed_image" widget="image"
+                               readonly="field_state == 'done'"
+                               options="{'size': [192, 192]}"
+                               string="Shop Closed Photo"/>
+                        <div class="text-muted" colspan="2"
+                             invisible="field_state == 'not_attended' or has_shop_closed_photo">
+                            Required before Shop Closed: photo of the closed shop / shutter.
+                        </div>
                     </group>
                     <notebook>
                         <page string="Products" name="lines">

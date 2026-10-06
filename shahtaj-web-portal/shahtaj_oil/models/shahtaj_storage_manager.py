@@ -46,9 +46,10 @@ PHOTO_CATEGORIES = {
     'delivery_proof': {
         'label': 'Delivery photos',
         'protected': False,
-        'help': 'Proof photos when stock is handed to a shop.',
+        'help': 'Handoff proof and shop-closed photos from delivery stops.',
         'fields': [
             ('shahtaj.dm.delivery', 'delivery_proof_image'),
+            ('shahtaj.dm.delivery', 'shop_closed_image'),
             ('stock.picking', 'shahtaj_delivery_proof_image'),
         ],
         'date_field': {
