@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Shahtaj Oil',
-    'version': '19.0.1.1.202',
+    'version': '19.0.1.1.206',
     'post_init_hook': 'post_init_hook',
     'category': 'Sales/Distribution',
     'summary': 'Unified Command Center for Shahtaj Oil distributions, field booking, and SPA frontend',
@@ -117,8 +117,9 @@
         'data/shahtaj_ui_mode_sync.xml',
         'data/shahtaj_user_access_sync.xml',
 
-        # ── 10. MENUS (ALWAYS LAST; includes distributor portal client action) ──
-        'views/menus.xml', # All combined Menus
+        # ── 10. MENUS (after every action they reference) ──
+        'views/menus.xml',
+        'views/menus_late.xml',
         'views/shahtaj_api_test_menu.xml',
     ],
     'assets': {

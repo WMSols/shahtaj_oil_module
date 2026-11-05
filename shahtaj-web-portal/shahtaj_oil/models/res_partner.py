@@ -135,7 +135,6 @@ class ResPartner(models.Model):
     registered_by_id = fields.Many2one(
         'res.users',
         string='Registered By User',
-        readonly=True,
         copy=False,
     )
     # Inverse of visit tasks — used by booker partner record rules so assigned
@@ -194,13 +193,11 @@ class ResPartner(models.Model):
     )
     shahtaj_field_verified_at = fields.Datetime(
         string='Field Verified At',
-        readonly=True,
         copy=False,
     )
     shahtaj_field_verified_by_id = fields.Many2one(
         'res.users',
         string='Field Verified By',
-        readonly=True,
         copy=False,
         ondelete='set null',
     )

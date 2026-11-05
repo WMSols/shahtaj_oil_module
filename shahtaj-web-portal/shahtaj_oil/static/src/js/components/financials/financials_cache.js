@@ -49,7 +49,7 @@ async function fetchLookups(orm) {
 async function fetchStats(orm) {
     const [totalOrders, toInvoice, openInvoices, creditNotes, approvedShops] = await Promise.all([
         orm.searchCount("sale.order", [["shahtaj_visit_id", "!=", false]]),
-        orm.searchCount("sale.order", [["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]]),
+        orm.searchCount("sale.order", [["shahtaj_visit_id", "!=", false], ["shahtaj_has_qty_to_invoice", "=", true]]),
         orm.searchCount("account.move", [["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true], ["state", "=", "posted"], ["payment_state", "in", ["not_paid", "partial"]]]),
         orm.searchCount("account.move", [["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]]),
         orm.searchCount("res.partner", [["is_shahtaj_shop", "=", true], ["shop_approval_state", "=", "approved"]]),

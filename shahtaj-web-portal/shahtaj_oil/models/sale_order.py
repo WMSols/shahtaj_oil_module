@@ -862,6 +862,38 @@ class SaleOrder(models.Model):
                 order=self.display_name,
             ))
 
+    shahtaj_has_qty_to_invoice = fields.Boolean(
+        string='Has Qty To Invoice',
+        compute='_compute_shahtaj_invoice_qty_flags',
+        store=True,
+        help='True when at least one product line still has qty_to_invoice > 0.',
+    )
+    shahtaj_is_partially_invoiced = fields.Boolean(
+        string='Partially Invoiced',
+        compute='_compute_shahtaj_invoice_qty_flags',
+        store=True,
+        help='True when some qty is already invoiced but invoiceable qty remains.',
+    )
+
+    @api.depends(
+        'order_line.qty_invoiced',
+        'order_line.qty_to_invoice',
+        'order_line.display_type',
+        'order_line.product_id',
+        'invoice_status',
+    )
+    def _compute_shahtaj_invoice_qty_flags(self):
+        for order in self:
+            lines = order.order_line.filtered(
+                lambda line: not line.display_type and line.product_id
+            )
+            has_remaining = any(line.qty_to_invoice > 0 for line in lines)
+            has_invoiced = any(line.qty_invoiced > 0 for line in lines)
+            order.shahtaj_has_qty_to_invoice = bool(lines and has_remaining)
+            order.shahtaj_is_partially_invoiced = bool(
+                lines and has_invoiced and has_remaining
+            )
+
     def _shahtaj_prepare_lines_for_order_invoice(self):
         """Force ordered-qty policy and refresh stored qty_to_invoice on this SO."""
         self.ensure_one()
@@ -880,8 +912,36 @@ class SaleOrder(models.Model):
                     line.qty_to_invoice = line.product_uom_qty - line.qty_invoiced
         return lines
 
+    def _shahtaj_invoiceable_product_lines(self):
+        """Product lines that still have qty left to invoice."""
+        self.ensure_one()
+        return self.order_line.filtered(
+            lambda line: not line.display_type and line.product_id and line.qty_to_invoice > 0
+        )
+
+    def _shahtaj_assert_invoice_lines_linked(self, invoices):
+        """Ensure customer invoice product lines are linked back to this SO."""
+        self.ensure_one()
+        for invoice in invoices:
+            product_lines = invoice.invoice_line_ids.filtered(
+                lambda line: not line.display_type and line.product_id
+            )
+            unlinked = product_lines.filtered(lambda line: not line.sale_line_ids)
+            if unlinked:
+                raise UserError(_(
+                    'Cannot post invoice for %(order)s: line(s) %(lines)s are not '
+                    'linked to the sales order. Fix the link or recreate the invoice.',
+                    order=self.display_name,
+                    lines=', '.join(unlinked.mapped('display_name')),
+                ))
+
     def action_shahtaj_create_and_post_invoice(self):
-        """Invoice ordered quantities and post — required before DM assign."""
+        """Invoice remaining ordered qty and post — required before DM assign.
+
+        Partial invoices (from Edit Invoice or elsewhere) stay valid: this method
+        posts any draft customer invoices first, then creates a new linked invoice
+        for whatever qty_to_invoice remains.
+        """
         self.ensure_one()
         self._shahtaj_assert_not_cancelled()
         user = self.env.user
@@ -903,26 +963,44 @@ class SaleOrder(models.Model):
         # Warehouse can dispatch and invoice, but has no accounting write ACL.
         order = self.sudo() if warehouse_only else self
 
-        posted = order._shahtaj_posted_customer_invoices()
-        if posted:
-            return posted.ids
+        order._shahtaj_prepare_lines_for_order_invoice()
+        result_invoices = self.env['account.move']
 
         drafts = order.invoice_ids.filtered(
             lambda move: move.state == 'draft' and move.move_type == 'out_invoice'
         )
         if drafts:
+            order._shahtaj_assert_invoice_lines_linked(drafts)
             drafts.action_post()
-            return drafts.ids
+            result_invoices |= drafts
+            order._shahtaj_prepare_lines_for_order_invoice()
 
-        order._shahtaj_prepare_lines_for_order_invoice()
+        if not order._shahtaj_invoiceable_product_lines():
+            posted = order._shahtaj_posted_customer_invoices()
+            if posted:
+                # Invoiced qty already covers ordered (equal or higher via Edit Invoice).
+                # Do not reopen the posted invoice as if Generate Invoice created a new one.
+                raise UserError(_(
+                    '%(order)s has no remaining quantity to invoice '
+                    '(invoiced qty already covers the order). '
+                    'Open the existing invoice from Customer Invoices if you need it.',
+                    order=self.display_name,
+                ))
+            raise UserError(_(
+                'No invoiceable quantity on %(order)s after switching to ordered quantities.',
+                order=self.display_name,
+            ))
+
         invoices = order._create_invoices(final=False)
         if not invoices:
             raise UserError(_(
                 'No invoiceable quantity on %(order)s after switching to ordered quantities.',
                 order=self.display_name,
             ))
+        order._shahtaj_assert_invoice_lines_linked(invoices)
         invoices.action_post()
-        return invoices.ids
+        result_invoices |= invoices
+        return result_invoices.ids
 
     @api.depends(
         'shahtaj_dm_delivery_ids.delivery_man_id',

@@ -58,6 +58,8 @@ export class ShahtajDashboard extends Component {
             shopStatus: 'all',
             shopRegisteredOn: '',
             shopRegistrar: 'all',
+            openShopId: false,
+            openShopNonce: 0,
             staffStatus: 'all',
             stockStatus: 'all',
             orderDate: '',
@@ -138,7 +140,15 @@ export class ShahtajDashboard extends Component {
                 filters.checkinRole = ev.detail.checkinRole || 'all';
                 filters.checkinDate = ev.detail.checkinDate || '';
             }
-            this.switchTab(ev.detail.tab, ev.detail.subTab, { filters });
+            const shopId = ev.detail.shopId ? parseInt(ev.detail.shopId, 10) : false;
+            if (shopId) {
+                this.state.openShopId = shopId;
+                this.state.openShopNonce += 1;
+            }
+            this.switchTab(ev.detail.tab, ev.detail.subTab, {
+                filters,
+                forceBusy: !!(ev.detail.forceBusy || shopId),
+            });
         });
         onWillStart(async () => {
             await loadPortalAccess();
@@ -288,7 +298,20 @@ export class ShahtajDashboard extends Component {
                 delete payload.stillOwed;
                 delete payload.cashTrend;
             }
+            if (this.canSeeCard("checkins")) {
+                delete payload.todayCheckins;
+            }
             Object.assign(this.state.kpis, payload);
+            if (this.canSeeCard("checkins") && opsDate === this.state.opsDate) {
+                const bounds = this._pktDateToUtcBounds(opsDate);
+                const shopVisits = await this.orm.searchCount("shahtaj.gps.attempt", [
+                    ["create_date", ">=", bounds.start],
+                    ["create_date", "<=", bounds.end],
+                ]);
+                if (token === this._kpiLoadToken && opsDate === this.state.opsDate) {
+                    this.state.kpis.todayCheckins = shopVisits;
+                }
+            }
         } catch (error) {
             console.error("Failed to fetch Master KPIs", error);
         } finally {
@@ -684,6 +707,13 @@ export class ShahtajDashboard extends Component {
         return this.state.opsDate || this.todayStr;
     }
 
+    _pktDateToUtcBounds(dateStr) {
+        const start = new Date(`${dateStr}T00:00:00+05:00`);
+        const end = new Date(`${dateStr}T23:59:59+05:00`);
+        const toOdooUtc = (d) => d.toISOString().slice(0, 19).replace("T", " ");
+        return { start: toOdooUtc(start), end: toOdooUtc(end) };
+    }
+
     openStaff(role = 'order_booker', status = 'all') {
         this.state.staffRole = role;
         this.switchTab('staff', '', { filters: { staffStatus: status } });
@@ -738,7 +768,7 @@ export class ShahtajDashboard extends Component {
     openTodayCheckins() {
         this.switchTab('operations', 'checkins', {
             filters: {
-                checkinPurpose: 'check_in',
+                checkinPurpose: 'all',
                 checkinRole: 'all',
                 checkinDate: this._opsDay(),
             },

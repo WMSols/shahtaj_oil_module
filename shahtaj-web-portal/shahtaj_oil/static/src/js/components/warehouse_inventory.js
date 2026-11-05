@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUpdateProps, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmModal } from "./confirm_modal";
 import {
@@ -10,7 +10,8 @@ import {
     firstAllowedSub,
     hasFinancialAccess,
     loadPortalAccess,
-    notifyPortalBusy,
+    openPortalBusy,
+    releaseOwnerPortalBusy,
     showPrices,
 } from "../shahtaj_access";
 import { filterOptionValue, setFilterField } from "../shahtaj_filter_ui";
@@ -78,6 +79,7 @@ export class WarehouseInventory extends Component {
         };
         this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
 
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         onWillStart(async () => {
             await loadPortalAccess();
             this.state.activeSubTab = this._normalizeSubTab(this.state.activeSubTab);
@@ -235,7 +237,7 @@ export class WarehouseInventory extends Component {
 
         const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
-        notifyPortalBusy(true);
+        const endBusy = openPortalBusy(this);
         try {
             const pag = this.state.pagination[tab];
             const filters = this.state.filters[tab];
@@ -289,9 +291,9 @@ export class WarehouseInventory extends Component {
         } catch (error) {
             this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
+            endBusy();
             if (fetchToken === this._listFetchToken) {
                 this.state.isLoadingList = false;
-                notifyPortalBusy(false);
             }
         }
     }

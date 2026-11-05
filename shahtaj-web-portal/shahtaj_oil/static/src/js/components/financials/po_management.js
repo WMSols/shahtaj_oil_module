@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
-import { Component, useState, onMounted, onWillUpdateProps, onWillUnmount } from "@odoo/owl";
+import { Component, useState, onMounted, onWillUpdateProps, onWillUnmount, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { canSee, hasFinancialAccess, notifyPortalBusy, portalAccessState } from "../../shahtaj_access";
+import { canSee, hasFinancialAccess, openPortalBusy, portalAccessState, releaseOwnerPortalBusy } from "../../shahtaj_access";
 import { printFilter, printListPdf } from "../../shahtaj_list_export";
 import { filterOptionValue, setFilterField } from "../../shahtaj_filter_ui";
 import { ConfirmModal } from "../confirm_modal";
@@ -112,6 +112,7 @@ export class PoManagement extends Component {
             this._consumePendingPoPrefill();
         };
         window.addEventListener("shahtaj-open-create-po", this._onOpenCreatePo);
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         onWillUnmount(() => {
             window.removeEventListener("shahtaj-open-create-po", this._onOpenCreatePo);
         });
@@ -266,7 +267,7 @@ export class PoManagement extends Component {
         filters = filters || {};
         const domain = [];
         if (stateKey === "allOrders") domain.push(["shahtaj_visit_id", "!=", false]);
-        if (stateKey === "orders") domain.push(["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]);
+        if (stateKey === "orders") domain.push(["shahtaj_visit_id", "!=", false], ["shahtaj_has_qty_to_invoice", "=", true]);
         if (stateKey === "invoices") domain.push(["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]);
         if (stateKey === "creditNotes") domain.push(["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]);
         if (stateKey === "payments") domain.push(["partner_id.is_shahtaj_shop", "=", true]);
@@ -365,7 +366,7 @@ export class PoManagement extends Component {
 
         const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
-        notifyPortalBusy(true);
+        const endBusy = openPortalBusy(this);
         try {
             const { stateKey, model, fields } = config;
             const pag = this.state.pagination[stateKey];
@@ -522,9 +523,9 @@ export class PoManagement extends Component {
                 this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
             }
         } finally {
+            endBusy();
             if (fetchToken === this._listFetchToken) {
                 this.state.isLoadingList = false;
-                notifyPortalBusy(false);
             }
         }
     }
@@ -1443,21 +1444,13 @@ export class PoManagement extends Component {
                 billId = ids.find((id) => !previousIds.has(id)) || false;
             }
             this.notification.add("Vendor bill created successfully.", { type: "success" });
-            this._openBillAfterTab = billId || null;
-            this.requestTabSwitch("financials", "vendor_bills");
+            // Stay inside PO Management — a dashboard sub-tab switch remounts this
+            // component (contentReady gap) and races the bill open with "Component is destroyed".
+            this.setPoSubTab("vendor_bills");
             if (billId) {
-                const openId = billId;
-                setTimeout(() => {
-                    if (this._openBillAfterTab !== openId) {
-                        return;
-                    }
-                    this._openBillAfterTab = null;
-                    this.state.poSubTab = "vendor_bills";
-                    this._reloadVendorBill(openId);
-                }, 50);
+                await this._reloadVendorBill(billId);
             }
         } catch (error) {
-            this._openBillAfterTab = null;
             this.notification.add("Failed to create vendor bill: " + (error.data?.message || error.message), { type: "danger" });
         }
     }

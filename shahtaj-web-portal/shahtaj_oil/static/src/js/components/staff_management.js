@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUpdateProps, onMounted, onWillUnmount } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUpdateProps, onMounted, onWillUnmount, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmModal } from "./confirm_modal";
 import {
@@ -10,7 +10,8 @@ import {
     defaultStaffRole,
     hasFinancialAccess,
     loadPortalAccess,
-    notifyPortalBusy,
+    openPortalBusy,
+    releaseOwnerPortalBusy,
 } from "../shahtaj_access";
 
 export class StaffManagement extends Component {
@@ -136,6 +137,7 @@ export class StaffManagement extends Component {
             }, 150000);
         });
 
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         onWillUnmount(() => {
             if (this.pollingInterval) clearInterval(this.pollingInterval);
         });
@@ -272,9 +274,9 @@ export class StaffManagement extends Component {
 
     async fetchStaffData(isBackgroundPoll = false) {
         const fetchToken = isBackgroundPoll ? this._listFetchToken : ++this._listFetchToken;
+        const endBusy = isBackgroundPoll ? null : openPortalBusy(this);
         if (!isBackgroundPoll) {
             this.state.loading.fetch = true;
-            notifyPortalBusy(true);
         }
         try {
             const tab = this.state.viewMode === "archive" ? "archive" : "staff";
@@ -324,9 +326,11 @@ export class StaffManagement extends Component {
                 this.notification.add("Failed to fetch data: " + (error.data?.message || error.message), { type: "danger" });
             }
         } finally {
+            if (endBusy) {
+                endBusy();
+            }
             if (!isBackgroundPoll && fetchToken === this._listFetchToken) {
                 this.state.loading.fetch = false;
-                notifyPortalBusy(false);
             }
         }
     }

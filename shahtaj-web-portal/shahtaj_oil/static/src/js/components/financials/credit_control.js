@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUpdateProps, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { canMutate, canSee, hasFinancialAccess, notifyPortalBusy } from "../../shahtaj_access";
+import { canMutate, canSee, hasFinancialAccess, openPortalBusy, releaseOwnerPortalBusy } from "../../shahtaj_access";
 import { printFilter, printListPdf } from "../../shahtaj_list_export";
 import { invalidateFinancialStats } from "./financials_cache";
 
@@ -35,6 +35,7 @@ export class CreditControl extends Component {
                 credits: { page: 1, limit: ITEMS_PER_PAGE, total: 0 },
             },
         });
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         this.debounceSearch = (func, wait) => {
             return (...args) => {
                 clearTimeout(this.state.searchTimeout);
@@ -91,6 +92,40 @@ export class CreditControl extends Component {
         this.onFilterChange('credits');
     }
 
+    onRiskStatusFilterChange(ev) {
+        this.state.filters.credits.status = ev.target.value || "all";
+        this.onFilterChange("credits");
+    }
+
+    _mapCreditShop(shop) {
+        const limit = shop.credit_limit || 0;
+        const utilized = shop.outstanding_balance || 0;
+        let status = "Healthy";
+        if (shop.shahtaj_shop_category === "cash") {
+            status = "Cash";
+        } else if (limit > 0) {
+            if (utilized > limit) {
+                status = "Exceeded";
+            } else if (utilized >= limit * 0.85) {
+                status = "Critical";
+            }
+        }
+        return {
+            id: shop.id,
+            shopId: shop.id,
+            shop: shop.name,
+            owner: shop.owner_name || "N/A",
+            limit: shop.shahtaj_shop_category === "cash" ? "N/A" : limit.toLocaleString(),
+            rawLimit: limit,
+            utilized: utilized.toLocaleString(),
+            rawUtilized: utilized,
+            available: Math.max(0, limit - utilized).toLocaleString(),
+            status,
+            outstanding: utilized.toLocaleString(),
+            rawOutstanding: utilized,
+        };
+    }
+
     changePage(listKey, direction) {
         const pag = this.state.pagination[listKey];
         const newPage = pag.page + direction;
@@ -126,7 +161,7 @@ export class CreditControl extends Component {
 
         const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
-        notifyPortalBusy(true);
+        const endBusy = openPortalBusy(this);
         try {
             const { stateKey, model, fields } = config;
             const pag = this.state.pagination[stateKey];
@@ -137,7 +172,7 @@ export class CreditControl extends Component {
             }
             
             if (stateKey === 'allOrders') domain.push(["shahtaj_visit_id", "!=", false]);
-            if (stateKey === 'orders') domain.push(["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]);
+            if (stateKey === 'orders') domain.push(["shahtaj_visit_id", "!=", false], ["shahtaj_has_qty_to_invoice", "=", true]);
             if (stateKey === 'invoices') domain.push(["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]);
             if (stateKey === 'creditNotes') domain.push(["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]);
             if (stateKey === 'payments') domain.push(["partner_id.is_shahtaj_shop", "=", true]);
@@ -213,7 +248,13 @@ export class CreditControl extends Component {
             const queryContext = (stateKey === 'vendors' && this.state.vendorViewMode === 'archived') ? { active_test: false } : {};
             // outstanding_balance is computed/non-stored, so shop balances must be sorted in JS
             // (highest outstanding first) then sliced to keep pagination ranking correct.
+            // Risk status (Healthy/Critical/Exceeded) is also computed — filter after load.
             const sortShopBalances = stateKey === 'credits' && this.state.creditSubView === 'balances';
+            const riskStatusFilter = stateKey === 'credits'
+                && this.state.creditSubView === 'risk'
+                && filters
+                && filters.status
+                && filters.status !== 'all';
             let records;
             if (sortShopBalances) {
                 const page = await this.orm.call(
@@ -227,6 +268,18 @@ export class CreditControl extends Component {
                 );
                 records = page.records || [];
                 this.state.pagination[stateKey].total = page.total || 0;
+            } else if (riskStatusFilter) {
+                const allRecords = await this.orm.searchRead(model, domain, fields, {
+                    order: "id desc",
+                    context: queryContext,
+                });
+                const filtered = allRecords
+                    .map((shop) => this._mapCreditShop(shop))
+                    .filter((shop) => shop.status === filters.status);
+                this.state.pagination[stateKey].total = filtered.length;
+                const start = (pag.page - 1) * pag.limit;
+                this.state.credits = filtered.slice(start, start + pag.limit);
+                records = null;
             } else {
                 const [total, fetchedRecords] = await Promise.all([
                     this.orm.searchCount(model, domain, { context: queryContext }),
@@ -241,24 +294,8 @@ export class CreditControl extends Component {
                 this.state.pagination[stateKey].total = total;
             }
             // 5. MAP DATA TO UI
-            if (stateKey === 'credits') {
-                this.state.credits = records.map((shop) => {
-                    const limit = shop.credit_limit || 0;
-                    const utilized = shop.outstanding_balance || 0;
-                    let status = "Healthy";
-                    if (shop.shahtaj_shop_category === "cash") status = "Cash";
-                    else if (limit > 0) {
-                        if (utilized > limit) status = "Exceeded";
-                        else if (utilized >= limit * 0.85) status = "Critical";
-                    }
-                    return {
-                        id: shop.id, shopId: shop.id, shop: shop.name, owner: shop.owner_name || "N/A",
-                        limit: shop.shahtaj_shop_category === "cash" ? "N/A" : limit.toLocaleString(),
-                        rawLimit: limit, utilized: utilized.toLocaleString(), rawUtilized: utilized,
-                        available: Math.max(0, limit - utilized).toLocaleString(), status,
-                        outstanding: utilized.toLocaleString(), rawOutstanding: utilized,
-                    };
-                });
+            if (stateKey === 'credits' && records) {
+                this.state.credits = records.map((shop) => this._mapCreditShop(shop));
             }
             if (stateKey === 'invoices' || stateKey === 'creditNotes') {
                 this.state[stateKey] = records.map((inv) => {
@@ -351,9 +388,9 @@ export class CreditControl extends Component {
                 this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
             }
         } finally {
+            endBusy();
             if (fetchToken === this._listFetchToken) {
                 this.state.isLoadingList = false;
-                notifyPortalBusy(false);
             }
         }
     }

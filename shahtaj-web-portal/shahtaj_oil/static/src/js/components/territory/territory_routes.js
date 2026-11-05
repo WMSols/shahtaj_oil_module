@@ -14,6 +14,8 @@ export class TerritoryRoutes extends Component {
         requestedShopStatus: { type: String, optional: true },
         requestedShopRegisteredOn: { type: String, optional: true },
         requestedShopRegistrar: { type: String, optional: true },
+        requestedOpenShopId: { type: [Number, Boolean], optional: true },
+        requestedOpenShopNonce: { type: Number, optional: true },
     };
 
     setup() {

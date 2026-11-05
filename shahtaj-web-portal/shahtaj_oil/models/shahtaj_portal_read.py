@@ -318,7 +318,7 @@ class ShahtajPortalRead(models.AbstractModel):
                 'totalOrders': self._count('sale.order', [('shahtaj_visit_id', '!=', False)]),
                 'toInvoice': self._count('sale.order', [
                     ('shahtaj_visit_id', '!=', False),
-                    ('invoice_status', '=', 'to invoice'),
+                    ('shahtaj_has_qty_to_invoice', '=', True),
                 ]),
                 'openInvoices': self._count('account.move', [
                     ('move_type', 'in', ['out_invoice']),

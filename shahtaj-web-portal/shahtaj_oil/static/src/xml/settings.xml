@@ -27,7 +27,7 @@
                                     <div>
                                         <h5 class="fw-bold mb-1">DM Overwrite Buttons</h5>
                                         <small class="text-muted">
-                                            Show Mark Delivery, Pick Stock, and Return WH override actions in DM Operations.
+                                            Show Mark Delivery, Pick Stock, Reset Pending, and Return WH override actions in DM Operations.
                                             Saved for this company — applies on the next Operations refresh.
                                         </small>
                                     </div>

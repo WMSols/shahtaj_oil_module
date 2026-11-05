@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUpdateProps, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { hasFinancialAccess, notifyPortalBusy } from "../../shahtaj_access";
+import { hasFinancialAccess, openPortalBusy, releaseOwnerPortalBusy } from "../../shahtaj_access";
 import { ConfirmModal } from "../confirm_modal";
 import { formatDate, invalidateFinancialStats } from "./financials_cache";
 
@@ -74,6 +74,7 @@ export class Expenses extends Component {
             };
         };
         this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         onWillUpdateProps(async (nextProps) => {
             if (nextProps.refreshNonce !== this.props.refreshNonce) {
                 await this.loadExpenseLookups();
@@ -167,7 +168,7 @@ export class Expenses extends Component {
 
         const fetchToken = ++this._listFetchToken;
         this.state.isLoadingList = true;
-        notifyPortalBusy(true);
+        const endBusy = openPortalBusy(this);
         try {
             const { stateKey, model, fields } = config;
             const pag = this.state.pagination[stateKey];
@@ -178,7 +179,7 @@ export class Expenses extends Component {
             }
             
             if (stateKey === 'allOrders') domain.push(["shahtaj_visit_id", "!=", false]);
-            if (stateKey === 'orders') domain.push(["shahtaj_visit_id", "!=", false], ["invoice_status", "=", "to invoice"]);
+            if (stateKey === 'orders') domain.push(["shahtaj_visit_id", "!=", false], ["shahtaj_has_qty_to_invoice", "=", true]);
             if (stateKey === 'invoices') domain.push(["move_type", "in", ["out_invoice"]], ["partner_id.is_shahtaj_shop", "=", true]);
             if (stateKey === 'creditNotes') domain.push(["move_type", "=", "out_refund"], ["partner_id.is_shahtaj_shop", "=", true]);
             if (stateKey === 'payments') domain.push(["partner_id.is_shahtaj_shop", "=", true]);
@@ -392,9 +393,9 @@ export class Expenses extends Component {
                 this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
             }
         } finally {
+            endBusy();
             if (fetchToken === this._listFetchToken) {
                 this.state.isLoadingList = false;
-                notifyPortalBusy(false);
             }
         }
     }

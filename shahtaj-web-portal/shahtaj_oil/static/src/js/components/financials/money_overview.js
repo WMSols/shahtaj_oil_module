@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
-import { Component, useState, onMounted, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onMounted, onWillUpdateProps, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { hasFinancialAccess, notifyPortalBusy } from "../../shahtaj_access";
+import { hasFinancialAccess, openPortalBusy, releaseOwnerPortalBusy } from "../../shahtaj_access";
 import { cachedRead } from "../../shahtaj_read_cache";
 import { formatDate, requestFinancialTabSwitch } from "./financials_cache";
 import { setPendingCashDirection } from "./po_prefill";
@@ -33,6 +33,7 @@ export class MoneyOverview extends Component {
             }
         });
         this._moneyLoadToken = 0;
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         onMounted(() => {
             if (!hasFinancialAccess()) {
                 this.state.money.isLoading = false;
@@ -65,7 +66,7 @@ export class MoneyOverview extends Component {
         const from = this.state.money.date_from;
         const to = this.state.money.date_to;
         this.state.money.isLoading = true;
-        notifyPortalBusy(true);
+        const endBusy = openPortalBusy(this);
         const key = ["money", from, to].join("|");
         try {
             const summary = await cachedRead(key, () => this.orm.call(
@@ -87,10 +88,10 @@ export class MoneyOverview extends Component {
             console.error("Money Overview Fetch Error:", error);
             this.notification.add("Failed to load money overview: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
+            endBusy();
             if (token === this._moneyLoadToken) {
                 this.state.money.isLoading = false;
             }
-            notifyPortalBusy(false);
         }
     }
 }

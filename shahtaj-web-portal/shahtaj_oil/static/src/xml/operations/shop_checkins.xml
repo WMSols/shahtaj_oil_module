@@ -228,9 +228,22 @@
             <div class="col-md-6 mb-3 mb-md-0">
                 <div class="card border-0 shadow-sm p-4 h-100 rounded-3">
                     <h6 class="text-muted text-uppercase small fw-bold mb-3">GPS Attempt</h6>
-                    <h5 class="fw-bold text-dark mb-1">
-                        <t t-esc="this.state.selectedCheckin.shop"/>
-                    </h5>
+                    <div class="mb-1">
+                        <t t-if="this.state.selectedCheckin.shopId">
+                            <button type="button"
+                                    class="btn btn-sm btn-primary shadow-sm fw-bold"
+                                    t-on-click="() => this.viewShopFromCheckin(this.state.selectedCheckin)"
+                                    title="Open this shop's details (by Shop ID)">
+                                <t t-esc="this.state.selectedCheckin.shop"/>
+                                →
+                            </button>
+                        </t>
+                        <t t-else="">
+                            <h5 class="fw-bold text-dark mb-0">
+                                <t t-esc="this.state.selectedCheckin.shop"/>
+                            </h5>
+                        </t>
+                    </div>
                     <p class="text-muted mb-1 small">
                         <strong>Shop ID: </strong>
                         <t t-esc="this.state.selectedCheckin.shopId"/>

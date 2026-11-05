@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { notifyPortalBusy } from "../shahtaj_access";
+import { openPortalBusy, releaseOwnerPortalBusy } from "../shahtaj_access";
 import { printListPdf } from "../shahtaj_list_export";
 
 const DONE_STATES = ["delivered", "returned"];
@@ -35,6 +35,7 @@ export class DeliveryManPerformance extends Component {
             this.state.searchTimeout = setTimeout(() => this.fetchProgress(), 400);
         };
 
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         onWillStart(async () => {
             await Promise.all([this.fetchDeliveryMen(), this.fetchProgress()]);
         });
@@ -109,7 +110,7 @@ export class DeliveryManPerformance extends Component {
     async fetchProgress() {
         const fetchToken = ++this._listFetchToken;
         this.state.isLoading = true;
-        notifyPortalBusy(true);
+        const endBusy = openPortalBusy(this);
         const pag = this.state.pagination;
         try {
             const domain = this._userDomain();
@@ -153,9 +154,9 @@ export class DeliveryManPerformance extends Component {
                 this.state.rows = [];
             }
         } finally {
+            endBusy();
             if (fetchToken === this._listFetchToken) {
                 this.state.isLoading = false;
-                notifyPortalBusy(false);
             }
         }
     }

@@ -634,7 +634,10 @@
                                     <div class="fw-bold text-dark"><t t-esc="ord.total"/></div>
                                 </td>
                                 <td class="text-end pe-4">
-                                    <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewOrder(ord)">Review ➔</button>
+                                    <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewOrder(ord)">
+                                        <t t-if="this.canApproveOrders">Review ➔</t>
+                                        <t t-else="">View ➔</t>
+                                    </button>
                                 </td>
                             </tr>
                         </t>
@@ -664,9 +667,9 @@
                     </svg>
                     Back to Verification Queue
                 </button>
-                <div class="d-flex align-items-center gap-2">
-                    <button t-if="this.canMutate" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="openRejectModal" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">Reject</button>
-                    <button t-if="this.canMutate" class="btn btn-sm btn-success text-white fw-bold" t-on-click="approveSelectedOrder" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">
+                <div class="d-flex align-items-center gap-2" t-if="this.canApproveOrders">
+                    <button class="btn btn-sm btn-outline-danger fw-bold" t-on-click="openRejectModal" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">Reject</button>
+                    <button class="btn btn-sm btn-success text-white fw-bold" t-on-click="approveSelectedOrder" t-att-disabled="this.state.isApprovingOrder or this.state.isRejectingOrder">
                         <t t-if="this.state.isApprovingOrder"><span class="spinner-border spinner-border-sm me-1"/> Approving...</t>
                         <t t-else="">Approve Order</t>
                     </button>
@@ -754,7 +757,7 @@
             <textarea class="form-control mb-3" rows="4" t-model="this.state.rejectReason" placeholder="Explain why this order or discount is rejected..."></textarea>
             <div class="d-flex justify-content-end gap-2">
                 <button class="btn btn-light border fw-bold" t-on-click="closeRejectModal">Cancel</button>
-                <button t-if="this.canMutate" class="btn btn-danger fw-bold text-white" t-on-click="rejectSelectedOrder" t-att-disabled="this.state.isRejectingOrder">
+                <button t-if="this.canApproveOrders" class="btn btn-danger fw-bold text-white" t-on-click="rejectSelectedOrder" t-att-disabled="this.state.isRejectingOrder">
                     <t t-if="this.state.isRejectingOrder">Rejecting...</t>
                     <t t-else="">Confirm Rejection</t>
                 </button>
@@ -784,7 +787,7 @@
             <textarea class="form-control mb-3" rows="3" t-model="this.state.creditOverride.note" placeholder="Reason for approving above the credit limit"></textarea>
             <div class="d-flex justify-content-end gap-2">
                 <button class="btn btn-light border fw-bold" t-on-click="closeCreditOverride">Cancel</button>
-                <button t-if="this.canMutate" class="btn btn-danger fw-bold text-white" t-on-click="proceedCreditOverride" t-att-disabled="this.state.isProcessingOverride">
+                <button t-if="this.canApproveOrders" class="btn btn-danger fw-bold text-white" t-on-click="proceedCreditOverride" t-att-disabled="this.state.isProcessingOverride">
                     <t t-if="this.state.isProcessingOverride">Processing...</t>
                     <t t-else="">Proceed Anyway</t>
                 </button>

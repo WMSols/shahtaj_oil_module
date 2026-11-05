@@ -20,7 +20,7 @@
                             <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
                             <input type="text" class="form-control border-start-0 ps-0" placeholder="Search shops..." t-att-value="this.state.filters.credits.search" t-on-input="(ev) => this.onSearchInput(ev, 'credits')"/>
                         </div>
-                        <select t-if="this.state.creditSubView === 'risk'" class="form-select form-select-sm w-auto shadow-sm" t-model="this.state.filters.credits.status" t-on-change="() => this.onFilterChange('credits')">
+                        <select t-if="this.state.creditSubView === 'risk'" class="form-select form-select-sm w-auto shadow-sm" t-att-value="this.state.filters.credits.status" t-on-change="onRiskStatusFilterChange">
                             <option value="all">All Risk Statuses</option>
                             <option value="Healthy">Healthy</option>
                             <option value="Critical">Critical</option>

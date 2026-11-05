@@ -1,10 +1,10 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUpdateProps, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { session } from "@web/session";
 import { ConfirmModal } from "./confirm_modal";
-import { hasFinancialAccess, notifyPortalBusy } from "../shahtaj_access";
+import { hasFinancialAccess, openPortalBusy, releaseOwnerPortalBusy } from "../shahtaj_access";
 
 const ITEMS_PER_PAGE = 50;
 
@@ -138,6 +138,7 @@ export class Accounting extends Component {
         };
         this.debouncedFetchActiveList = this.debounceSearch(() => this.fetchActiveList(), 400);
 
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         onWillStart(async () => {
             if (!hasFinancialAccess()) {
                 return;
@@ -656,7 +657,7 @@ export class Accounting extends Component {
         const fetchToken = ++this._listFetchToken;
         const tab = this.state.activeSubTab;
         this.state.isLoadingList = true;
-        notifyPortalBusy(true);
+        const endBusy = openPortalBusy(this);
         try {
             if (tab === "journals") {
                 if (this.state.journalPanel === "entries") {
@@ -675,9 +676,9 @@ export class Accounting extends Component {
         } catch (error) {
             this.notification.add("Failed to fetch list: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
+            endBusy();
             if (fetchToken === this._listFetchToken) {
                 this.state.isLoadingList = false;
-                notifyPortalBusy(false);
             }
         }
     }

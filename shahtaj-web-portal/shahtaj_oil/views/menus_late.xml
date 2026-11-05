@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      These menus need parents created in menus.xml, so they load after it.
+      The duplicated IDs also run here second so Odoo still merges their groups
+      onto the copies defined in menus.xml.
+    -->
+
+    <menuitem id="menu_shahtaj_dm_day_sessions"
+              name="DM Day Sessions"
+              parent="menu_shahtaj_delivery_man_ops"
+              action="action_shahtaj_dm_day_session"
+              sequence="25"
+              groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
+
+    <!-- Intentionally NOT first: app home must be My Deliveries (seq 28 in menus.xml) -->
+    <menuitem id="menu_shahtaj_dm_my_day_session"
+              name="My Day Session"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_dm_my_day_session"
+              sequence="34"
+              groups="shahtaj_oil.group_shahtaj_delivery_man"/>
+
+    <!-- Distributor native UI: keep under Shahtaj Oil app -->
+    <menuitem id="menu_shahtaj_gps_attempts"
+              name="Shop GPS Attempts"
+              parent="menu_shahtaj_root"
+              action="action_shahtaj_gps_attempt"
+              sequence="95"
+              groups="shahtaj_oil.group_shahtaj_ui_pack_ob_ops"/>
+
+</odoo>

@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, onWillUnmount } from "@odoo/owl";
+import { Component, useState, onWillStart, onWillUnmount, onWillDestroy } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { notifyPortalBusy } from "../shahtaj_access";
+import { openPortalBusy, releaseOwnerPortalBusy } from "../shahtaj_access";
 import { startConnectionProbe } from "./connection_probe";
 
 export class PortalSettings extends Component {
@@ -39,6 +39,7 @@ export class PortalSettings extends Component {
         this._stopConnectionProbe = startConnectionProbe((patch) => {
             Object.assign(this.state, patch);
         });
+        onWillDestroy(() => releaseOwnerPortalBusy(this));
         onWillUnmount(() => {
             if (this._stopConnectionProbe) {
                 this._stopConnectionProbe();
@@ -151,7 +152,7 @@ export class PortalSettings extends Component {
 
     async loadSettings() {
         this.state.isLoading = true;
-        notifyPortalBusy(true);
+        const endBusy = openPortalBusy(this);
         try {
             const [limits, profile, appInfo, dmOverwrite] = await Promise.all([
                 this.orm.call("res.company", "shahtaj_get_shop_distance_limits", []),
@@ -174,8 +175,8 @@ export class PortalSettings extends Component {
                 { type: "danger" }
             );
         } finally {
+            endBusy();
             this.state.isLoading = false;
-            notifyPortalBusy(false);
         }
     }
 

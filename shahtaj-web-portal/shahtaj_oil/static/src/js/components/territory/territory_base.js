@@ -20,6 +20,8 @@ export class TerritoryBase extends Component {
         requestedShopStatus: { type: String, optional: true },
         requestedShopRegisteredOn: { type: String, optional: true },
         requestedShopRegistrar: { type: String, optional: true },
+        requestedOpenShopId: { type: [Number, Boolean], optional: true },
+        requestedOpenShopNonce: { type: Number, optional: true },
     };
     static components = { ConfirmModal, RouteFilter };
     
@@ -138,6 +140,7 @@ export class TerritoryBase extends Component {
         onWillStart(async () => {
             await this.fetchDashboardData({ force: false });
             await this.fetchActiveList(); // Force the paginator to run on initial load
+            await this._openRequestedShopDetails(this.props);
         });
         onWillUpdateProps((nextProps) => {
             const shopChanged = this._shopNavChanged(nextProps);
@@ -157,6 +160,11 @@ export class TerritoryBase extends Component {
                         this.props.onRefreshSettled();
                     }
                 });
+            }
+            const openShopChanged = (nextProps.requestedOpenShopNonce || 0) !== (this.props.requestedOpenShopNonce || 0)
+                && nextProps.requestedOpenShopId;
+            if (openShopChanged) {
+                this._openRequestedShopDetails(nextProps);
             }
         });
 
@@ -1467,6 +1475,21 @@ export class TerritoryBase extends Component {
         URL.revokeObjectURL(url);
     }
 
+    async _openRequestedShopDetails(props = this.props) {
+        const shopId = props.requestedOpenShopId ? parseInt(props.requestedOpenShopId, 10) : 0;
+        if (!shopId || this.state.activeSubTab !== "shops") {
+            return;
+        }
+        try {
+            await this.viewShopDetails(shopId);
+        } catch (error) {
+            this.notification.add(
+                "Failed to open shop details: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        }
+    }
+
     async viewShopDetails(shopId) {
         this.closeShopActionMenu();
         const details = await this.orm.read(
@@ -1490,6 +1513,8 @@ export class TerritoryBase extends Component {
             this.state.shopRouteSearchQuery = '';
             this.state.pagination.shopRoutes.page = 1;
             this._syncShopRoutesPagination();
+        } else {
+            this.notification.add(`Shop ID ${shopId} was not found.`, { type: "warning" });
         }
     }
 

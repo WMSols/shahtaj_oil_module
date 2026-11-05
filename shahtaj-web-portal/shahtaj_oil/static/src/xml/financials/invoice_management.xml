@@ -138,18 +138,23 @@
                                 <button t-if="this.canMutate and this.state.selectedOrder.invoice_status === 'to invoice'" class="btn btn-primary fw-bold text-white shadow-sm px-4" t-on-click="() => this.triggerCreateInvoice(this.state.selectedOrder)" t-att-disabled="this.state.isCreatingInvoice">
                                     <span t-if="this.state.isCreatingInvoice" class="spinner-border spinner-border-sm me-2"/>
                                     <t t-if="this.state.isCreatingInvoice">Generating...</t>
+                                    <t t-elif="this.state.selectedOrder.isPartialInvoice">
+                                        <i class="fa fa-file-text me-1"></i> Invoice Remaining</t>
                                     <t t-else="">
                                         <i class="fa fa-file-text me-1"></i> Generate Invoice</t>
                                 </button>
                             </div>
                             <div class="card p-0 shadow-sm border-0 border-start border-4 border-dark overflow-hidden">
                                 <div class="p-4 border-bottom bg-white">
-                                    <div class="d-flex justify-content-between align-items-center mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                                         <h4 class="text-dark fw-bold mb-0">Order Details: <t t-esc="this.state.selectedOrder.display_name"/>
                                         </h4>
-                                        <span class="badge text-info fs-6 shadow-sm">
-                                            <t t-esc="this.state.selectedOrder.status"/>
-                                        </span>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <span t-if="this.state.selectedOrder.isPartialInvoice" class="badge bg-warning text-dark fs-6 shadow-sm">Partial Invoiced</span>
+                                            <span class="badge text-info fs-6 shadow-sm">
+                                                <t t-esc="this.state.selectedOrder.status"/>
+                                            </span>
+                                        </div>
                                     </div>
                                     <div class="row gx-4 gy-3">
                                         <div class="col-md-4">
@@ -297,6 +302,7 @@
                                         <th>Shop Name</th>
                                         <th>Order Booker</th>
                                         <th>Order Date</th>
+                                        <th class="text-center">Invoice</th>
                                         <th class="text-end">Total Amount</th>
                                         <th class="text-end pe-4">Action</th>
                                     </tr>
@@ -304,7 +310,7 @@
                                 <tbody>
                                         <t t-if="this.state.orders.length === 0 and !this.state.isLoadingList">
                                         <tr>
-                                                <td colspan="6" class="text-center py-5 text-muted">
+                                                <td colspan="7" class="text-center py-5 text-muted">
                                                     <i class="fa fa-file-clock-o fs-1 mb-3 opacity-50"></i>
                                                     <p class="mb-1 fw-bold fs-5 text-dark">No pending orders to invoice.</p>
                                             </td>
@@ -317,6 +323,10 @@
                                                     <td class="fw-bold"><t t-esc="ord.shop"/><small class="d-block text-muted fw-normal">Shop ID: <t t-esc="ord.shopId"/></small></td>
                                                     <td><span class="badge bg-secondary text-dark"><i class="fa fa-user me-1"></i><t t-esc="ord.booker"/></span><small class="d-block text-muted mt-1">Booker ID: <t t-esc="ord.bookerId"/></small></td>
                                                     <td class="text-muted"><t t-esc="ord.date"/></td>
+                                                    <td class="text-center">
+                                                        <span t-if="ord.isPartialInvoice" class="badge bg-warning text-dark" title="Some quantity already invoiced; remaining qty can still be billed">Partial Invoiced</span>
+                                                        <span t-else="" class="badge bg-light text-muted border">To Invoice</span>
+                                                    </td>
                                                     <td class="text-end fw-bold text-dark">Rs. <t t-esc="ord.amount"/></td>
                                                     <td class="text-end pe-4"><button class="btn btn-sm btn-dark fw-bold px-3" t-on-click="() => this.viewOrder(ord)" t-att-title="this.isKpo ? 'Open this order to verify items' : 'Open this order to verify items and generate a bill'"><t t-if="this.isKpo">View</t><t t-else="">View &amp; Invoice</t></button></td>
                                         </tr>
@@ -352,6 +362,8 @@
                                 <button t-if="this.canMutate" class="btn btn-primary fw-bold text-white shadow-sm px-4" t-on-click="() => this.triggerCreateInvoice(this.state.selectedOrder)" t-att-disabled="this.state.isCreatingInvoice">
                                     <span t-if="this.state.isCreatingInvoice" class="spinner-border spinner-border-sm me-2"/>
                                     <t t-if="this.state.isCreatingInvoice">Generating...</t>
+                                    <t t-elif="this.state.selectedOrder.isPartialInvoice">
+                                        <i class="fa fa-file-text me-1"></i> Invoice Remaining</t>
                                     <t t-else="">
                                         <i class="fa fa-file-text me-1"></i> Generate Invoice</t>
                                 </button>
@@ -359,8 +371,11 @@
 
                             <div class="card p-0 shadow-sm border-0 border-start border-4 border-primary overflow-hidden">
                                 <div class="p-4 border-bottom bg-white">
-                                    <h4 class="mb-4 text-dark fw-bold">Order Details: <t t-esc="this.state.selectedOrder.display_name"/>
-                                    </h4>
+                                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                                        <h4 class="mb-0 text-dark fw-bold">Order Details: <t t-esc="this.state.selectedOrder.display_name"/>
+                                        </h4>
+                                        <span t-if="this.state.selectedOrder.isPartialInvoice" class="badge bg-warning text-dark fs-6 shadow-sm">Partial Invoiced</span>
+                                    </div>
                                     <div class="row gx-4 gy-3">
                                         <div class="col-md-4">
                                             <div class="small text-muted fw-bold text-uppercase mb-1">Customer / Shop</div>

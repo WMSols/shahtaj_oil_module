@@ -13,7 +13,7 @@
                             <div class="d-flex gap-2" t-if="this.showDmJobActions()">
                                 <button t-if="this.state.selectedDmJob.orderId" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openAssignModal(this.state.selectedDmJob.orderId, true)">View DM Assignment</button>
                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canPickJob(this.state.selectedDmJob)" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openPickModal(this.state.selectedDmJob.id)">Pick Stock</button>
-                                <button t-if="this.canMutate and this.canResetField(this.state.selectedDmJob)" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.resetDmJobField(this.state.selectedDmJob.id)">Reset Pending</button>
+                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canResetField(this.state.selectedDmJob)" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.resetDmJobField(this.state.selectedDmJob.id)">Reset Pending</button>
                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(this.state.selectedDmJob)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(this.state.selectedDmJob.id)">Return to WH</button>
                             </div>
                         </div>
@@ -41,6 +41,28 @@
                                         <div class="col-md-6"><span class="text-muted small d-block">Invoice</span><span><t t-esc="this.state.selectedDmJob.invoiceStatus || '—'"/></span></div>
                                     </t>
                                     <div class="col-12" t-if="this.state.selectedDmJob.notes"><span class="text-muted small d-block">Notes</span><span><t t-esc="this.state.selectedDmJob.notes"/></span></div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden"
+                             t-if="this.state.selectedDmJob.hasShopClosedPhoto and this.state.selectedDmJob.shopClosedImage">
+                            <button type="button" class="btn shahtaj-accordion-toggle w-100 text-start d-flex align-items-center justify-content-between p-3" t-on-click="() => this.toggleDmJobSection('shopClosed')">
+                                <h6 class="mb-0 fw-bold text-dark text-uppercase small">Shop Closed Photo</h6>
+                                <i t-attf-class="fa #{this.state.dmJobSections.shopClosed ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted"/>
+                            </button>
+                            <t t-if="this.state.dmJobSections.shopClosed">
+                                <div class="border-top p-3">
+                                    <span class="text-muted small d-block mb-2">Shop Closed Photo</span>
+                                    <button type="button" class="btn p-0 border-0 bg-transparent"
+                                            t-on-click="() => this.openImagePreview(this.proofImageSrc(this.state.selectedDmJob.shopClosedImage), 'Shop Closed Photo')"
+                                            title="Click to enlarge">
+                                        <img t-att-src="this.proofImageSrc(this.state.selectedDmJob.shopClosedImage)"
+                                             alt="Shop Closed Photo"
+                                             class="rounded border shadow-sm"
+                                             style="width: 280px; height: 280px; object-fit: cover; cursor: zoom-in;"/>
+                                    </button>
+                                    <div class="text-muted small mt-1">Click to enlarge</div>
                                 </div>
                             </t>
                         </div>
@@ -367,7 +389,7 @@
                                             <td><span t-attf-class="badge #{this.fieldStateBadgeClass(job.fieldState)}"><t t-esc="this.fieldStateLabel(job.fieldState)"/></span></td>
                                             <td class="text-end pe-4">
                                                 <button class="btn btn-sm btn-outline-dark fw-bold me-1" t-on-click="() => this.viewDmJob(job)">View</button>
-                                                <button t-if="this.canMutate and this.canResetField(job)" class="btn btn-sm btn-outline-secondary fw-bold me-1" t-on-click="() => this.resetDmJobField(job.id)">Reset</button>
+                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canResetField(job)" class="btn btn-sm btn-outline-secondary fw-bold me-1" t-on-click="() => this.resetDmJobField(job.id)">Reset</button>
                                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(job)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(job.id)">Return WH</button>
                                             </td>
                                         </tr>

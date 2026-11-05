@@ -23,7 +23,7 @@
                 <TerritoryRouteList requestedSubTab="'routes'" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
             <t t-if="this.state.activeSubTab === 'shops'">
-                <TerritoryShops requestedSubTab="'shops'" requestedShopStatus="this.props.requestedShopStatus" requestedShopRegisteredOn="this.props.requestedShopRegisteredOn" requestedShopRegistrar="this.props.requestedShopRegistrar" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
+                <TerritoryShops requestedSubTab="'shops'" requestedShopStatus="this.props.requestedShopStatus" requestedShopRegisteredOn="this.props.requestedShopRegisteredOn" requestedShopRegistrar="this.props.requestedShopRegistrar" requestedOpenShopId="this.props.requestedOpenShopId" requestedOpenShopNonce="this.props.requestedOpenShopNonce" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
             </t>
             <t t-if="this.state.activeSubTab === 'archive'">
                 <TerritoryArchive requestedSubTab="'archive'" previousSubTab="this.state.previousSubTab" onBack.bind="closeArchive" refreshNonce="this.state.refreshNonce" onRefreshSettled.bind="onRefreshSettled"/>
