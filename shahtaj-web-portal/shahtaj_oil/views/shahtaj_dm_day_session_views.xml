@@ -5,7 +5,8 @@
         <field name="name">shahtaj.dm.day.session.list</field>
         <field name="model">shahtaj.dm.day.session</field>
         <field name="arch" type="xml">
-            <list string="DM Day Sessions" create="false" delete="false">
+            <list string="DM Day Sessions" create="false" delete="false"
+                  default_order="session_date desc, id desc">
                 <field name="session_date"/>
                 <field name="delivery_man_id"/>
                 <field name="state" string="Day Status" widget="badge"
@@ -14,6 +15,10 @@
                        decoration-muted="state == 'ended'"/>
                 <field name="departed_at" string="Left Office At"/>
                 <field name="ended_at"/>
+                <field name="end_source" string="Ended By" widget="badge" optional="show"
+                       decoration-warning="end_source == 'system'"
+                       decoration-info="end_source == 'dm'"
+                       decoration-primary="end_source == 'distributor'"/>
             </list>
         </field>
     </record>
@@ -68,8 +73,19 @@
                         <group string="Times">
                             <field name="departed_at" string="Left Office At" readonly="1"/>
                             <field name="ended_at" readonly="1"/>
+                            <field name="end_source" string="Ended By" readonly="1"
+                                   invisible="state != 'ended'"
+                                   widget="badge"
+                                   decoration-warning="end_source == 'system'"
+                                   decoration-info="end_source == 'dm'"
+                                   decoration-primary="end_source == 'distributor'"/>
                         </group>
                     </group>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="end_source != 'system'">
+                        This day was <b>closed by the system</b> because the DM did not
+                        press End Day before the next calendar day.
+                    </div>
                     <group string="GPS criteria (company)">
                         <group>
                             <field name="gps_min_distance_m" readonly="1"/>
@@ -90,6 +106,18 @@
         <field name="name">DM Day Sessions</field>
         <field name="res_model">shahtaj.dm.day.session</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">['|', ('departed_at', '!=', False), ('state', '=', 'ended')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No real day journeys yet.
+            </p>
+            <p>
+                Sessions appear here after a delivery man presses <b>Leave Office</b>.
+                Login-only / still-loading office rows are hidden.
+                If a DM forgets End Day, the system auto-ends past days and marks
+                <b>Ended By = System</b>.
+            </p>
+        </field>
     </record>
 
     <!-- Opens today's session form — does NOT auto-depart -->

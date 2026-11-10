@@ -325,7 +325,9 @@ class ShahtajDmVanTransfer(models.TransientModel):
         extra = ''
         if self.open_picked_job_count:
             extra = _(
-                ' %(count)s open picked job(s) were not changed — use job Return if paperwork should match.',
+                ' %(count)s open picked job(s) may still show on paperwork '
+                '(today’s jobs are reconciled to the van; overdue/past history stays). '
+                'Use job Return WH if a past job must be closed.',
                 count=self.open_picked_job_count,
             )
         if self.actor_role == 'distributor':
@@ -360,7 +362,9 @@ class ShahtajDmVanTransfer(models.TransientModel):
             if self.open_picked_job_count:
                 result['params']['message'] = _(
                     'All van stock returned to warehouse. '
-                    '%(count)s open picked job(s) still show stock as picked on paperwork.',
+                    'Today’s open jobs were reconciled to the empty van. '
+                    '%(count)s open picked job(s) may remain on overdue/past days (history) — '
+                    'reschedule or Return WH those separately.',
                     count=self.open_picked_job_count,
                 )
             else:

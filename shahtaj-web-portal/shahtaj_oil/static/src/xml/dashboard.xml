@@ -288,7 +288,7 @@
                     <h6 class="mb-0 fw-bold text-dark mt-2" t-esc="this.portalTitle"/>
                 </div>
 
-                <div class="list-group list-group-flush p-3 fw-bold flex-grow-1">                
+                <div class="list-group list-group-flush p-3 fw-bold flex-grow-1">
                     <!-- NEW: Dashboard Overview Button -->
                     <div class="mb-2">
                         <button t-on-click="() => this.switchTab('overview')" data-shahtaj-nav="overview" data-shahtaj-menu="1" class="list-group-item list-group-item-action border-0 rounded text-start d-flex align-items-center transition-all w-100" t-att-style="this.state.activeTab === 'overview' ? 'background-color: #0f172a; color: #ffffff;' : 'color: #4b5563; background-color: transparent;'">

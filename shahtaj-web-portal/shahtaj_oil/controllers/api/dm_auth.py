@@ -119,6 +119,7 @@ class ShahtajDmApiAuth(http.Controller):
                     'date': str(session.session_date),
                     'departed_at': session.departed_at.isoformat(sep=' ') if session.departed_at else False,
                     'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
+                    'end_source': session.end_source or False,
                 }
                 gps_criteria_payload = serializers.gps_criteria(user_env)
             except (AccessError, AccessDenied):
@@ -163,6 +164,7 @@ class ShahtajDmApiAuth(http.Controller):
                 'date': str(session.session_date),
                 'departed_at': session.departed_at.isoformat(sep=' ') if session.departed_at else False,
                 'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
+                'end_source': session.end_source or False,
             },
             'online_status': presence['online_status'],
             'last_seen_at': presence['last_seen_at'],

@@ -1202,6 +1202,18 @@ export class OperationsBase extends Component {
                 ['scheduled_date', '=', false],
             ];
         }
+        if (schedule === 'today') {
+            return [
+                ['state', 'in', openStates],
+                ['scheduled_date', '=', this._pktTodayDateStr()],
+            ];
+        }
+        if (schedule === 'future') {
+            return [
+                ['state', 'in', openStates],
+                ['scheduled_date', '>', this._pktTodayDateStr()],
+            ];
+        }
         return [];
     }
 
@@ -1221,6 +1233,12 @@ export class OperationsBase extends Component {
             shopDue: j.shop_outstanding_balance || 0,
             state: j.state,
             fieldState: j.field_state,
+            loadStatus: j.shahtaj_load_status || '',
+            loadLabel: j.shahtaj_load_label || '',
+            apdSummary: j.shahtaj_apd_summary || '',
+            qtyStillToPick: j.qty_still_to_pick || 0,
+            scheduleStatus: j.schedule_status || '',
+            isOverdue: !!j.is_overdue,
             assignmentMode: j.assignment_mode || '',
             gpsVerified: j.gps_verified,
             lines: [],
@@ -1549,10 +1567,30 @@ export class OperationsBase extends Component {
         ];
     }
 
+    _rollupDispatchStockStates(states) {
+        /** One stock badge per order — avoid Ready + Picked on the same row. */
+        const present = this._sortedStockStates(states);
+        if (!present.length) return [];
+        if (present.length === 1) return present;
+        return ["mixed"];
+    }
+
+    _rollupDispatchLoadStatuses(statuses) {
+        /** One load badge per order — mixed jobs roll up to partially loaded. */
+        const present = [...new Set((statuses || []).filter(Boolean))];
+        if (!present.length) return [];
+        if (present.length === 1) return present;
+        if (present.every((s) => s === "full")) return ["full"];
+        if (present.every((s) => s === "not_loaded")) return ["not_loaded"];
+        // Any mix of not_loaded / partial / full → order is not fully loaded overall.
+        return ["partial"];
+    }
+
     async _dispatchUnassignedByOrder(orderIds) {
         const qtyByOrder = {};
         const stockStatesByOrder = {};
-        if (!orderIds.length) return { qtyByOrder, stockStatesByOrder };
+        const loadStatusesByOrder = {};
+        if (!orderIds.length) return { qtyByOrder, stockStatesByOrder, loadStatusesByOrder };
         // No stored unassigned qty. Assigned qty is on DM jobs; leftover is ordered minus that.
         const [lines, jobs] = await Promise.all([
             this.orm.searchRead(
@@ -1567,7 +1605,7 @@ export class OperationsBase extends Component {
             this.orm.searchRead(
                 "shahtaj.dm.delivery",
                 [["sale_order_id", "in", orderIds]],
-                ["sale_order_id", "qty_assigned_total", "state"],
+                ["sale_order_id", "qty_assigned_total", "state", "shahtaj_load_status"],
             ),
         ]);
         const ordered = {};
@@ -1578,19 +1616,23 @@ export class OperationsBase extends Component {
         }
         const assigned = {};
         const states = {};
+        const loads = {};
         for (const job of jobs) {
             const orderId = job.sale_order_id && job.sale_order_id[0];
             if (!orderId) continue;
             assigned[orderId] = (assigned[orderId] || 0) + (Number(job.qty_assigned_total) || 0);
             if (!states[orderId]) states[orderId] = [];
             if (job.state) states[orderId].push(job.state);
+            if (!loads[orderId]) loads[orderId] = [];
+            if (job.shahtaj_load_status) loads[orderId].push(job.shahtaj_load_status);
         }
         for (const orderId of orderIds) {
             const left = (ordered[orderId] || 0) - (assigned[orderId] || 0);
             qtyByOrder[orderId] = left > 0 ? left : 0;
-            stockStatesByOrder[orderId] = this._sortedStockStates(states[orderId]);
+            stockStatesByOrder[orderId] = this._rollupDispatchStockStates(states[orderId]);
+            loadStatusesByOrder[orderId] = this._rollupDispatchLoadStatuses(loads[orderId]);
         }
-        return { qtyByOrder, stockStatesByOrder };
+        return { qtyByOrder, stockStatesByOrder, loadStatusesByOrder };
     }
 
     _operationsListQuery(tab, filters) {
@@ -1673,6 +1715,8 @@ export class OperationsBase extends Component {
             fields = [
                 'id', 'display_name', 'delivery_man_id', 'partner_id', 'sale_order_id',
                 'order_booker_id', 'scheduled_date', 'state', 'field_state',
+                'shahtaj_load_status', 'shahtaj_load_label', 'shahtaj_apd_summary',
+                'qty_still_to_pick', 'schedule_status', 'is_overdue',
                 'assignment_mode', 'gps_verified',
             ];
             // Shop balance compute writes shop_invoice_ids (account.move). Warehouse
@@ -1698,8 +1742,13 @@ export class OperationsBase extends Component {
         } else if (tab === 'sessions') {
             model = 'shahtaj.dm.day.session';
             targetState = 'tableSessions';
-            fields = ['id', 'delivery_man_id', 'session_date', 'state', 'departed_at', 'ended_at'];
+            fields = [
+                'id', 'delivery_man_id', 'session_date', 'state',
+                'departed_at', 'ended_at', 'end_source', 'notes',
+            ];
             order = 'session_date desc, id desc';
+            // Real journeys only — hide login-only Office rows with no Leave Office.
+            domain.push('|', ['departed_at', '!=', false], ['state', '=', 'ended']);
             if (filters.dm && filters.dm !== 'all') domain.push(['delivery_man_id', '=', parseInt(filters.dm)]);
             domain.push(...this._dateRangeDomain(filters, 'session_date'));
         } else if (tab === 'collections') {
@@ -1889,7 +1938,7 @@ export class OperationsBase extends Component {
                 const [lines, invoiceFlags, dispatchExtras] = await Promise.all([
                     orderIds.length ? this.orm.searchRead("sale.order.line", [["order_id", "in", orderIds]], ["order_id", "product_uom_qty", "qty_delivered"]) : Promise.resolve([]),
                     this._customerInvoiceStates(records),
-                    tab === "dispatch" ? this._dispatchUnassignedByOrder(orderIds) : Promise.resolve({ qtyByOrder: {}, stockStatesByOrder: {} }),
+                    tab === "dispatch" ? this._dispatchUnassignedByOrder(orderIds) : Promise.resolve({ qtyByOrder: {}, stockStatesByOrder: {}, loadStatusesByOrder: {} }),
                 ]);
                 if (fetchToken !== this._listFetchToken) {
                     return;
@@ -1902,6 +1951,7 @@ export class OperationsBase extends Component {
                         row.qtyToDeliver = o.shahtaj_qty_to_deliver || 0;
                         row.qtyUnassigned = (dispatchExtras.qtyByOrder || {})[o.id] || 0;
                         row.stockStates = (dispatchExtras.stockStatesByOrder || {})[o.id] || [];
+                        row.loadStatuses = (dispatchExtras.loadStatusesByOrder || {})[o.id] || [];
                         row.dmJobCount = o.shahtaj_dm_delivery_count || 0;
                     }
                     return row;
@@ -1927,6 +1977,8 @@ export class OperationsBase extends Component {
                     dm: s.delivery_man_id ? s.delivery_man_id[1] : '—',
                     date: s.session_date || '—',
                     state: s.state,
+                    endSource: s.end_source || '',
+                    notes: s.notes || '',
                     departed: s.departed_at ? (this.formatUtcToPkt(s.departed_at) || '—') : '—',
                     ended: s.ended_at ? (this.formatUtcToPkt(s.ended_at) || '—') : '—',
                 }));
@@ -2541,6 +2593,7 @@ export class OperationsBase extends Component {
         const map = {
             not_ready: "Not ready", ready: "Ready", picked: "Picked",
             partial: "Partial", delivered: "Delivered", returned: "Returned",
+            mixed: "Mixed",
         };
         return map[state] || state || "—";
     }
@@ -2553,8 +2606,28 @@ export class OperationsBase extends Component {
             partial: "bg-warning text-dark",
             delivered: "bg-success text-white",
             returned: "bg-danger text-white",
+            mixed: "bg-secondary text-white",
         };
         return map[state] || "bg-secondary text-white";
+    }
+
+    loadStatusLabel(status, fallbackLabel = "") {
+        if (fallbackLabel) return fallbackLabel;
+        const map = {
+            not_loaded: "Not loaded",
+            partial: "Partially loaded",
+            full: "Fully loaded",
+        };
+        return map[status] || "";
+    }
+
+    loadStatusBadgeClass(status) {
+        const map = {
+            not_loaded: "bg-secondary text-white",
+            partial: "bg-warning text-dark",
+            full: "bg-success text-white",
+        };
+        return map[status] || "bg-light text-dark border";
     }
 
     fieldStateLabel(state) {
@@ -2574,6 +2647,42 @@ export class OperationsBase extends Component {
             done: "bg-success text-white",
         };
         return map[state] || "bg-secondary text-white";
+    }
+
+    scheduleStatusLabel(status) {
+        const map = {
+            today: "Today",
+            overdue: "Overdue",
+            unscheduled: "Unscheduled",
+            future: "Future",
+            closed: "Closed",
+        };
+        return map[status] || "";
+    }
+
+    scheduleStatusBadgeClass(status) {
+        const map = {
+            today: "bg-success text-white",
+            overdue: "bg-warning text-dark",
+            unscheduled: "bg-warning text-dark",
+            future: "bg-light text-dark border",
+            closed: "bg-secondary text-white",
+        };
+        return map[status] || "bg-light text-dark border";
+    }
+
+    /** Left accent for active today vs overdue/history rows. */
+    dmJobRowStyle(job) {
+        if (!job) {
+            return "";
+        }
+        if (job.scheduleStatus === "today") {
+            return "box-shadow: inset 3px 0 0 #0f766e;";
+        }
+        if (job.scheduleStatus === "overdue" || job.scheduleStatus === "unscheduled") {
+            return "box-shadow: inset 3px 0 0 #d97706;";
+        }
+        return "";
     }
 
     recoveryStateLabel(state) {
@@ -2707,6 +2816,9 @@ export class OperationsBase extends Component {
                 delivered: this._formatAssignQty(lines.reduce((sum, line) => sum + (Number(line.qtyDelivered) || 0), 0)),
                 stockState: job.stockState || "",
                 stock: this._stockProgressLabel(job.stockState),
+                loadStatus: job.loadStatus || "",
+                loadLabel: this.loadStatusLabel(job.loadStatus, job.loadLabel),
+                apdSummary: job.apdSummary || "",
                 stop: this._stopProgressLabel(job.fieldState),
             };
         });
@@ -2830,7 +2942,11 @@ export class OperationsBase extends Component {
             : [];
         const existingIds = jobs.map((j) => j.existing_job_id && j.existing_job_id[0]).filter(Boolean);
         const existingRecs = existingIds.length
-            ? await this.orm.read("shahtaj.dm.delivery", existingIds, ["id", "state", "field_state", "delivery_man_id"])
+            ? await this.orm.read("shahtaj.dm.delivery", existingIds, [
+                "id", "state", "field_state", "delivery_man_id",
+                "shahtaj_load_status", "shahtaj_load_label", "shahtaj_apd_summary",
+                "qty_still_to_pick",
+            ])
             : [];
         const existingById = Object.fromEntries(existingRecs.map((e) => [e.id, e]));
         const linesById = Object.fromEntries(lineRecs.map((l) => [l.id, l]));
@@ -2857,6 +2973,10 @@ export class OperationsBase extends Component {
                 deliveryManName: Array.isArray(dm) ? (dm[1] || "") : "",
                 stockState: existing ? existing.state : "",
                 fieldState: existing ? existing.field_state : "",
+                loadStatus: existing ? (existing.shahtaj_load_status || "") : "",
+                loadLabel: existing ? (existing.shahtaj_load_label || "") : "",
+                apdSummary: existing ? (existing.shahtaj_apd_summary || "") : "",
+                qtyStillToPick: existing ? (existing.qty_still_to_pick || 0) : 0,
                 canRemove: !existing || !lockedStates.includes(existing.state),
                 lines: (j.line_ids || []).map((lid) => {
                     const l = linesById[lid] || {};
@@ -2886,22 +3006,36 @@ export class OperationsBase extends Component {
 
     async _savePlannedDeliveryDate() {
         const modal = this.state.assignModal;
-        if (modal.readOnly || !modal.orderId || !modal.canEditDeliveryDate || !modal.plannedDeliveryDate) {
+        if (modal.readOnly || !modal.orderId || !modal.plannedDeliveryDate) {
             return;
         }
         const [order] = await this.orm.read("sale.order", [modal.orderId], [
             "shahtaj_planned_delivery_date",
             "shahtaj_can_edit_delivery_plan",
         ]);
-        if (!order || !order.shahtaj_can_edit_delivery_plan) {
+        if (!order) {
             return;
         }
         if (order.shahtaj_planned_delivery_date === modal.plannedDeliveryDate) {
             return;
         }
-        await this.orm.write("sale.order", [modal.orderId], {
-            shahtaj_planned_delivery_date: modal.plannedDeliveryDate,
-        });
+        if (!modal.canEditDeliveryDate || !order.shahtaj_can_edit_delivery_plan) {
+            this.notification.add(
+                "Cannot change Delivery Day — stock is on the van for today’s open trip, or every job is fully delivered. Return undelivered stock, End Day, wait until tomorrow, or reschedule a returned job.",
+                { type: "warning" },
+            );
+            return;
+        }
+        try {
+            await this.orm.write("sale.order", [modal.orderId], {
+                shahtaj_planned_delivery_date: modal.plannedDeliveryDate,
+            });
+        } catch (error) {
+            this.notification.add(
+                error.data?.message || error.message || "Could not update Delivery Day.",
+                { type: "danger" },
+            );
+        }
     }
 
     async persistAssignEdits() {
@@ -2987,6 +3121,9 @@ export class OperationsBase extends Component {
             "display_name", "delivery_man_id", "scheduled_date", "scheduled_time",
             "picked_at", "delivered_at", "state", "field_state", "assignment_mode",
             "assigned_by_id", "qty_assigned_total",
+            "shahtaj_load_status", "shahtaj_load_label", "shahtaj_apd_summary",
+            "qty_still_to_pick", "schedule_status", "is_overdue",
+            "shahtaj_delivery_day_lock_reason", "shahtaj_can_edit_schedule",
             "sale_order_id", "partner_id", "order_booker_id", "order_date", "notes", "is_walk_in",
             "gps_verified", "check_in_distance_m", "receiver_name",
             "check_in_latitude", "check_in_longitude", "has_delivery_proof", "delivery_proof_image",
@@ -3022,6 +3159,14 @@ export class OperationsBase extends Component {
             deliveredAt: rec.delivered_at || "",
             state: rec.state || job.state,
             fieldState: rec.field_state || job.fieldState,
+            loadStatus: rec.shahtaj_load_status || job.loadStatus || "",
+            loadLabel: rec.shahtaj_load_label || job.loadLabel || "",
+            apdSummary: rec.shahtaj_apd_summary || job.apdSummary || "",
+            qtyStillToPick: rec.qty_still_to_pick || 0,
+            scheduleStatus: rec.schedule_status || job.scheduleStatus || "",
+            isOverdue: !!(rec.is_overdue ?? job.isOverdue),
+            deliveryDayLockReason: rec.shahtaj_delivery_day_lock_reason || "",
+            canEditSchedule: !!rec.shahtaj_can_edit_schedule,
             assignmentMode: rec.assignment_mode || "",
             assignedBy: rec.assigned_by_id ? rec.assigned_by_id[1] : "—",
             amount: rec.amount_total || 0,
@@ -3071,10 +3216,93 @@ export class OperationsBase extends Component {
         this.closeImagePreview();
     }
 
+    _jobHasLeftoverOnVan(job) {
+        if (!job) {
+            return false;
+        }
+        const lines = job.lines || [];
+        if (lines.length) {
+            return lines.some((line) => {
+                const onVan = Number(line.qtyOnVan);
+                if (Number.isFinite(onVan)) {
+                    return onVan > 0.000001;
+                }
+                return (Number(line.qtyPicked) || 0) - (Number(line.qtyDelivered) || 0) > 0.000001;
+            });
+        }
+        // List rows have no lines — picked/partial means leftover may still be on the van.
+        return ["picked", "partial"].includes(job.state);
+    }
+
+    buildResetRetryWarning(job) {
+        const name = (job && (job.name || job.order)) || "this job";
+        const stock = this.stockStateLabel(job?.state);
+        const stop = this.fieldStateLabel(job?.fieldState);
+        if (!job || job.state === "delivered") {
+            return {
+                blocked: true,
+                title: "Cannot Reset & Retry",
+                message:
+                    `${name} is Fully Delivered. Reset is blocked.\n\n` +
+                    "Use Undo Delivery to Shop (when still allowed), or create a new order for extra qty.",
+            };
+        }
+        if (job.state === "not_ready") {
+            return {
+                blocked: true,
+                title: "Cannot Reset & Retry",
+                message: `${name} is waiting for invoice. Post the invoice first.`,
+            };
+        }
+
+        const steps = [];
+        const hasVanLeftover = this._jobHasLeftoverOnVan(job);
+        if (hasVanLeftover) {
+            steps.push("Return leftover stock from the van to the warehouse first");
+        }
+        if (job.state === "returned" || hasVanLeftover) {
+            steps.push("Reopen Stock to Ready or Partial (already-delivered qty is kept)");
+        } else if (["ready", "picked", "partial"].includes(job.state)) {
+            steps.push("Keep Stock open for re-pick of remaining assigned qty");
+        }
+        steps.push("Set Stop to Pending");
+        steps.push("Set Delivery Day to today so the app Today Load shows it again");
+        steps.push("DM can attempt the remaining qty again");
+
+        const numbered = steps.map((step, idx) => `${idx + 1}. ${step}`).join("\n");
+        return {
+            blocked: false,
+            title: "Reset & Retry — confirm",
+            message:
+                `Current status: Stock ${stock}, Stop ${stop}.\n\n` +
+                `Reset & Retry will:\n${numbered}\n\n` +
+                "Do you want to continue?",
+        };
+    }
+
+    requestResetDmJobField(job) {
+        if (!job || !this.canMutate || !this.showDmOverwriteButtons) {
+            return;
+        }
+        const warning = this.buildResetRetryWarning(job);
+        if (warning.blocked) {
+            this.notification.add(warning.message, { type: "warning" });
+            return;
+        }
+        if (!this.canResetField(job)) {
+            this.notification.add("Reset & Retry is not available for this job.", { type: "warning" });
+            return;
+        }
+        this.showConfirm(warning.title, warning.message, () => this.resetDmJobField(job.id));
+    }
+
     async resetDmJobField(jobId) {
         try {
             await this.orm.call("shahtaj.dm.delivery", "action_field_reset_pending", [[jobId]]);
-            this.notification.add("Field status reset to pending.", { type: "success" });
+            this.notification.add(
+                "Job reset for retry — Stop Pending, stock reopened, scheduled for today. DM can attempt again.",
+                { type: "success" },
+            );
             await this.fetchActiveList();
             if (this.state.selectedDmJob && this.state.selectedDmJob.id === jobId) {
                 await this.viewDmJob({ id: jobId });
@@ -3161,7 +3389,14 @@ export class OperationsBase extends Component {
     }
 
     canResetField(job) {
-        return job && ["in_transit", "not_attended", "failed"].includes(job.fieldState);
+        // Dist override restart: any open / returned job (not fully delivered / waiting invoice).
+        if (!job) {
+            return false;
+        }
+        if (["delivered", "not_ready"].includes(job.state)) {
+            return false;
+        }
+        return ["ready", "picked", "partial", "returned"].includes(job.state);
     }
 
     canReturnWarehouse(job) {
@@ -3182,6 +3417,24 @@ export class OperationsBase extends Component {
     sessionLabel(state) {
         const map = { office: "Office", on_the_way: "On the way", ended: "Ended" };
         return map[state] || state || "—";
+    }
+
+    sessionEndSourceLabel(source) {
+        const map = {
+            dm: "DM ended",
+            distributor: "Office ended",
+            system: "System ended",
+        };
+        return map[source] || "";
+    }
+
+    sessionEndSourceBadgeClass(source) {
+        const map = {
+            dm: "bg-info text-white",
+            distributor: "bg-primary text-white",
+            system: "bg-warning text-dark",
+        };
+        return map[source] || "bg-secondary text-white";
     }
 
     assignmentModeLabel(mode) {
@@ -4797,12 +5050,17 @@ export class OperationsBase extends Component {
             const filters = this.state.filters.dm_jobs || {};
             const stockLabels = { except_not_ready: "Except not ready", ready: "Ready", picked: "Picked", partial: "Partial", delivered: "Delivered", returned: "Returned", not_ready: "Not ready" };
             const fieldLabels = { pending: "Pending", in_transit: "In transit", done: "Done", not_attended: "Shop closed", failed: "Failed" };
-            const scheduleLabels = { overdue: "Overdue / Not Done", unscheduled: "Unscheduled" };
+            const scheduleLabels = {
+                today: "Today",
+                future: "Future",
+                overdue: "Overdue / Not Done",
+                unscheduled: "Unscheduled",
+            };
             const rows = await this._loadMappedPrintRows("dm_jobs");
             const financial = this.hasFinancialAccess;
             const columns = ["Job", "Date", "Order", "Shop", "Delivery Man", "Booker"];
             if (financial) columns.push("Amount", "Shop Due");
-            columns.push("Stock", "Field");
+            columns.push("Stock", "Load", "A/P/D", "Field");
             await this._openListPrint(
                 "Delivery Jobs",
                 [
@@ -4819,7 +5077,12 @@ export class OperationsBase extends Component {
                 rows.map((job) => {
                     const cells = [job.name || "", job.date || "", job.order || "", job.shop || "", job.dm || "", job.booker || ""];
                     if (financial) cells.push(this.formatMoney(job.amount), this.formatMoney(job.shopDue));
-                    cells.push(this.stockStateLabel(job.state), this.fieldStateLabel(job.fieldState));
+                    cells.push(
+                        this.stockStateLabel(job.state),
+                        this.loadStatusLabel(job.loadStatus, job.loadLabel),
+                        job.apdSummary || "",
+                        this.fieldStateLabel(job.fieldState),
+                    );
                     return cells;
                 }),
             );

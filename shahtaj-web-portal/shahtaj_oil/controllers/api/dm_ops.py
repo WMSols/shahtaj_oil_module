@@ -27,6 +27,7 @@ class ShahtajDmApiOps(http.Controller):
             'state': session.state,
             'departed_at': session.departed_at.isoformat(sep=' ') if session.departed_at else False,
             'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
+            'end_source': session.end_source or False,
             'notes': session.notes or '',
         })
 
@@ -59,6 +60,7 @@ class ShahtajDmApiOps(http.Controller):
             'date': str(session.session_date),
             'state': session.state,
             'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
+            'end_source': session.end_source or False,
         })
 
     # ── Office load ───────────────────────────────────────────────────

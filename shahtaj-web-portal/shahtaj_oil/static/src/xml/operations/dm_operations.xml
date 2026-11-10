@@ -13,14 +13,23 @@
                             <div class="d-flex gap-2" t-if="this.showDmJobActions()">
                                 <button t-if="this.state.selectedDmJob.orderId" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openAssignModal(this.state.selectedDmJob.orderId, true)">View DM Assignment</button>
                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canPickJob(this.state.selectedDmJob)" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openPickModal(this.state.selectedDmJob.id)">Pick Stock</button>
-                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canResetField(this.state.selectedDmJob)" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.resetDmJobField(this.state.selectedDmJob.id)">Reset Pending</button>
+                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canResetField(this.state.selectedDmJob)" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.requestResetDmJobField(this.state.selectedDmJob)" title="Warns with current-status steps, then returns leftover / reopens Stock / Pending / today after you confirm.">Reset &amp; Retry</button>
                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(this.state.selectedDmJob)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(this.state.selectedDmJob.id)">Return to WH</button>
                             </div>
                         </div>
                         <h4 class="fw-bold"><t t-esc="this.state.selectedDmJob.name"/></h4>
-                        <div class="d-flex gap-2 mb-3 flex-wrap">
+                        <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+                            <span t-if="this.state.selectedDmJob.scheduleStatus" t-attf-class="badge #{this.scheduleStatusBadgeClass(this.state.selectedDmJob.scheduleStatus)}"><t t-esc="this.scheduleStatusLabel(this.state.selectedDmJob.scheduleStatus)"/></span>
                             <span t-attf-class="badge #{this.stockStateBadgeClass(this.state.selectedDmJob.state)}"><t t-esc="this.stockStateLabel(this.state.selectedDmJob.state)"/></span>
+                            <span t-if="this.state.selectedDmJob.loadStatus" t-attf-class="badge #{this.loadStatusBadgeClass(this.state.selectedDmJob.loadStatus)}"><t t-esc="this.loadStatusLabel(this.state.selectedDmJob.loadStatus, this.state.selectedDmJob.loadLabel)"/></span>
+                            <span t-if="this.state.selectedDmJob.apdSummary" class="badge bg-light text-dark border"><t t-esc="this.state.selectedDmJob.apdSummary"/></span>
                             <span t-attf-class="badge #{this.fieldStateBadgeClass(this.state.selectedDmJob.fieldState)}"><t t-esc="this.fieldStateLabel(this.state.selectedDmJob.fieldState)"/></span>
+                        </div>
+                        <div t-if="this.state.selectedDmJob.qtyStillToPick &gt; 0 and !['returned', 'delivered'].includes(this.state.selectedDmJob.state)" class="alert alert-warning py-2 px-3 small mb-3">
+                            <span class="fw-bold"><t t-esc="this.state.selectedDmJob.qtyStillToPick"/></span> still to load onto the van.
+                        </div>
+                        <div t-if="this.state.selectedDmJob.deliveryDayLockReason" class="alert alert-secondary py-2 px-3 small mb-3">
+                            <t t-esc="this.state.selectedDmJob.deliveryDayLockReason"/>
                         </div>
 
                         <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
@@ -260,7 +269,14 @@
                                                         <span t-attf-class="badge me-1 #{this.stockStateBadgeClass(stockState)}"><t t-esc="this.stockStateLabel(stockState)"/></span>
                                                     </t>
                                                 </t>
-                                                <span t-else="" class="text-muted">—</span>
+                                                <t t-if="row.loadStatuses and row.loadStatuses.length">
+                                                    <div class="mt-1">
+                                                        <t t-foreach="row.loadStatuses" t-as="loadStatus" t-key="loadStatus">
+                                                            <span t-attf-class="badge me-1 #{this.loadStatusBadgeClass(loadStatus)}"><t t-esc="this.loadStatusLabel(loadStatus)"/></span>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                                <span t-if="!(row.stockStates and row.stockStates.length) and !(row.loadStatuses and row.loadStatuses.length)" class="text-muted">—</span>
                                             </td>
                                             <td><t t-esc="row.dmJobCount"/></td>
                                             <td class="text-end pe-4">
@@ -330,6 +346,8 @@
                         </select>
                         <select class="form-select form-select-sm" style="max-width: 190px;" t-model="this.state.filters.dm_jobs.schedule" t-on-change="() => this.onFilterChange('dm_jobs')">
                             <option value="all">All schedule</option>
+                            <option value="today">Today (active)</option>
+                            <option value="future">Future</option>
                             <option value="overdue">Overdue / Not Done</option>
                             <option value="unscheduled">Unscheduled</option>
                         </select>
@@ -363,18 +381,22 @@
                                         <th class="text-end border-top-0" t-if="this.hasFinancialAccess">Amount</th>
                                         <th class="text-end border-top-0" t-if="this.hasFinancialAccess">Shop Due</th>
                                         <th class="border-top-0">Stock</th>
+                                        <th class="border-top-0">Load</th>
                                         <th class="border-top-0">Field</th>
                                         <th class="text-end pe-4 border-top-0">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <t t-if="this.state.tableDmJobs.length === 0 and !this.state.isLoadingList">
-                                        <tr><td t-att-colspan="this.hasFinancialAccess ? 9 : 7" class="text-center py-5 text-muted fw-bold">No delivery jobs for these filters.</td></tr>
+                                        <tr><td t-att-colspan="this.hasFinancialAccess ? 10 : 8" class="text-center py-5 text-muted fw-bold">No delivery jobs for these filters.</td></tr>
                                     </t>
                                     <t t-foreach="this.state.tableDmJobs" t-as="job" t-key="job.id">
-                                        <tr>
+                                        <tr t-att-style="this.dmJobRowStyle(job)">
                                             <td class="ps-4 fw-bold"><t t-esc="job.name"/></td>
-                                            <td><t t-esc="job.date"/></td>
+                                            <td>
+                                                <div><t t-esc="job.date"/></div>
+                                                <span t-if="job.scheduleStatus" t-attf-class="badge mt-1 #{this.scheduleStatusBadgeClass(job.scheduleStatus)}"><t t-esc="this.scheduleStatusLabel(job.scheduleStatus)"/></span>
+                                            </td>
                                             <td>
                                                 <div class="fw-bold"><t t-esc="job.order"/></div>
                                                 <small class="text-muted"><t t-esc="job.shop"/></small>
@@ -386,10 +408,15 @@
                                             <td class="text-end" t-if="this.hasFinancialAccess">Rs. <t t-esc="this.formatMoney(job.amount)"/></td>
                                             <td class="text-end" t-if="this.hasFinancialAccess" t-attf-class="#{job.shopDue &gt; 0 ? 'text-danger fw-bold' : ''}">Rs. <t t-esc="this.formatMoney(job.shopDue)"/></td>
                                             <td><span t-attf-class="badge #{this.stockStateBadgeClass(job.state)}"><t t-esc="this.stockStateLabel(job.state)"/></span></td>
+                                            <td>
+                                                <span t-if="job.loadStatus" t-attf-class="badge #{this.loadStatusBadgeClass(job.loadStatus)}"><t t-esc="this.loadStatusLabel(job.loadStatus, job.loadLabel)"/></span>
+                                                <span t-else="" class="text-muted">—</span>
+                                                <div t-if="job.apdSummary" class="small text-muted mt-1"><t t-esc="job.apdSummary"/></div>
+                                            </td>
                                             <td><span t-attf-class="badge #{this.fieldStateBadgeClass(job.fieldState)}"><t t-esc="this.fieldStateLabel(job.fieldState)"/></span></td>
                                             <td class="text-end pe-4">
                                                 <button class="btn btn-sm btn-outline-dark fw-bold me-1" t-on-click="() => this.viewDmJob(job)">View</button>
-                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canResetField(job)" class="btn btn-sm btn-outline-secondary fw-bold me-1" t-on-click="() => this.resetDmJobField(job.id)">Reset</button>
+                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canResetField(job)" class="btn btn-sm btn-outline-secondary fw-bold me-1" t-on-click="() => this.requestResetDmJobField(job)" title="Shows a status warning first; only resets after you confirm.">Reset &amp; Retry</button>
                                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(job)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(job.id)">Return WH</button>
                                             </td>
                                         </tr>
@@ -441,20 +468,31 @@
                                         <th class="border-top-0">Status</th>
                                         <th class="border-top-0">Departed</th>
                                         <th class="border-top-0">Ended</th>
+                                        <th class="border-top-0">Ended by</th>
                                         <th class="text-end pe-4 border-top-0">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <t t-if="!this.state.tableSessions.length and !this.state.isLoadingList">
-                                        <tr><td colspan="6" class="text-center py-5 text-muted fw-bold">No day sessions for these filters.</td></tr>
+                                        <tr><td colspan="7" class="text-center py-5 text-muted fw-bold">No day journeys yet. Rows appear after Leave Office (login-only Office rows are hidden).</td></tr>
                                     </t>
                                     <t t-foreach="this.state.tableSessions" t-as="sess" t-key="sess.id">
                                         <tr>
                                             <td class="ps-4 fw-bold"><t t-esc="sess.dm"/></td>
                                             <td><t t-esc="sess.date"/></td>
-                                            <td><t t-esc="this.sessionLabel(sess.state)"/></td>
+                                            <td>
+                                                <span t-attf-class="badge #{sess.state === 'on_the_way' ? 'bg-success text-white' : (sess.state === 'ended' ? 'bg-secondary text-white' : 'bg-info text-white')}">
+                                                    <t t-esc="this.sessionLabel(sess.state)"/>
+                                                </span>
+                                            </td>
                                             <td><t t-esc="sess.departed"/></td>
                                             <td><t t-esc="sess.ended"/></td>
+                                            <td>
+                                                <span t-if="sess.endSource" t-attf-class="badge #{this.sessionEndSourceBadgeClass(sess.endSource)}">
+                                                    <t t-esc="this.sessionEndSourceLabel(sess.endSource)"/>
+                                                </span>
+                                                <span t-else="" class="text-muted">—</span>
+                                            </td>
                                             <td class="text-end pe-4">
                                                 <button t-if="this.canMutate and sess.state !== 'office'" class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.resetSession(sess.id)">Reset to office</button>
                                             </td>
@@ -721,12 +759,16 @@
                                         </div>
                                         <small class="text-muted">This collection: Rs. <t t-esc="this.formatMoney(this.state.selectedRecovery.amount)"/></small>
                                     </t>
-                                    <span t-elif="this.state.selectedRecovery.invoiceLabel" class="fw-bold">
-                                        <t t-esc="this.state.selectedRecovery.invoiceLabel"/>
-                                    </span>
-                                    <span t-else="" class="text-muted">
-                                        <t t-esc="this.state.selectedRecovery.invoiceNote || 'No invoice linked to this collection.'"/>
-                                    </span>
+                                    <t t-elif="this.state.selectedRecovery.invoiceLabel">
+                                        <span class="fw-bold">
+                                            <t t-esc="this.state.selectedRecovery.invoiceLabel"/>
+                                        </span>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="text-muted">
+                                            <t t-esc="this.state.selectedRecovery.invoiceNote || 'No invoice linked to this collection.'"/>
+                                        </span>
+                                    </t>
                                 </div>
                                 <div class="col-12">
                                     <span class="text-muted small d-block">Notes</span>
@@ -1168,75 +1210,86 @@
                                     <b>Delivery progress</b>
                                     <span class="text-muted"> (read-only — from saved DM jobs)</span>
                                 </p>
-                                    <t t-if="this.assignDeliveryProgress.empty">
-                                        <p class="mb-0 small text-muted">No DM jobs yet. Save assignments first.</p>
-                                    </t>
-                                    <t t-else="">
-                                        <table class="table table-sm table-bordered mb-2">
-                                            <thead>
+                                <t t-if="this.assignDeliveryProgress.empty">
+                                    <p class="mb-0 small text-muted">No DM jobs yet. Save assignments first.</p>
+                                </t>
+                                <t t-else="">
+                                    <table class="table table-sm table-bordered mb-2">
+                                        <thead>
+                                            <tr>
+                                                <th>Delivery Man</th>
+                                                <th class="text-end">Assigned</th>
+                                                <th class="text-end">Picked</th>
+                                                <th class="text-end">Delivered</th>
+                                                <th>Stock</th>
+                                                <th>Load</th>
+                                                <th>Stop</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="this.assignDeliveryProgress.jobs" t-as="prow" t-key="prow.id">
                                                 <tr>
-                                                    <th>Delivery Man</th>
-                                                    <th class="text-end">Assigned</th>
-                                                    <th class="text-end">Picked</th>
-                                                    <th class="text-end">Delivered</th>
-                                                    <th>Stock</th>
-                                                    <th>Stop</th>
+                                                    <td><t t-esc="prow.dm"/></td>
+                                                    <td class="text-end"><t t-esc="prow.assigned"/></td>
+                                                    <td class="text-end"><t t-esc="prow.picked"/></td>
+                                                    <td class="text-end"><t t-esc="prow.delivered"/></td>
+                                                    <td>
+                                                        <span t-if="prow.stockState" t-attf-class="badge #{this.stockStateBadgeClass(prow.stockState)}"><t t-esc="prow.stock"/></span>
+                                                        <span t-else="">—</span>
+                                                    </td>
+                                                    <td>
+                                                        <span t-if="prow.loadStatus" t-attf-class="badge #{this.loadStatusBadgeClass(prow.loadStatus)}"><t t-esc="prow.loadLabel"/></span>
+                                                        <span t-else="">—</span>
+                                                    </td>
+                                                    <td><t t-esc="prow.stop"/></td>
                                                 </tr>
-                                            </thead>
-                                            <tbody>
-                                                <t t-foreach="this.assignDeliveryProgress.jobs" t-as="prow" t-key="prow.id">
-                                                    <tr>
-                                                        <td><t t-esc="prow.dm"/></td>
-                                                        <td class="text-end"><t t-esc="prow.assigned"/></td>
-                                                        <td class="text-end"><t t-esc="prow.picked"/></td>
-                                                        <td class="text-end"><t t-esc="prow.delivered"/></td>
-                                                        <td>
-                                                            <span t-if="prow.stockState" t-attf-class="badge #{this.stockStateBadgeClass(prow.stockState)}"><t t-esc="prow.stock"/></span>
-                                                            <t t-else="">—</t>
-                                                        </td>
-                                                        <td><t t-esc="prow.stop"/></td>
-                                                    </tr>
-                                                </t>
-                                            </tbody>
-                                        </table>
-                                        <table class="table table-sm table-bordered mb-0">
-                                            <thead>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                    <table class="table table-sm table-bordered mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Product</th>
+                                                <th class="text-end">Ordered</th>
+                                                <th class="text-end">Assigned</th>
+                                                <th class="text-end">Picked</th>
+                                                <th class="text-end">Delivered</th>
+                                                <th>Per DM (A/P/D)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-if="!this.assignDeliveryProgress.products.length">
+                                                <tr><td colspan="6" class="text-muted">No products</td></tr>
+                                            </t>
+                                            <t t-foreach="this.assignDeliveryProgress.products" t-as="prow" t-key="'prog-' + prow.id">
                                                 <tr>
-                                                    <th>Product</th>
-                                                    <th class="text-end">Ordered</th>
-                                                    <th class="text-end">Assigned</th>
-                                                    <th class="text-end">Picked</th>
-                                                    <th class="text-end">Delivered</th>
-                                                    <th>Per DM (A/P/D)</th>
+                                                    <td><t t-esc="prow.product"/></td>
+                                                    <td class="text-end"><t t-esc="prow.ordered"/></td>
+                                                    <td class="text-end"><t t-esc="prow.assigned"/></td>
+                                                    <td class="text-end"><t t-esc="prow.picked"/></td>
+                                                    <td class="text-end"><t t-esc="prow.delivered"/></td>
+                                                    <td class="small"><t t-esc="prow.perDm"/></td>
                                                 </tr>
-                                            </thead>
-                                            <tbody>
-                                                <t t-if="!this.assignDeliveryProgress.products.length">
-                                                    <tr><td colspan="6" class="text-muted">No products</td></tr>
-                                                </t>
-                                                <t t-foreach="this.assignDeliveryProgress.products" t-as="prow" t-key="'prog-' + prow.id">
-                                                    <tr>
-                                                        <td><t t-esc="prow.product"/></td>
-                                                        <td class="text-end"><t t-esc="prow.ordered"/></td>
-                                                        <td class="text-end"><t t-esc="prow.assigned"/></td>
-                                                        <td class="text-end"><t t-esc="prow.picked"/></td>
-                                                        <td class="text-end"><t t-esc="prow.delivered"/></td>
-                                                        <td class="small"><t t-esc="prow.perDm"/></td>
-                                                    </tr>
-                                                </t>
-                                            </tbody>
-                                        </table>
-                                    </t>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </t>
                             </div>
                             <div class="mb-3" style="max-width: 240px;">
                                 <label class="small fw-bold">Planned Delivery Date</label>
                                 <input type="date" class="form-control form-control-sm" t-model="this.state.assignModal.plannedDeliveryDate" t-att-disabled="this.state.assignModal.readOnly || !this.state.assignModal.canEditDeliveryDate"/>
+                                <div t-if="!this.state.assignModal.canEditDeliveryDate" class="form-text text-muted">
+                                    Locked while stock is on the van for today’s open trip, or when every job is fully delivered. Returned jobs can be rescheduled (past days stay editable).
+                                </div>
                             </div>
                             <t t-foreach="this.state.assignModal.jobs" t-as="job" t-key="job.id">
                                 <div class="border rounded-3 p-3 mb-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
                                         <span class="small fw-bold">Delivery man</span>
-                                        <span t-if="job.stockState" t-attf-class="badge #{this.stockStateBadgeClass(job.stockState)}"><t t-esc="this._stockProgressLabel(job.stockState)"/></span>
+                                        <div class="d-flex gap-1 flex-wrap">
+                                            <span t-if="job.stockState" t-attf-class="badge #{this.stockStateBadgeClass(job.stockState)}"><t t-esc="this._stockProgressLabel(job.stockState)"/></span>
+                                            <span t-if="job.loadStatus" t-attf-class="badge #{this.loadStatusBadgeClass(job.loadStatus)}"><t t-esc="this.loadStatusLabel(job.loadStatus, job.loadLabel)"/></span>
+                                        </div>
                                     </div>
                                     <div class="row g-2 mb-2">
                                         <div t-attf-class="#{this.state.assignModal.readOnly ? 'col-12' : 'col-md-10'}">
@@ -1442,6 +1495,15 @@
                          style="max-width: 100%; max-height: 78vh; object-fit: contain;"/>
                 </div>
             </div>
+        </t>
+
+        <t t-if="this.state.confirmModal.isOpen">
+            <ConfirmModal
+                title="this.state.confirmModal.title"
+                message="this.state.confirmModal.message"
+                onConfirm="this.state.confirmModal.onConfirm"
+                onCancel="() => this.closeConfirm()"
+            />
         </t>
         </div>
     </t>

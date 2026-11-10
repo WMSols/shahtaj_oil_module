@@ -193,8 +193,8 @@ class ShahtajDmTodayLoad(models.TransientModel):
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
 
-        # Stamp free van onto jobs so Shop Progress / Stock match Load need=0.
-        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        # Stamp free van onto today's jobs so Shop Progress / Stock match Load need=0.
+        Delivery._shahtaj_apply_free_van_for_day(dm, day)
         deliveries = Delivery.search(
             self._shahtaj_today_load_delivery_domain(dm, day),
             order='scheduled_date, partner_id, id',
@@ -360,7 +360,7 @@ class ShahtajDmTodayLoad(models.TransientModel):
         )
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
-        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        Delivery._shahtaj_apply_free_van_for_day(dm, day)
         deliveries = Delivery.search(
             self._shahtaj_today_load_delivery_domain(dm, day),
             order='id',

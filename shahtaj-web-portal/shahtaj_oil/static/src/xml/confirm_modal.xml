@@ -12,7 +12,7 @@
                         <button type="button" class="btn-close" t-on-click="props.onCancel"></button>
                     </div>
                     <div class="modal-body py-4">
-                        <p class="mb-0 text-muted fs-6"><t t-esc="props.message"/></p>
+                        <p class="mb-0 text-muted fs-6" style="white-space: pre-line;"><t t-esc="props.message"/></p>
                     </div>
                     <div class="modal-footer border-top-0 bg-light">
                         <button type="button" class="btn btn-outline-secondary fw-bold px-4" t-on-click="props.onCancel">Cancel</button>

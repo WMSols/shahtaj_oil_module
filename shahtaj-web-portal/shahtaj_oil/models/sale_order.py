@@ -76,7 +76,12 @@ class SaleOrder(models.Model):
         string='Planned Delivery Date',
         compute='_compute_shahtaj_planned_delivery_date',
         inverse='_inverse_shahtaj_planned_delivery_date',
-        help='Editable while no delivery stock has been picked. Updates open DM jobs.',
+        help=(
+            'Updates open DM jobs (including returned jobs being rescheduled). '
+            'Locked only while stock is on the van for today’s open trip, or when '
+            'every job is fully delivered. Unlocked after return, DM End Day, or '
+            'when the calendar day has passed.'
+        ),
     )
     shahtaj_can_edit_delivery_plan = fields.Boolean(
         compute='_compute_shahtaj_can_edit_delivery_plan',
@@ -1014,6 +1019,18 @@ class SaleOrder(models.Model):
             order.shahtaj_assigned_dm_id = job.delivery_man_id if job else False
             order.shahtaj_dm_scheduled_date = job.scheduled_date if job else False
 
+    def _shahtaj_jobs_for_delivery_day_edit(self):
+        """Jobs that may receive a Planned Delivery Date change.
+
+        Includes returned jobs (reschedule reopens a new pick cycle).
+        Excludes fully delivered and jobs that still have leftover on the van.
+        """
+        self.ensure_one()
+        return self.shahtaj_dm_delivery_ids.filtered(
+            lambda j: j.state != 'delivered'
+            and not j._shahtaj_is_active_loaded_trip_locked()
+        )
+
     @api.depends(
         'shahtaj_dm_delivery_ids.scheduled_date',
         'shahtaj_dm_delivery_ids.state',
@@ -1022,48 +1039,61 @@ class SaleOrder(models.Model):
     )
     def _compute_shahtaj_planned_delivery_date(self):
         for order in self:
+            # Prefer jobs Dist can still move; else any open / finished job date.
+            editable = order._shahtaj_jobs_for_delivery_day_edit().sorted('id')
             open_jobs = order.shahtaj_dm_delivery_ids.filtered(
-                lambda j: j.state not in ('picked', 'partial', 'delivered', 'returned'),
+                lambda j: j.state != 'delivered',
             ).sorted('id')
-            jobs = open_jobs or order.shahtaj_dm_delivery_ids.sorted('id')
+            jobs = editable or open_jobs or order.shahtaj_dm_delivery_ids.sorted('id')
             order.shahtaj_planned_delivery_date = jobs[:1].scheduled_date if jobs else False
 
     @api.depends(
         'state',
         'shahtaj_delivery_status',
         'shahtaj_dm_delivery_ids.state',
+        'shahtaj_dm_delivery_ids.scheduled_date',
+        'shahtaj_dm_delivery_ids.delivery_man_id',
+        'shahtaj_dm_delivery_ids.line_ids.qty_picked',
+        'shahtaj_dm_delivery_ids.line_ids.qty_delivered',
     )
     def _compute_shahtaj_can_edit_delivery_plan(self):
         for order in self:
             if order.state not in ('sale', 'done'):
                 order.shahtaj_can_edit_delivery_plan = False
                 continue
-            open_jobs = order.shahtaj_dm_delivery_ids.filtered(
-                lambda j: j.state not in ('picked', 'partial', 'delivered', 'returned'),
+            order.shahtaj_can_edit_delivery_plan = bool(
+                order._shahtaj_jobs_for_delivery_day_edit()
             )
-            order.shahtaj_can_edit_delivery_plan = bool(open_jobs)
 
     def _inverse_shahtaj_planned_delivery_date(self):
         for order in self:
-            if not order.shahtaj_can_edit_delivery_plan:
+            if order.state not in ('sale', 'done'):
                 raise UserError(_(
                     'Cannot change the planned delivery date for %(order)s — '
-                    'confirm the order and assign delivery men first, or stock may '
-                    'already be picked.',
+                    'confirm the order and assign delivery men first.',
                     order=order.display_name,
                 ))
             open_jobs = order.shahtaj_dm_delivery_ids.filtered(
-                lambda j: j.state not in ('picked', 'partial', 'delivered', 'returned'),
+                lambda j: j.state != 'delivered',
             )
             if not open_jobs:
                 raise UserError(_(
-                    'No open delivery jobs to reschedule for %(order)s.',
+                    'No open delivery jobs to reschedule for %(order)s. '
+                    'Fully delivered jobs stay closed.',
+                    order=order.display_name,
+                ))
+            editable = order._shahtaj_jobs_for_delivery_day_edit()
+            if not editable:
+                raise UserError(_(
+                    'Cannot change the planned delivery date for %(order)s — '
+                    'leftover stock is still on the van. Return undelivered stock '
+                    '(or Reset & Retry) before rescheduling.',
                     order=order.display_name,
                 ))
             old_dates = ', '.join({
-                str(d) for d in open_jobs.mapped('scheduled_date') if d
+                str(d) for d in editable.mapped('scheduled_date') if d
             }) or '—'
-            open_jobs.with_context(shahtaj_skip_planning_log=True).write({
+            editable.with_context(shahtaj_skip_planning_log=True).write({
                 'scheduled_date': order.shahtaj_planned_delivery_date,
             })
             self.env['shahtaj.activity.log'].log_business(

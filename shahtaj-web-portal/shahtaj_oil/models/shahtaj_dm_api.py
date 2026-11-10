@@ -110,7 +110,7 @@ class ShahtajDmApiService(models.AbstractModel):
         for job in jobs:
             job.sudo()._sync_with_sale_order(ensure_visit_task=False)
         # Sync: free van cover → qty_picked / Loaded (Dist + app agree).
-        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        Delivery._shahtaj_apply_free_van_for_day(dm, day)
         # Mid-day Dist assigns while Left Office → Heading on load refresh.
         Delivery._shahtaj_sync_route_after_dist_change(dm, day)
         jobs = Delivery.search(
@@ -200,6 +200,7 @@ class ShahtajDmApiService(models.AbstractModel):
                 'state': session.state,
                 'departed_at': session.departed_at.isoformat(sep=' ') if session.departed_at else False,
                 'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
+                'end_source': session.end_source or False,
             },
             'shops': shops,
             'pick_lines': pick_lines,
@@ -229,7 +230,7 @@ class ShahtajDmApiService(models.AbstractModel):
         for delivery in deliveries:
             delivery.sudo()._sync_with_sale_order(ensure_visit_task=False)
         # Attribute free van first so "need=0" jobs become Loaded before pick math.
-        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        Delivery._shahtaj_apply_free_van_for_day(dm, day)
         deliveries = Delivery.search(
             Delivery._shahtaj_today_open_jobs_domain(dm, day),
             order='id',
@@ -442,7 +443,7 @@ class ShahtajDmApiService(models.AbstractModel):
         open_jobs = jobs.filtered(lambda j: j.state in ('not_ready', 'ready', 'picked', 'partial'))
         for job in open_jobs:
             job.sudo()._sync_with_sale_order(ensure_visit_task=False)
-        Delivery._shahtaj_attribute_free_van_to_open_jobs(dm, day)
+        Delivery._shahtaj_apply_free_van_for_day(dm, day)
         # Dist mid-day assigns while Left Office → correct Stop on pull refresh.
         Delivery._shahtaj_sync_route_after_dist_change(dm, day)
         jobs = Delivery.search(self._jobs_domain(dm, day, open_only=False), order='id')
@@ -459,6 +460,7 @@ class ShahtajDmApiService(models.AbstractModel):
                 'state': session.state,
                 'departed_at': session.departed_at.isoformat(sep=' ') if session.departed_at else False,
                 'ended_at': session.ended_at.isoformat(sep=' ') if session.ended_at else False,
+                'end_source': session.end_source or False,
             },
             'counts': {
                 'assigned': len(jobs),

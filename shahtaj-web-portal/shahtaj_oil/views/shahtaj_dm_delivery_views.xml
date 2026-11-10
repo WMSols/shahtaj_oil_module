@@ -104,6 +104,8 @@
                        groups="shahtaj_oil.group_shahtaj_delivery_man,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="qty_assigned_total" string="Assigned Qty" optional="show"
                        groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
+                <field name="shahtaj_apd_summary" string="A / P / D" optional="show"
+                       groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="is_split_share" optional="hide"
                        groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="state" string="Stock" widget="badge"
@@ -111,6 +113,11 @@
                        decoration-info="state == 'ready'"
                        decoration-warning="state in ('picked', 'partial')"
                        decoration-success="state == 'delivered'"/>
+                <field name="shahtaj_load_status" string="Load" widget="badge" optional="show"
+                       decoration-muted="shahtaj_load_status == 'not_loaded'"
+                       decoration-warning="shahtaj_load_status == 'partial'"
+                       decoration-success="shahtaj_load_status == 'full'"
+                       groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                 <field name="field_state" string="Stop" widget="badge"
                        decoration-muted="field_state == 'pending'"
                        decoration-info="field_state == 'in_transit'"
@@ -199,9 +206,10 @@
                             groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_native_distributor_ui,shahtaj_oil.group_shahtaj_warehouse"
                             icon="fa-refresh"/>
                     <button name="action_field_reset_pending" type="object"
-                            string="Reset Stop" class="btn-secondary"
-                            invisible="field_state not in ('in_transit', 'not_attended', 'failed', 'done') or state in ('delivered', 'returned')"
-                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
+                            string="Reset &amp; Retry" class="btn-secondary"
+                            invisible="state in ('delivered', 'not_ready')"
+                            groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"
+                            confirm="Reset &amp; Retry this job? Leftover van stock (if any) is returned to WH, Stock reopens Ready/Partial (delivered qty kept), Stop becomes Pending, and Delivery Day is set to today so the DM can attempt again."/>
                     <button name="action_print_invoice" type="object"
                             string="Print Invoice" class="btn-secondary"
                             invisible="state == 'not_ready'"
@@ -271,6 +279,9 @@
                                    readonly="shahtaj_processing_locked"/>
                             <field name="scheduled_date"
                                    readonly="not shahtaj_can_edit_schedule"/>
+                            <field name="shahtaj_delivery_day_lock_reason" readonly="1"
+                                   invisible="not shahtaj_delivery_day_lock_reason"
+                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                             <field name="schedule_status" widget="badge" readonly="1"
                                    decoration-danger="schedule_status in ('overdue', 'unscheduled')"
                                    decoration-warning="schedule_status == 'future'"
@@ -290,6 +301,16 @@
                                    decoration-danger="field_state == 'failed'"
                                    decoration-success="field_state == 'done'"
                                    readonly="1"/>
+                            <field name="shahtaj_load_status" widget="badge" readonly="1"
+                                   decoration-muted="shahtaj_load_status == 'not_loaded'"
+                                   decoration-warning="shahtaj_load_status == 'partial'"
+                                   decoration-success="shahtaj_load_status == 'full'"
+                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
+                            <field name="shahtaj_apd_summary" readonly="1"
+                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
+                            <field name="qty_still_to_pick" readonly="1"
+                                   invisible="qty_still_to_pick &lt;= 0"
+                                   groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                             <field name="assignment_mode" readonly="1"
                                    groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_warehouse"/>
                             <field name="assigned_by_id" readonly="1"
