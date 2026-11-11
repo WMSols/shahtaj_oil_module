@@ -1490,9 +1490,10 @@ class ShahtajDmDelivery(models.Model):
                 'assigned_by_id': assigned_by.id,
                 'assignment_mode': 'manual',
             }
-            # Picked / partial / delivered jobs keep delivery man and day frozen.
-            # Remaining qty can still be assigned (same DM or an extra DM).
-            if not job._shahtaj_is_processing_locked():
+            # Picked / partial / delivered: keep day frozen while leftover/finished.
+            # Ready / not_ready: Dist may set Delivery Day on assign.
+            # Returned: allow day change so Assign can reopen a new cycle.
+            if not job._shahtaj_is_processing_locked() or job.state == 'returned':
                 write_vals['scheduled_date'] = day
                 write_vals['scheduled_time'] = scheduled_time or 0.0
             job.write(write_vals)

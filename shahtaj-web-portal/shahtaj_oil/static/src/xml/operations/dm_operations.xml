@@ -1279,7 +1279,7 @@
                                 <label class="small fw-bold">Planned Delivery Date</label>
                                 <input type="date" class="form-control form-control-sm" t-model="this.state.assignModal.plannedDeliveryDate" t-att-disabled="this.state.assignModal.readOnly || !this.state.assignModal.canEditDeliveryDate"/>
                                 <div t-if="!this.state.assignModal.canEditDeliveryDate" class="form-text text-muted">
-                                    Locked while stock is on the van for today’s open trip, or when every job is fully delivered. Returned jobs can be rescheduled (past days stay editable).
+                                    Locked while leftover stock for this order’s job is still on the van, or when every job is fully delivered. Return WH / Reset &amp; Retry to unlock. Returned jobs can be rescheduled.
                                 </div>
                             </div>
                             <t t-foreach="this.state.assignModal.jobs" t-as="job" t-key="job.id">

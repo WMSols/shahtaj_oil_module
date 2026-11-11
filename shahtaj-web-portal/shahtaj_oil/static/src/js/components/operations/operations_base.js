@@ -3009,6 +3009,11 @@ export class OperationsBase extends Component {
         if (modal.readOnly || !modal.orderId || !modal.plannedDeliveryDate) {
             return;
         }
+        // Date was already pushed onto wizard jobs in persistAssignEdits before confirm.
+        // This only syncs SO planned date for reopen/reschedule paths (e.g. returned).
+        if (!modal.canEditDeliveryDate) {
+            return;
+        }
         const [order] = await this.orm.read("sale.order", [modal.orderId], [
             "shahtaj_planned_delivery_date",
             "shahtaj_can_edit_delivery_plan",
@@ -3019,11 +3024,9 @@ export class OperationsBase extends Component {
         if (order.shahtaj_planned_delivery_date === modal.plannedDeliveryDate) {
             return;
         }
-        if (!modal.canEditDeliveryDate || !order.shahtaj_can_edit_delivery_plan) {
-            this.notification.add(
-                "Cannot change Delivery Day — stock is on the van for today’s open trip, or every job is fully delivered. Return undelivered stock, End Day, wait until tomorrow, or reschedule a returned job.",
-                { type: "warning" },
-            );
+        if (!order.shahtaj_can_edit_delivery_plan) {
+            // Assign already created jobs with the wizard day; leftover on van may
+            // lock SO date edits. Do not scare Dist with a false "assign failed" warn.
             return;
         }
         try {
@@ -3039,11 +3042,24 @@ export class OperationsBase extends Component {
     }
 
     async persistAssignEdits() {
-        const jobs = this.state.assignModal.jobs;
+        const modal = this.state.assignModal;
+        const jobs = modal.jobs || [];
+        const planned = modal.plannedDeliveryDate || false;
+        // Push Planned Delivery Date onto wizard rows BEFORE confirm so new jobs
+        // are created on the Dist-chosen day (not a stale default of today).
+        const writeDate = !!(
+            planned
+            && !modal.readOnly
+            && modal.canEditDeliveryDate
+        );
         for (const job of jobs) {
-            await this.orm.write("shahtaj.dm.assign.wizard.job", [job.id], {
+            const vals = {
                 delivery_man_id: job.deliveryManId ? parseInt(job.deliveryManId, 10) : false,
-            });
+            };
+            if (writeDate) {
+                vals.scheduled_date = planned;
+            }
+            await this.orm.write("shahtaj.dm.assign.wizard.job", [job.id], vals);
             for (const line of job.lines) {
                 await this.orm.write("shahtaj.dm.assign.wizard.line", [line.id], {
                     qty_assigned: Number(line.qtyAssigned) || 0,
