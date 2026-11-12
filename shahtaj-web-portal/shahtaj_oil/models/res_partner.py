@@ -1037,8 +1037,20 @@ class ResPartner(models.Model):
         return action
 
     def _shahtaj_can_write_exterior_photo(self):
-        """Exterior photo is booker-only (verify-on-site / on-site register)."""
+        """Allow exterior photo only for trusted write paths.
+
+        Allowed:
+        - sudo / explicit ``shahtaj_bypass_exterior_lock``
+        - booker on-site register / field-verify contexts
+        - Odoo CSV/XLS import (``import_file`` set by ``base_import``)
+
+        Blocked:
+        - normal frontend form / RPC writes (distributors and other users)
+        """
         if self.env.su or self.env.context.get('shahtaj_bypass_exterior_lock'):
+            return True
+        # Native Import records UI sets this on model.load(); form saves do not.
+        if self.env.context.get('import_file'):
             return True
         if self.env.context.get('shahtaj_field_verifying'):
             return True
