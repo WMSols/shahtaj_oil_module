@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Distributor wizard: mark full or partial delivery on a field sales order."""
+from collections import defaultdict
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_is_zero
@@ -19,11 +21,161 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
         related='sale_order_id.partner_id',
         string='Shop',
     )
+    delivery_source = fields.Selection(
+        [
+            ('warehouse', 'Warehouse stock'),
+            ('van', 'DM van stock'),
+        ],
+        string='Stock Source',
+        required=True,
+        default='warehouse',
+        help=(
+            'Warehouse: ship from WH to shop (van leftover stays as free surplus). '
+            'Van: ship from the DM van for an active / today job.'
+        ),
+    )
     line_ids = fields.One2many(
         'shahtaj.mark.delivery.wizard.line',
         'wizard_id',
         string='Products to Deliver',
     )
+
+    @api.model
+    def shahtaj_mark_delivery_options(self, order_id):
+        """Portal helper: active/today jobs + whether van or WH can supply.
+
+        Returns a JSON-serializable dict for the source-choice UI.
+        """
+        order = self.env['sale.order'].browse(order_id)
+        if not order.exists():
+            return {
+                'ok': False,
+                'message': _('Sales order not found.'),
+            }
+        order._shahtaj_assert_not_cancelled()
+        Delivery = self.env['shahtaj.dm.delivery']
+        warehouse = Delivery._get_warehouse()
+        wh_loc = warehouse.lot_stock_id
+        today = fields.Date.context_today(self)
+
+        # Remaining qty by product on the SO.
+        remaining_by_product = defaultdict(float)
+        product_names = {}
+        for sol in order.order_line.filtered(
+            lambda l: l.product_id and not l.display_type
+            and l.product_id.type == 'consu' and l.product_id.is_storable
+        ):
+            left = max((sol.product_uom_qty or 0.0) - (sol.qty_delivered or 0.0), 0.0)
+            if left <= 0:
+                continue
+            remaining_by_product[sol.product_id.id] += left
+            product_names[sol.product_id.id] = sol.product_id.display_name
+
+        if not remaining_by_product:
+            return {
+                'ok': False,
+                'message': _('Nothing left to deliver on this order.'),
+                'needs_choice': False,
+                'warehouse_ok': False,
+                'van_ok': False,
+            }
+
+        wh_map = Delivery._shahtaj_physical_wh_qty_map(
+            wh_loc, set(remaining_by_product),
+        )
+        wh_short = []
+        wh_has_any = False
+        for pid, need in remaining_by_product.items():
+            product = self.env['product.product'].browse(pid)
+            rounding = (product.uom_id.rounding if product.exists() else None) or 0.01
+            avail = max(wh_map.get(pid, 0.0), 0.0)
+            if float_compare(avail, 0.0, precision_rounding=rounding) > 0:
+                wh_has_any = True
+            if float_compare(need, avail, precision_rounding=rounding) > 0:
+                wh_short.append({
+                    'product': product_names.get(pid, pid),
+                    'need': need,
+                    'available': avail,
+                })
+        # Enable WH path if any free stock exists; confirm asserts exact Deliver Now qty.
+        warehouse_ok = wh_has_any
+
+        jobs = Delivery.search([
+            ('sale_order_id', '=', order.id),
+            ('state', 'in', ('ready', 'picked', 'partial')),
+        ], order='id asc')
+
+        active_jobs = []
+        van_ok = False
+        for job in jobs:
+            is_today = bool(job.scheduled_date and job.scheduled_date == today)
+            # Active / today: already on van, or scheduled for today.
+            if job.state not in ('picked', 'partial') and not is_today:
+                continue
+
+            van_stock = []
+            job_van_has_any = False
+            physical = {}
+            if job.van_location_id:
+                physical = Delivery._shahtaj_physical_van_qty_map(
+                    job.van_location_id, set(remaining_by_product),
+                )
+            for pid, need in remaining_by_product.items():
+                product = self.env['product.product'].browse(pid)
+                rounding = (product.uom_id.rounding if product.exists() else None) or 0.01
+                avail = max(physical.get(pid, 0.0), 0.0)
+                van_stock.append({
+                    'product': product_names.get(pid, pid),
+                    'need': need,
+                    'available': avail,
+                })
+                if float_compare(avail, 0.0, precision_rounding=rounding) > 0:
+                    job_van_has_any = True
+
+            can_use_van = bool(
+                job.van_location_id
+                and job.state in ('picked', 'partial')
+                and job_van_has_any
+            )
+            if can_use_van:
+                van_ok = True
+
+            active_jobs.append({
+                'id': job.id,
+                'name': job.display_name,
+                'dm_id': job.delivery_man_id.id if job.delivery_man_id else False,
+                'dm_name': job.delivery_man_id.name if job.delivery_man_id else '',
+                'state': job.state,
+                'scheduled_date': str(job.scheduled_date) if job.scheduled_date else False,
+                'is_today': is_today,
+                'van_location': (
+                    job.van_location_id.display_name if job.van_location_id else ''
+                ),
+                'van_stock': van_stock,
+                'van_ok': can_use_van,
+            })
+
+        needs_choice = bool(active_jobs)
+        default_source = 'van' if van_ok else 'warehouse'
+        return {
+            'ok': True,
+            'order_id': order.id,
+            'order_name': order.display_name,
+            'needs_choice': needs_choice,
+            'default_source': default_source,
+            'warehouse_ok': warehouse_ok,
+            'warehouse_short': wh_short,
+            'van_ok': van_ok,
+            'active_jobs': active_jobs,
+            'wh_stock': [
+                {
+                    'product': product_names.get(pid, pid),
+                    'need': need,
+                    'available': max(wh_map.get(pid, 0.0), 0.0),
+                }
+                for pid, need in remaining_by_product.items()
+            ],
+        }
 
     @api.model
     def default_get(self, fields_list):
@@ -33,6 +185,12 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
         if not order.exists():
             return res
         res['sale_order_id'] = order.id
+        source = self.env.context.get('shahtaj_delivery_source') or res.get('delivery_source')
+        if source in ('warehouse', 'van'):
+            res['delivery_source'] = source
+        else:
+            res['delivery_source'] = 'warehouse'
+
         # Custom-portal distributors lack stock.move / picking ACL; elevate only
         # this delivery preparation path (confirm path already uses sudo on moves).
         pickings = order.sudo().picking_ids.filtered(
@@ -63,6 +221,68 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
         res['line_ids'] = lines
         return res
 
+    def _shahtaj_source_location(self):
+        """Resolve WH or van location for the chosen delivery_source."""
+        self.ensure_one()
+        Delivery = self.env['shahtaj.dm.delivery']
+        warehouse = Delivery._get_warehouse()
+        if self.delivery_source == 'warehouse':
+            return warehouse.lot_stock_id, None
+
+        today = fields.Date.context_today(self)
+        jobs = Delivery.search([
+            ('sale_order_id', '=', self.sale_order_id.id),
+            ('state', 'in', ('picked', 'partial')),
+            ('van_location_id', '!=', False),
+        ], order='id asc')
+        # Prefer today's job, else first with van leftover.
+        job = jobs.filtered(lambda j: j.scheduled_date == today)[:1] or jobs[:1]
+        if not job:
+            raise UserError(_(
+                'No active DM van job found for this order. '
+                'Use Warehouse stock, or pick onto a van first.'
+            ))
+        return job.van_location_id, job
+
+    def _shahtaj_retarget_outgoing_to(self, location):
+        """Point open SO outgoing moves at WH or van before validate."""
+        self.ensure_one()
+        if not location:
+            raise UserError(_('Missing stock location for Mark Delivery.'))
+        pickings = self.sale_order_id.sudo().picking_ids.filtered(
+            lambda p: p.state not in ('done', 'cancel') and p.picking_type_code == 'outgoing'
+        )
+        for picking in pickings:
+            if picking.state == 'draft':
+                picking.action_confirm()
+            for move in picking.move_ids.filtered(lambda m: m.state not in ('done', 'cancel')):
+                move.location_id = location.id
+            picking.location_id = location.id
+            picking.action_assign()
+
+    def _shahtaj_assert_source_stock(self):
+        """Block confirm when chosen source cannot cover Deliver Now qtys."""
+        self.ensure_one()
+        need = defaultdict(float)
+        for line in self.line_ids:
+            rounding = line.product_uom_id.rounding or 0.01
+            if float_is_zero(line.qty_to_deliver, precision_rounding=rounding):
+                continue
+            if line.product_id:
+                need[line.product_id.id] += float(line.qty_to_deliver or 0.0)
+        if not need:
+            return
+        location, _job = self._shahtaj_source_location()
+        Delivery = self.env['shahtaj.dm.delivery']
+        if self.delivery_source == 'van':
+            Delivery._shahtaj_assert_physical_van_qty(
+                location, need, _('mark delivery from van'),
+            )
+        else:
+            Delivery._shahtaj_assert_physical_wh_qty(
+                location, need, _('mark delivery from warehouse'),
+            )
+
     def action_deliver_all_remaining(self):
         self.ensure_one()
         for line in self.line_ids:
@@ -77,6 +297,8 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
                 'No open delivery for this order. '
                 'Stock may already be fully delivered, or the product is not tracked in inventory.'
             ))
+        if self.delivery_source not in ('warehouse', 'van'):
+            raise UserError(_('Choose Warehouse or DM van as the stock source.'))
 
         pickings = self.env['stock.picking']
         any_qty = False
@@ -99,25 +321,27 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
                 move.quantity = 0.0
             else:
                 any_qty = True
-                move._set_quantity_done(line.qty_to_deliver)
-                move.picked = True
             pickings |= move.picking_id
 
         if not any_qty:
             raise UserError(_('Enter a quantity to deliver on at least one product.'))
 
+        # Point outgoing at chosen source, assert stock, then set done qtys.
+        location, _job = self._shahtaj_source_location()
+        self._shahtaj_retarget_outgoing_to(location)
+        self._shahtaj_assert_source_stock()
+
         pickings = pickings.sudo().filtered(lambda p: p.state not in ('done', 'cancel'))
         pickings.filtered(lambda p: p.state == 'draft').action_confirm()
         pickings.action_assign()
-        # Re-apply quantities after assign (reservation can reset them).
         for line in self.line_ids:
             move = line.move_id.sudo()
             if move.state in ('done', 'cancel'):
                 continue
-            if not float_is_zero(
-                line.qty_to_deliver,
-                precision_rounding=line.product_uom_id.rounding or 0.01,
-            ):
+            rounding = line.product_uom_id.rounding or 0.01
+            if float_is_zero(line.qty_to_deliver, precision_rounding=rounding):
+                move.quantity = 0.0
+            else:
                 move._set_quantity_done(line.qty_to_deliver)
                 move.picked = True
 
@@ -135,7 +359,7 @@ class ShahtajMarkDeliveryWizard(models.TransientModel):
             })
             wiz.process()
 
-        # SO qty_delivered is truth: when fully delivered, close matching DM jobs.
+        # Sync DM jobs (partial or full) so DM cannot re-deliver the same qty.
         order = self.sale_order_id.sudo()
         order.invalidate_recordset(['shahtaj_delivery_status', 'shahtaj_qty_to_deliver'])
         self.env['shahtaj.dm.delivery']._shahtaj_align_dm_jobs_to_sale_delivery(order)

@@ -14,7 +14,7 @@
                                 <button t-if="this.state.selectedDmJob.orderId" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openAssignModal(this.state.selectedDmJob.orderId, true)">View DM Assignment</button>
                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canPickJob(this.state.selectedDmJob)" class="btn btn-sm btn-dark text-white fw-bold" t-on-click="() => this.openPickModal(this.state.selectedDmJob.id)">Pick Stock</button>
                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canResetField(this.state.selectedDmJob)" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="() => this.requestResetDmJobField(this.state.selectedDmJob)" title="Warns with current-status steps, then returns leftover / reopens Stock / Pending / today after you confirm.">Reset &amp; Retry</button>
-                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(this.state.selectedDmJob)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(this.state.selectedDmJob.id)">Return to WH</button>
+                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(this.state.selectedDmJob)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.requestReturnDmJobWarehouse(this.state.selectedDmJob)">Return to WH</button>
                             </div>
                         </div>
                         <h4 class="fw-bold"><t t-esc="this.state.selectedDmJob.name"/></h4>
@@ -27,6 +27,16 @@
                         </div>
                         <div t-if="this.state.selectedDmJob.qtyStillToPick &gt; 0 and !['returned', 'delivered'].includes(this.state.selectedDmJob.state)" class="alert alert-warning py-2 px-3 small mb-3">
                             <span class="fw-bold"><t t-esc="this.state.selectedDmJob.qtyStillToPick"/></span> still to load onto the van.
+                        </div>
+                        <div t-if="this.state.selectedDmJob.vanClaimBanner"
+                             t-attf-class="alert py-2 px-3 small mb-3 #{this.state.selectedDmJob.vanClaimBannerType === 'warning' ? 'alert-warning' : 'alert-info'}">
+                            <div class="fw-bold mb-1" t-if="this.state.selectedDmJob.vanClaimMismatch">Stock mismatch</div>
+                            <div class="fw-bold mb-1" t-elif="!this.state.selectedDmJob.vanClaimActive">Van leftover not active</div>
+                            <div style="white-space: pre-line;"><t t-esc="this.state.selectedDmJob.vanClaimBanner"/></div>
+                        </div>
+                        <div t-if="this.state.selectedDmJob.vanClaimActive and !this.state.selectedDmJob.vanClaimMismatch and ['picked', 'partial'].includes(this.state.selectedDmJob.state)"
+                             class="alert alert-success py-2 px-3 small mb-3">
+                            Today’s job — leftover below is the <b>live</b> van claim (same stock reserved for this stop).
                         </div>
                         <div t-if="this.state.selectedDmJob.deliveryDayLockReason" class="alert alert-secondary py-2 px-3 small mb-3">
                             <t t-esc="this.state.selectedDmJob.deliveryDayLockReason"/>
@@ -143,7 +153,16 @@
                                 <div class="table-responsive border-top">
                                     <table class="table table-sm align-middle mb-0">
                                         <thead class="bg-light small text-muted text-uppercase">
-                                            <tr><th class="ps-3">Product</th><th class="text-end">Ordered</th><th class="text-end">Assigned</th><th class="text-end">Picked</th><th class="text-end">Delivered</th><th class="text-end pe-3">On van</th></tr>
+                                            <tr>
+                                                <th class="ps-3">Product</th>
+                                                <th class="text-end">Ordered</th>
+                                                <th class="text-end">Assigned</th>
+                                                <th class="text-end">Picked</th>
+                                                <th class="text-end">Delivered</th>
+                                                <th class="text-end pe-3" t-att-title="this.state.selectedDmJob.vanClaimActive ? 'Live leftover reserved on van for today’s job' : 'Not an active van claim (overdue / future / unscheduled)'">
+                                                    Leftover
+                                                </th>
+                                            </tr>
                                         </thead>
                                         <tbody>
                                             <t t-foreach="this.state.selectedDmJob.lines" t-as="line" t-key="line.id">
@@ -153,7 +172,20 @@
                                                     <td class="text-end"><t t-esc="line.qtyAssigned"/></td>
                                                     <td class="text-end"><t t-esc="line.qtyPicked"/></td>
                                                     <td class="text-end"><t t-esc="line.qtyDelivered"/></td>
-                                                    <td class="text-end pe-3"><t t-esc="line.qtyOnVan"/></td>
+                                                    <td class="text-end pe-3">
+                                                        <t t-if="line.claimActive">
+                                                            <span t-attf-class="fw-bold #{line.qtyPhysicalVan !== null and line.qtyOnVan &gt; (line.qtyPhysicalVan + 0.000001) ? 'text-danger' : ''}">
+                                                                <t t-esc="line.qtyOnVanDisplay"/>
+                                                            </span>
+                                                            <div t-if="line.qtyPhysicalVan !== null and line.qtyOnVan &gt; 0" class="small text-muted">
+                                                                Van now: <t t-esc="line.qtyPhysicalVan"/>
+                                                            </div>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <span class="text-muted" title="Not on today’s active van claim">—</span>
+                                                            <div t-if="line.qtyOnVan &gt; 0" class="small text-muted">Was <t t-esc="line.qtyOnVan"/> (not active)</div>
+                                                        </t>
+                                                    </td>
                                                 </tr>
                                             </t>
                                         </tbody>
@@ -286,7 +318,7 @@
                                                     <t t-else="">Confirm</t>
                                                 </button>
                                                 <button t-if="this.canDispatchOrders and this.canAssignDeliveryMan(row)" class="btn btn-sm btn-dark text-white fw-bold me-1" t-on-click="() => this.openAssignModal(row.odoo_id)">Assign / Split</button>
-                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and !row.dmJobCount and row.hasPostedInvoice and row.status !== 'Cancelled'" class="btn btn-sm btn-outline-primary fw-bold me-1" t-on-click="() => this.openDeliveryCustom(row.odoo_id)">Mark Delivery</button>
+                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and !row.dmJobCount and row.hasPostedInvoice and row.status !== 'Cancelled'" class="btn btn-sm btn-outline-primary fw-bold me-1" t-on-click="() => this.requestMarkDelivery(row.odoo_id)">Mark Delivery</button>
                                                 <button class="btn btn-sm btn-outline-dark fw-bold" t-on-click="() => this.viewDelivery(row)">View</button>
                                             </td>
                                         </tr>
@@ -412,12 +444,13 @@
                                                 <span t-if="job.loadStatus" t-attf-class="badge #{this.loadStatusBadgeClass(job.loadStatus)}"><t t-esc="this.loadStatusLabel(job.loadStatus, job.loadLabel)"/></span>
                                                 <span t-else="" class="text-muted">—</span>
                                                 <div t-if="job.apdSummary" class="small text-muted mt-1"><t t-esc="job.apdSummary"/></div>
+                                                <div t-if="this.vanClaimHintForListJob(job)" class="small text-warning fw-bold mt-1"><t t-esc="this.vanClaimHintForListJob(job)"/></div>
                                             </td>
                                             <td><span t-attf-class="badge #{this.fieldStateBadgeClass(job.fieldState)}"><t t-esc="this.fieldStateLabel(job.fieldState)"/></span></td>
                                             <td class="text-end pe-4">
                                                 <button class="btn btn-sm btn-outline-dark fw-bold me-1" t-on-click="() => this.viewDmJob(job)">View</button>
                                                 <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canResetField(job)" class="btn btn-sm btn-outline-secondary fw-bold me-1" t-on-click="() => this.requestResetDmJobField(job)" title="Shows a status warning first; only resets after you confirm.">Reset &amp; Retry</button>
-                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(job)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.returnDmJobWarehouse(job.id)">Return WH</button>
+                                                <button t-if="this.canMutate and this.showDmOverwriteButtons and this.canReturnWarehouse(job)" class="btn btn-sm btn-outline-danger fw-bold" t-on-click="() => this.requestReturnDmJobWarehouse(job)">Return WH</button>
                                             </td>
                                         </tr>
                                     </t>
@@ -839,7 +872,7 @@
                                     <!-- NEW: Auto-Hiding Mark Delivery Button -->
                                 <t t-set="hasPendingDelivery" t-value="this.state.selectedDelivery.full_lines and this.state.selectedDelivery.full_lines.some(l => l.qty > l.delivered)"/>
                                 <t t-if="this.canMutate and this.showDmOverwriteButtons and hasPendingDelivery and this.state.selectedDelivery.status !== 'Cancelled' and this.state.selectedDelivery.orderState !== 'cancel'">
-                                    <button class="btn btn-sm btn-primary shadow-sm fw-bold px-3 text-white d-flex align-items-center" t-on-click="() => this.openDeliveryCustom(this.state.selectedDelivery.odoo_id)">
+                                    <button class="btn btn-sm btn-primary shadow-sm fw-bold px-3 text-white d-flex align-items-center" t-on-click="() => this.requestMarkDelivery(this.state.selectedDelivery.odoo_id)">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-package-check me-1">
                                             <path d="m16 16 2 2 4-4"/>
                                             <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/>
@@ -1405,6 +1438,82 @@
         </t>
 
             <!-- ========================================== -->
+        <!-- MARK DELIVERY SOURCE CHOICE                -->
+        <!-- ========================================== -->
+        <t t-if="this.state.showMarkDeliverySourceModal and this.state.markDeliveryOptions">
+            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background: rgba(15, 23, 42, 0.6); z-index: 1056; backdrop-filter: blur(4px);">
+                <div class="card border-0 shadow-lg rounded-4 overflow-hidden" style="width: 100%; max-width: 640px;">
+                    <div class="bg-dark text-white p-4 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-white">Mark Delivery — choose stock source</h5>
+                        <button type="button" class="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 32px; height: 32px;" t-on-click="closeMarkDeliverySourceModal" title="Cancel">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="p-4 bg-light">
+                        <p class="small text-muted mb-3">
+                            Order <strong t-esc="this.state.markDeliveryOptions.order_name"/> has an active / today DM job.
+                            Pick where stock should come from. Short stock is blocked.
+                        </p>
+
+                        <t t-foreach="this.state.markDeliveryOptions.active_jobs || []" t-as="job" t-key="job.id">
+                            <div class="border rounded-3 bg-white p-3 mb-3 shadow-sm">
+                                <div class="fw-bold text-dark mb-1">
+                                    DM: <t t-esc="job.dm_name or 'Unassigned'"/>
+                                    <span class="badge bg-secondary ms-2 text-uppercase"><t t-esc="job.state"/></span>
+                                    <t t-if="job.is_today"><span class="badge bg-primary ms-1">Today</span></t>
+                                </div>
+                                <div class="small text-muted mb-2"><t t-esc="job.name"/> — <t t-esc="job.van_location or 'No van yet'"/></div>
+                                <t t-foreach="job.van_stock || []" t-as="vs" t-key="vs_index">
+                                    <div class="small d-flex justify-content-between">
+                                        <span t-esc="vs.product"/>
+                                        <span>Need <t t-esc="vs.need"/> / Van <t t-esc="vs.available"/></span>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+
+                        <div class="border rounded-3 bg-white p-3 mb-3 shadow-sm">
+                            <div class="fw-bold text-dark mb-2">Warehouse free stock</div>
+                            <t t-foreach="this.state.markDeliveryOptions.wh_stock || []" t-as="ws" t-key="ws_index">
+                                <div class="small d-flex justify-content-between">
+                                    <span t-esc="ws.product"/>
+                                    <span>Need <t t-esc="ws.need"/> / WH <t t-esc="ws.available"/></span>
+                                </div>
+                            </t>
+                        </div>
+
+                        <div class="alert alert-warning border-0 small mb-3">
+                            From warehouse: van leftover stays on the van as free surplus (walk-in / other use).
+                            From van: stock leaves the van to the shop.
+                            Either way DM jobs sync so the same qty is not delivered twice.
+                        </div>
+                        <t t-if="!this.state.markDeliveryOptions.van_ok and !this.state.markDeliveryOptions.warehouse_ok">
+                            <div class="alert alert-danger border-0 small mb-3">
+                                Neither the DM van nor the warehouse has free stock for this order. Add stock or cancel.
+                            </div>
+                        </t>
+
+                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                            <button type="button" class="btn btn-outline-secondary fw-bold" t-on-click="closeMarkDeliverySourceModal">Cancel</button>
+                            <button type="button" class="btn btn-outline-primary fw-bold"
+                                    t-att-disabled="!this.state.markDeliveryOptions.van_ok"
+                                    t-on-click="() => this.chooseMarkDeliverySource('van')"
+                                    title="Deliver remaining qty from the DM van">
+                                From DM van
+                            </button>
+                            <button type="button" class="btn btn-primary fw-bold text-white"
+                                    t-att-disabled="!this.state.markDeliveryOptions.warehouse_ok"
+                                    t-on-click="() => this.chooseMarkDeliverySource('warehouse')"
+                                    title="Deliver remaining qty from warehouse">
+                                From warehouse
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+
+            <!-- ========================================== -->
         <!-- CUSTOM DELIVERY MODAL OVERLAY              -->
         <!-- ========================================== -->
 <t t-if="this.state.showDeliveryModal">
@@ -1431,8 +1540,12 @@
 <div class="alert alert-info border-0 shadow-sm rounded-3 small d-flex align-items-center mb-4">
 <i class="fa fa-info-circle fs-4 me-3"></i>
 <div>
-    <strong class="d-block mb-1">Set the exact quantities being delivered right now.</strong>
-                                    Any remaining balance will automatically be moved to a backorder by the system.
+    <strong class="d-block mb-1">
+        Source:
+        <t t-if="this.state.deliverySource === 'van'">DM van stock</t>
+        <t t-else="">Warehouse stock</t>
+    </strong>
+    Set quantities now. Short stock is blocked. Remaining qty stays open for later (DM or another mark).
 </div>
 </div>
 

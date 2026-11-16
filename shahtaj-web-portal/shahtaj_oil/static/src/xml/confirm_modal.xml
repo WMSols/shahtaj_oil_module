@@ -16,7 +16,7 @@
                     </div>
                     <div class="modal-footer border-top-0 bg-light">
                         <button type="button" class="btn btn-outline-secondary fw-bold px-4" t-on-click="props.onCancel">Cancel</button>
-                        <button type="button" class="btn btn-danger ms-2 fw-bold px-4" t-on-click="props.onConfirm">Confirm</button>
+                        <button type="button" class="btn btn-danger ms-2 fw-bold px-4" t-on-click="props.onConfirm">OK</button>
                     </div>
                 </div>
             </div>

@@ -10,14 +10,15 @@
                     <group>
                         <field name="sale_order_id"/>
                         <field name="partner_id"/>
+                        <field name="delivery_source"/>
                     </group>
                 </group>
                 <div class="alert alert-info" role="alert">
+                    Choose <b>Warehouse</b> or <b>DM van</b> stock source first.
                     Set <b>Deliver Now</b> for each product (full or partial).
-                    Stock on hand will decrease and the sales order
-                    <b>Delivered</b> quantity will update.
-                    With invoice policy <b>Delivered quantities</b>,
-                    <b>Orders to Invoice</b> will then only allow billing what was delivered.
+                    Stock on the chosen location will decrease; short stock is blocked.
+                    DM jobs sync so the same qty cannot be delivered twice.
+                    Warehouse source leaves any remaining van load as free van surplus.
                 </div>
                 <field name="line_ids">
                     <list editable="bottom" create="false" delete="false">

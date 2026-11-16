@@ -684,6 +684,16 @@ class SaleOrder(models.Model):
             if drafts:
                 drafts.sudo().button_cancel()
             order.with_context(disable_cancel_warning=True).action_cancel()
+            # Drop any leftover open jobs for this cancelled SO (listing safety net).
+            leftover = order.shahtaj_dm_delivery_ids.filtered(
+                lambda j: j.state in ('not_ready', 'ready')
+            )
+            if leftover:
+                try:
+                    with self.env.cr.savepoint():
+                        leftover.sudo().unlink()
+                except Exception:
+                    pass
             self.env['shahtaj.activity.log'].log_business(
                 operation='order.cancelled',
                 name='Cancel order',

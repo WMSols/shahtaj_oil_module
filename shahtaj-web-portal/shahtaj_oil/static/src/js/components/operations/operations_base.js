@@ -165,6 +165,10 @@ export class OperationsBase extends Component {
             showDeliveryModal: false,
             deliveryWizardId: null,
             deliveryLines: [],
+            deliverySource: 'warehouse',
+            showMarkDeliverySourceModal: false,
+            markDeliveryOptions: null,
+            pendingMarkDeliveryOrderId: null,
             // --- NEW: PERFORMANCE TRACKING STATES ---
             perfSubTab: 'schedules', // 'schedules', 'targets'
             selectedSchedule: null,
@@ -1724,6 +1728,8 @@ export class OperationsBase extends Component {
             if (this.hasFinancialAccess) {
                 fields.push('amount_total', 'shop_outstanding_balance');
             }
+            // Hide jobs whose sales order was cancelled; reappear when SO is sale/done again.
+            domain.push(['sale_order_id.state', 'in', ['sale', 'done']]);
             if (filters.search) {
                 domain.push('|', '|', '|',
                     ['display_name', 'ilike', filters.search],
@@ -2463,7 +2469,10 @@ export class OperationsBase extends Component {
         }
     }
     // --- CUSTOM DELIVERY MODAL LOGIC ---
-    async openDeliveryCustom(orderId) {
+    async requestMarkDelivery(orderId) {
+        if (!orderId || !this.canMutate || !this.showDmOverwriteButtons) {
+            return;
+        }
         const rows = [...this.state.tableDispatch, ...this.state.tableDeliveries, ...this.state.tableOrders];
         const row = rows.find((r) => r.odoo_id === orderId) || this.state.selectedDelivery || this.state.selectedOrder;
         if (row && (row.status === "Cancelled" || row.orderState === "cancel")) {
@@ -2471,24 +2480,112 @@ export class OperationsBase extends Component {
             return;
         }
         try {
-            const wizardIds = await this.orm.create("shahtaj.mark.delivery.wizard", [{}], {
-                context: { active_id: orderId }
+            const options = await this.orm.call(
+                "shahtaj.mark.delivery.wizard",
+                "shahtaj_mark_delivery_options",
+                [orderId],
+            );
+            if (!options || !options.ok) {
+                this.notification.add(options?.message || "Mark Delivery is not available.", { type: "warning" });
+                return;
+            }
+            this.state.pendingMarkDeliveryOrderId = orderId;
+            this.state.markDeliveryOptions = options;
+            if (options.needs_choice) {
+                this.state.showMarkDeliverySourceModal = true;
+                return;
+            }
+            if (!options.warehouse_ok) {
+                this.notification.add(
+                    "Not enough free warehouse stock to mark delivery.",
+                    { type: "warning" },
+                );
+                return;
+            }
+            this.showConfirm(
+                "Mark Delivery",
+                `Deliver ${options.order_name || "this order"} from warehouse?\n\n` +
+                    "• Take WH stock\n" +
+                    "• Update shop qty\n" +
+                    "• Sync DM jobs",
+                () => this.openDeliveryCustom(orderId, "warehouse"),
+            );
+        } catch (error) {
+            this.notification.add(
+                "Failed to check delivery options: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        }
+    }
+
+    closeMarkDeliverySourceModal() {
+        this.state.showMarkDeliverySourceModal = false;
+        this.state.markDeliveryOptions = null;
+        this.state.pendingMarkDeliveryOrderId = null;
+    }
+
+    chooseMarkDeliverySource(source) {
+        const orderId = this.state.pendingMarkDeliveryOrderId;
+        const options = this.state.markDeliveryOptions;
+        if (!orderId || !options) {
+            this.closeMarkDeliverySourceModal();
+            return;
+        }
+        if (source === "van" && !options.van_ok) {
+            this.notification.add(
+                "DM van does not have enough stock for the remaining qty.",
+                { type: "warning" },
+            );
+            return;
+        }
+        if (source === "warehouse" && !options.warehouse_ok) {
+            this.notification.add(
+                "Warehouse does not have enough free stock for the remaining qty.",
+                { type: "warning" },
+            );
+            return;
+        }
+        this.state.showMarkDeliverySourceModal = false;
+        this.openDeliveryCustom(orderId, source);
+    }
+
+    async openDeliveryCustom(orderId, source = "warehouse") {
+        const rows = [...this.state.tableDispatch, ...this.state.tableDeliveries, ...this.state.tableOrders];
+        const row = rows.find((r) => r.odoo_id === orderId) || this.state.selectedDelivery || this.state.selectedOrder;
+        if (row && (row.status === "Cancelled" || row.orderState === "cancel")) {
+            this.notification.add("Cancelled orders cannot be delivered.", { type: "warning" });
+            return;
+        }
+        const deliverySource = source === "van" ? "van" : "warehouse";
+        try {
+            const wizardIds = await this.orm.create("shahtaj.mark.delivery.wizard", [{
+                delivery_source: deliverySource,
+            }], {
+                context: {
+                    active_id: orderId,
+                    shahtaj_delivery_source: deliverySource,
+                },
             });
             this.state.deliveryWizardId = wizardIds[0];
-            
-            const wizard = await this.orm.read("shahtaj.mark.delivery.wizard", [this.state.deliveryWizardId], ["line_ids"]);
-            
+            this.state.deliverySource = deliverySource;
+            this.state.pendingMarkDeliveryOrderId = orderId;
+
+            const wizard = await this.orm.read("shahtaj.mark.delivery.wizard", [this.state.deliveryWizardId], ["line_ids", "delivery_source"]);
+            if (wizard[0].delivery_source) {
+                this.state.deliverySource = wizard[0].delivery_source;
+            }
+
             if (wizard[0].line_ids && wizard[0].line_ids.length > 0) {
                 const linesData = await this.orm.read("shahtaj.mark.delivery.wizard.line", wizard[0].line_ids, [
                     "product_id", "qty_ordered", "qty_already_delivered", "qty_to_deliver"
                 ]);
-                
+
                 this.state.deliveryLines = linesData.map(l => ({
                     id: l.id,
                     product: l.product_id ? l.product_id[1] : 'Unknown',
                     ordered: l.qty_ordered,
                     delivered: l.qty_already_delivered,
-                    toDeliver: l.qty_to_deliver 
+                    toDeliver: l.qty_to_deliver
                 }));
                 this.state.showDeliveryModal = true;
             } else {
@@ -2509,6 +2606,9 @@ export class OperationsBase extends Component {
         this.state.showDeliveryModal = false;
         this.state.deliveryWizardId = null;
         this.state.deliveryLines = [];
+        this.state.deliverySource = 'warehouse';
+        this.state.markDeliveryOptions = null;
+        this.state.pendingMarkDeliveryOrderId = null;
     }
 
     deliverAllRemaining() {
@@ -2517,8 +2617,13 @@ export class OperationsBase extends Component {
             line.toDeliver = Math.max(0, line.ordered - line.delivered);
         });
     }
-   async confirmDeliveryCustom() {
+
+    async confirmDeliveryCustom() {
         try {
+            const source = this.state.deliverySource === "van" ? "van" : "warehouse";
+            await this.orm.write("shahtaj.mark.delivery.wizard", [this.state.deliveryWizardId], {
+                delivery_source: source,
+            });
             // 1. Write the user's updated quantities back to the hidden Odoo wizard
             const lineUpdates = this.state.deliveryLines.map(line => {
                 return this.orm.write("shahtaj.mark.delivery.wizard.line", [line.id], {
@@ -2526,30 +2631,35 @@ export class OperationsBase extends Component {
                 });
             });
             await Promise.all(lineUpdates);
-            
-            // 2. Trigger Odoo's native validation & backorder creation
+
+            // 2. Validate from chosen source (WH or van) + sync DM jobs
             await this.orm.call("shahtaj.mark.delivery.wizard", "action_confirm_delivery", [this.state.deliveryWizardId]);
-            
-            this.notification.add("Delivery logged successfully.", { type: "success" });
+
+            this.notification.add(
+                source === "van"
+                    ? "Delivery logged from DM van."
+                    : "Delivery logged from warehouse.",
+                { type: "success" },
+            );
             this.closeDeliveryModal();
-            
+
             // 3. Refresh the UI
             await this.fetchActiveList();
             if (this.state.selectedDelivery) {
-                // FIX: Look in the new paginated arrays instead of the deleted 'orders' array
                 let updatedOrder = this.state.tableDispatch.find(o => o.odoo_id === this.state.selectedDelivery.odoo_id) ||
                                    this.state.tableDeliveries.find(o => o.odoo_id === this.state.selectedDelivery.odoo_id) ||
                                    this.state.tableOrders.find(o => o.odoo_id === this.state.selectedDelivery.odoo_id);
-                
+
                 if (!updatedOrder) {
-                    updatedOrder = this.state.selectedDelivery; // Fallback
+                    updatedOrder = this.state.selectedDelivery;
                 }
-                
-                // Forcefully update the status so the UI immediately reflects the delivery
-                updatedOrder.status = 'Delivered';
+
                 await this.viewDelivery(updatedOrder);
             }
-            
+            if (this.state.activeSubTab === "deliveries" && this.state.deliveriesSubTab === "jobs") {
+                await this.fetchActiveList();
+            }
+
         } catch(error) {
             this.notification.add("Failed to confirm delivery: " + (error.data?.message || error.message), { type: "danger" });
         }
@@ -3152,15 +3262,25 @@ export class OperationsBase extends Component {
                 "shop_credit_limit", "shop_unpaid_invoice_count", "shop_invoice_count",
             );
         }
-        const [detail, lines] = await Promise.all([
+        const [detail, lines, claimSnap] = await Promise.all([
             this.orm.read("shahtaj.dm.delivery", [job.id], detailFields),
             this.orm.searchRead(
                 "shahtaj.dm.delivery.line",
                 [["delivery_id", "=", job.id]],
                 ["id", "product_id", "qty_ordered", "qty_assigned", "qty_to_pick", "qty_picked", "qty_delivered", "qty_remaining_on_van"],
             ),
+            // Loaded only on View — keeps the jobs list light.
+            this.orm.call("shahtaj.dm.delivery", "shahtaj_get_van_claim_snapshot", [[job.id]]).catch(() => null),
         ]);
         const rec = detail[0] || {};
+        const claimByLine = {};
+        const claim = claimSnap || {};
+        for (const crow of claim.lines || []) {
+            if (crow && crow.line_id) {
+                claimByLine[crow.line_id] = crow;
+            }
+        }
+        const claimActive = !!claim.claim_active;
         this.state.selectedDmJob = {
             ...job,
             name: rec.display_name || job.name,
@@ -3179,7 +3299,7 @@ export class OperationsBase extends Component {
             loadLabel: rec.shahtaj_load_label || job.loadLabel || "",
             apdSummary: rec.shahtaj_apd_summary || job.apdSummary || "",
             qtyStillToPick: rec.qty_still_to_pick || 0,
-            scheduleStatus: rec.schedule_status || job.scheduleStatus || "",
+            scheduleStatus: rec.schedule_status || job.scheduleStatus || claim.schedule_status || "",
             isOverdue: !!(rec.is_overdue ?? job.isOverdue),
             deliveryDayLockReason: rec.shahtaj_delivery_day_lock_reason || "",
             canEditSchedule: !!rec.shahtaj_can_edit_schedule,
@@ -3206,17 +3326,63 @@ export class OperationsBase extends Component {
             proofImage: rec.delivery_proof_image || "",
             hasShopClosedPhoto: !!rec.has_shop_closed_photo,
             shopClosedImage: rec.shop_closed_image || "",
-            lines: lines.map((l) => ({
-                id: l.id,
-                product: l.product_id ? l.product_id[1] : "Product",
-                qtyOrdered: l.qty_ordered || 0,
-                qtyAssigned: l.qty_assigned || 0,
-                qtyToPick: l.qty_to_pick || 0,
-                qtyPicked: l.qty_picked || 0,
-                qtyDelivered: l.qty_delivered || 0,
-                qtyOnVan: l.qty_remaining_on_van || 0,
-            })),
+            vanClaimActive: claimActive,
+            vanClaimBanner: claim.banner || "",
+            vanClaimBannerType: claim.banner_type || "",
+            vanClaimMismatch: !!claim.mismatch,
+            lines: lines.map((l) => {
+                const snap = claimByLine[l.id] || {};
+                const paper = Number(snap.paper_leftover);
+                const qtyOnVanPaper = Number.isFinite(paper)
+                    ? paper
+                    : (l.qty_remaining_on_van || 0);
+                const display = Object.prototype.hasOwnProperty.call(snap, "display")
+                    ? snap.display
+                    : (claimActive ? String(qtyOnVanPaper) : "—");
+                return {
+                    id: l.id,
+                    product: l.product_id ? l.product_id[1] : "Product",
+                    qtyOrdered: l.qty_ordered || 0,
+                    qtyAssigned: l.qty_assigned || 0,
+                    qtyToPick: l.qty_to_pick || 0,
+                    qtyPicked: l.qty_picked || 0,
+                    qtyDelivered: l.qty_delivered || 0,
+                    qtyOnVan: qtyOnVanPaper,
+                    qtyOnVanDisplay: display,
+                    qtyPhysicalVan: snap.physical_on_van === false || snap.physical_on_van === undefined
+                        ? null
+                        : Number(snap.physical_on_van),
+                    claimActive: snap.claim_active !== undefined ? !!snap.claim_active : claimActive,
+                };
+            }),
         };
+    }
+
+    /** Today + picked/partial → leftover is live van claim; else historical / not active. */
+    isVanClaimActiveJob(job) {
+        if (!job || job.isWalkIn) {
+            return false;
+        }
+        if (job.vanClaimActive !== undefined && job.vanClaimActive !== null) {
+            return !!job.vanClaimActive;
+        }
+        return job.scheduleStatus === "today" && ["picked", "partial"].includes(job.state);
+    }
+
+    vanClaimHintForListJob(job) {
+        if (!job || !["picked", "partial"].includes(job.state) || job.isWalkIn) {
+            return "";
+        }
+        if (job.scheduleStatus === "today") {
+            return "";
+        }
+        if (job.scheduleStatus === "future") {
+            return "Not active (future)";
+        }
+        if (job.scheduleStatus === "unscheduled") {
+            return "Not active (no day)";
+        }
+        return "Not active (overdue)";
     }
 
     toggleDmJobSection(key) {
@@ -3252,47 +3418,36 @@ export class OperationsBase extends Component {
 
     buildResetRetryWarning(job) {
         const name = (job && (job.name || job.order)) || "this job";
-        const stock = this.stockStateLabel(job?.state);
-        const stop = this.fieldStateLabel(job?.fieldState);
         if (!job || job.state === "delivered") {
             return {
                 blocked: true,
                 title: "Cannot Reset & Retry",
                 message:
-                    `${name} is Fully Delivered. Reset is blocked.\n\n` +
-                    "Use Undo Delivery to Shop (when still allowed), or create a new order for extra qty.",
+                    `${name} is fully delivered.\n\n` +
+                    "Use Undo Delivery first, or create a new order.",
             };
         }
         if (job.state === "not_ready") {
             return {
                 blocked: true,
                 title: "Cannot Reset & Retry",
-                message: `${name} is waiting for invoice. Post the invoice first.`,
+                message: `${name} needs a posted invoice first.`,
             };
         }
 
-        const steps = [];
         const hasVanLeftover = this._jobHasLeftoverOnVan(job);
+        const bullets = [];
         if (hasVanLeftover) {
-            steps.push("Return leftover stock from the van to the warehouse first");
+            bullets.push("• Clear van leftover");
         }
-        if (job.state === "returned" || hasVanLeftover) {
-            steps.push("Reopen Stock to Ready or Partial (already-delivered qty is kept)");
-        } else if (["ready", "picked", "partial"].includes(job.state)) {
-            steps.push("Keep Stock open for re-pick of remaining assigned qty");
-        }
-        steps.push("Set Stop to Pending");
-        steps.push("Set Delivery Day to today so the app Today Load shows it again");
-        steps.push("DM can attempt the remaining qty again");
+        bullets.push("• Reopen remaining qty");
+        bullets.push("• Stop to pending");
+        bullets.push("• Schedule today");
 
-        const numbered = steps.map((step, idx) => `${idx + 1}. ${step}`).join("\n");
         return {
             blocked: false,
-            title: "Reset & Retry — confirm",
-            message:
-                `Current status: Stock ${stock}, Stop ${stop}.\n\n` +
-                `Reset & Retry will:\n${numbered}\n\n` +
-                "Do you want to continue?",
+            title: "Reset & Retry",
+            message: `Reset ${name}?\n\n${bullets.join("\n")}`,
         };
     }
 
@@ -3328,7 +3483,42 @@ export class OperationsBase extends Component {
         }
     }
 
+    async requestReturnDmJobWarehouse(job) {
+        const jobId = typeof job === "object" ? job?.id : job;
+        if (!jobId || !this.canMutate || !this.showDmOverwriteButtons) {
+            return;
+        }
+        try {
+            const check = await this.orm.call(
+                "shahtaj.dm.delivery",
+                "shahtaj_check_return_to_warehouse",
+                [[jobId]],
+            );
+            if (!check || !check.ok) {
+                this.notification.add(
+                    check?.message || "Return WH is not available for this job.",
+                    { type: "warning" },
+                );
+                return;
+            }
+            const name = (typeof job === "object" && (job.name || job.order)) || "this job";
+            this.showConfirm(
+                "Return to Warehouse",
+                `Return leftover for ${name}?\n\n` +
+                    "• Move van stock\n" +
+                    "• Back to warehouse\n" +
+                    "• Clear job leftover",
+                () => this.returnDmJobWarehouse(jobId),
+            );
+        } catch (error) {
+            this.notification.add(error.data?.message || error.message, { type: "danger" });
+        }
+    }
+
     async returnDmJobWarehouse(jobId) {
+        if (!jobId || !this.canMutate || !this.showDmOverwriteButtons) {
+            return;
+        }
         try {
             await this.orm.call("shahtaj.dm.delivery", "action_return_to_warehouse", [[jobId]]);
             this.notification.add("Undelivered stock returned to warehouse.", { type: "success" });

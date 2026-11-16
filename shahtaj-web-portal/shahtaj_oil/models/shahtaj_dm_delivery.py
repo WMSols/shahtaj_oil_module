@@ -2305,6 +2305,296 @@ class ShahtajDmDelivery(models.Model):
                 ))
 
     @api.model
+    def _shahtaj_physical_van_qty_map(self, van_location, product_ids=None):
+        """Live on-hand qty on a van location (stock.quant.quantity)."""
+        if not van_location:
+            return {}
+        domain = [
+            ('location_id', '=', van_location.id),
+            ('quantity', '!=', 0),
+        ]
+        if product_ids is not None:
+            pids = list(product_ids)
+            if not pids:
+                return {}
+            domain.append(('product_id', 'in', pids))
+        rows = self.env['stock.quant'].sudo().read_group(
+            domain,
+            ['quantity:sum'],
+            ['product_id'],
+        )
+        return {
+            row['product_id'][0]: float(row.get('quantity') or 0.0)
+            for row in rows
+            if row.get('product_id')
+        }
+
+    @api.model
+    def _shahtaj_assert_physical_van_qty(self, van_location, qty_by_product, purpose):
+        """Block van outgoing moves when physical on-hand is insufficient.
+
+        Prevents negative van quants from force-validated pickings that only
+        trusted job paper qty (picked − delivered).
+        """
+        need = {
+            int(pid): float(qty or 0.0)
+            for pid, qty in (qty_by_product or {}).items()
+            if float(qty or 0.0) > 0
+        }
+        if not need:
+            return
+        if not van_location:
+            raise UserError(_('Missing van location — cannot %(purpose)s.', purpose=purpose))
+        physical = self._shahtaj_physical_van_qty_map(van_location, set(need))
+        Product = self.env['product.product'].sudo()
+        for pid, qty in need.items():
+            product = Product.browse(pid)
+            rounding = (product.uom_id.rounding if product.exists() else None) or 0.01
+            available = physical.get(pid, 0.0)
+            if float_compare(available, 0.0, precision_rounding=rounding) < 0:
+                available = 0.0
+            if float_compare(qty, available, precision_rounding=rounding) > 0:
+                raise UserError(_(
+                    'Cannot %(purpose)s %(qty)s of %(product)s — van only has %(avail)s. '
+                    'Return / deliver is blocked so warehouse stock stays correct.',
+                    purpose=purpose,
+                    qty=qty,
+                    product=product.display_name if product.exists() else pid,
+                    avail=available,
+                ))
+
+    @api.model
+    def _shahtaj_physical_wh_qty_map(self, wh_location, product_ids=None):
+        """Live free qty on warehouse stock (available_quantity = on-hand − reserved)."""
+        if not wh_location:
+            return {}
+        Quant = self.env['stock.quant'].sudo()
+        domain = [('location_id', '=', wh_location.id)]
+        if product_ids is not None:
+            pids = list(product_ids)
+            if not pids:
+                return {}
+            domain.append(('product_id', 'in', pids))
+        quants = Quant.search(domain)
+        by_pid = defaultdict(float)
+        for quant in quants:
+            by_pid[quant.product_id.id] += float(quant.available_quantity or 0.0)
+        return dict(by_pid)
+
+    @api.model
+    def _shahtaj_assert_physical_wh_qty(self, wh_location, qty_by_product, purpose):
+        """Block WH outgoing moves when free on-hand is insufficient (no negatives)."""
+        need = {
+            int(pid): float(qty or 0.0)
+            for pid, qty in (qty_by_product or {}).items()
+            if float(qty or 0.0) > 0
+        }
+        if not need:
+            return
+        if not wh_location:
+            raise UserError(_('Missing warehouse location — cannot %(purpose)s.', purpose=purpose))
+        physical = self._shahtaj_physical_wh_qty_map(wh_location, set(need))
+        Product = self.env['product.product'].sudo()
+        for pid, qty in need.items():
+            product = Product.browse(pid)
+            rounding = (product.uom_id.rounding if product.exists() else None) or 0.01
+            available = physical.get(pid, 0.0)
+            if float_compare(available, 0.0, precision_rounding=rounding) < 0:
+                available = 0.0
+            if float_compare(qty, available, precision_rounding=rounding) > 0:
+                raise UserError(_(
+                    'Cannot %(purpose)s %(qty)s of %(product)s — warehouse only has %(avail)s free. '
+                    'Blocked so warehouse stock cannot go negative.',
+                    purpose=purpose,
+                    qty=qty,
+                    product=product.display_name if product.exists() else pid,
+                    avail=available,
+                ))
+
+    def shahtaj_check_return_to_warehouse(self):
+        """UI click-check only: whether Return WH is allowed (no stock move).
+
+        Used by the portal so the jobs list stays light — validation runs on click.
+        """
+        self.ensure_one()
+        if self.is_walk_in:
+            return {
+                'ok': False,
+                'message': _(
+                    'Return WH is not used for walk-in jobs. '
+                    'Walk-in stock already left the van at sale time.'
+                ),
+            }
+        if self.state not in ('picked', 'partial'):
+            return {
+                'ok': False,
+                'message': _(
+                    'Return WH is only for Picked or Partial jobs that still have '
+                    'undelivered stock on the van.'
+                ),
+            }
+        if not self.van_location_id:
+            return {
+                'ok': False,
+                'message': _(
+                    'This job has no van location yet. Pick stock onto the van first.'
+                ),
+            }
+
+        physical_need = defaultdict(float)
+        for line in self.line_ids:
+            return_qty = max((line.qty_picked or 0.0) - (line.qty_delivered or 0.0), 0.0)
+            if return_qty <= 0 or not line.product_id:
+                continue
+            physical_need[line.product_id.id] += return_qty
+
+        if not physical_need:
+            return {
+                'ok': False,
+                'message': _(
+                    'Nothing to return — this job has no undelivered leftover on the van.'
+                ),
+            }
+
+        physical = self._shahtaj_physical_van_qty_map(
+            self.van_location_id, set(physical_need),
+        )
+        Product = self.env['product.product'].sudo()
+        short_parts = []
+        for pid, need in physical_need.items():
+            product = Product.browse(pid)
+            rounding = (product.uom_id.rounding if product.exists() else None) or 0.01
+            avail = physical.get(pid, 0.0)
+            if float_compare(avail, 0.0, precision_rounding=rounding) < 0:
+                avail = 0.0
+            if float_compare(need, avail, precision_rounding=rounding) > 0:
+                short_parts.append(_(
+                    '%(product)s: need %(need)s, van has %(avail)s',
+                    product=product.display_name if product.exists() else pid,
+                    need=need,
+                    avail=avail,
+                ))
+        if short_parts:
+            return {
+                'ok': False,
+                'message': _(
+                    'Cannot return to warehouse — van does not have this job’s leftover stock.\n'
+                    '%(details)s\n'
+                    'Return is blocked so warehouse is not increased with fake stock.',
+                    details='\n'.join(short_parts),
+                ),
+            }
+        return {
+            'ok': True,
+            'message': _(
+                'Undelivered leftover for this job will move from the van back to the warehouse.'
+            ),
+        }
+
+    def shahtaj_get_van_claim_snapshot(self):
+        """Portal job View: live leftover vs not-active claim (no list payload).
+
+        Today + picked/partial → leftover is an active van reservation.
+        Overdue / future / unscheduled → leftover is historical; UI should show —.
+        """
+        self.ensure_one()
+        today = fields.Date.context_today(self)
+        open_loaded = self.state in ('picked', 'partial')
+        is_today = bool(self.scheduled_date and self.scheduled_date == today)
+        claim_active = bool(open_loaded and is_today and not self.is_walk_in)
+
+        paper_need = defaultdict(float)
+        line_rows = []
+        for line in self.line_ids:
+            paper = max((line.qty_picked or 0.0) - (line.qty_delivered or 0.0), 0.0)
+            pid = line.product_id.id if line.product_id else False
+            if pid and paper > 0:
+                paper_need[pid] += paper
+            line_rows.append({
+                'line_id': line.id,
+                'product_id': pid,
+                'paper_leftover': paper,
+            })
+
+        physical = {}
+        if claim_active and self.van_location_id and paper_need:
+            physical = self._shahtaj_physical_van_qty_map(
+                self.van_location_id, set(paper_need),
+            )
+
+        lines_out = []
+        mismatch_parts = []
+        for row in line_rows:
+            paper = float(row['paper_leftover'] or 0.0)
+            pid = row['product_id']
+            if not claim_active:
+                lines_out.append({
+                    'line_id': row['line_id'],
+                    'paper_leftover': paper,
+                    'physical_on_van': False,
+                    'display': '—',
+                    'claim_active': False,
+                })
+                continue
+            avail = float(physical.get(pid, 0.0) or 0.0) if pid else 0.0
+            if avail < 0:
+                avail = 0.0
+            lines_out.append({
+                'line_id': row['line_id'],
+                'paper_leftover': paper,
+                'physical_on_van': avail,
+                'display': f'{paper:g}' if paper else '0',
+                'claim_active': True,
+            })
+            if pid and paper > 0:
+                product = self.env['product.product'].sudo().browse(pid)
+                rounding = (product.uom_id.rounding if product.exists() else None) or 0.01
+                if float_compare(paper, avail, precision_rounding=rounding) > 0:
+                    mismatch_parts.append(_(
+                        '%(product)s: job leftover %(paper)s, van has %(avail)s',
+                        product=product.display_name if product.exists() else pid,
+                        paper=paper,
+                        avail=avail,
+                    ))
+
+        banner = ''
+        banner_type = ''
+        if open_loaded and not claim_active and not self.is_walk_in:
+            status = self.schedule_status or 'overdue'
+            if status == 'future':
+                banner = _(
+                    'Not on today’s plan — leftover is not active van stock. '
+                    'Reschedule to today before treating it as on-van.'
+                )
+            elif status == 'unscheduled':
+                banner = _(
+                    'Unscheduled job — leftover is not active van stock until a delivery day is set to today.'
+                )
+            else:
+                banner = _(
+                    'Overdue / not today — leftover is not active van stock. '
+                    'Reschedule to today (or Reset & Retry) to use it on the van again.'
+                )
+            banner_type = 'info'
+        elif claim_active and mismatch_parts:
+            banner = _(
+                'Stock mismatch — this job’s leftover is more than physical van stock.\n'
+                '%(details)s\n'
+                'Return WH is blocked until van stock matches.',
+                details='\n'.join(mismatch_parts),
+            )
+            banner_type = 'warning'
+
+        return {
+            'claim_active': claim_active,
+            'schedule_status': self.schedule_status or '',
+            'lines': lines_out,
+            'banner': banner,
+            'banner_type': banner_type,
+            'mismatch': bool(mismatch_parts),
+        }
+
+    @api.model
     def _shahtaj_create_walk_in_job(
         self,
         sale_order,
@@ -2386,49 +2676,70 @@ class ShahtajDmDelivery(models.Model):
 
     @api.model
     def _shahtaj_align_dm_jobs_to_sale_delivery(self, sale_order):
-        """When the SO is fully delivered, align open DM jobs to delivered.
+        """Sync open DM jobs with SO qty_delivered (partial or full).
 
-        SO truth = sum of order line qty_delivered (any path: DM GPS, Mark Delivery).
-        Multi-DM shares are each marked complete for their assigned qty so jobs
-        do not stay 'picked' with qty_delivered=0 after the SO is done.
+        SO truth = order line qty_delivered (DM GPS or office Mark Delivery).
+        FIFO across jobs per sale order line so office delivery cannot be
+        delivered again by the DM (blocks double handoff).
+
+        Does not move van stock — leftover physical on the van after a WH
+        Mark Delivery stays as free van surplus (walk-in / other use).
         """
         sale_order = sale_order.sudo()
         if not sale_order or not sale_order.exists():
-            return self.browse()
-        storable = sale_order.order_line.filtered(
-            lambda l: l.product_id and l.product_id.type == 'consu' and not l.display_type
-        )
-        if not storable:
-            return self.browse()
-        ordered = sum(storable.mapped('product_uom_qty'))
-        delivered = sum(storable.mapped('qty_delivered'))
-        if float_compare(delivered, ordered, precision_digits=2) < 0:
             return self.browse()
 
         jobs = self.search([
             ('sale_order_id', '=', sale_order.id),
             ('state', 'in', ('not_ready', 'ready', 'picked', 'partial')),
-        ])
+        ], order='id asc')
         if not jobs:
             return jobs
 
-        now = fields.Datetime.now()
+        # sale_line_id → job lines (FIFO by job id)
+        lines_by_sol = defaultdict(list)
         for job in jobs:
             for line in job.line_ids:
-                target = line.qty_assigned or 0.0
-                new_picked = max(line.qty_picked or 0.0, target)
+                if line.sale_order_line_id:
+                    lines_by_sol[line.sale_order_line_id.id].append(line)
+
+        touched_jobs = self.browse()
+        for sol in sale_order.order_line.filtered(
+            lambda l: l.product_id and not l.display_type and l.id in lines_by_sol
+        ):
+            credit = float(sol.qty_delivered or 0.0)
+            for line in lines_by_sol[sol.id]:
+                assigned = float(line.qty_assigned or 0.0)
+                take = min(assigned, credit)
+                new_del = max(float(line.qty_delivered or 0.0), take)
+                new_picked = max(float(line.qty_picked or 0.0), new_del)
                 line.write({
+                    'qty_delivered': new_del,
                     'qty_picked': new_picked,
-                    'qty_delivered': target,
-                    'qty_to_pick': 0.0,
-                    'qty_to_deliver': 0.0,
+                    'qty_to_pick': max(assigned - new_picked, 0.0),
+                    'qty_to_deliver': max(assigned - new_del, 0.0),
                 })
-            job.with_context(shahtaj_skip_planning_log=True).write({
-                'state': 'delivered',
-                'field_state': 'done',
-                'delivered_at': job.delivered_at or now,
-            })
-            job._ensure_dm_visit_completed()
+                credit = max(credit - take, 0.0)
+                touched_jobs |= line.delivery_id
+
+        now = fields.Datetime.now()
+        for job in (touched_jobs or jobs):
+            new_state = job._compute_dm_state_from_qtys()
+            vals = {'state': new_state}
+            if new_state == 'delivered':
+                vals.update({
+                    'field_state': 'done',
+                    'delivered_at': job.delivered_at or now,
+                })
+            elif new_state == 'partial' and job.field_state in (
+                'pending', 'not_attended', 'failed',
+            ):
+                vals['field_state'] = 'in_transit'
+            job.with_context(shahtaj_skip_planning_log=True).write(vals)
+            if new_state == 'delivered':
+                job._ensure_dm_visit_completed()
+            else:
+                job._ensure_visit_task()
         return jobs
 
     @api.model
@@ -2561,6 +2872,16 @@ class ShahtajDmDelivery(models.Model):
         if not move_vals_list:
             raise UserError(_('No products to pick.'))
 
+        # Hard block: never force WH→van when free warehouse qty is short.
+        wh_need = defaultdict(float)
+        for mv in move_vals_list:
+            wh_need[mv['product_id']] += float(mv['product_uom_qty'] or 0.0)
+        self._shahtaj_assert_physical_wh_qty(
+            warehouse.lot_stock_id,
+            wh_need,
+            _('pick stock to van'),
+        )
+
         picking = self._create_stock_picking(
             picking_type=picking_type,
             location_id=warehouse.lot_stock_id,
@@ -2656,11 +2977,70 @@ class ShahtajDmDelivery(models.Model):
         self.write({'field_state': 'failed'})
         return True
 
+    def _shahtaj_clear_leftover_before_retry(self):
+        """Before Reset & Retry: return physical leftover, or clear paper only.
+
+        If the van still has the job leftover → normal Return WH.
+        If van is empty/short but paperwork still shows leftover → clear paper
+        (qty_picked → qty_delivered) and mark Returned without inventing WH stock.
+        """
+        self.ensure_one()
+        if self.state not in ('picked', 'partial'):
+            return False
+        physical_need = defaultdict(float)
+        has_paper = False
+        for line in self.line_ids:
+            left = max((line.qty_picked or 0.0) - (line.qty_delivered or 0.0), 0.0)
+            if left <= 0:
+                continue
+            has_paper = True
+            if line.product_id:
+                physical_need[line.product_id.id] += left
+        if not has_paper:
+            return False
+
+        can_physical_return = bool(self.van_location_id and physical_need)
+        if can_physical_return:
+            try:
+                self._shahtaj_assert_physical_van_qty(
+                    self.van_location_id,
+                    physical_need,
+                    _('return to warehouse'),
+                )
+            except UserError:
+                can_physical_return = False
+
+        if can_physical_return:
+            self.action_return_to_warehouse()
+            return True
+
+        # Paper-only reconcile — van has nothing to move.
+        for line in self.line_ids:
+            left = max((line.qty_picked or 0.0) - (line.qty_delivered or 0.0), 0.0)
+            if left <= 0:
+                continue
+            line.qty_picked = line.qty_delivered
+            line.qty_to_pick = max((line.qty_assigned or 0.0) - (line.qty_picked or 0.0), 0.0)
+            line.qty_to_deliver = max(
+                (line.qty_assigned or 0.0) - (line.qty_delivered or 0.0), 0.0,
+            )
+        self.write({
+            'state': 'returned',
+            'field_state': 'pending',
+        })
+        self._ensure_visit_task()
+        _logger.info(
+            'Shahtaj reset: cleared paper van leftover on job %s (no physical stock to return)',
+            self.display_name,
+        )
+        return True
+
     def action_field_reset_pending(self):
         """Distributor override: restart this job so the DM can attempt again.
 
         - Fully Delivered stays blocked (use Undo Delivery when allowed).
         - If leftover stock is still on the van (Picked / Partial): return it to WH first.
+        - If van is empty but paper leftover remains: clear paper only, then reopen.
         - Returned (or just-returned) Stock is reopened to Ready / Partial from qtys.
         - Stop is cleared to Pending; Delivery Day is set to **today** so the native
           app shows the job on Today Load again.
@@ -2680,14 +3060,10 @@ class ShahtajDmDelivery(models.Model):
             ))
 
         today = fields.Date.context_today(self)
-        # 1) Van leftover must go back to WH before a clean retry.
+        # 1) Clear van leftover before retry: real return if stock exists,
+        #    otherwise paper-only clear (no fake WH inbound).
         if self.state in ('picked', 'partial'):
-            on_van = any(
-                (l.qty_picked or 0.0) - (l.qty_delivered or 0.0) > 0.000001
-                for l in self.line_ids
-            )
-            if on_van:
-                self.action_return_to_warehouse()
+            self._shahtaj_clear_leftover_before_retry()
 
         # 2) Reopen Returned → Ready/Partial, Stop Pending, day = today (app visibility).
         if self.state == 'returned':
@@ -2845,6 +3221,7 @@ class ShahtajDmDelivery(models.Model):
 
         move_vals_list = []
         deliver_updates = []
+        physical_need = defaultdict(float)
         for line in self.line_ids:
             qty = float(qty_by_line_id.get(line.id) or 0.0)
             if qty <= 0:
@@ -2868,9 +3245,17 @@ class ShahtajDmDelivery(models.Model):
                 vals['sale_line_id'] = line.sale_order_line_id.id
             move_vals_list.append(vals)
             deliver_updates.append((line, qty))
+            if line.product_id:
+                physical_need[line.product_id.id] += qty
 
         if not move_vals_list:
             raise UserError(_('No products to deliver.'))
+
+        self._shahtaj_assert_physical_van_qty(
+            self.van_location_id,
+            physical_need,
+            _('deliver to shop'),
+        )
 
         picking = self._create_stock_picking(
             picking_type=out_type,
@@ -2944,6 +3329,8 @@ class ShahtajDmDelivery(models.Model):
         warehouse = self._get_warehouse()
         picking_type = warehouse.int_type_id
         move_vals_list = []
+        line_updates = []
+        physical_need = defaultdict(float)
         for line in self.line_ids:
             return_qty = max(line.qty_picked - line.qty_delivered, 0.0)
             if return_qty <= 0:
@@ -2955,12 +3342,18 @@ class ShahtajDmDelivery(models.Model):
                 'location_id': self.van_location_id.id,
                 'location_dest_id': warehouse.lot_stock_id.id,
             })
-            # Keep qty_delivered; reduce qty_picked to what was actually delivered
-            line.qty_picked = line.qty_delivered
-            line.qty_to_pick = max(line.qty_assigned - line.qty_picked, 0.0)
-            line.qty_to_deliver = max(line.qty_assigned - line.qty_delivered, 0.0)
+            line_updates.append(line)
+            if line.product_id:
+                physical_need[line.product_id.id] += return_qty
         if not move_vals_list:
             raise UserError(_('No undelivered van stock to return for this order.'))
+
+        # Block over-return that would create negative van / false WH inbound.
+        self._shahtaj_assert_physical_van_qty(
+            self.van_location_id,
+            physical_need,
+            _('return to warehouse'),
+        )
 
         picking = self._create_stock_picking(
             picking_type=picking_type,
@@ -2974,6 +3367,12 @@ class ShahtajDmDelivery(models.Model):
         for move in picking.move_ids:
             move.quantity = move.product_uom_qty
         picking.with_context(skip_backorder=True, skip_sms=True).button_validate()
+
+        # Paperwork only after stock move succeeds.
+        for line in line_updates:
+            line.qty_picked = line.qty_delivered
+            line.qty_to_pick = max(line.qty_assigned - line.qty_picked, 0.0)
+            line.qty_to_deliver = max(line.qty_assigned - line.qty_delivered, 0.0)
 
         self.write({
             'state': 'returned',
