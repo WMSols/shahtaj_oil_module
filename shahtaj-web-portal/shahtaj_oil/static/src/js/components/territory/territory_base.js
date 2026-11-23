@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillStart, useEffect, useRef,onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onWillStart, onMounted, onWillUnmount, useEffect, useRef, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmModal } from "../confirm_modal";
 import { hasFinancialAccess } from "../../shahtaj_access";
@@ -42,6 +42,7 @@ export class TerritoryBase extends Component {
             showRouteForm: false,
             showShopForm: false,
             selectedShopDetails: null,
+            isRefreshingShopDetails: false,
             shopImagePreview: { open: false, key: "" },
             shopCategoryEdit: 'credit',
             shopActionMenuId: null,
@@ -70,7 +71,17 @@ export class TerritoryBase extends Component {
             routeFilterZone: 'all',  
             bookers: [],
             // Custom Modal State
-            confirmModal: { isOpen: false, title: '', message: '', onConfirm: null },
+            confirmModal: {
+                isOpen: false,
+                title: '',
+                message: '',
+                onConfirm: null,
+                onSecondary: null,
+                confirmLabel: 'OK',
+                cancelLabel: 'Cancel',
+                confirmClass: 'btn btn-danger ms-2 fw-bold px-4',
+                secondaryLabel: '',
+            },
             isLoading: false,
 
             areaForm: { name: '', is_active: true },
@@ -141,6 +152,21 @@ export class TerritoryBase extends Component {
             await this.fetchDashboardData({ force: false });
             await this.fetchActiveList(); // Force the paginator to run on initial load
             await this._openRequestedShopDetails(this.props);
+        });
+        this._onShopDetailsVisibility = () => {
+            if (
+                document.visibilityState === 'visible'
+                && this.state.activeSubTab === 'shops'
+                && this.state.selectedShopDetails?.id
+            ) {
+                this.refreshShopDetails({ soft: true, silent: true });
+            }
+        };
+        onMounted(() => {
+            document.addEventListener('visibilitychange', this._onShopDetailsVisibility);
+        });
+        onWillUnmount(() => {
+            document.removeEventListener('visibilitychange', this._onShopDetailsVisibility);
         });
         onWillUpdateProps((nextProps) => {
             const shopChanged = this._shopNavChanged(nextProps);
@@ -484,17 +510,27 @@ export class TerritoryBase extends Component {
         await this.reloadFromRefresh();
     }
     // Custom Modal Controller
-    showConfirm(title, message, onConfirmCallback) {
-     this.state.confirmModal = {
-         isOpen: true,
-         title: title,
-         message: message,
-         onConfirm: async () => {
-             this.state.confirmModal.isOpen = false;
-             await onConfirmCallback();
-         }
-     };
- }
+    showConfirm(title, message, onConfirmCallback, options = {}) {
+        this.state.confirmModal = {
+            isOpen: true,
+            title,
+            message,
+            confirmLabel: options.confirmLabel || 'OK',
+            cancelLabel: options.cancelLabel || 'Cancel',
+            confirmClass: options.confirmClass || 'btn btn-danger ms-2 fw-bold px-4',
+            secondaryLabel: options.secondaryLabel || '',
+            onSecondary: options.onSecondary
+                ? async () => {
+                    this.state.confirmModal.isOpen = false;
+                    await options.onSecondary();
+                }
+                : null,
+            onConfirm: async () => {
+                this.state.confirmModal.isOpen = false;
+                await onConfirmCallback();
+            },
+        };
+    }
 
  closeConfirm() {
      this.state.confirmModal.isOpen = false;
@@ -530,17 +566,27 @@ export class TerritoryBase extends Component {
     }
 
     // Custom Modal Controller
-    showConfirm(title, message, onConfirmCallback) {
-     this.state.confirmModal = {
-         isOpen: true,
-         title: title,
-         message: message,
-         onConfirm: async () => {
-             this.state.confirmModal.isOpen = false;
-             await onConfirmCallback();
-         }
-     };
- }
+    showConfirm(title, message, onConfirmCallback, options = {}) {
+        this.state.confirmModal = {
+            isOpen: true,
+            title,
+            message,
+            confirmLabel: options.confirmLabel || 'OK',
+            cancelLabel: options.cancelLabel || 'Cancel',
+            confirmClass: options.confirmClass || 'btn btn-danger ms-2 fw-bold px-4',
+            secondaryLabel: options.secondaryLabel || '',
+            onSecondary: options.onSecondary
+                ? async () => {
+                    this.state.confirmModal.isOpen = false;
+                    await options.onSecondary();
+                }
+                : null,
+            onConfirm: async () => {
+                this.state.confirmModal.isOpen = false;
+                await onConfirmCallback();
+            },
+        };
+    }
 
  closeConfirm() {
      this.state.confirmModal.isOpen = false;
@@ -1293,6 +1339,14 @@ export class TerritoryBase extends Component {
         this.toggleArchive('res.partner', shop.id, false);
     }
 
+    onShopMenuDisapprove(shop) {
+        this.closeShopActionMenu();
+        if (!shop || !shop.id) {
+            return;
+        }
+        this.confirmRejectShop(shop.id, shop.name, shop.shop_approval_state);
+    }
+
     formatShopRoutes(shop) {
         if (!shop) {
             return 'Unassigned';
@@ -1490,31 +1544,58 @@ export class TerritoryBase extends Component {
         }
     }
 
-    async viewShopDetails(shopId) {
+    async viewShopDetails(shopId, { soft = false } = {}) {
         this.closeShopActionMenu();
-        const details = await this.orm.read(
-            "res.partner",
-            [shopId],
-            [
-                "id", "name", "owner_name", "phone", "owner_cnic_number", "shop_license_number", "partner_latitude", "partner_longitude",
-                "shahtaj_shop_category", "credit_limit", "legacy_balance", "outstanding_balance",
-                "route_ids", "shahtaj_routes_display", "shahtaj_route_tag", "registered_by_id",
-                "owner_cnic_front", "owner_cnic_back", "owner_photo", "shop_exterior_photo",
-                "shop_approval_state",
-                "shahtaj_field_verified", "shahtaj_field_verified_at", "shahtaj_field_verified_by_id",
-                "shahtaj_visit_tag",
-            ]
-        );
-        if (details.length > 0) {
-            const shop = details[0];
+        this.state.isRefreshingShopDetails = true;
+        try {
+            const shop = await this.orm.call(
+                "res.partner",
+                "shahtaj_get_shop_detail_snapshot",
+                [shopId],
+                { include_images: !soft },
+            );
+            if (!shop) {
+                this.notification.add(`Shop ID ${shopId} was not found.`, { type: "warning" });
+                return;
+            }
             shop.route_lines = await this._loadShopRouteLines(shop.route_ids || []);
-            this.state.selectedShopDetails = shop;
+            if (soft && this.state.selectedShopDetails?.id === shopId) {
+                // Keep already-loaded images; refresh status/financials/GPS.
+                const prev = this.state.selectedShopDetails;
+                this.state.selectedShopDetails = {
+                    ...prev,
+                    ...shop,
+                    owner_cnic_front: shop.owner_cnic_front ?? prev.owner_cnic_front,
+                    owner_cnic_back: shop.owner_cnic_back ?? prev.owner_cnic_back,
+                    owner_photo: shop.owner_photo ?? prev.owner_photo,
+                    shop_exterior_photo: shop.shop_exterior_photo ?? prev.shop_exterior_photo,
+                    route_lines: shop.route_lines,
+                };
+            } else {
+                this.state.selectedShopDetails = shop;
+                this.state.shopRouteSearchQuery = '';
+                this.state.pagination.shopRoutes.page = 1;
+            }
             this.state.shopCategoryEdit = shop.shahtaj_shop_category || 'credit';
-            this.state.shopRouteSearchQuery = '';
-            this.state.pagination.shopRoutes.page = 1;
             this._syncShopRoutesPagination();
-        } else {
-            this.notification.add(`Shop ID ${shopId} was not found.`, { type: "warning" });
+        } catch (error) {
+            this.notification.add(
+                "Failed to load shop details: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isRefreshingShopDetails = false;
+        }
+    }
+
+    async refreshShopDetails({ soft = false, silent = false } = {}) {
+        if (!this.state.selectedShopDetails?.id || this.state.isRefreshingShopDetails) {
+            return;
+        }
+        const shopId = this.state.selectedShopDetails.id;
+        await this.viewShopDetails(shopId, { soft });
+        if (!silent) {
+            this.notification.add("Shop details refreshed.", { type: "success" });
         }
     }
 
@@ -1542,21 +1623,71 @@ export class TerritoryBase extends Component {
         }
     }
 
-   async approveShop(shopId) {
+   async approveShop(shopId, invoiceDecision = null) {
         this.state.isApprovingShop = true;
         try {
-            await this.orm.call("res.partner", "action_approve_shop", [[shopId]]);
+            const context = { shahtaj_legacy_invoice_silent: true };
+            if (invoiceDecision === 'yes' || invoiceDecision === 'no') {
+                context.shahtaj_legacy_invoice_decision = invoiceDecision;
+            }
+            await this.orm.call(
+                "res.partner",
+                "action_approve_shop",
+                [[shopId]],
+                { context },
+            );
             await this.fetchDashboardData();
             if (this.state.selectedShopDetails && this.state.selectedShopDetails.id === shopId) {
                 await this.viewShopDetails(shopId);
             }
             await this.fetchActiveList();
-            this.notification.add("Shop approved successfully.", { type: "success" });
+            this.notification.add(
+                invoiceDecision === 'yes'
+                    ? "Shop approved and legacy invoice created."
+                    : "Shop approved successfully.",
+                { type: "success" },
+            );
         } catch (error) {
             this.notification.add("Failed to approve shop: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
             this.state.isApprovingShop = false;
         }
+    }
+
+    async confirmApproveShop(shopId) {
+        try {
+            const prompt = await this.orm.call(
+                "res.partner",
+                "shahtaj_shop_needs_legacy_invoice_prompt",
+                [[shopId]],
+            );
+            if (prompt?.needed) {
+                const amount = Number(prompt.amount || 0);
+                const amountLabel = Number.isFinite(amount)
+                    ? amount.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                    : String(prompt.amount || '');
+                this.showConfirm(
+                    "Create Legacy Invoice?",
+                    `This shop has a legacy balance of Rs. ${amountLabel}.\n\nYes: approve and create the opening invoice now.\nNo: approve only (invoice later from Settings).`,
+                    () => this.approveShop(shopId, 'yes'),
+                    {
+                        confirmLabel: 'Yes — Create Invoice',
+                        confirmClass: 'btn btn-primary ms-2 fw-bold px-4',
+                        secondaryLabel: 'No — Approve Only',
+                        onSecondary: () => this.approveShop(shopId, 'no'),
+                        cancelLabel: 'Cancel',
+                    },
+                );
+                return;
+            }
+        } catch (error) {
+            // Fall through to approve without prompt if helper fails.
+            this.notification.add(
+                "Could not check legacy invoice prompt: " + (error.data?.message || error.message),
+                { type: "warning" },
+            );
+        }
+        await this.approveShop(shopId, 'no');
     }
 
     async rejectShop(shopId) {
@@ -1568,38 +1699,58 @@ export class TerritoryBase extends Component {
                 await this.viewShopDetails(shopId);
             }
             await this.fetchActiveList();
-            this.notification.add("Shop application rejected.", { type: "info" });
+            this.notification.add("Shop disapproved / rejected.", { type: "info" });
         } catch (error) {
-            this.notification.add("Failed to reject shop: " + (error.data?.message || error.message), { type: "danger" });
+            this.notification.add("Failed to disapprove shop: " + (error.data?.message || error.message), { type: "danger" });
         } finally {
             this.state.isRejectingShop = false;
         }
     }
 
-    confirmRejectShop(shopId) {
+    confirmRejectShop(shopId, shopName = '', approvalState = '') {
+        const label = shopName ? `“${shopName}”` : 'this shop';
+        const isApproved = approvalState === 'approved';
+        const title = isApproved ? 'Disapprove Shop?' : 'Reject Shop Application?';
+        const message = isApproved
+            ? `Disapprove ${label}?\n\nThis changes approval status to Rejected.\nPending visit tasks for this shop will be cancelled.\n\nThis does NOT clear GPS or on-site verification.\n\nContinue?`
+            : `Reject registration for ${label}?\n\nThe shop will be marked Rejected and will not be used for schedules/visits until approved again.\nThe order booker can update and resubmit if needed.\n\nThis does NOT clear GPS verification.\n\nContinue?`;
         this.showConfirm(
-            "Reject Shop Application",
-            "Reject this shop registration? The order booker can update and resubmit if needed.",
+            title,
+            message,
             () => this.rejectShop(shopId),
+            {
+                confirmLabel: isApproved ? 'Yes — Disapprove' : 'Yes — Reject',
+                cancelLabel: 'Cancel',
+                confirmClass: 'btn btn-danger ms-2 fw-bold px-4',
+            },
         );
     }
 
     approveSelectedShop() {
         if (!this.state.selectedShopDetails) return;
-        this.approveShop(this.state.selectedShopDetails.id);
+        this.confirmApproveShop(this.state.selectedShopDetails.id);
     }
 
     rejectSelectedShop() {
         if (!this.state.selectedShopDetails) return;
-        this.confirmRejectShop(this.state.selectedShopDetails.id);
+        this.confirmRejectShop(
+            this.state.selectedShopDetails.id,
+            this.state.selectedShopDetails.name,
+            this.state.selectedShopDetails.shop_approval_state,
+        );
     }
 
     confirmResetShopVerification(shopId, shopName = '') {
         const label = shopName ? `“${shopName}”` : 'this shop';
         this.showConfirm(
-            'Reset Verification & GPS',
-            `Reset on-site verification for ${label}? GPS coordinates will be cleared. The order booker must re-verify location and capture an exterior photo on the next visit.`,
+            'Reset Verification & GPS?',
+            `Reset on-site verification for ${label}?\n\nThis will:\n• Mark the shop as Not Verified\n• Clear GPS latitude/longitude\n• Require the order booker to re-verify and take an exterior photo on the next visit\n\nThis does NOT change approval (Approved/Pending/Rejected stays the same).\n\nContinue?`,
             () => this.resetShopFieldVerification(shopId),
+            {
+                confirmLabel: 'Yes — Reset GPS',
+                cancelLabel: 'Cancel',
+                confirmClass: 'btn btn-warning ms-2 fw-bold px-4 text-dark',
+            },
         );
     }
 

@@ -106,6 +106,17 @@ class ShahtajVisitTarget(models.Model):
         store=True,
         help='0–100. For Combined targets this is the average of individual line percentages.',
     )
+    sales_value = fields.Monetary(
+        string='Sales Value',
+        compute='_compute_progress',
+        store=True,
+        currency_field='currency_id',
+        help=(
+            'Untaxed amount booked on confirmed sale orders for this target’s '
+            'products in the period (ordered qty × sales price on the order line). '
+            'Independent of volume progress; used for Dist performance visibility.'
+        ),
+    )
     active = fields.Boolean(default=True)
     period_status = fields.Selection(
         [
@@ -292,6 +303,26 @@ class ShahtajVisitTarget(models.Model):
             qty_map[line.product_id.id] = qty_map.get(line.product_id.id, 0.0) + line.product_uom_qty
         return qty_map
 
+    def _lines_amount_map(self, product_ids):
+        """Return {product_id: untaxed booked amount} for this target's booker/period."""
+        self.ensure_one()
+        if not product_ids:
+            return {}
+        lines = self.env['sale.order.line'].search(
+            self._sale_order_line_domain_for_target(
+                self.order_booker_id,
+                self.date_start,
+                self.date_end,
+                product_ids=product_ids,
+            )
+        )
+        amount_map = {pid: 0.0 for pid in product_ids}
+        for line in lines:
+            amount_map[line.product_id.id] = (
+                amount_map.get(line.product_id.id, 0.0) + (line.price_subtotal or 0.0)
+            )
+        return amount_map
+
     def _lines_weight_kg_map(self, product_ids):
         """Return {product_id: ordered_weight_kg} for this target's booker/period."""
         self.ensure_one()
@@ -337,20 +368,25 @@ class ShahtajVisitTarget(models.Model):
             achieved = 0.0
             remaining = 0.0
             progress = 0.0
+            sales = 0.0
             goal = target.target_value or 0.0
 
             if target.date_start and target.date_end and target.order_booker_id:
                 if target.target_type == 'collective_qty' and target.line_ids:
                     product_ids = target.line_ids.mapped('product_id').ids
                     qty_map = target._lines_qty_map(product_ids)
+                    amount_map = target._lines_amount_map(product_ids)
                     achieved = sum(qty_map.values())
+                    sales = sum(amount_map.values())
                 elif target.target_type == 'collective_weight' and target.line_ids:
                     product_ids = target.line_ids.mapped('product_id').ids
                     kg_map = target._lines_weight_kg_map(product_ids)
+                    amount_map = target._lines_amount_map(product_ids)
                     achieved_kg = sum(kg_map.values())
                     achieved = self._kg_to_weight(
                         achieved_kg, target.target_weight_uom,
                     )
+                    sales = sum(amount_map.values())
                 elif target.target_type == 'product_bundle' and target.line_ids:
                     target.line_ids._compute_line_progress()
                     percents = target.line_ids.mapped('progress_percent')
@@ -361,9 +397,11 @@ class ShahtajVisitTarget(models.Model):
                     goal = 100.0
                     achieved = progress
                     remaining = max(0.0, 100.0 - progress)
+                    sales = sum(target.line_ids.mapped('sales_value'))
                     target.achieved_value = achieved
                     target.remaining_value = remaining
                     target.progress_percent = progress
+                    target.sales_value = sales
                     continue
 
             target.achieved_value = achieved
@@ -372,9 +410,13 @@ class ShahtajVisitTarget(models.Model):
                 progress = self._cap_percent((achieved / goal) * 100.0)
             target.remaining_value = remaining
             target.progress_percent = progress
+            target.sales_value = sales
 
             if target.target_type in MULTI_PRODUCT_TYPES and target.line_ids:
                 target.line_ids._compute_line_progress()
+                # Lines carry sales_value; keep parent total aligned after line flush.
+                if target.target_type in COLLECTIVE_TYPES:
+                    target.sales_value = sales
 
     def _force_recompute_progress(self):
         """Force stored progress fields to refresh from current sale orders.
@@ -386,15 +428,20 @@ class ShahtajVisitTarget(models.Model):
         targets = self.exists()
         if not targets:
             return
-        fnames = ['achieved_value', 'remaining_value', 'progress_percent']
+        fnames = [
+            'achieved_value', 'remaining_value', 'progress_percent', 'sales_value',
+        ]
+        line_fnames = [
+            'achieved_value', 'remaining_value', 'progress_percent', 'sales_value',
+        ]
         lines = targets.mapped('line_ids')
         targets.invalidate_recordset(fnames, flush=False)
         if lines:
-            lines.invalidate_recordset(fnames, flush=False)
-            for fname in fnames:
+            lines.invalidate_recordset(line_fnames, flush=False)
+            for fname in line_fnames:
                 self.env.add_to_compute(lines._fields[fname], lines)
             # Lines first so Combined (product_bundle) parent reads fresh %.
-            lines.flush_recordset(fnames)
+            lines.flush_recordset(line_fnames)
         for fname in fnames:
             self.env.add_to_compute(targets._fields[fname], targets)
         targets.flush_recordset(fnames)
@@ -525,6 +572,18 @@ class ShahtajVisitTargetLine(models.Model):
         compute='_compute_line_progress',
         store=True,
     )
+    currency_id = fields.Many2one(
+        related='target_id.currency_id',
+        string='Currency',
+        readonly=True,
+    )
+    sales_value = fields.Monetary(
+        string='Sales Value',
+        compute='_compute_line_progress',
+        store=True,
+        currency_field='currency_id',
+        help='Untaxed booked amount for this product in the target period.',
+    )
 
     @api.constrains('product_id', 'measure_type', 'target_value', 'target_weight_uom', 'target_id')
     def _check_line(self):
@@ -577,15 +636,18 @@ class ShahtajVisitTargetLine(models.Model):
                     line.achieved_value = 0.0
                     line.remaining_value = 0.0
                     line.progress_percent = 0.0
+                    line.sales_value = 0.0
                 continue
 
             product_ids = lines.mapped('product_id').ids
             qty_map = parent._lines_qty_map(product_ids)
             kg_map = parent._lines_weight_kg_map(product_ids)
+            amount_map = parent._lines_amount_map(product_ids)
 
             for line in lines:
                 achieved = 0.0
                 goal = 0.0
+                sales = amount_map.get(line.product_id.id, 0.0) if line.product_id else 0.0
                 if parent.target_type == 'collective_qty':
                     achieved = qty_map.get(line.product_id.id, 0.0)
                     # Informational share only — parent holds the real goal.
@@ -611,6 +673,7 @@ class ShahtajVisitTargetLine(models.Model):
                     goal = 0.0
 
                 line.achieved_value = achieved
+                line.sales_value = sales
                 if goal:
                     line.remaining_value = max(0.0, goal - achieved)
                     # Line % always capped 0–100 (contribution share for collective;

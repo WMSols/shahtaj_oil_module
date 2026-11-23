@@ -27,6 +27,20 @@ class ResCompany(models.Model):
         help='When enabled, show Mark Delivery, Pick Stock, and Return WH '
              'override actions in the portal DM Operations screens.',
     )
+    shahtaj_legacy_invoice_auto = fields.Boolean(
+        string='Auto Legacy Balance Invoices',
+        default=False,
+        help='When enabled, approving a shop can create a legacy-balance '
+             'invoice (after user confirmation). Also unlocks the Settings '
+             'batch generator for approved shops that still need an invoice. '
+             'Keep OFF during migration imports.',
+    )
+    shahtaj_legacy_invoice_batch_size = fields.Integer(
+        string='Legacy Invoice Batch Size',
+        default=100,
+        help='How many pending legacy invoices to create per Start click '
+             '(recommended 50–200 on small servers).',
+    )
 
     @api.constrains('shahtaj_min_shop_distance_m', 'shahtaj_max_shop_distance_m')
     def _check_shahtaj_shop_distance_limits(self):
@@ -114,6 +128,137 @@ class ResCompany(models.Model):
                 message=_('enabled=%s', value),
             )
         return self.shahtaj_get_dm_overwrite_buttons()
+
+    @api.model
+    def _shahtaj_legacy_invoice_pending_domain(self):
+        """Approved shops with non-zero legacy balance and no invoice yet."""
+        return [
+            ('is_shahtaj_shop', '=', True),
+            ('active', '=', True),
+            ('shop_approval_state', '=', 'approved'),
+            ('legacy_balance', '!=', 0),
+            ('legacy_balance_move_id', '=', False),
+        ]
+
+    @api.model
+    def _shahtaj_legacy_invoice_created_domain(self):
+        """Shops that already have a legacy balance invoice linked."""
+        return [
+            ('is_shahtaj_shop', '=', True),
+            ('legacy_balance_move_id', '!=', False),
+        ]
+
+    @api.model
+    def shahtaj_get_legacy_invoice_settings(self):
+        """Portal/settings payload: toggle, batch size, and live counts."""
+        company = self.env.company
+        Partner = self.env['res.partner'].sudo()
+        pending = Partner.search_count(self._shahtaj_legacy_invoice_pending_domain())
+        created = Partner.search_count(self._shahtaj_legacy_invoice_created_domain())
+        batch = company.shahtaj_legacy_invoice_batch_size or 100
+        if batch < 1:
+            batch = 1
+        if batch > 500:
+            batch = 500
+        return {
+            'enabled': bool(company.shahtaj_legacy_invoice_auto),
+            'batch_size': batch,
+            'pending_count': pending,
+            'created_count': created,
+        }
+
+    @api.model
+    def shahtaj_set_legacy_invoice_auto(self, enabled=False):
+        """Enable/disable automatic legacy invoice flows for this company."""
+        if not self._shahtaj_can_edit_company_settings():
+            raise AccessError(_(
+                'Only distributors or administrators can change legacy invoice settings.'
+            ))
+        company = self.env.company.sudo()
+        value = bool(enabled)
+        if company.shahtaj_legacy_invoice_auto != value:
+            company.write({'shahtaj_legacy_invoice_auto': value})
+            self.env['shahtaj.activity.log'].log_business(
+                operation='settings.legacy_invoice_auto',
+                name='Legacy invoice auto setting updated',
+                related_record=company,
+                message=_('enabled=%s', value),
+            )
+        return self.shahtaj_get_legacy_invoice_settings()
+
+    @api.model
+    def shahtaj_set_legacy_invoice_batch_size(self, batch_size=100):
+        """Save batch size used by the Settings Start button."""
+        if not self._shahtaj_can_edit_company_settings():
+            raise AccessError(_(
+                'Only distributors or administrators can change legacy invoice settings.'
+            ))
+        try:
+            size = int(batch_size)
+        except (TypeError, ValueError) as err:
+            raise UserError(_('Batch size must be a whole number.')) from err
+        if size < 1 or size > 500:
+            raise UserError(_('Batch size must be between 1 and 500.'))
+        company = self.env.company.sudo()
+        if company.shahtaj_legacy_invoice_batch_size != size:
+            company.write({'shahtaj_legacy_invoice_batch_size': size})
+            self.env['shahtaj.activity.log'].log_business(
+                operation='settings.legacy_invoice_batch_size',
+                name='Legacy invoice batch size updated',
+                related_record=company,
+                message=_('batch_size=%s', size),
+            )
+        return self.shahtaj_get_legacy_invoice_settings()
+
+    @api.model
+    def shahtaj_run_legacy_invoice_batch(self, limit=None):
+        """Create up to ``limit`` pending legacy invoices (Settings Start)."""
+        if not self._shahtaj_can_edit_company_settings():
+            raise AccessError(_(
+                'Only distributors or administrators can generate legacy invoices.'
+            ))
+        company = self.env.company
+        if not company.shahtaj_legacy_invoice_auto:
+            raise UserError(_(
+                'Turn on Auto Legacy Balance Invoices before generating invoices.'
+            ))
+        if limit is None:
+            limit = company.shahtaj_legacy_invoice_batch_size or 100
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as err:
+            raise UserError(_('Batch size must be a whole number.')) from err
+        if limit < 1:
+            raise UserError(_('Batch size must be at least 1.'))
+        if limit > 500:
+            limit = 500
+
+        Partner = self.env['res.partner']
+        pending = Partner.search(
+            self._shahtaj_legacy_invoice_pending_domain(),
+            limit=limit,
+            order='id',
+        )
+        created_before = len(pending)
+        if pending:
+            pending.with_context(
+                shahtaj_force_legacy_invoice=True,
+            )._post_legacy_balance_entry()
+        stats = self.shahtaj_get_legacy_invoice_settings()
+        posted = created_before - Partner.search_count([
+            ('id', 'in', pending.ids),
+            ('legacy_balance_move_id', '=', False),
+        ]) if pending else 0
+        stats['batch_attempted'] = created_before
+        stats['batch_posted'] = posted
+        self.env['shahtaj.activity.log'].log_business(
+            operation='settings.legacy_invoice_batch',
+            name='Legacy invoice batch run',
+            related_record=company,
+            message=_('attempted=%(a)s posted=%(p)s pending_left=%(l)s',
+                      a=created_before, p=posted, l=stats['pending_count']),
+        )
+        return stats
 
     def _shahtaj_get_default_expense_account(self):
         """Pick any active Expense account for operating expense posts."""

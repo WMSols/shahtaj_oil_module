@@ -15,8 +15,20 @@
                         <p class="mb-0 text-muted fs-6" style="white-space: pre-line;"><t t-esc="props.message"/></p>
                     </div>
                     <div class="modal-footer border-top-0 bg-light">
-                        <button type="button" class="btn btn-outline-secondary fw-bold px-4" t-on-click="props.onCancel">Cancel</button>
-                        <button type="button" class="btn btn-danger ms-2 fw-bold px-4" t-on-click="props.onConfirm">OK</button>
+                        <button type="button" class="btn btn-outline-secondary fw-bold px-4" t-on-click="props.onCancel">
+                            <t t-esc="props.cancelLabel || 'Cancel'"/>
+                        </button>
+                        <button t-if="props.secondaryLabel and props.onSecondary"
+                                type="button"
+                                class="btn btn-outline-dark fw-bold px-4"
+                                t-on-click="props.onSecondary">
+                            <t t-esc="props.secondaryLabel"/>
+                        </button>
+                        <button type="button"
+                                t-att-class="props.confirmClass || 'btn btn-danger ms-2 fw-bold px-4'"
+                                t-on-click="props.onConfirm">
+                            <t t-esc="props.confirmLabel || 'OK'"/>
+                        </button>
                     </div>
                 </div>
             </div>

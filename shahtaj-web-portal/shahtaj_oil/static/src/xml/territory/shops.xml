@@ -47,6 +47,14 @@
                 </small>
             </div>
             <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-dark fw-bold d-flex align-items-center"
+                        t-on-click="() => this.refreshShopDetails({ soft: false, silent: false })"
+                        t-att-disabled="this.state.isRefreshingShopDetails"
+                        title="Reload latest shop, GPS, and legacy invoice status">
+                    <span t-if="this.state.isRefreshingShopDetails" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <i t-else="" class="fa fa-refresh me-1"></i>
+                    Refresh
+                </button>
                 <button class="btn btn-sm btn-outline-primary fw-bold d-flex align-items-center"
                         t-on-click="editShopFromDetails"
                         title="Edit this shop">
@@ -151,11 +159,14 @@
                             </div>
                         </div>
                         <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
-                            <div class="px-3 py-2 bg-light border-bottom">
-                                <strong class="text-dark small text-uppercase">Coordinates</strong>
+                            <div class="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                                <strong class="text-dark small text-uppercase mb-0">GPS &amp; On-site Verification</strong>
+                                <span t-attf-class="badge #{this.state.selectedShopDetails.shahtaj_field_verified ? 'bg-success text-white' : 'bg-warning text-dark'}">
+                                    <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified ? 'Verified' : 'Not Verified'"/>
+                                </span>
                             </div>
                             <div class="p-3">
-                                <div class="row g-3">
+                                <div class="row g-3 mb-3">
                                     <div class="col-6">
                                         <div class="text-muted small mb-1">Latitude</div>
                                         <div class="fw-bold text-dark">
@@ -169,16 +180,6 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                        <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-3">
-                            <div class="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                                <strong class="text-dark small text-uppercase mb-0">On-site Verification</strong>
-                                <span t-attf-class="badge #{this.state.selectedShopDetails.shahtaj_field_verified ? 'bg-success text-white' : 'bg-warning text-dark'}">
-                                    <t t-esc="this.state.selectedShopDetails.shahtaj_field_verified ? 'Verified' : 'Not Verified'"/>
-                                </span>
-                            </div>
-                            <div class="p-3">
                                 <t t-if="this.state.selectedShopDetails.shahtaj_field_verified">
                                     <div class="small text-muted mb-1">Verified at</div>
                                     <div class="fw-bold text-dark mb-2">
@@ -191,11 +192,11 @@
                                         </t>
                                         <t t-else="">—</t>
                                     </div>
-                                    <p class="small text-muted mb-3 mb-md-3">
-                                        Use this if GPS was captured incorrectly or the shop moved.
-                                        Resetting clears coordinates so the booker re-verifies on the next visit.
+                                    <p class="small text-muted mb-3">
+                                        Use only if the GPS pin is wrong or the shop moved.
+                                        This does <strong>not</strong> change approval status.
                                     </p>
-                                    <button class="btn btn-sm btn-outline-warning fw-bold d-flex align-items-center"
+                                    <button class="btn btn-sm btn-warning fw-bold d-flex align-items-center text-dark"
                                             t-on-click="confirmResetSelectedShopVerification"
                                             t-att-disabled="this.state.isResettingShopVerification"
                                             title="Clear GPS and mark shop as not verified">
@@ -245,6 +246,35 @@
                                     </div>
                                 </div>
                             </t>
+                        </div>
+                        <div class="mt-3" t-if="this.hasFinancialAccess">
+                            <h6 class="fw-bold text-secondary">Legacy Balance Invoice</h6>
+                            <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                        <span class="text-muted">Created</span>
+                                        <strong class="text-dark"
+                                                t-esc="this.state.selectedShopDetails.shahtaj_legacy_invoice_created ? 'Yes' : 'No'"/>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                        <span class="text-muted">Invoice Status</span>
+                                        <strong class="text-dark"
+                                                t-esc="this.state.selectedShopDetails.shahtaj_legacy_invoice_move_state || 'Not created'"/>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                        <span class="text-muted">Payment Status</span>
+                                        <strong class="text-dark"
+                                                t-esc="this.state.selectedShopDetails.shahtaj_legacy_invoice_payment_state || 'N/A'"/>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                        <span class="text-muted">Amount Due</span>
+                                        <strong class="text-dark">
+                                            Rs.
+                                            <t t-esc="this.state.selectedShopDetails.shahtaj_legacy_invoice_amount_residual || 0"/>
+                                        </strong>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -306,43 +336,52 @@
                 </t>
             </div>
 
-            <div class="border-top pt-3 mt-2 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div class="border-top pt-3 mt-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
                     <t t-if="this.state.selectedShopDetails.shop_approval_state === 'pending'">
-                        <small class="text-muted fw-bold">Verify photos, location, and details, then approve or reject this application.</small>
+                        <small class="text-muted fw-bold">Review details, then approve or reject this registration.</small>
                     </t>
                     <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'approved'">
                         <small class="text-success fw-bold">This shop is approved and available for schedules and visits.</small>
-                        <small t-if="this.state.selectedShopDetails.shahtaj_field_verified" class="text-muted d-block mt-1">
-                            On-site GPS is locked. Reset verification only if the pin is wrong or the shop relocated.
+                        <small class="text-muted d-block mt-1">
+                            Disapprove removes approval only. To clear GPS, use Reset Verification on the GPS card above.
                         </small>
                     </t>
                     <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'rejected'">
-                        <small class="text-danger fw-bold">This shop was rejected. You can approve it if the application should proceed.</small>
+                        <small class="text-danger fw-bold">This shop is disapproved/rejected. You can approve it again if needed.</small>
                     </t>
                 </div>
-               <div class="d-flex gap-2 flex-wrap justify-content-md-end">
-                    <t t-if="this.state.selectedShopDetails.shahtaj_field_verified">
-                        <button class="btn btn-outline-warning fw-bold d-flex align-items-center"
-                                t-on-click="confirmResetSelectedShopVerification"
-                                t-att-disabled="this.state.isResettingShopVerification"
-                                title="Clear GPS and require on-site re-verification">
-                            <span t-if="this.state.isResettingShopVerification" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Unverify GPS
-                        </button>
-                    </t>
+                <div class="d-flex gap-2 flex-wrap justify-content-md-end">
                     <t t-if="this.state.selectedShopDetails.shop_approval_state === 'pending'">
-                        <button class="btn btn-outline-danger fw-bold d-flex align-items-center" t-on-click="rejectSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Reject this shop application">
+                        <button class="btn btn-danger fw-bold text-white d-flex align-items-center"
+                                t-on-click="rejectSelectedShop"
+                                t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop"
+                                title="Reject this shop registration">
                             <span t-if="this.state.isRejectingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Reject
+                            Reject Application
                         </button>
-                        <button class="btn btn-success fw-bold text-white d-flex align-items-center" t-on-click="approveSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Approve and activate this shop">
+                        <button class="btn btn-success fw-bold text-white d-flex align-items-center"
+                                t-on-click="approveSelectedShop"
+                                t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop"
+                                title="Approve and activate this shop">
                             <span t-if="this.state.isApprovingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             Approve Shop
                         </button>
                     </t>
+                    <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'approved'">
+                        <button class="btn btn-danger fw-bold text-white d-flex align-items-center"
+                                t-on-click="rejectSelectedShop"
+                                t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop"
+                                title="Disapprove this shop (approval only)">
+                            <span t-if="this.state.isRejectingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Disapprove Shop
+                        </button>
+                    </t>
                     <t t-elif="this.state.selectedShopDetails.shop_approval_state === 'rejected'">
-                        <button class="btn btn-success fw-bold text-white d-flex align-items-center" t-on-click="approveSelectedShop" t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop" title="Approve this previously rejected shop">
+                        <button class="btn btn-success fw-bold text-white d-flex align-items-center"
+                                t-on-click="approveSelectedShop"
+                                t-att-disabled="this.state.isApprovingShop or this.state.isRejectingShop"
+                                title="Approve this previously rejected shop">
                             <span t-if="this.state.isApprovingShop" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             Approve Shop
                         </button>
@@ -522,19 +561,27 @@
                                     >
                                         <li>
                                             <button type="button" class="dropdown-item small py-2" t-on-click="() => this.onShopMenuEdit(shop)">
-                                                Edit
+                                                Edit Shop Details
                                             </button>
                                         </li>
                                         <li t-if="shop.shahtaj_visit_tag === 'visited'">
-                                            <button type="button" class="dropdown-item small py-2 text-warning"
-                                                    t-on-click="() => this.onShopMenuResetVerification(shop)">
+                                            <button type="button" class="dropdown-item small py-2 text-warning fw-semibold"
+                                                    t-on-click="() => this.onShopMenuResetVerification(shop)"
+                                                    title="Clear GPS only — does not change approval">
                                                 Reset Verification &amp; GPS
+                                            </button>
+                                        </li>
+                                        <li t-if="shop.shop_approval_state === 'pending' or shop.shop_approval_state === 'approved'">
+                                            <button type="button" class="dropdown-item small py-2 text-danger fw-semibold"
+                                                    t-on-click="() => this.onShopMenuDisapprove(shop)"
+                                                    title="Change approval status only — does not clear GPS">
+                                                <t t-esc="shop.shop_approval_state === 'approved' ? 'Disapprove Shop' : 'Reject Application'"/>
                                             </button>
                                         </li>
                                         <li><hr class="dropdown-divider my-1"/></li>
                                         <li>
                                             <button type="button" class="dropdown-item small py-2 text-danger" t-on-click="() => this.onShopMenuArchive(shop)">
-                                                Archive
+                                                Archive Shop
                                             </button>
                                         </li>
                                     </ul>
@@ -828,11 +875,16 @@
         </t>
         <!-- Custom Confirm Modal -->
         <t t-if="this.state.confirmModal.isOpen">
-            <ConfirmModal 
-                title="this.state.confirmModal.title" 
-                message="this.state.confirmModal.message" 
-                onConfirm="this.state.confirmModal.onConfirm" 
-                onCancel="() => this.closeConfirm()" 
+            <ConfirmModal
+                title="this.state.confirmModal.title"
+                message="this.state.confirmModal.message"
+                onConfirm="this.state.confirmModal.onConfirm"
+                onCancel="() => this.closeConfirm()"
+                confirmLabel="this.state.confirmModal.confirmLabel"
+                cancelLabel="this.state.confirmModal.cancelLabel"
+                confirmClass="this.state.confirmModal.confirmClass"
+                secondaryLabel="this.state.confirmModal.secondaryLabel"
+                onSecondary="this.state.confirmModal.onSecondary"
             />
         </t>
         </div>

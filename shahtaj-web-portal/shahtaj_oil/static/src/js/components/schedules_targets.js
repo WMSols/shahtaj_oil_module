@@ -282,7 +282,7 @@ export class SchedulesTargets extends Component {
             [
                 'id', 'name', 'date_start', 'date_end', 'period_status', 'target_type',
                 'target_value', 'achieved_value', 'remaining_value', 'progress_percent',
-                'product_id', 'currency_id', 'target_weight_uom', 'active'
+                'sales_value', 'product_id', 'currency_id', 'target_weight_uom', 'active'
             ],
             {
                 context: { active_test: false },
@@ -300,6 +300,7 @@ export class SchedulesTargets extends Component {
             amount: r.target_value,
             achievedAmount: r.achieved_value,
             remainingAmount: r.remaining_value,
+            salesValue: r.sales_value || 0,
             weightUom: r.target_weight_uom || null,
             progress: r.progress_percent || 0,
             progressPercentage: r.progress_percent ? `${r.progress_percent.toFixed(1)}%` : '0%',
@@ -325,6 +326,7 @@ export class SchedulesTargets extends Component {
                 [
                     'id', 'target_id', 'product_id', 'measure_type', 'target_value',
                     'target_weight_uom', 'achieved_value', 'remaining_value', 'progress_percent',
+                    'sales_value',
                 ],
             );
             const byTarget = {};
@@ -344,12 +346,20 @@ export class SchedulesTargets extends Component {
                     remaining_value: line.remaining_value,
                     progress_percent: line.progress_percent || 0,
                     progressWidth: Math.max(0, Math.min(100, line.progress_percent || 0)),
+                    sales_value: line.sales_value || 0,
                 });
             });
             this.state.targets.forEach((t) => {
                 t.lines = byTarget[t.id] || [];
             });
         }
+    }
+
+    formatSalesValue(value) {
+        return (Number(value) || 0).toLocaleString(undefined, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        });
     }
 
     // ─── Navigation ─────────────────────────────────────────────────────────────

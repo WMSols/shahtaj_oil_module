@@ -17,6 +17,8 @@
                 <field name="target_value"/>
                 <field name="target_weight_uom" optional="hide"/>
                 <field name="achieved_value"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="sales_value" string="Sales Value" optional="show"/>
                 <field name="remaining_value" optional="hide"/>
                 <field name="progress_percent" widget="progressbar"/>
                 <field name="active"/>
@@ -69,6 +71,8 @@
                                        column_invisible="parent.target_type != 'product_bundle'"
                                        invisible="measure_type != 'weight'"/>
                                 <field name="achieved_value" optional="show" readonly="1"/>
+                                <field name="currency_id" column_invisible="1"/>
+                                <field name="sales_value" string="Sales Value" optional="show" readonly="1"/>
                                 <field name="progress_percent" widget="progressbar" optional="show" readonly="1"/>
                             </list>
                         </field>
@@ -77,12 +81,15 @@
                         <group>
                             <field name="achieved_value" readonly="1"/>
                             <field name="remaining_value" readonly="1"/>
+                            <field name="sales_value" string="Sales Value (booked)" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
                             <field name="progress_percent" widget="progressbar" readonly="1"/>
                         </group>
                     </group>
                     <div class="alert alert-info" role="alert">
                         <b>Collective Quantity / Weight:</b> pick products; one shared goal; any of those products add to progress.<br/>
-                        <b>Combined Product Targets:</b> each product has its own qty/weight goal; headline % is the average of line percentages (0–100, 100 = complete).
+                        <b>Combined Product Targets:</b> each product has its own qty/weight goal; headline % is the average of line percentages (0–100, 100 = complete).<br/>
+                        <b>Sales Value:</b> untaxed amount from confirmed sale orders for the target products in the period (booked, not delivered).
                     </div>
                 </sheet>
                 <footer>

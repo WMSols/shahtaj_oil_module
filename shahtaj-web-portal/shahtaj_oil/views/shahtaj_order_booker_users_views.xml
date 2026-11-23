@@ -122,6 +122,8 @@
                                     <field name="target_type"/>
                                     <field name="target_value"/>
                                     <field name="achieved_value"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="sales_value" string="Sales Value"/>
                                     <field name="progress_percent" widget="progressbar"/>
                                     <field name="active"/>
                                 </list>

@@ -171,6 +171,26 @@ class ResPartner(models.Model):
         copy=False,
         ondelete='restrict',
     )
+    shahtaj_legacy_invoice_created = fields.Boolean(
+        string='Legacy Invoice Created',
+        compute='_compute_shahtaj_legacy_invoice_status',
+    )
+    shahtaj_legacy_invoice_move_state = fields.Char(
+        string='Legacy Invoice Status',
+        compute='_compute_shahtaj_legacy_invoice_status',
+        help='Not created / Draft / Posted / Cancelled',
+    )
+    shahtaj_legacy_invoice_payment_state = fields.Char(
+        string='Legacy Invoice Payment',
+        compute='_compute_shahtaj_legacy_invoice_status',
+        help='N/A / Not Paid / Partially Paid / Paid / Reversed',
+    )
+    shahtaj_legacy_invoice_amount_residual = fields.Monetary(
+        string='Legacy Invoice Amount Due',
+        compute='_compute_shahtaj_legacy_invoice_status',
+        currency_field='currency_id',
+        help='Remaining amount on the legacy balance invoice (0 when paid).',
+    )
     outstanding_balance = fields.Monetary(
         string='Outstanding Balance',
         compute='_compute_outstanding_balance',
@@ -390,6 +410,85 @@ class ResPartner(models.Model):
         # Standard Odoo receivable balance for this customer (shop).
         for partner in self:
             partner.outstanding_balance = partner.sudo().credit
+
+    @api.depends(
+        'legacy_balance_move_id',
+        'legacy_balance_move_id.state',
+        'legacy_balance_move_id.payment_state',
+        'legacy_balance_move_id.amount_residual',
+    )
+    def _compute_shahtaj_legacy_invoice_status(self):
+        """Human-readable legacy invoice lifecycle for shop form / portal."""
+        state_labels = {
+            'draft': _('Draft'),
+            'posted': _('Posted'),
+            'cancel': _('Cancelled'),
+        }
+        payment_labels = {
+            'not_paid': _('Not Paid'),
+            'in_payment': _('In Payment'),
+            'paid': _('Paid'),
+            'partial': _('Partially Paid'),
+            'reversed': _('Reversed'),
+            'invoicing_legacy': _('Invoicing Legacy'),
+        }
+        for partner in self:
+            # sudo: payment_state / residual must stay visible to office users
+            # even when they lack full accounting ACL.
+            move = partner.sudo().legacy_balance_move_id
+            if not move:
+                partner.shahtaj_legacy_invoice_created = False
+                partner.shahtaj_legacy_invoice_move_state = _('Not created')
+                partner.shahtaj_legacy_invoice_payment_state = _('N/A')
+                partner.shahtaj_legacy_invoice_amount_residual = 0.0
+                continue
+            partner.shahtaj_legacy_invoice_created = True
+            partner.shahtaj_legacy_invoice_move_state = state_labels.get(
+                move.state, move.state or _('Unknown'),
+            )
+            if move.state != 'posted':
+                partner.shahtaj_legacy_invoice_payment_state = _('N/A')
+                partner.shahtaj_legacy_invoice_amount_residual = 0.0
+            else:
+                partner.shahtaj_legacy_invoice_payment_state = payment_labels.get(
+                    move.payment_state, move.payment_state or _('Unknown'),
+                )
+                partner.shahtaj_legacy_invoice_amount_residual = move.amount_residual or 0.0
+
+    @api.model
+    def shahtaj_get_shop_detail_snapshot(self, shop_id, include_images=True):
+        """Fresh shop detail payload for portal (always reloads payment/AR)."""
+        shop = self.browse(int(shop_id)).exists()
+        if not shop or not shop.is_shahtaj_shop:
+            return False
+
+        # Drop ORM cache so payment_state / credit reflect latest accounting.
+        shop.invalidate_recordset()
+        move = shop.sudo().legacy_balance_move_id
+        if move:
+            move.invalidate_recordset([
+                'state', 'payment_state', 'amount_residual', 'amount_total', 'name',
+            ])
+
+        fields_list = [
+            'id', 'name', 'owner_name', 'phone', 'owner_cnic_number',
+            'shop_license_number', 'partner_latitude', 'partner_longitude',
+            'shahtaj_shop_category', 'credit_limit', 'legacy_balance',
+            'outstanding_balance',
+            'shahtaj_legacy_invoice_created', 'shahtaj_legacy_invoice_move_state',
+            'shahtaj_legacy_invoice_payment_state',
+            'shahtaj_legacy_invoice_amount_residual', 'legacy_balance_move_id',
+            'route_ids', 'shahtaj_routes_display', 'shahtaj_route_tag',
+            'registered_by_id', 'shop_approval_state',
+            'shahtaj_field_verified', 'shahtaj_field_verified_at',
+            'shahtaj_field_verified_by_id', 'shahtaj_visit_tag',
+        ]
+        if include_images:
+            fields_list.extend([
+                'owner_cnic_front', 'owner_cnic_back',
+                'owner_photo', 'shop_exterior_photo',
+            ])
+        return shop.read(fields_list)[0]
 
     @api.onchange('zone_id')
     def _onchange_zone_id(self):
@@ -663,9 +762,13 @@ class ResPartner(models.Model):
             need_primary._shahtaj_sync_primary_route_from_route_ids()
         shop_partners._validate_shop_required_fields()
         shop_partners._validate_operational_territory_assignment()
-        shop_partners.filtered(
+        # Legacy invoices are gated: only when company toggle allows and
+        # context forces immediate post (never during CSV import).
+        to_invoice = shop_partners.filtered(
             lambda p: p.shop_approval_state == 'approved'
-        )._post_legacy_balance_entry()
+        )._shahtaj_filter_legacy_invoice_candidates()
+        if to_invoice and self._shahtaj_can_auto_post_legacy_invoice():
+            to_invoice._post_legacy_balance_entry()
         Log = self.env['shahtaj.activity.log']
         for shop in shop_partners:
             Log.log_business(
@@ -773,9 +876,13 @@ class ResPartner(models.Model):
         )):
             self.filtered('is_shahtaj_shop')._validate_shop_required_fields()
         if 'legacy_balance' in vals:
-            self.filtered(
+            # Do not auto-post on plain write/import. Create via approve "Yes",
+            # Settings batch, or explicit shahtaj_force_legacy_invoice context.
+            candidates = self.filtered(
                 lambda p: p.shop_approval_state == 'approved' and not p.legacy_balance_move_id
-            )._post_legacy_balance_entry()
+            )._shahtaj_filter_legacy_invoice_candidates()
+            if candidates and self._shahtaj_can_auto_post_legacy_invoice():
+                candidates._post_legacy_balance_entry()
         if 'shop_approval_state' in vals:
             self.filtered('is_shahtaj_shop')._sync_visit_tasks_after_approval_change()
         shops = self.filtered('is_shahtaj_shop')
@@ -938,18 +1045,99 @@ class ResPartner(models.Model):
                 'state': 'pending',
             })
 
+    @api.model
+    def _shahtaj_legacy_invoice_auto_enabled(self):
+        return bool(self.env.company.shahtaj_legacy_invoice_auto)
+
+    @api.model
+    def _shahtaj_can_auto_post_legacy_invoice(self):
+        """Immediate post only when toggle ON and explicitly forced (not import)."""
+        if self.env.context.get('import_file'):
+            return False
+        if self.env.context.get('shahtaj_skip_legacy_invoice'):
+            return False
+        if self.env.context.get('shahtaj_force_legacy_invoice'):
+            return True
+        return False
+
+    def _shahtaj_filter_legacy_invoice_candidates(self):
+        """Shops eligible for a new legacy invoice (non-zero, no move yet)."""
+        result = self.env['res.partner']
+        for partner in self.filtered(
+            lambda p: p.is_shahtaj_shop and not p.legacy_balance_move_id
+        ):
+            company = partner.company_id or self.env.company
+            currency = partner.currency_id or company.currency_id
+            if partner.legacy_balance and not float_is_zero(
+                partner.legacy_balance,
+                precision_rounding=currency.rounding,
+            ):
+                result |= partner
+        return result
+
+    def _shahtaj_needs_legacy_invoice_prompt(self):
+        """True when toggle is on and at least one shop needs an invoice decision."""
+        if not self._shahtaj_legacy_invoice_auto_enabled():
+            return False
+        return bool(self._shahtaj_filter_legacy_invoice_candidates())
+
+    @api.model
+    def shahtaj_shop_needs_legacy_invoice_prompt(self, shop_ids):
+        """Portal helper: whether approve should ask to create legacy invoice."""
+        shops = self.browse(shop_ids).exists()
+        return {
+            'needed': shops._shahtaj_needs_legacy_invoice_prompt(),
+            'enabled': self._shahtaj_legacy_invoice_auto_enabled(),
+            'amount': sum(shops._shahtaj_filter_legacy_invoice_candidates().mapped(
+                'legacy_balance'
+            )),
+        }
+
     def action_approve_shop(self):
-        """Distributor approves a pending shop; posts legacy balance if set."""
+        """Approve shop(s); optionally ask / post legacy invoice when toggle is on."""
         pending = self.filtered(lambda p: p.shop_approval_state != 'approved')
+        if not pending:
+            return True
+
+        decision = self.env.context.get('shahtaj_legacy_invoice_decision')
+        needs_prompt = pending._shahtaj_needs_legacy_invoice_prompt()
+        # Backend Approve button: open wizard when toggle on + balance set.
+        if (
+            needs_prompt
+            and decision not in ('yes', 'no')
+            and not self.env.context.get('shahtaj_legacy_invoice_silent')
+        ):
+            wizard = self.env['shahtaj.legacy.invoice.approve.wizard'].create({
+                'partner_ids': [(6, 0, pending.ids)],
+            })
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Legacy Balance Invoice'),
+                'res_model': 'shahtaj.legacy.invoice.approve.wizard',
+                'res_id': wizard.id,
+                'view_mode': 'form',
+                'target': 'new',
+            }
+
         for partner in pending:
             company = partner.company_id or self.env.company
             if partner.legacy_balance and not float_is_zero(
                 partner.legacy_balance,
                 precision_rounding=(partner.currency_id or company.currency_id).rounding,
             ):
-                partner._get_shop_receivable_account(company)
-        pending.write({'shop_approval_state': 'approved', 'is_shahtaj_shop': True})
-        pending._post_legacy_balance_entry()
+                # Pre-check receivable account only when we will invoice now.
+                if decision == 'yes':
+                    partner._get_shop_receivable_account(company)
+
+        pending.with_context(
+            shahtaj_skip_legacy_invoice=True,
+        ).write({'shop_approval_state': 'approved', 'is_shahtaj_shop': True})
+
+        if decision == 'yes':
+            pending.with_context(
+                shahtaj_force_legacy_invoice=True,
+            )._post_legacy_balance_entry()
+
         Log = self.env['shahtaj.activity.log']
         for shop in pending:
             Log.log_business(
@@ -958,6 +1146,30 @@ class ResPartner(models.Model):
                 related_record=shop,
                 message=shop.display_name,
             )
+        return True
+
+    def action_shahtaj_create_legacy_invoice(self):
+        """Manual/shop-form button: create legacy invoice for eligible shops."""
+        if not self._shahtaj_legacy_invoice_auto_enabled():
+            raise UserError(_(
+                'Turn on Auto Legacy Balance Invoices in Settings before creating '
+                'legacy invoices.'
+            ))
+        candidates = self._shahtaj_filter_legacy_invoice_candidates().filtered(
+            lambda p: p.shop_approval_state == 'approved'
+        )
+        if not candidates:
+            raise UserError(_(
+                'No eligible legacy balance to invoice '
+                '(need approved shop, non-zero balance, and no invoice yet).'
+            ))
+        for partner in candidates:
+            company = partner.company_id or self.env.company
+            partner._get_shop_receivable_account(company)
+        candidates.with_context(
+            shahtaj_force_legacy_invoice=True,
+        )._post_legacy_balance_entry()
+        return True
 
     def action_reject_shop(self):
         self.write({'shop_approval_state': 'rejected'})

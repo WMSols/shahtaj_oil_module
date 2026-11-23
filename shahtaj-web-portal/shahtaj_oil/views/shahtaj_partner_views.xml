@@ -82,6 +82,13 @@
                 <filter string="Pending" name="pending"
                         domain="[('shop_approval_state', '=', 'pending')]"/>
                 <separator/>
+                <filter string="Legacy invoice pending"
+                        name="legacy_invoice_pending"
+                        domain="[('shop_approval_state', '=', 'approved'), ('legacy_balance', '!=', 0), ('legacy_balance_move_id', '=', False)]"/>
+                <filter string="Legacy invoice created"
+                        name="legacy_invoice_created"
+                        domain="[('legacy_balance_move_id', '!=', False)]"/>
+                <separator/>
                 <filter string="Route Tag" name="groupby_route_tag"
                         context="{'group_by': 'shahtaj_route_tag'}"/>
                 <filter string="Visit Tag" name="groupby_visit"
@@ -117,6 +124,11 @@
                             invisible="not route_ids"
                             confirm="Remove this shop from all routes? It will get no visit tasks until assigned again from a route."
                             groups="shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager"/>
+                    <button name="action_shahtaj_create_legacy_invoice" type="object"
+                            string="Create Legacy Invoice"
+                            invisible="legacy_balance_move_id or shop_approval_state != 'approved' or not legacy_balance"
+                            groups="shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager"
+                            confirm="Create the opening legacy balance invoice for this shop now?"/>
                     <button name="action_view_legacy_balance_move" type="object"
                             string="Legacy Balance Invoice"
                             invisible="not legacy_balance_move_id"
@@ -142,7 +154,6 @@
                     <field name="type" invisible="1"/>
                     <field name="allowed_zone_ids" invisible="1"/>
                     <field name="allowed_route_ids" invisible="1"/>
-                    <field name="legacy_balance_move_id" invisible="1"/>
                     <field name="currency_id" invisible="1"/>
                     <field name="sale_order_count" invisible="1"/>
                     <field name="account_move_count" invisible="1"/>
@@ -283,6 +294,20 @@
                             <field name="property_account_receivable_id"
                                    string="Receivable Account"
                                    options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <group string="Legacy Balance Invoice"
+                           groups="shahtaj_oil.group_shahtaj_distributor_financial,shahtaj_oil.group_shahtaj_office_ops,shahtaj_oil.group_shahtaj_manager,account.group_account_invoice,account.group_account_readonly">
+                        <group>
+                            <field name="shahtaj_legacy_invoice_created" readonly="1"/>
+                            <field name="shahtaj_legacy_invoice_move_state" readonly="1"
+                                   string="Invoice Status"/>
+                            <field name="shahtaj_legacy_invoice_payment_state" readonly="1"
+                                   string="Payment Status"/>
+                            <field name="shahtaj_legacy_invoice_amount_residual" readonly="1"
+                                   string="Amount Due"/>
+                            <field name="legacy_balance_move_id" readonly="1"
+                                   options="{'no_create': True, 'no_open': False}"/>
                         </group>
                     </group>
                     <group string="Verification Photos">

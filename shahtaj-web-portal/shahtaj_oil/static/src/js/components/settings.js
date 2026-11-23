@@ -4,8 +4,11 @@ import { Component, useState, onWillStart, onWillUnmount, onWillDestroy } from "
 import { useService } from "@web/core/utils/hooks";
 import { openPortalBusy, releaseOwnerPortalBusy } from "../shahtaj_access";
 import { startConnectionProbe } from "./connection_probe";
+import { ConfirmModal } from "./confirm_modal";
 
 export class PortalSettings extends Component {
+    static components = { ConfirmModal };
+
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
@@ -15,7 +18,24 @@ export class PortalSettings extends Component {
             isSavingCompany: false,
             isSavingLogo: false,
             isSavingDmOverwrite: false,
+            isSavingLegacyInvoice: false,
+            isRunningLegacyBatch: false,
             dmOverwriteButtons: false,
+            legacyInvoice: {
+                enabled: false,
+                batch_size: 100,
+                pending_count: 0,
+                created_count: 0,
+            },
+            confirmModal: {
+                isOpen: false,
+                title: "",
+                message: "",
+                onConfirm: null,
+                confirmLabel: "OK",
+                cancelLabel: "Discard",
+                confirmClass: "btn btn-danger ms-2 fw-bold px-4",
+            },
             companyId: null,
             companyForm: {
                 name: "",
@@ -75,6 +95,143 @@ export class PortalSettings extends Component {
             );
         } finally {
             this.state.isSavingDmOverwrite = false;
+        }
+    }
+
+    showConfirm(title, message, onConfirmCallback, options = {}) {
+        this.state.confirmModal = {
+            isOpen: true,
+            title,
+            message,
+            confirmLabel: options.confirmLabel || "OK",
+            cancelLabel: options.cancelLabel || "Discard",
+            confirmClass: options.confirmClass || "btn btn-danger ms-2 fw-bold px-4",
+            onConfirm: async () => {
+                this.state.confirmModal.isOpen = false;
+                await onConfirmCallback();
+            },
+        };
+    }
+
+    closeConfirm() {
+        this.state.confirmModal.isOpen = false;
+    }
+
+    _applyLegacyInvoiceStats(stats) {
+        this.state.legacyInvoice.enabled = Boolean(stats?.enabled);
+        this.state.legacyInvoice.batch_size = stats?.batch_size || 100;
+        this.state.legacyInvoice.pending_count = stats?.pending_count || 0;
+        this.state.legacyInvoice.created_count = stats?.created_count || 0;
+    }
+
+    async onLegacyInvoiceToggle(ev) {
+        const enabled = Boolean(ev.target.checked);
+        const previous = this.state.legacyInvoice.enabled;
+        if (!enabled && previous) {
+            // Revert UI until user confirms.
+            ev.target.checked = true;
+            this.state.legacyInvoice.enabled = true;
+            this.showConfirm(
+                "Turn off automatic legacy invoices?",
+                "If you turn this off, legacy balance invoices will not be created automatically when shops are approved.\n\nPending amounts can still be invoiced later after you turn it back on and run Start Batch.",
+                async () => {
+                    await this._saveLegacyInvoiceAuto(false, ev);
+                },
+                {
+                    confirmLabel: "Turn Off",
+                    cancelLabel: "Discard",
+                    confirmClass: "btn btn-danger ms-2 fw-bold px-4",
+                },
+            );
+            return;
+        }
+        await this._saveLegacyInvoiceAuto(enabled, ev);
+    }
+
+    async _saveLegacyInvoiceAuto(enabled, ev = null) {
+        const previous = this.state.legacyInvoice.enabled;
+        this.state.legacyInvoice.enabled = enabled;
+        this.state.isSavingLegacyInvoice = true;
+        try {
+            const stats = await this.orm.call(
+                "res.company",
+                "shahtaj_set_legacy_invoice_auto",
+                [],
+                { enabled },
+            );
+            this._applyLegacyInvoiceStats(stats);
+            this.notification.add(
+                enabled
+                    ? "Auto legacy balance invoices enabled."
+                    : "Auto legacy balance invoices disabled.",
+                { type: "success" },
+            );
+        } catch (error) {
+            this.state.legacyInvoice.enabled = previous;
+            if (ev?.target) {
+                ev.target.checked = previous;
+            }
+            this.notification.add(
+                error.data?.message || error.message || "Failed to save legacy invoice setting",
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isSavingLegacyInvoice = false;
+        }
+    }
+
+    async onLegacyBatchSizeChange() {
+        const size = parseInt(this.state.legacyInvoice.batch_size, 10);
+        if (Number.isNaN(size) || size < 1 || size > 500) {
+            this.notification.add("Batch size must be between 1 and 500.", { type: "warning" });
+            return;
+        }
+        this.state.isSavingLegacyInvoice = true;
+        try {
+            const stats = await this.orm.call(
+                "res.company",
+                "shahtaj_set_legacy_invoice_batch_size",
+                [],
+                { batch_size: size },
+            );
+            this._applyLegacyInvoiceStats(stats);
+            this.notification.add(`Batch size saved: ${stats.batch_size}.`, { type: "success" });
+        } catch (error) {
+            this.notification.add(
+                error.data?.message || error.message || "Failed to save batch size",
+                { type: "danger" },
+            );
+        } finally {
+            this.state.isSavingLegacyInvoice = false;
+        }
+    }
+
+    async startLegacyInvoiceBatch() {
+        if (!this.state.legacyInvoice.enabled || this.state.legacyInvoice.pending_count <= 0) {
+            return;
+        }
+        this.state.isRunningLegacyBatch = true;
+        const endBusy = openPortalBusy(this);
+        try {
+            const stats = await this.orm.call(
+                "res.company",
+                "shahtaj_run_legacy_invoice_batch",
+                [],
+                { limit: this.state.legacyInvoice.batch_size || 100 },
+            );
+            this._applyLegacyInvoiceStats(stats);
+            this.notification.add(
+                `Created ${stats.batch_posted || 0} invoice(s). ${stats.pending_count || 0} still pending.`,
+                { type: "success" },
+            );
+        } catch (error) {
+            this.notification.add(
+                error.data?.message || error.message || "Failed to create legacy invoices",
+                { type: "danger" },
+            );
+        } finally {
+            endBusy();
+            this.state.isRunningLegacyBatch = false;
         }
     }
 
@@ -154,11 +311,12 @@ export class PortalSettings extends Component {
         this.state.isLoading = true;
         const endBusy = openPortalBusy(this);
         try {
-            const [limits, profile, appInfo, dmOverwrite] = await Promise.all([
+            const [limits, profile, appInfo, dmOverwrite, legacyInvoice] = await Promise.all([
                 this.orm.call("res.company", "shahtaj_get_shop_distance_limits", []),
                 this.orm.call("res.company", "shahtaj_get_company_profile", []),
                 this.orm.call("res.company", "shahtaj_get_app_info", []),
                 this.orm.call("res.company", "shahtaj_get_dm_overwrite_buttons", []),
+                this.orm.call("res.company", "shahtaj_get_legacy_invoice_settings", []),
             ]);
             this.state.gpsForm.min_m = limits.min_m ?? 0;
             this.state.gpsForm.max_m = limits.max_m ?? 100;
@@ -169,6 +327,7 @@ export class PortalSettings extends Component {
             this.state.appName = appInfo.name || "Shahtaj Oil";
             this.state.appVersion = appInfo.version || "";
             this.state.dmOverwriteButtons = Boolean(dmOverwrite?.enabled);
+            this._applyLegacyInvoiceStats(legacyInvoice);
         } catch (error) {
             this.notification.add(
                 error.data?.message || error.message || "Failed to load settings",

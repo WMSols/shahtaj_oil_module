@@ -1830,7 +1830,7 @@ export class OperationsBase extends Component {
             model = 'shahtaj.visit.target';
             targetState = 'tableTargets';
             context = { active_test: false };
-            fields = ['id', 'name', 'date_start', 'date_end', 'period_status', 'target_type', 'target_value', 'achieved_value', 'remaining_value', 'progress_percent', 'product_id', 'currency_id', 'target_weight_uom', 'active', 'order_booker_id'];
+            fields = ['id', 'name', 'date_start', 'date_end', 'period_status', 'target_type', 'target_value', 'achieved_value', 'remaining_value', 'progress_percent', 'sales_value', 'product_id', 'currency_id', 'target_weight_uom', 'active', 'order_booker_id'];
             if (filters.booker !== 'all') domain.push(['order_booker_id', '=', parseInt(filters.booker)]);
             if (filters.type !== 'all') domain.push(['target_type', '=', filters.type]);
         }
@@ -2050,6 +2050,7 @@ export class OperationsBase extends Component {
                     id: r.id, name: r.name, bookerId: r.order_booker_id ? r.order_booker_id[0] : null, bookerName: r.order_booker_id ? r.order_booker_id[1] : 'Unknown',
                     startDate: r.date_start, endDate: r.date_end, periodStatus: r.period_status || '', type: r.target_type, displayType: r.target_type ? r.target_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown',
                     targetValue: r.target_value, achievedValue: r.achieved_value, remainingValue: r.remaining_value, progress: r.progress_percent || 0,
+                    salesValue: r.sales_value || 0,
                     product: r.product_id ? r.product_id[1] : null, currency: r.currency_id ? r.currency_id[1] : null, weightUom: r.target_weight_uom || '', active: r.active,
                     showActive: this._targetShowActive(r.active, r.date_end),
                     periodComplete: this._targetPeriodComplete(r.date_end),
@@ -5051,6 +5052,7 @@ export class OperationsBase extends Component {
                 periodStatus: row.period_status || "",
                 achievedValue: row.achieved_value,
                 targetValue: row.target_value,
+                salesValue: row.sales_value || 0,
                 progress: row.progress_percent || 0,
                 showActive: this._targetShowActive(row.active, row.date_end),
             }));
@@ -5234,7 +5236,7 @@ export class OperationsBase extends Component {
                 this._printFilter("Booker", filters.booker !== "all" ? this._lookupName(this.state.lookupBookers, filters.booker) : ""),
                 this._printFilter("Target type", typeRow ? typeRow.label : ""),
             ],
-            ["Booker", "Target Metric", "Period Start", "Period End", "Period Status", "Achieved", "Goal", "Progress %", "Status"],
+            ["Booker", "Target Metric", "Period Start", "Period End", "Period Status", "Achieved", "Goal", "Sales Value (Rs)", "Progress %", "Status"],
             rows.map((row) => [
                 row.bookerName || "",
                 row.displayType || "",
@@ -5243,6 +5245,7 @@ export class OperationsBase extends Component {
                 periodLabels[row.periodStatus] || row.periodStatus || "",
                 row.achievedValue ?? "",
                 row.targetValue ?? "",
+                this.formatMoney(row.salesValue),
                 `${Math.round(row.progress || 0)}%`,
                 row.showActive ? "Active" : "Inactive",
             ]),

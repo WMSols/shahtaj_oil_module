@@ -43,6 +43,68 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="card border shadow-sm p-4 rounded-3 bg-white mb-4">
+                                <div class="d-flex justify-content-between align-items-start gap-3">
+                                    <div>
+                                        <h5 class="fw-bold mb-1">Auto Legacy Balance Invoices</h5>
+                                        <small class="text-muted">
+                                            Keep OFF during shop/legacy imports. When ON, approval can create invoices (after confirm),
+                                            and you can generate pending invoices in batches below.
+                                        </small>
+                                    </div>
+                                    <div class="form-check form-switch flex-shrink-0 mb-0">
+                                        <input class="form-check-input cursor-pointer" type="checkbox" role="switch"
+                                               id="legacyInvoiceAutoSwitch"
+                                               t-att-checked="this.state.legacyInvoice.enabled"
+                                               t-att-disabled="this.state.isSavingLegacyInvoice or this.state.isRunningLegacyBatch"
+                                               t-on-change="onLegacyInvoiceToggle"/>
+                                        <label class="form-check-label small fw-bold cursor-pointer" for="legacyInvoiceAutoSwitch">
+                                            <t t-esc="this.state.legacyInvoice.enabled ? 'On' : 'Off'"/>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <t t-if="this.state.legacyInvoice.enabled">
+                                    <div class="row g-3 mt-3">
+                                        <div class="col-md-3">
+                                            <div class="border rounded-3 p-3 bg-light h-100">
+                                                <div class="small text-muted fw-bold text-uppercase">Created</div>
+                                                <div class="fs-4 fw-bold text-success"
+                                                     t-esc="this.state.legacyInvoice.created_count"/>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border rounded-3 p-3 bg-light h-100">
+                                                <div class="small text-muted fw-bold text-uppercase">Pending</div>
+                                                <div class="fs-4 fw-bold text-warning"
+                                                     t-esc="this.state.legacyInvoice.pending_count"/>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="small fw-bold text-muted mb-1 d-block">Batch size</label>
+                                            <input type="number" class="form-control" min="1" max="500" step="1"
+                                                   t-model.number="this.state.legacyInvoice.batch_size"
+                                                   t-att-disabled="this.state.isSavingLegacyInvoice or this.state.isRunningLegacyBatch"
+                                                   t-on-change="onLegacyBatchSizeChange"/>
+                                            <small class="text-muted">Recommend 50–200 on small servers</small>
+                                        </div>
+                                        <div class="col-md-3 d-flex align-items-end">
+                                            <button class="btn btn-dark fw-bold text-white w-100"
+                                                    t-on-click="startLegacyInvoiceBatch"
+                                                    t-att-disabled="this.state.isRunningLegacyBatch or this.state.legacyInvoice.pending_count &lt;= 0">
+                                                <span t-if="this.state.isRunningLegacyBatch" class="spinner-border spinner-border-sm me-2"/>
+                                                <t t-if="this.state.legacyInvoice.pending_count &lt;= 0">All Caught Up</t>
+                                                <t t-else="">Start Batch</t>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted d-block mt-2"
+                                           t-if="this.state.legacyInvoice.pending_count &lt;= 0">
+                                        No approved shops left with a non-zero legacy balance and no invoice.
+                                    </small>
+                                </t>
+                            </div>
                             <div class="card border shadow-sm p-4 rounded-3 bg-white">
                                 <div class="d-flex justify-content-between align-items-start mb-3">
                                     <div>
@@ -189,6 +251,18 @@
                     </div>
                 </div>
             </div>
+
+            <t t-if="this.state.confirmModal.isOpen">
+                <ConfirmModal
+                    title="this.state.confirmModal.title"
+                    message="this.state.confirmModal.message"
+                    onConfirm="this.state.confirmModal.onConfirm"
+                    onCancel="() => this.closeConfirm()"
+                    confirmLabel="this.state.confirmModal.confirmLabel"
+                    cancelLabel="this.state.confirmModal.cancelLabel"
+                    confirmClass="this.state.confirmModal.confirmClass"
+                />
+            </t>
         </div>
     </t>
 </templates>

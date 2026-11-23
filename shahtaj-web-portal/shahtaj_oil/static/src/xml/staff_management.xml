@@ -579,6 +579,7 @@
                                     <th class="border-top-0 ps-4">Target Period</th>
                                     <th class="border-top-0">Target Goal</th>
                                     <th class="border-top-0 text-center">Achieved</th>
+                                    <th class="border-top-0 text-end">Sales Value</th>
                                     <th class="border-top-0" style="min-width: 150px;">Progress Tracker</th>
                                     <th class="border-top-0 text-end pe-4">Status</th>
                                 </tr>
@@ -586,7 +587,7 @@
                             <tbody>
                                 <t t-if="this.state.detailTargets.length === 0">
                                     <tr>
-                                        <td colspan="5" class="text-center py-4 text-muted fw-bold">No performance targets assigned.</td>
+                                        <td colspan="6" class="text-center py-4 text-muted fw-bold">No performance targets assigned.</td>
                                     </tr>
                                 </t>
                                 <t t-foreach="this.state.detailTargets" t-as="target" t-key="target.id">
@@ -607,6 +608,7 @@
                                             <small class="text-muted text-nowrap"><t t-esc="target.target_value"/></small>
                                         </td>
                                         <td class="align-middle text-center fw-bold text-dark text-nowrap"><t t-esc="target.achieved_value"/></td>
+                                        <td class="align-middle text-end fw-bold text-dark text-nowrap">Rs <t t-esc="this.formatMoney(target.sales_value)"/></td>
                                         <td class="align-middle">
                                             <div class="d-flex align-items-center">
                                                 <div class="progress flex-grow-1 me-2" style="height: 6px;">

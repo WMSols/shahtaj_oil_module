@@ -466,13 +466,14 @@
                                     <th class="ps-4 border-top-0">Period</th>
                                     <th class="border-top-0">Target Goal</th>
                                     <th class="border-top-0">Achieved</th>
+                                    <th class="border-top-0 text-end">Sales Value</th>
                                     <th class="border-top-0">Status</th>
                                     <th class="text-end pe-4 border-top-0">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <t t-if="currentBookerTargets.length === 0">
-                                    <tr><td colspan="5" class="text-center py-4 text-muted">No targets configured for this booker.</td></tr>
+                                    <tr><td colspan="6" class="text-center py-4 text-muted">No targets configured for this booker.</td></tr>
                                 </t>
                                 <t t-foreach="currentBookerTargets" t-as="tgt" t-key="tgt.id">
                                     <tr t-att-class="!tgt.showActive ? 'table-secondary' : ''">
@@ -525,6 +526,7 @@
                                                                 <t t-else="">
                                                                     Contribution achieved <t t-esc="line.achieved_value"/>
                                                                 </t>
+                                                                · Rs <t t-esc="this.formatSalesValue(line.sales_value)"/>
                                                                 · <t t-esc="line.progress_percent"/>%
                                                             </div>
                                                             <div class="progress mt-1" style="height: 4px; max-width: 200px;">
@@ -546,6 +548,10 @@
                                             <t t-else="">
                                                 <small class="d-block text-muted fw-normal"><t t-esc="tgt.remainingAmount"/> left</small>
                                             </t>
+                                        </td>
+                                        <td class="align-middle text-end fw-bold text-nowrap">
+                                            Rs <t t-esc="this.formatSalesValue(tgt.salesValue)"/>
+                                            <small class="d-block text-muted fw-normal">booked</small>
                                         </td>
                                         <td class="align-middle">
                                             <span t-attf-class="badge #{tgt.showActive ? 'bg-success text-white' : 'bg-secondary text-dark'} px-2 py-1 shadow-sm"><t t-esc="tgt.status"/></span>

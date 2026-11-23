@@ -377,13 +377,14 @@
                     <th class="border-top-0">Target Metric</th>
                     <th class="border-top-0">Period</th>
                     <th class="border-top-0 text-center">Achieved / Goal</th>
+                    <th class="border-top-0 text-end">Sales Value</th>
                     <th class="border-top-0 text-center" style="width: 150px;">Progress</th>
                     <th class="border-top-0 text-end pe-4">Status</th>
                 </tr>
             </thead>
             <tbody>
                 <t t-if="this.state.tableTargets.length === 0 and !this.state.isLoadingList">
-                    <tr><td colspan="6" class="text-center py-5 text-muted">No targets found matching your filters.</td></tr>
+                    <tr><td colspan="7" class="text-center py-5 text-muted">No targets found matching your filters.</td></tr>
                 </t>
                 <t t-foreach="this.state.tableTargets" t-as="tgt" t-key="tgt.id">
                     <tr style="cursor:pointer;" class="transition-all" t-on-click="() => this.viewTarget(tgt)">
@@ -399,6 +400,7 @@
                             </div>
                         </td>
                         <td class="align-middle text-center fw-bold text-dark text-nowrap"><span class="text-success"><t t-esc="tgt.achievedValue"/></span><span class="text-muted mx-1">/</span><t t-esc="tgt.targetValue"/></td>
+                        <td class="align-middle text-end fw-bold text-dark text-nowrap">Rs <t t-esc="this.formatMoney(tgt.salesValue)"/></td>
                         <td class="align-middle text-center">
                             <div class="d-flex align-items-center justify-content-center w-100">
                                 <div class="progress flex-grow-1 me-2 shadow-sm" style="height: 6px;"><div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{tgt.progress}%;"></div></div>
@@ -515,6 +517,12 @@
                         <small class="text-muted ms-1" t-if="this.state.selectedTarget.type === 'collective_weight'">
                             <t t-esc="this.state.selectedTarget.weightUom"/>
                         </small>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-dark fw-bold">Sales Value (booked):</span>
+                    <span class="text-dark fw-bold fs-5">
+                        Rs <t t-esc="this.formatMoney(this.state.selectedTarget.salesValue)"/>
                     </span>
                 </div>
                 <div class="d-flex justify-content-between mb-3 border-bottom pb-3">

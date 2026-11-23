@@ -17,3 +17,4 @@ from . import shahtaj_dm_collect_payment
 from . import shahtaj_dm_walk_in
 from . import shahtaj_order_reject
 from . import shahtaj_credit_override
+from . import shahtaj_legacy_invoice_approve

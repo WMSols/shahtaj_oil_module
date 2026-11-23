@@ -25,6 +25,35 @@
                             </div>
                         </setting>
                     </block>
+                    <block title="Legacy Balance Invoices" name="shahtaj_legacy_invoices">
+                        <setting string="Auto legacy balance invoices"
+                                 help="Keep OFF during migration imports. When ON, approval can create invoices (after confirm) and Settings batch generation is available.">
+                            <field name="shahtaj_legacy_invoice_auto"/>
+                            <div class="content-group" invisible="not shahtaj_legacy_invoice_auto">
+                                <div class="row mt-2">
+                                    <div class="text-muted col-lg-12">
+                                        Created: <field name="shahtaj_legacy_invoice_created_count" class="oe_inline" readonly="1"/>
+                                        · Pending: <field name="shahtaj_legacy_invoice_pending_count" class="oe_inline" readonly="1"/>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <label for="shahtaj_legacy_invoice_batch_size" class="col-lg-4 o_light_label"/>
+                                    <field name="shahtaj_legacy_invoice_batch_size" class="col-lg-2"/>
+                                    <div class="text-muted col-lg-6">Shops per Start click (1–500, recommend 100)</div>
+                                </div>
+                                <div class="mt-3" invisible="shahtaj_legacy_invoice_pending_count == 0">
+                                    <button name="action_shahtaj_run_legacy_invoice_batch"
+                                            type="object"
+                                            string="Start — Create Legacy Invoices (batch)"
+                                            class="btn-primary"
+                                            confirm="Create legacy balance invoices for the next batch of approved shops? This may take a moment."/>
+                                </div>
+                                <div class="mt-2 text-muted" invisible="shahtaj_legacy_invoice_pending_count &gt; 0">
+                                    No pending legacy invoices. Start is hidden.
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

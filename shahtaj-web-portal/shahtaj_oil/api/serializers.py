@@ -540,6 +540,7 @@ def target_line_dict(line):
         'achieved_value': line.achieved_value,
         'remaining_value': line.remaining_value,
         'progress_percent': line.progress_percent,
+        'sales_value': line.sales_value,
     }
     if parent_type == 'product_bundle':
         data['measure_type'] = line.measure_type
@@ -565,6 +566,7 @@ def target_dict(target):
         'achieved_value': target.achieved_value,
         'remaining_value': target.remaining_value,
         'progress_percent': target.progress_percent,
+        'sales_value': target.sales_value,
         'lines': [target_line_dict(line) for line in target.line_ids],
         'is_expandable': True,
         'headline_progress_percent': target.progress_percent,
