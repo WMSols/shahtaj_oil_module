@@ -220,10 +220,18 @@ export class PortalSettings extends Component {
                 { limit: this.state.legacyInvoice.batch_size || 100 },
             );
             this._applyLegacyInvoiceStats(stats);
-            this.notification.add(
-                `Created ${stats.batch_posted || 0} invoice(s). ${stats.pending_count || 0} still pending.`,
-                { type: "success" },
-            );
+            const attempted = stats.batch_attempted || 0;
+            const posted = stats.batch_posted || 0;
+            const pendingLeft = stats.pending_count || 0;
+            let message;
+            if (attempted === 0) {
+                message = `No shops with legacy balance > 0 are waiting for an invoice. Pending: ${pendingLeft}.`;
+            } else {
+                message = `Created ${posted} of ${attempted} invoice(s) this batch. ${pendingLeft} still pending.`;
+            }
+            this.notification.add(message, {
+                type: posted > 0 || attempted === 0 ? "success" : "warning",
+            });
         } catch (error) {
             this.notification.add(
                 error.data?.message || error.message || "Failed to create legacy invoices",

@@ -131,12 +131,16 @@ class ResCompany(models.Model):
 
     @api.model
     def _shahtaj_legacy_invoice_pending_domain(self):
-        """Approved shops with non-zero legacy balance and no invoice yet."""
+        """Approved shops that still need a legacy invoice.
+
+        Use ``> 0`` (not ``!= 0``): Odoo ``!=`` on monetary fields also matches
+        empty/NULL balances, which inflated Pending and made Start Batch create 0.
+        """
         return [
             ('is_shahtaj_shop', '=', True),
             ('active', '=', True),
             ('shop_approval_state', '=', 'approved'),
-            ('legacy_balance', '!=', 0),
+            ('legacy_balance', '>', 0),
             ('legacy_balance_move_id', '=', False),
         ]
 
@@ -233,11 +237,17 @@ class ResCompany(models.Model):
         if limit > 500:
             limit = 500
 
-        Partner = self.env['res.partner']
+        # Same sudo scope as the Settings counters (avoids empty batches when
+        # record rules / company visibility hide shops from the UI user).
+        Partner = self.env['res.partner'].sudo()
         pending = Partner.search(
             self._shahtaj_legacy_invoice_pending_domain(),
             limit=limit,
             order='id',
+        )
+        # Extra safety: only post shops that still qualify in Python terms.
+        pending = pending._shahtaj_filter_legacy_invoice_candidates().filtered(
+            lambda p: p.shop_approval_state == 'approved'
         )
         created_before = len(pending)
         if pending:

@@ -84,7 +84,7 @@
                 <separator/>
                 <filter string="Legacy invoice pending"
                         name="legacy_invoice_pending"
-                        domain="[('shop_approval_state', '=', 'approved'), ('legacy_balance', '!=', 0), ('legacy_balance_move_id', '=', False)]"/>
+                        domain="[('shop_approval_state', '=', 'approved'), ('legacy_balance', '>', 0), ('legacy_balance_move_id', '=', False)]"/>
                 <filter string="Legacy invoice created"
                         name="legacy_invoice_created"
                         domain="[('legacy_balance_move_id', '!=', False)]"/>
