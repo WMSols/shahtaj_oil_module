@@ -29,18 +29,7 @@ import {
     getOperationsTaxCatalog,
 } from "./operations_cache";
 import { ensureLeaflet } from "../../shahtaj_leaflet";
-
-let pendingCheckinOrder = null;
-
-function queueCheckinOrder(order) {
-    pendingCheckinOrder = order;
-}
-
-function takeCheckinOrder() {
-    const order = pendingCheckinOrder;
-    pendingCheckinOrder = null;
-    return order;
-}
+import { queuePortalOrder, takePortalDmJob, takePortalOrder } from "../../shahtaj_portal_nav";
 
 export class OperationsBase extends Component {
      static components = { ConfirmModal };
@@ -251,7 +240,11 @@ export class OperationsBase extends Component {
                 this.state.ordersSubTab = "live";
             }
             // Catalogs are large on production; do not block Live Orders on them.
-            const pendingOrder = this.state.activeSubTab === "orders" ? takeCheckinOrder() : null;
+            const pendingOrder = this.state.activeSubTab === "orders" ? takePortalOrder() : null;
+            const pendingJob = (
+                this.state.activeSubTab === "deliveries"
+                && this.state.deliveriesSubTab === "jobs"
+            ) ? takePortalDmJob() : null;
             await Promise.all([
                 this.loadDropdownData(),
                 this.fetchActiveList(),
@@ -259,6 +252,9 @@ export class OperationsBase extends Component {
             ]);
             if (pendingOrder) {
                 await this.viewOrder(pendingOrder);
+            }
+            if (pendingJob) {
+                await this.viewDmJob(pendingJob);
             }
             this.loadSaleOrderCatalog();
             if (hasFinancialAccess()) this.loadTaxAndProductData();
@@ -2498,7 +2494,8 @@ export class OperationsBase extends Component {
             }
             if (!options.warehouse_ok) {
                 this.notification.add(
-                    "Not enough free warehouse stock to mark delivery.",
+                    options.message
+                        || "Not enough stock in the warehouse to mark delivery.",
                     { type: "warning" },
                 );
                 return;
@@ -2534,14 +2531,15 @@ export class OperationsBase extends Component {
         }
         if (source === "van" && !options.van_ok) {
             this.notification.add(
-                "DM van does not have enough stock for the remaining qty.",
+                "Not enough stock on the delivery van. Load the van first, or use warehouse.",
                 { type: "warning" },
             );
             return;
         }
         if (source === "warehouse" && !options.warehouse_ok) {
             this.notification.add(
-                "Warehouse does not have enough free stock for the remaining qty.",
+                options.message
+                    || "Not enough stock in the warehouse for this order.",
                 { type: "warning" },
             );
             return;
@@ -2677,7 +2675,15 @@ export class OperationsBase extends Component {
         this.state.selectedSettlement = null;
         this.state.selectedRecovery = null;
         this.state.isEditingDelivery = false;
-        this.fetchActiveList();
+        this.fetchActiveList().then(async () => {
+            if (tabName !== "jobs") {
+                return;
+            }
+            const pendingJob = takePortalDmJob();
+            if (pendingJob) {
+                await this.viewDmJob(pendingJob);
+            }
+        });
     }
 
     deliveryStatusLabel(status) {
@@ -3949,7 +3955,15 @@ export class OperationsBase extends Component {
             this.state.isProcessingOverride = false;
         }
 
-        this.fetchActiveList();
+        this.fetchActiveList().then(async () => {
+            if (tabName !== "orders") {
+                return;
+            }
+            const pendingOrder = takePortalOrder();
+            if (pendingOrder) {
+                await this.viewOrder(pendingOrder);
+            }
+        });
     }
     setPerfSubTab(tabName) {
         this.state.perfSubTab = tabName;
@@ -4923,9 +4937,9 @@ export class OperationsBase extends Component {
                     is_fully_delivered: totalOrd > 0 && totalDel >= totalOrd, line_ids: o.order_line, lines: [] 
                 };
 
-                queueCheckinOrder(targetOrder);
+                queuePortalOrder(targetOrder);
                 window.dispatchEvent(new CustomEvent('shahtaj-dashboard-switch', {
-                    detail: { tab: 'operations', subTab: 'orders' }
+                    detail: { tab: 'operations', subTab: 'orders', forceBusy: true }
                 }));
             }
         } catch (error) {

@@ -191,6 +191,14 @@ class ProductTemplate(models.Model):
             else:
                 template.shahtaj_qty_bookable = 0.0
 
+    def shahtaj_stock_occupation(self):
+        """Portal Stock Overview: occupation drill-down for this product."""
+        self.ensure_one()
+        variant = self.product_variant_id
+        if not variant:
+            raise UserError(_('No product variant found for stock occupation.'))
+        return variant.shahtaj_stock_occupation()
+
     def _shahtaj_needs_stock_qty_sudo(self):
         """Roles without stock.user ACL still need on-hand qty on product lists."""
         if self.env.su:

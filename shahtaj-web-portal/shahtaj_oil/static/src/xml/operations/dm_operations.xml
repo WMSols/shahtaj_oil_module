@@ -1488,8 +1488,8 @@
                             Either way DM jobs sync so the same qty is not delivered twice.
                         </div>
                         <t t-if="!this.state.markDeliveryOptions.van_ok and !this.state.markDeliveryOptions.warehouse_ok">
-                            <div class="alert alert-danger border-0 small mb-3">
-                                Neither the DM van nor the warehouse has free stock for this order. Add stock or cancel.
+                            <div class="alert alert-danger border-0 small mb-3" style="white-space: pre-line;">
+                                <t t-esc="this.state.markDeliveryOptions.message || 'No warehouse or van stock is available to mark this delivery.'"/>
                             </div>
                         </t>
 

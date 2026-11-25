@@ -128,26 +128,42 @@ export class ShahtajDashboard extends Component {
         });
         // Global Event listnere to sync child component tab switches with the main dashboard state
         window.addEventListener('shahtaj-dashboard-switch', (ev) => {
-            if (ev.detail.staffRole) {
-                this.state.staffRole = ev.detail.staffRole;
+            const detail = ev.detail || {};
+            if (detail.staffRole) {
+                this.state.staffRole = detail.staffRole;
             }
-            if (ev.detail.deliveriesSubTab) {
-                this.state.deliveriesSubTab = ev.detail.deliveriesSubTab;
+            if (detail.deliveriesSubTab) {
+                this.state.deliveriesSubTab = detail.deliveriesSubTab;
             }
             const filters = {};
-            if (ev.detail.checkinPurpose || ev.detail.checkinRole || ev.detail.checkinDate) {
-                filters.checkinPurpose = ev.detail.checkinPurpose || 'all';
-                filters.checkinRole = ev.detail.checkinRole || 'all';
-                filters.checkinDate = ev.detail.checkinDate || '';
+            if (detail.checkinPurpose || detail.checkinRole || detail.checkinDate) {
+                filters.checkinPurpose = detail.checkinPurpose || 'all';
+                filters.checkinRole = detail.checkinRole || 'all';
+                filters.checkinDate = detail.checkinDate || '';
             }
-            const shopId = ev.detail.shopId ? parseInt(ev.detail.shopId, 10) : false;
+            if (detail.orderDate !== undefined) {
+                filters.orderDate = detail.orderDate || '';
+            }
+            if (detail.dispatchDate !== undefined) {
+                filters.dispatchDate = detail.dispatchDate || '';
+            }
+            if (detail.dmDate !== undefined) {
+                filters.dmDate = detail.dmDate || '';
+            }
+            if (detail.dmFieldState !== undefined) {
+                filters.dmFieldState = detail.dmFieldState || 'all';
+            }
+            if (detail.dmState !== undefined) {
+                filters.dmState = detail.dmState || 'all';
+            }
+            const shopId = detail.shopId ? parseInt(detail.shopId, 10) : false;
             if (shopId) {
                 this.state.openShopId = shopId;
                 this.state.openShopNonce += 1;
             }
-            this.switchTab(ev.detail.tab, ev.detail.subTab, {
+            this.switchTab(detail.tab, detail.subTab, {
                 filters,
-                forceBusy: !!(ev.detail.forceBusy || shopId),
+                forceBusy: !!(detail.forceBusy || shopId),
             });
         });
         onWillStart(async () => {

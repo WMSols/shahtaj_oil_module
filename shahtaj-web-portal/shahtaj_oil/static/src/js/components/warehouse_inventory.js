@@ -15,6 +15,11 @@ import {
     showPrices,
 } from "../shahtaj_access";
 import { filterOptionValue, setFilterField } from "../shahtaj_filter_ui";
+import {
+    queuePortalDmJob,
+    queuePortalOrder,
+    switchPortalTab,
+} from "../shahtaj_portal_nav";
 
 export class WarehouseInventory extends Component {
     static props = {
@@ -35,6 +40,14 @@ export class WarehouseInventory extends Component {
             showWarehouseForm: false,
             showProductAddForm: false,
             showProductDetails: false,
+            showStockOccupation: false,
+            occupationLoading: false,
+            occupation: null,
+            occupationFilters: {
+                section: 'all',
+                search: '',
+            },
+            occupationOpening: false,
             
             // --- NEW: Tax Management States ---
             showTaxForm: false,
@@ -249,7 +262,7 @@ export class WarehouseInventory extends Component {
 
             if (tab === 'inventory' || tab === 'management') {
                 model = 'product.template';
-                fields = ["id", "name", "categ_id", "qty_available", "uom_name", "type", "is_storable", "list_price", "standard_price", "shahtaj_vendor_id", "shahtaj_vendor_name", "barcode", "weight", "volume", "invoice_policy", "image_1920", "shahtaj_qty_bookable", "shahtaj_qty_received", "shahtaj_qty_sold", "virtual_available", "shahtaj_sale_uom", "shahtaj_kg_per_unit", "taxes_id", "active"];
+                fields = ["id", "name", "categ_id", "qty_available", "uom_name", "type", "is_storable", "list_price", "standard_price", "shahtaj_vendor_id", "shahtaj_vendor_name", "barcode", "weight", "volume", "invoice_policy", "image_1920", "shahtaj_qty_bookable", "virtual_available", "shahtaj_sale_uom", "shahtaj_kg_per_unit", "taxes_id", "active"];
                 domain = [['sale_ok', '=', true], ['default_code', '!=', 'SHAHTAJ-LEGACY'], ['active', '=', true]];
                 
                 if (filters.search) domain.push(['name', 'ilike', filters.search]);
@@ -482,8 +495,259 @@ export class WarehouseInventory extends Component {
         this.state.showProductAddForm = false;
         this.state.showProductDetails = false;
         this.state.showTaxForm = false;
+        this.state.showStockOccupation = false;
+        this.state.occupation = null;
+        this.state.occupationFilters = { section: 'all', search: '' };
         this.state.currentProduct = null;
         this.state.editingTaxId = null;
+    }
+
+    async openStockOccupation(item) {
+        if (!item?.id) {
+            return;
+        }
+        this.state.showStockOccupation = true;
+        this.state.occupationLoading = true;
+        this.state.occupation = null;
+        this.state.occupationFilters = { section: 'all', search: '' };
+        try {
+            const data = await this.orm.call(
+                "product.template",
+                "shahtaj_stock_occupation",
+                [[item.id]],
+            );
+            this.state.occupation = data;
+        } catch (error) {
+            this.notification.add(
+                error?.data?.message || error?.message || "Failed to load stock occupation.",
+                { type: "danger" },
+            );
+            this.state.showStockOccupation = false;
+        } finally {
+            this.state.occupationLoading = false;
+        }
+    }
+
+    closeStockOccupation() {
+        this.state.showStockOccupation = false;
+        this.state.occupation = null;
+        this.state.occupationLoading = false;
+        this.state.occupationFilters = { section: 'all', search: '' };
+    }
+
+    onOccupationSearchInput(ev) {
+        this.state.occupationFilters.search = ev.target.value || '';
+    }
+
+    onOccupationSectionChange(ev) {
+        this.state.occupationFilters.section = ev.target.value || 'all';
+    }
+
+    clearOccupationFilters() {
+        this.state.occupationFilters = { section: 'all', search: '' };
+    }
+
+    _occupationSearchMatch(...parts) {
+        const q = (this.state.occupationFilters.search || '').trim().toLowerCase();
+        if (!q) {
+            return true;
+        }
+        return parts.some((part) => String(part || '').toLowerCase().includes(q));
+    }
+
+    get occupationSection() {
+        return this.state.occupationFilters.section || 'all';
+    }
+
+    get filteredOccupationOrders() {
+        const rows = this.state.occupation?.orders || [];
+        return rows.filter((row) => this._occupationSearchMatch(
+            row.order_name, row.shop, row.is_walk_in ? 'walk-in customer' : '',
+        ));
+    }
+
+    get filteredOccupationCarts() {
+        const rows = this.state.occupation?.carts || [];
+        return rows.filter((row) => this._occupationSearchMatch(
+            row.booker, row.shop, 'cart', 'visit',
+        ));
+    }
+
+    get filteredOccupationJobs() {
+        const rows = this.state.occupation?.jobs || [];
+        return rows.filter((row) => this._occupationSearchMatch(
+            row.job_name, row.order_name, row.shop, row.dm_name, row.state, row.job_id,
+        ));
+    }
+
+    get filteredOccupationVans() {
+        const rows = this.state.occupation?.vans || [];
+        return rows.filter((row) => this._occupationSearchMatch(
+            row.dm_name, row.van_location, 'van', 'free',
+        ));
+    }
+
+    showOccupationOrders() {
+        const section = this.occupationSection;
+        return section === 'all' || section === 'orders';
+    }
+
+    showOccupationCarts() {
+        const section = this.occupationSection;
+        return section === 'all' || section === 'carts';
+    }
+
+    showOccupationWarehouse() {
+        const section = this.occupationSection;
+        return section === 'all' || section === 'warehouse';
+    }
+
+    showOccupationVans() {
+        const section = this.occupationSection;
+        return section === 'all' || section === 'vans';
+    }
+
+    showOccupationJobs() {
+        const section = this.occupationSection;
+        return section === 'all' || section === 'jobs';
+    }
+
+    get canOpenOccupationOrder() {
+        return canSee("operations", "orders");
+    }
+
+    get canOpenOccupationJob() {
+        return canSee("operations", "deliveries", "jobs");
+    }
+
+    get occupationUom() {
+        return this.state.occupation?.uom || "";
+    }
+
+    get occupationUomLabel() {
+        return this.occupationUom || "product units";
+    }
+
+    occupationJobStateLabel(state) {
+        const map = {
+            not_ready: "Not ready",
+            ready: "Ready",
+            picked: "Picked",
+            partial: "Partial",
+            delivered: "Delivered",
+            returned: "Returned",
+        };
+        return map[state] || state || "—";
+    }
+
+    occupationJobLabel(row) {
+        if (!row) {
+            return "—";
+        }
+        if (row.job_name) {
+            return row.job_name;
+        }
+        return row.job_id ? `#${row.job_id}` : "—";
+    }
+
+    async openOccupationOrderInPortal(orderId) {
+        if (!orderId || this.state.occupationOpening) {
+            return;
+        }
+        if (!this.canOpenOccupationOrder) {
+            this.notification.add("You do not have access to Live Orders.", { type: "warning" });
+            return;
+        }
+        this.state.occupationOpening = true;
+        try {
+            const orders = await this.orm.searchRead(
+                "sale.order",
+                [["id", "=", orderId]],
+                [
+                    "name", "partner_id", "user_id", "date_order", "amount_total",
+                    "amount_tax", "state", "order_line", "invoice_status", "shahtaj_is_walk_in",
+                ],
+            );
+            if (!orders.length) {
+                this.notification.add("Sales order not found.", { type: "warning" });
+                return;
+            }
+            const o = orders[0];
+            const lines = o.order_line.length
+                ? await this.orm.searchRead(
+                    "sale.order.line",
+                    [["order_id", "=", o.id]],
+                    ["product_uom_qty", "qty_delivered"],
+                )
+                : [];
+            const totalOrd = lines.reduce((sum, line) => sum + line.product_uom_qty, 0);
+            const totalDel = lines.reduce((sum, line) => sum + line.qty_delivered, 0);
+            let status = "Draft";
+            if (o.state === "sale") {
+                status = o.invoice_status === "invoiced" ? "Invoiced" : "To Invoice";
+            } else if (o.state === "done") {
+                status = "Delivered";
+            } else if (o.state === "cancel") {
+                status = "Cancelled";
+            }
+            const orderDate = o.date_order ? String(o.date_order).split(" ")[0] : "";
+            queuePortalOrder({
+                odoo_id: o.id,
+                id: o.name,
+                shop: o.partner_id ? o.partner_id[1] : "Unknown",
+                partner_id: o.partner_id,
+                booker: o.user_id ? o.user_id[1] : "Unknown",
+                date: orderDate || "Unknown",
+                items: o.order_line.length,
+                total: `Rs. ${(o.amount_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                tax: `Rs. ${(o.amount_tax || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                status,
+                invoice_status: o.invoice_status,
+                isWalkIn: !!o.shahtaj_is_walk_in,
+                is_fully_delivered: totalOrd > 0 && totalDel >= totalOrd,
+                line_ids: o.order_line,
+                lines: [],
+            });
+            // Clear day filter so TZ/day mismatch does not hide the opened order in the list.
+            switchPortalTab({
+                tab: "operations",
+                subTab: "orders",
+                forceBusy: true,
+                orderDate: "",
+            });
+        } catch (error) {
+            this.notification.add(
+                "Failed to open order: " + (error.data?.message || error.message),
+                { type: "danger" },
+            );
+        } finally {
+            this.state.occupationOpening = false;
+        }
+    }
+
+    openOccupationJobInPortal(jobId) {
+        if (!jobId || this.state.occupationOpening) {
+            return;
+        }
+        if (!this.canOpenOccupationJob) {
+            this.notification.add("You do not have access to Delivery Jobs.", { type: "warning" });
+            return;
+        }
+        this.state.occupationOpening = true;
+        try {
+            queuePortalDmJob({ id: jobId });
+            switchPortalTab({
+                tab: "operations",
+                subTab: "deliveries",
+                deliveriesSubTab: "jobs",
+                forceBusy: true,
+                dmDate: "",
+                dmFieldState: "all",
+                dmState: "all",
+            });
+        } finally {
+            this.state.occupationOpening = false;
+        }
     }
 
     // --- NEW: Tax Management Handlers ---

@@ -311,10 +311,343 @@
         </t>
 <!-- Stock Mangement Tab -->
         <t t-if="this.state.activeSubTab === 'management'">
+            <t t-if="this.state.showStockOccupation">
+                <div class="p-4 bg-white border-bottom">
+                    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                        <div>
+                            <button type="button" class="btn btn-sm btn-light border fw-bold px-3 shadow-sm mb-3" t-on-click="closeStockOccupation">
+                                <i class="fa fa-arrow-left me-1"/> Back to stock list
+                            </button>
+                            <h2 class="fw-bold mb-1 text-dark">
+                                Where is stock?
+                                <t t-if="this.state.occupation">
+                                    — <t t-esc="this.state.occupation.product_name"/>
+                                </t>
+                            </h2>
+                            <small class="text-muted">
+                                See which orders hold quantity, what sits in the warehouse, and what is on delivery vans.
+                            </small>
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div class="input-group input-group-sm shadow-sm" style="width: 240px;">
+                                <span class="input-group-text bg-white text-muted border-end-0">
+                                    <i class="fa fa-search"/>
+                                </span>
+                                <input type="text"
+                                       class="form-control border-start-0 ps-0"
+                                       placeholder="Search order, shop, DM, job…"
+                                       t-att-value="this.state.occupationFilters.search"
+                                       t-on-input="onOccupationSearchInput"/>
+                            </div>
+                            <select class="form-select form-select-sm shadow-sm" style="width: 170px;"
+                                    t-att-value="this.state.occupationFilters.section"
+                                    t-on-change="onOccupationSectionChange">
+                                <option value="all">All sections</option>
+                                <option value="orders">Orders holding</option>
+                                <option value="carts">Open carts</option>
+                                <option value="warehouse">Warehouse</option>
+                                <option value="vans">Delivery vans</option>
+                                <option value="jobs">Delivery jobs</option>
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" t-on-click="clearOccupationFilters">
+                                <i class="fa fa-times me-1"/> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="position-relative bg-light">
+                    <t t-if="this.state.occupationLoading">
+                        <div class="d-flex justify-content-center align-items-center py-5">
+                            <div class="spinner-border text-primary" role="status"/>
+                        </div>
+                    </t>
+                    <t t-elif="this.state.occupation">
+                        <div class="p-4">
+                            <div class="row g-3 mb-4">
+                                <div class="col-6 col-md-3">
+                                    <div class="bg-white border rounded-3 p-3 h-100 shadow-sm">
+                                        <div class="text-muted text-uppercase small fw-bold">On hand</div>
+                                        <div class="fs-4 fw-bold text-dark">
+                                            <t t-esc="this.formatStockQty(this.state.occupation.summary.on_hand)"/>
+                                            <small class="text-muted ms-1"><t t-esc="this.state.occupation.uom"/></small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="bg-white border rounded-3 p-3 h-100 shadow-sm">
+                                        <div class="text-muted text-uppercase small fw-bold">Available to book</div>
+                                        <div class="fs-4 fw-bold text-primary">
+                                            <t t-esc="this.formatStockQty(this.state.occupation.summary.available_to_book)"/>
+                                            <small class="text-muted ms-1"><t t-esc="this.state.occupation.uom"/></small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="bg-white border rounded-3 p-3 h-100 shadow-sm">
+                                        <div class="text-muted text-uppercase small fw-bold">Held by orders / carts</div>
+                                        <div class="fs-4 fw-bold text-warning">
+                                            <t t-esc="this.formatStockQty(this.state.occupation.summary.soft_held)"/>
+                                            <small class="text-muted ms-1"><t t-esc="this.state.occupation.uom"/></small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="bg-white border rounded-3 p-3 h-100 shadow-sm">
+                                        <div class="text-muted text-uppercase small fw-bold">On vans (physical)</div>
+                                        <div class="fs-4 fw-bold text-info">
+                                            <t t-esc="this.formatStockQty(this.state.occupation.summary.van_on_hand)"/>
+                                            <small class="text-muted ms-1"><t t-esc="this.state.occupation.uom"/></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-light border small text-muted mb-4">
+                                <strong>How to read this:</strong>
+                                All quantities are in <t t-esc="this.occupationUomLabel"/>.
+                                Available to book = on hand minus orders/carts still waiting delivery.
+                                Warehouse free = not reserved. Van free/extra = on van but not needed for open jobs.
+                                <t t-if="this.canOpenOccupationOrder || this.canOpenOccupationJob">
+                                    Use the Open buttons to jump into the portal section you can access.
+                                </t>
+                                Row clicks do nothing.
+                            </div>
+
+                            <t t-if="this.showOccupationOrders()">
+                                <div class="bg-white border rounded-3 shadow-sm mb-4 overflow-hidden">
+                                    <div class="px-3 py-2 border-bottom bg-light d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0 fw-bold text-dark">Orders holding this product</h6>
+                                        <span class="badge bg-secondary"><t t-esc="this.filteredOccupationOrders.length"/></span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0 align-middle">
+                                            <thead class="small text-muted text-uppercase">
+                                                <tr>
+                                                    <th class="ps-3 border-0">Order</th>
+                                                    <th class="border-0">Shop / Customer</th>
+                                                    <th class="border-0 text-end">Held</th>
+                                                    <th class="border-0 text-end">Ordered</th>
+                                                    <th class="border-0 text-end">Delivered</th>
+                                                    <th t-if="this.canOpenOccupationOrder" class="border-0 text-end pe-3">Open</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-if="this.filteredOccupationOrders.length === 0">
+                                                    <tr>
+                                                        <td t-att-colspan="this.canOpenOccupationOrder ? 6 : 5" class="text-center text-muted py-4">
+                                                            No matching orders holding stock.
+                                                        </td>
+                                                    </tr>
+                                                </t>
+                                                <t t-foreach="this.filteredOccupationOrders" t-as="row" t-key="row.order_id">
+                                                    <tr>
+                                                        <td class="ps-3">
+                                                            <div class="fw-bold text-dark"><t t-esc="row.order_name"/></div>
+                                                            <small class="text-muted">
+                                                                <t t-esc="row.date_order || ''"/>
+                                                                <t t-if="row.is_walk_in"> · Walk-in</t>
+                                                            </small>
+                                                        </td>
+                                                        <td><t t-esc="row.shop"/></td>
+                                                        <td class="text-end fw-bold text-warning"><t t-esc="this.formatStockQty(row.qty_held)"/></td>
+                                                        <td class="text-end"><t t-esc="this.formatStockQty(row.qty_ordered)"/></td>
+                                                        <td class="text-end"><t t-esc="this.formatStockQty(row.qty_delivered)"/></td>
+                                                        <td t-if="this.canOpenOccupationOrder" class="text-end pe-3">
+                                                            <button type="button"
+                                                                    class="btn btn-sm btn-outline-primary fw-bold"
+                                                                    t-att-disabled="this.state.occupationOpening"
+                                                                    t-on-click.stop="() => this.openOccupationOrderInPortal(row.order_id)"
+                                                                    title="Open in Live Orders">
+                                                                Open order
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <t t-if="this.showOccupationCarts()">
+                                <div class="bg-white border rounded-3 shadow-sm mb-4 overflow-hidden">
+                                    <div class="px-3 py-2 border-bottom bg-light d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0 fw-bold text-dark">Open visit carts (not ordered yet)</h6>
+                                        <span class="badge bg-secondary"><t t-esc="this.filteredOccupationCarts.length"/></span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0 align-middle">
+                                            <thead class="small text-muted text-uppercase">
+                                                <tr>
+                                                    <th class="ps-3 border-0">Booker</th>
+                                                    <th class="border-0">Shop</th>
+                                                    <th class="border-0 text-end pe-3">Held in cart</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-if="this.filteredOccupationCarts.length === 0">
+                                                    <tr><td colspan="3" class="text-center text-muted py-4">No open carts holding this product.</td></tr>
+                                                </t>
+                                                <t t-foreach="this.filteredOccupationCarts" t-as="row" t-key="row.visit_id">
+                                                    <tr>
+                                                        <td class="ps-3 fw-bold"><t t-esc="row.booker || '—'"/></td>
+                                                        <td><t t-esc="row.shop || '—'"/></td>
+                                                        <td class="text-end pe-3 fw-bold"><t t-esc="this.formatStockQty(row.qty_held)"/></td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <t t-if="this.showOccupationWarehouse()">
+                                <div class="bg-white border rounded-3 shadow-sm mb-4 overflow-hidden">
+                                    <div class="px-3 py-2 border-bottom bg-light">
+                                        <h6 class="mb-0 fw-bold text-dark">Warehouse</h6>
+                                    </div>
+                                    <div class="p-3">
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <div class="small text-muted fw-bold text-uppercase">On hand in WH</div>
+                                                <div class="fs-5 fw-bold">
+                                                    <t t-esc="this.formatStockQty(this.state.occupation.warehouse.on_hand)"/>
+                                                    <small class="text-muted ms-1"><t t-esc="this.occupationUom"/></small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="small text-muted fw-bold text-uppercase">Free in WH</div>
+                                                <div class="fs-5 fw-bold text-success">
+                                                    <t t-esc="this.formatStockQty(this.state.occupation.warehouse.free)"/>
+                                                    <small class="text-muted ms-1"><t t-esc="this.occupationUom"/></small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="small text-muted fw-bold text-uppercase">Reserved in WH</div>
+                                                <div class="fs-5 fw-bold text-warning">
+                                                    <t t-esc="this.formatStockQty(this.state.occupation.warehouse.reserved)"/>
+                                                    <small class="text-muted ms-1"><t t-esc="this.occupationUom"/></small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted d-block mt-2">
+                                            <t t-esc="this.state.occupation.warehouse.location || this.state.occupation.warehouse.name || 'Warehouse'"/>
+                                        </small>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <t t-if="this.showOccupationVans()">
+                                <div class="bg-white border rounded-3 shadow-sm mb-4 overflow-hidden">
+                                    <div class="px-3 py-2 border-bottom bg-light d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0 fw-bold text-dark">Delivery vans</h6>
+                                        <span class="badge bg-secondary"><t t-esc="this.filteredOccupationVans.length"/></span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0 align-middle">
+                                            <thead class="small text-muted text-uppercase">
+                                                <tr>
+                                                    <th class="ps-3 border-0">Delivery man</th>
+                                                    <th class="border-0 text-end">On van</th>
+                                                    <th class="border-0 text-end">For open jobs</th>
+                                                    <th class="border-0 text-end pe-3">Free / extra</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-if="this.filteredOccupationVans.length === 0">
+                                                    <tr><td colspan="4" class="text-center text-muted py-4">No van stock for this product.</td></tr>
+                                                </t>
+                                                <t t-foreach="this.filteredOccupationVans" t-as="row" t-key="row_index">
+                                                    <tr>
+                                                        <td class="ps-3">
+                                                            <div class="fw-bold"><t t-esc="row.dm_name"/></div>
+                                                            <small class="text-muted"><t t-esc="row.van_location"/></small>
+                                                        </td>
+                                                        <td class="text-end fw-bold"><t t-esc="this.formatStockQty(row.qty_on_van)"/></td>
+                                                        <td class="text-end"><t t-esc="this.formatStockQty(row.qty_for_jobs)"/></td>
+                                                        <td class="text-end pe-3 fw-bold text-success"><t t-esc="this.formatStockQty(row.qty_free_extra)"/></td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <t t-if="this.showOccupationJobs()">
+                                <div class="bg-white border rounded-3 shadow-sm mb-2 overflow-hidden">
+                                    <div class="px-3 py-2 border-bottom bg-light d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0 fw-bold text-dark">Open delivery jobs</h6>
+                                        <span class="badge bg-secondary"><t t-esc="this.filteredOccupationJobs.length"/></span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0 align-middle">
+                                            <thead class="small text-muted text-uppercase">
+                                                <tr>
+                                                    <th class="ps-3 border-0">Job</th>
+                                                    <th class="border-0">Order / Shop</th>
+                                                    <th class="border-0">DM</th>
+                                                    <th class="border-0">Status</th>
+                                                    <th class="border-0 text-end">Picked</th>
+                                                    <th class="border-0 text-end">Still on van</th>
+                                                    <th t-if="this.canOpenOccupationJob" class="border-0 text-end pe-3">Open</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-if="this.filteredOccupationJobs.length === 0">
+                                                    <tr>
+                                                        <td t-att-colspan="this.canOpenOccupationJob ? 7 : 6" class="text-center text-muted py-4">
+                                                            No open delivery jobs for this product.
+                                                        </td>
+                                                    </tr>
+                                                </t>
+                                                <t t-foreach="this.filteredOccupationJobs" t-as="row" t-key="row.job_id">
+                                                    <tr>
+                                                        <td class="ps-3">
+                                                            <div class="fw-bold text-dark">
+                                                                <t t-esc="this.occupationJobLabel(row)"/>
+                                                            </div>
+                                                            <small class="text-muted"><t t-esc="row.scheduled_date || ''"/></small>
+                                                        </td>
+                                                        <td>
+                                                            <div class="fw-bold"><t t-esc="row.order_name || '—'"/></div>
+                                                            <small class="text-muted"><t t-esc="row.shop"/></small>
+                                                        </td>
+                                                        <td><t t-esc="row.dm_name || '—'"/></td>
+                                                        <td>
+                                                            <span class="badge bg-light text-dark border">
+                                                                <t t-esc="this.occupationJobStateLabel(row.state)"/>
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-end"><t t-esc="this.formatStockQty(row.qty_picked)"/></td>
+                                                        <td class="text-end fw-bold"><t t-esc="this.formatStockQty(row.qty_on_van_paper)"/></td>
+                                                        <td t-if="this.canOpenOccupationJob" class="text-end pe-3">
+                                                            <button type="button"
+                                                                    class="btn btn-sm btn-outline-primary fw-bold"
+                                                                    t-att-disabled="this.state.occupationOpening"
+                                                                    t-on-click.stop="() => this.openOccupationJobInPortal(row.job_id)"
+                                                                    title="Open in Delivery Jobs">
+                                                                Open job
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+                </div>
+            </t>
+
+            <t t-else="">
             <div class="p-4 bg-white border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
                     <h2 class="fw-bold mb-0 text-dark">Stock Management Overview</h2>
-                    <small class="text-muted">Monitor available quantities. Stock is received through purchase orders.</small>
+                    <small class="text-muted">Monitor available quantities. Use Occupation to see where stock is held.</small>
                 </div>
 
                 <div class="d-flex align-items-center gap-2">
@@ -345,18 +678,16 @@
                     <thead class="bg-light text-uppercase small fw-bold text-muted">
                         <tr>
                             <th class="border-top-0 ps-4 py-3">Product Name</th>
-                            <th class="border-top-0 py-3 text-end" title="Total stock received into the warehouse">Received</th>
-                            <th class="border-top-0 py-3 text-end" title="Quantity delivered to shops from confirmed sales orders">Sold</th>
                             <th class="border-top-0 py-3 text-end" title="Total physical units located in the warehouse">On-Hand Qty</th>
                             <th class="border-top-0 py-3 text-end" title="Units bookers can still sell: On-Hand minus open visit carts and undelivered confirmed sales orders">Available to Book</th>
-                            <!-- <th class="border-top-0 py-3 text-end" title="Predicted future stock based on incoming/outgoing orders">Forecast</th> -->
-                            <th t-if="this.showPrices" class="border-top-0 py-3 text-end pe-4" title="Cost price / sale price">Price Cost/Sale</th>
+                            <th t-if="this.showPrices" class="border-top-0 py-3 text-end" title="Cost price / sale price">Price Cost/Sale</th>
+                            <th class="border-top-0 py-3 text-end pe-4">Occupation</th>
                         </tr>
                     </thead>
                     <tbody>
                         <t t-if="this.state.tableStock.length === 0 and !this.state.isLoadingList">
                                 <tr>
-                                    <td t-att-colspan="this.showPrices ? 6 : 5" class="text-center py-5 text-muted fw-bold">No stock matches your search or filter criteria.</td>
+                                    <td t-att-colspan="this.showPrices ? 5 : 4" class="text-center py-5 text-muted fw-bold">No stock matches your search or filter criteria.</td>
                                 </tr>
                             </t>
                         <t t-foreach="this.state.tableStock" t-as="item" t-key="item.id">
@@ -366,14 +697,6 @@
                                     <t t-if="item.qty_available &lt;= 0">
                                         <span class="badge bg-danger text-white ms-2" style="font-size: 0.65rem;">Out of Stock</span>
                                     </t>
-                                </td>
-                                <td class="text-end fw-bold">
-                                    <t t-esc="this.formatStockQty(item.shahtaj_qty_received)"/>
-                                    <span class="text-muted small ms-1"><t t-esc="item.uom_name"/></span>
-                                </td>
-                                <td class="text-end fw-bold">
-                                    <t t-esc="this.formatStockQty(item.shahtaj_qty_sold)"/>
-                                    <span class="text-muted small ms-1"><t t-esc="item.uom_name"/></span>
                                 </td>
                                 <td class="text-end fw-bold">
                                     <span t-attf-class="#{item.qty_available &lt;= 0 ? 'text-danger' : 'text-dark'}">
@@ -389,16 +712,18 @@
                                         <t t-esc="item.uom_name"/>
                                     </span>
                                 </td>
-                                <!-- <td class="text-end text-success fw-bold">
-                                    <t t-esc="item.virtual_available || 0"/>
-                                    <span class="text-muted small ms-1">
-                                        <t t-esc="item.uom_name"/>
-                                    </span>
-                                </td> -->
-                                <td t-if="this.showPrices" class="text-end pe-4 fw-bold" title="Cost / Sale">
+                                <td t-if="this.showPrices" class="text-end fw-bold" title="Cost / Sale">
                                     <span class="text-muted">Rs. <t t-esc="(item.standard_price || 0).toLocaleString()"/></span>
                                     <span class="text-muted mx-1">/</span>
                                     <span class="text-success">Rs. <t t-esc="(item.list_price || 0).toLocaleString()"/></span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary fw-bold"
+                                            t-on-click="() => this.openStockOccupation(item)"
+                                            title="See where this stock is held">
+                                        Occupation
+                                    </button>
                                 </td>
                             </tr>
                         </t>
@@ -418,6 +743,7 @@
                     </div>
                 </div>
             </div>
+            </t>
         </t>
 <!-- Sales Taxes Tab -->
         <t t-if="this.state.activeSubTab === 'taxes'">

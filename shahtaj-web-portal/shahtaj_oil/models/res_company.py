@@ -173,7 +173,11 @@ class ResCompany(models.Model):
 
     @api.model
     def shahtaj_set_legacy_invoice_auto(self, enabled=False):
-        """Enable/disable automatic legacy invoice flows for this company."""
+        """Enable/disable automatic legacy invoice flows for this company.
+
+        Persists on ``res.company`` (current company). Portal Settings reloads
+        this value on every visit — it is not browser/local state.
+        """
         if not self._shahtaj_can_edit_company_settings():
             raise AccessError(_(
                 'Only distributors or administrators can change legacy invoice settings.'
@@ -188,6 +192,8 @@ class ResCompany(models.Model):
                 related_record=company,
                 message=_('enabled=%s', value),
             )
+        # Fresh read for the portal (toggle must survive leave/re-enter Settings).
+        company.invalidate_recordset(['shahtaj_legacy_invoice_auto'])
         return self.shahtaj_get_legacy_invoice_settings()
 
     @api.model

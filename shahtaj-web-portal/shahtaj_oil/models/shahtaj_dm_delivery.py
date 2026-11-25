@@ -2382,6 +2382,83 @@ class ShahtajDmDelivery(models.Model):
         return dict(by_pid)
 
     @api.model
+    def _shahtaj_physical_wh_onhand_qty_map(self, wh_location, product_ids=None):
+        """Live physical on-hand on warehouse (stock.quant.quantity, includes reserved)."""
+        if not wh_location:
+            return {}
+        domain = [
+            ('location_id', '=', wh_location.id),
+            ('quantity', '!=', 0),
+        ]
+        if product_ids is not None:
+            pids = list(product_ids)
+            if not pids:
+                return {}
+            domain.append(('product_id', 'in', pids))
+        rows = self.env['stock.quant'].sudo().read_group(
+            domain,
+            ['quantity:sum'],
+            ['product_id'],
+        )
+        return {
+            row['product_id'][0]: float(row.get('quantity') or 0.0)
+            for row in rows
+            if row.get('product_id')
+        }
+
+    @api.model
+    def _shahtaj_so_reserved_wh_qty_map(self, sale_order, wh_location, product_ids=None):
+        """Qty already reserved on WH for this sale order's open outgoing moves.
+
+        Mark Delivery may finish this reservation (same order), without treating
+        it as unavailable free stock.
+        """
+        sale_order = sale_order.sudo() if sale_order else sale_order
+        if not sale_order or not sale_order.exists() or not wh_location:
+            return {}
+        pids = set(product_ids) if product_ids is not None else None
+        reserved = defaultdict(float)
+        pickings = sale_order.picking_ids.filtered(
+            lambda p: p.state not in ('done', 'cancel') and p.picking_type_code == 'outgoing'
+        )
+        for move in pickings.move_ids.filtered(lambda m: m.state not in ('done', 'cancel')):
+            product = move.product_id
+            if not product or (pids is not None and product.id not in pids):
+                continue
+            # Prefer move lines still sitting in WH (reservation source).
+            lines = move.move_line_ids.filtered(
+                lambda ml: ml.location_id.id == wh_location.id
+                and ml.state not in ('done', 'cancel')
+            )
+            if lines:
+                for ml in lines:
+                    reserved[product.id] += float(
+                        getattr(ml, 'quantity_product_uom', None)
+                        or ml.quantity
+                        or 0.0
+                    )
+                continue
+            # Fallback: open move still sourced from WH with assigned qty only.
+            if move.location_id.id == wh_location.id:
+                assigned = float(getattr(move, 'quantity', None) or 0.0)
+                if assigned > 0:
+                    reserved[product.id] += assigned
+        return dict(reserved)
+
+    @api.model
+    def _shahtaj_wh_usable_for_sale_order_map(self, sale_order, wh_location, product_ids=None):
+        """WH stock Mark Delivery may use: free + reserved for this same order."""
+        free = self._shahtaj_physical_wh_qty_map(wh_location, product_ids)
+        own = self._shahtaj_so_reserved_wh_qty_map(sale_order, wh_location, product_ids)
+        pids = set(free) | set(own)
+        if product_ids is not None:
+            pids |= set(product_ids)
+        return {
+            pid: float(free.get(pid, 0.0)) + float(own.get(pid, 0.0))
+            for pid in pids
+        }
+
+    @api.model
     def _shahtaj_assert_physical_wh_qty(self, wh_location, qty_by_product, purpose):
         """Block WH outgoing moves when free on-hand is insufficient (no negatives)."""
         need = {

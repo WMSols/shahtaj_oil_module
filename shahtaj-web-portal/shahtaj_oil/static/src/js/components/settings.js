@@ -125,17 +125,21 @@ export class PortalSettings extends Component {
     }
 
     async onLegacyInvoiceToggle(ev) {
+        if (this.state.isSavingLegacyInvoice || this.state.isRunningLegacyBatch) {
+            ev.target.checked = this.state.legacyInvoice.enabled;
+            return;
+        }
         const enabled = Boolean(ev.target.checked);
         const previous = this.state.legacyInvoice.enabled;
         if (!enabled && previous) {
-            // Revert UI until user confirms.
+            // Keep switch On until the user confirms Turn Off.
             ev.target.checked = true;
             this.state.legacyInvoice.enabled = true;
             this.showConfirm(
                 "Turn off automatic legacy invoices?",
                 "If you turn this off, legacy balance invoices will not be created automatically when shops are approved.\n\nPending amounts can still be invoiced later after you turn it back on and run Start Batch.",
                 async () => {
-                    await this._saveLegacyInvoiceAuto(false, ev);
+                    await this._saveLegacyInvoiceAuto(false);
                 },
                 {
                     confirmLabel: "Turn Off",
@@ -145,32 +149,39 @@ export class PortalSettings extends Component {
             );
             return;
         }
-        await this._saveLegacyInvoiceAuto(enabled, ev);
+        await this._saveLegacyInvoiceAuto(enabled);
     }
 
-    async _saveLegacyInvoiceAuto(enabled, ev = null) {
-        const previous = this.state.legacyInvoice.enabled;
-        this.state.legacyInvoice.enabled = enabled;
+    async _saveLegacyInvoiceAuto(enabled) {
+        const wanted = Boolean(enabled);
+        const previous = Boolean(this.state.legacyInvoice.enabled);
+        this.state.legacyInvoice.enabled = wanted;
         this.state.isSavingLegacyInvoice = true;
         try {
+            // Positional arg is intentional: kwargs alone can be dropped by some
+            // call paths, which would leave enabled=False on the server.
             const stats = await this.orm.call(
                 "res.company",
                 "shahtaj_set_legacy_invoice_auto",
-                [],
-                { enabled },
+                [wanted],
             );
             this._applyLegacyInvoiceStats(stats);
+            const saved = Boolean(this.state.legacyInvoice.enabled);
+            if (saved !== wanted) {
+                this.notification.add(
+                    "Legacy invoice setting did not save as requested. Reloaded from server.",
+                    { type: "warning" },
+                );
+                return;
+            }
             this.notification.add(
-                enabled
+                saved
                     ? "Auto legacy balance invoices enabled."
                     : "Auto legacy balance invoices disabled.",
                 { type: "success" },
             );
         } catch (error) {
             this.state.legacyInvoice.enabled = previous;
-            if (ev?.target) {
-                ev.target.checked = previous;
-            }
             this.notification.add(
                 error.data?.message || error.message || "Failed to save legacy invoice setting",
                 { type: "danger" },
